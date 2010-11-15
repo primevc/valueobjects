@@ -2,7 +2,7 @@ package primevc.tools.valueobjects.xmlmap;
  import primevc.types.UniqueID;
  import primevc.types.EMail;
  import primevc.types.URI;
- import primevc.types.Color;
+ import primevc.types.RGBA;
  import primevc.types.Bitmap;
 
 class XMLString
@@ -16,7 +16,7 @@ class XMLString
 	static public inline function fromURI		(v:URI)		: String	{ return v.string; }
 	static public inline function fromEMail		(v:EMail)	: String	{ return v; }
 	
-	static public inline function fromColor		(v:Color)	: String	{ return Std.string(v); }
+	static public inline function fromColor		(v:RGBA)	: String	{ return Std.string(v); }
 	static public inline function fromBitmap	(v:Bitmap)	: String	{ return Std.string(v); }
 	
 	static public inline function fromDate (v:Date, ?format:String) : String
@@ -34,7 +34,7 @@ class XMLString
 	static public inline function toURI			(v:String)	: URI		{ return new URI().parse(v); }
 	static public inline function toEMail		(v:String)	: EMail		{ return v; }
 	
-	static public inline function toColor		(v:String)	: Color		{
+	static public inline function toColor		(v:String)	: RGBA		{
 		return v == null? 0 : Std.parseInt(v.charCodeAt(0) == '#'.code? "0x"+v.substr(1) : v);
 	}
 	static public inline function toBitmap		(v:String)	: Bitmap	{ return new Bitmap().parse(v); }

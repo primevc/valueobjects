@@ -447,7 +447,7 @@ private class HaxeUtil
 		{
 			case Tstring:				"''";
 			case Tbool(val):			val? "true" : "false";
-			case Tarray(type, _,_):		("new primevc.core.collections.ArrayList()");
+			case Tarray(type, _,_):		("new primevc.core.collections.ArrayList < " + HaxeUtil.haxeType( type ) + " >()");
 			
 			case Turi, TfileRef, Tinterval:
 				"new " + HaxeUtil.haxeType(Turi) + "()";

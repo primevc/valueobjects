@@ -49,10 +49,10 @@ class Haxe implements CodeGenerator
 		addPackage(def);
 		
 		if (immutable) {
-			a("\ninterface I"); a(def.name); a("VO implements primevc.mvc.traits.IEditEnabledValueObject");
+			a("\ninterface I"); a(def.name); a("VO implements primevc.core.traits.IEditEnabledValueObject");
 		}
 		else {
-			a("\nclass "); a(def.name); a("VO implements primevc.mvc.traits.IEditableValueObject<"); a(def.module.fullName); a(".I"); a(def.name); a("VO>");
+			a("\nclass "); a(def.name); a("VO implements primevc.core.traits.IEditableValueObject<"); a(def.module.fullName); a(".I"); a(def.name); a("VO>");
 			 	a(", implements "); a(def.module.fullName); a(".I"); a(def.name); a("VO");
 //			 	a(", implements "); a(def.module.fullName); a(".I"); a(def.name); a("EVO");
 			

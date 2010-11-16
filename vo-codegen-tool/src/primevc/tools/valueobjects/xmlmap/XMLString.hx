@@ -37,7 +37,7 @@ class XMLString
 	static public inline function toColor		(v:String)	: RGBA		{
 		return v == null? 0 : Std.parseInt(v.charCodeAt(0) == '#'.code? "0x"+v.substr(1) : v);
 	}
-	static public inline function toBitmap		(v:String)	: Bitmap	{ return new Bitmap().parse(v); }
+	static public inline function toBitmap		(v:String)	: Bitmap	{ return Bitmap.fromString(v); }
 	
 	
 	static public function toString(v:String) {

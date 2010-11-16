@@ -49,10 +49,10 @@ class Haxe implements CodeGenerator
 		addPackage(def);
 		
 		if (immutable) {
-			a("\ninterface I"); a(def.name); a(editable? "EVO implements org.valueobjects.traits.IEditEnabledValueObject" : "VO implements org.valueobjects.traits.IValueObject");
+			a("\ninterface I"); a(def.name); a(editable? "EVO implements primevc.mvc.traits.IEditEnabledValueObject" : "VO implements primevc.mvc.traits.IValueObject");
 		}
 		else {
-			a("\nclass "); a(def.name); a("VO implements org.valueobjects.traits.IEditableValueObject<"); a(def.module.fullName); a(".I"); a(def.name); a("EVO>");
+			a("\nclass "); a(def.name); a("VO implements primevc.mvc.traits.IEditableValueObject<"); a(def.module.fullName); a(".I"); a(def.name); a("EVO>");
 			 	a(", implements "); a(def.module.fullName); a(".I"); a(def.name); a("VO");
 			 	a(", implements "); a(def.module.fullName); a(".I"); a(def.name); a("EVO");
 			
@@ -483,13 +483,13 @@ private class HaxeUtil
 			case Tstring:					'String';
 			case Tdate:						'Date';
 			case Tdatetime:					'Date';
-			case Tinterval:					'org.valueobjects.types.DateInterval';
-			case Turi:						bindable? 'org.valueobjects.types.BindableURI' : 'org.valueobjects.types.URI';
-			case TuniqueID:					'org.valueobjects.types.UniqueID';
-			case Temail:					'org.valueobjects.types.EMail';
-			case Tcolor:					'org.valueobjects.types.Color';
-			case Tbitmap:					'org.valueobjects.types.Bitmap';
-			case TfileRef:					'org.valueobjects.types.FileRef';
+			case Tinterval:					'primevc.types.DateInterval';
+			case Turi:						bindable? 'primevc.types.BindableURI' : 'primevc.types.URI';
+			case TuniqueID:					'primevc.types.UniqueID';
+			case Temail:					'primevc.types.EMail';
+			case Tcolor:					'primevc.types.RGBA';
+			case Tbitmap:					'primevc.types.Bitmap';
+			case TfileRef:					'primevc.types.FileRef';
 			
 			case Tdef(ptypedef):			switch (ptypedef) {
 				case Tclass		(def): (immutableInterface? def.module.fullName + ".I" + def.name : def.fullName) + "VO";

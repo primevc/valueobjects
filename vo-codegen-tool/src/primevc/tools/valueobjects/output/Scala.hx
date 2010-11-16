@@ -150,7 +150,7 @@ class Scala implements CodeGenerator
 			if (ns.keys.length > 0) {
 			//	a("scala.collection.mutable.HashSet[");
 			//	a(getType(ns.baseType).name);
-				a("org.valueobjects.traits.NamedSet["); a(getType(ns.baseType).name); // a("] with ");
+				a("primevc.mvc.traits.NamedSet["); a(getType(ns.baseType).name); // a("] with ");
 			//	a("scala.collection.mutable.SetLike["); a(getType(ns.baseType).name); a(", "); a(def.name); a("VO");
 			}
 			else {
@@ -1088,7 +1088,7 @@ class Scala implements CodeGenerator
 			case Tdate:					"org.joda.time.DateMidnight";
 			case Tdatetime:				"org.joda.time.DateTime";
 			case Tinterval:				"org.joda.time.Interval";
-			case Tcolor:				"org.valueobjects.types.Color";
+			case Tcolor:				"primevc.types.RGBA";
 			case Tbitmap:				throw t; //"";
 			case Tbinding(_):			throw t; //"";
 		

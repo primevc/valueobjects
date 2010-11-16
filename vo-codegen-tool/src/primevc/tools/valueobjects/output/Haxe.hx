@@ -582,7 +582,7 @@ private class HaxeXMLMap extends CodeBufferer
 		if (map != null && map.root != null)
 			gen_fromXMLValueToTypeMapping(map.root, "node", 1);
 		
-		a("\t\tvar o = "); a(HaxeUtil.getClassConstructorCall(def)); a("\n");
+		a("\t\tvar o = "); a(HaxeUtil.getClassConstructorCall(def)); a(";\n");
 		a("\t\to.setFromXML(node);\n");
 		
 		a("\t\treturn o;\n");

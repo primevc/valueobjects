@@ -35,7 +35,7 @@ class Module
 	
 	static public function reinitialize() { 
 		root   = new Module("", null);
-		traits = declare("org.valueobjects.traits");
+		traits = declare("primevc.tools.types");
 	}
 	static var initialize = reinitialize();
 	
@@ -2333,6 +2333,7 @@ enum AbstractPType
 	//true = non-nullable bool default true
 	//false = non-nullable bool default false
 }
+
 
 enum PropertyOption
 {

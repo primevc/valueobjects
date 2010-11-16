@@ -42,19 +42,19 @@ class Haxe implements CodeGenerator
 		}
 	}
 	
-	private function genClassProperties(def:ClassDef, immutable:Bool, editable:Bool)
+	private function genClassProperties(def:ClassDef, immutable:Bool) //, editable:Bool)
 	{
 		this.code = new StringBuf();
 		var a = this.code.add;
 		addPackage(def);
 		
 		if (immutable) {
-			a("\ninterface I"); a(def.name); a(editable? "EVO implements primevc.mvc.traits.IEditEnabledValueObject" : "VO implements primevc.mvc.traits.IValueObject");
+			a("\ninterface I"); a(def.name); a("VO implements primevc.mvc.traits.IEditEnabledValueObject");
 		}
 		else {
-			a("\nclass "); a(def.name); a("VO implements primevc.mvc.traits.IEditableValueObject<"); a(def.module.fullName); a(".I"); a(def.name); a("EVO>");
+			a("\nclass "); a(def.name); a("VO implements primevc.mvc.traits.IEditableValueObject<"); a(def.module.fullName); a(".I"); a(def.name); a("VO>");
 			 	a(", implements "); a(def.module.fullName); a(".I"); a(def.name); a("VO");
-			 	a(", implements "); a(def.module.fullName); a(".I"); a(def.name); a("EVO");
+//			 	a(", implements "); a(def.module.fullName); a(".I"); a(def.name); a("EVO");
 			
 			if (def.superClass != null) a(", ");
 		}
@@ -81,9 +81,9 @@ class Haxe implements CodeGenerator
 		for (p in def.property) if (!Util.isDefinedInSuperClassOf(def, p)) {
 			
 			if (immutable) {
-				genGetter(p, true, editable);
+				genGetter(p, true);
 			} else {
-				genGetter(p, false, false);
+				genGetter(p, false);
 			//	genSetter(p, def.fullName);
 			}
 		}
@@ -91,7 +91,7 @@ class Haxe implements CodeGenerator
 		if (immutable) {
 			// Write immutable interface to disk
 			a("}\n");
-			write("I" + def.name + (editable? "EVO" : "VO"));
+			write("I" + def.name + "VO");
 		}
 	}
 	
@@ -100,11 +100,10 @@ class Haxe implements CodeGenerator
 		if (def.isMixin) return;
 		
 		// Interfaces
-		genClassProperties(def, true,  false);
-		genClassProperties(def, true,  true);
+		genClassProperties(def, true);
 		
 		// Class properties
-		genClassProperties(def, false, false);
+		genClassProperties(def, false);
 		
 		var magic = getMagicGenerator(def);
 		magic.inject(code);
@@ -158,14 +157,14 @@ class Haxe implements CodeGenerator
 		var a = code.add;
 		a("\n\tpublic function "); a(functionName); a("() : ");
 		if (functionName == "asEditable") {
-		 	a(def.module.fullName); a(".I"); a(def.name); a("EVO");
+		 	a(def.module.fullName); a(".I"); a(def.name); a("VO");
 		}
 		else a("Void");
 		
 		a("\n\t{\n");
 		
 		for (p in def.property) if (p.isBindable()) {
-			a("\t\tthis."); a(p.name); a("."); a(functionName); a("();\n");
+			a("\t\tthis."); a(p.name); a("."); a(functionName == "asEditable"? "beginEdit" : functionName); a("();\n");
 		}
 		
 		if (functionName == "asEditable") a("\t\treturn this;\n");
@@ -205,7 +204,7 @@ class Haxe implements CodeGenerator
 		file.close();
 	}
 	
-	function genGetter(p:Property, immutable:Bool, editable:Bool)
+	function genGetter(p:Property, immutable:Bool)
 	{
 		var a = code.add;
 		a("\tpublic var "); a(p.name); 
@@ -215,7 +214,7 @@ class Haxe implements CodeGenerator
 			a("(default,default");
 //			a("(default,set"); code.addCapitalized(p.name);
 		}
-		a(") : "); a(HaxeUtil.haxeType(p.type, immutable, p.isBindable(), editable)); a(";\n");
+		a(") : "); a(HaxeUtil.haxeType(p.type, immutable, p.isBindable())); a(";\n");
 	}
 /*	
 	function genSetter(p:Property, fullName:String)
@@ -447,7 +446,7 @@ private class HaxeUtil
 		{
 			case Tstring:				"''";
 			case Tbool(val):			val? "true" : "false";
-			case Tarray(type, _,_):		("new primevc.core.collections.ArrayList < " + HaxeUtil.haxeType( type ) + " >()");
+			case Tarray(type, _,_):		("new primevc.core.collections.ArrayList < " + HaxeUtil.haxeType( type, true ) + " >()");
 			
 			case Turi, TfileRef, Tinterval:
 				"new " + HaxeUtil.haxeType(Turi) + "()";
@@ -473,7 +472,7 @@ private class HaxeUtil
 		  else null;
 	}
 	
-	public static function haxeType(ptype:PType, ?immutableInterface:Bool = false, ?bindable:Bool = false, ?editable:Bool = false)
+	public static function haxeType(ptype:PType, ?immutableInterface:Bool = false, ?bindable:Bool = false)
 	{
 		var type = switch (ptype)
 		{
@@ -505,7 +504,7 @@ private class HaxeUtil
 		if (bindable)
 		{
 			// Check for Bindable
-			type = (immutableInterface? (editable? "primevc.core.IBindable" : "primevc.core.IBindableReadonly") : "primevc.core.RevertableBindable") + "<"+type+">";
+			type = "primevc.core.RevertableBindable<"+type+">";
 		}
 		
 		return type;

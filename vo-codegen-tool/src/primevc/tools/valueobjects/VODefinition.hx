@@ -1617,47 +1617,54 @@ class XMLMapNode
 		return n;
 	}*/
 	
-	public function parseData(data:Dynamic)
+	public function parseData(data:Dynamic) {
+		return doParseData(this, data);
+	}
+	
+	
+	static function doParseData(obj:XMLMapNode, data:Dynamic)
 	{
+		var attrs = XMLMapDefinition.attributes;
+		
 		if (Std.is(data, String)) {
-			value = stringParser.parse(data, this);
+			obj.value = stringParser.parse(data, obj);
 		}
 		else if(Std.is(data, XMLMapDefinition)) switch(cast(data, XMLMapDefinition)) {
 			case emptyNode:
-				value = XM_empty;
+				obj.value = XM_empty;
 			
 			case attributes(map):
-				if (this.attributes == null) this.attributes = new Hash();
+				if (obj.attributes == null) obj.attributes = new Hash();
 				for (f in Reflect.fields(map))
 				{
 					var val = Reflect.field(map, f);
 					if (Std.is(val, String))
-						attributes.set( f, stringParser.parse(val, this) );
+						obj.attributes.set( f, stringParser.parse(val, obj) );
 					else if (Std.is(val, Array))
 					{
 						// Attribute value-to-subtype mapping
-						var map = parseArrayMap(cast val);
+						var map = obj.parseArrayMap(cast val);
 						for (v in map.keys()) {
 							var cl = map.get(v);
-							cl.defaultXMLMap.root.getByNodePath(this).attributes.set(f, XM_String(v));
+							cl.defaultXMLMap.root.getByNodePath(obj).attributes.set(f, XM_String(v));
 						}
-						attributes.set( f, XM_typeMap(map) );
+						obj.attributes.set( f, XM_typeMap(map) );
 					}
 					else throw "What is this? " + val;
 				}
 			
 			case childNode(property):
-				var p = this.mapping.type.findProperty(property);
-				value = XM_child(property, p);
-				if (valuePath == null) valuePath = property;
+				var p = obj.mapping.type.findProperty(property);
+				obj.value = XM_child(property, p);
+				if (obj.valuePath == null) obj.valuePath = property;
 		}
 		else if(Std.is(data, Array)) {
-			for (v in cast(data, Array<Dynamic>)) parseData(v);
-			return this;
+			for (v in cast(data, Array<Dynamic>)) obj.parseData(v);
+			return obj;
 		}
 		else if(Reflect.isObject(data)) for (field in Reflect.fields(data))
 		{
-		//	children.push(new XMLMapNode(this, field, data));
+		//	children.push(new XMLMapNode(obj, field, data));
 			if (field == "addChildren")
 			{
 				var props : Array<String> = data.addChildren;
@@ -1668,14 +1675,14 @@ class XMLMapNode
 				if(!Std.is(props, Array))
 					throw Err_InvalidArgument("xmlmap("+Std.string(data)+")", data, "Array of children to add");
 				
-				this.addChildren(props);
+				obj.addChildren(props);
 			}
 			else {
-				children.push( new XMLMapNode(this, field).parseData(Reflect.field(data, field)) );
+				obj.children.push( new XMLMapNode(obj, field).parseData(Reflect.field(data, field)) );
 			}
 		}
 		
-		return this;
+		return obj;
 	}
 	
 	private function parseArrayMap(arr:Array<Dynamic>)

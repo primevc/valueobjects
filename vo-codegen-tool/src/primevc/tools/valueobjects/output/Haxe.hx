@@ -214,7 +214,7 @@ class Haxe implements CodeGenerator
 			a("(default,default");
 //			a("(default,set"); code.addCapitalized(p.name);
 		}
-		a(") : "); a(HaxeUtil.haxeType(p.type, immutable, p.isBindable())); a(";\n");
+		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable())); a(";\n");
 	}
 /*	
 	function genSetter(p:Property, fullName:String)

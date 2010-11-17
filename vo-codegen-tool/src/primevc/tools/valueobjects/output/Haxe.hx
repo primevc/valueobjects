@@ -63,7 +63,7 @@ class Haxe implements CodeGenerator
 		if (def.superClass != null)
 		{
 			if (immutable) {
-				a(" implements "); a(def.superClass.module.fullName); a(".I"); a(def.superClass.name);
+				a(", implements "); a(def.superClass.module.fullName); a(".I"); a(def.superClass.name);
 			} else {
 				a(" extends "); a(def.superClass.fullName);
 			}

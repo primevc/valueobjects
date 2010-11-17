@@ -470,14 +470,15 @@ private class HaxeUtil
 			case Tdef(type):
 				getClassConstructorCall(Util.unpackPTypedef(type));
 			
-			case Tinteger(_,_,_), Tdecimal(_,_,_), TuniqueID, TlinkedList, TenumConverter(_),
-				Temail, Tdate, Tdatetime, Tcolor, Tbitmap, Tbinding(_):
+			case Tinteger(_,_,_):		'primevc.types.Number.INT_NOT_SET';
+			case Tdecimal(_,_,_):		'primevc.types.Number.FLOAT_NOT_SET';
+			case TuniqueID, Temail:		"''";
+			
+			case TlinkedList, TenumConverter(_), Tdate, Tdatetime, Tcolor, Tbitmap, Tbinding(_):
 				null;
 		}
 		
-		if (code == null) return null;
-		
-		return bindable? "new primevc.core.RevertableBindable("+ code +");" : code + ";";
+		return bindable? "new primevc.core.RevertableBindable("+ code +");" : if (code == null) null else code + ";";
 	}
 	
 	public static function getClassConstructorCall(tdef:TypeDefinition)

@@ -29,4 +29,4 @@
 package primevc.types;
 
 
-typedef FileRef = String;
+class FileRef extends URI { }

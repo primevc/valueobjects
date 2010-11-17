@@ -48,27 +48,30 @@ class Haxe implements CodeGenerator
 		var a = this.code.add;
 		addPackage(def);
 		
-		if (immutable) {
-			a("\ninterface I"); a(def.name); a("VO implements primevc.core.traits.IEditEnabledValueObject");
-		}
-		else {
-			a("\nclass "); a(def.name); a("VO implements primevc.core.traits.IEditableValueObject<"); a(def.module.fullName); a(".I"); a(def.name); a("VO>");
-			 	a(", implements "); a(def.module.fullName); a(".I"); a(def.name); a("VO");
-//			 	a(", implements "); a(def.module.fullName); a(".I"); a(def.name); a("EVO");
-			
-			if (def.superClass != null) a(", ");
-		}
+		if (immutable)
+			a("\ninterface I"); 
+		else
+			a("\nclass ");
 		
-		var i = def.supertypes.length;
+		a(def.name); a("VO");
+		
+//		var i = def.supertypes.length;
 		if (def.superClass != null)
 		{
 			if (immutable) {
-				a(", implements "); a(def.superClass.module.fullName); a(".I"); a(def.superClass.name);
+				a(" implements "); a(def.superClass.module.fullName); a(".I"); a(def.superClass.name); a("VO,");
 			} else {
-				a(" extends "); a(def.superClass.fullName);
+				a(" extends "); a(def.superClass.fullName); a("VO,");
 			}
-			a("VO");
-			if (--i > 1) code.addChar(','.code);
+			
+//			if (--i > 1) code.addChar(','.code);
+		}
+		
+		if (immutable)
+			a(" implements primevc.core.traits.IEditEnabledValueObject, implements primevc.core.traits.IValueObject");
+		else {
+			a(" implements "); a(def.module.fullName); a(".I"); a(def.name); a("VO,");
+			a(" implements primevc.core.traits.IEditableValueObject");
 		}
 		
 	/*	for (t in def.supertypes) if (t != def.superClass) {
@@ -145,29 +148,42 @@ class Haxe implements CodeGenerator
 		a("\t}\n#end\n");
 	}
 	
-	private function genEditFunctions(def:TypeDefinitionWithProperties)
+	private function genEditFunctions(def:ClassDef)
 	{
-		genBindindableFunctionCalls(def, "asEditable");
+		genBindindableFunctionCalls(def, "beginEdit");
 		genBindindableFunctionCalls(def, "commitEdit");
 		genBindindableFunctionCalls(def, "cancelEdit");
 	}
 	
-	private function genBindindableFunctionCalls(def:TypeDefinitionWithProperties, functionName)
+	private function genBindindableFunctionCalls(def:ClassDef, functionName)
 	{
+/*		if (def.superClass != null)
+		{
+			// Check if this function should be overridden
+			var doOverride = false;
+			for (p in def.property) if (p.isBindable() && !Util.isDefinedInSuperClassOf(def, p)) {
+				doOverride = true;
+				break;
+			}
+			
+			if (!doOverride) return; // no need to override
+		}
+*/		
+		
 		var a = code.add;
-		a("\n\tpublic function "); a(functionName); a("() : ");
-		if (functionName == "asEditable") {
-		 	a(def.module.fullName); a(".I"); a(def.name); a("VO");
-		}
-		else a("Void");
+		a("\n\t");
+		if (def.superClass != null) a("override ");
 		
-		a("\n\t{\n");
+		a("public function "); a(functionName); a("() : Void\n\t{\n");
 		
-		for (p in def.property) if (p.isBindable()) {
-			a("\t\tthis."); a(p.name); a("."); a(functionName == "asEditable"? "beginEdit" : functionName); a("();\n");
+		if (def.superClass != null) {
+			a("\t\tsuper."); a(functionName); a("();\n");
 		}
 		
-		if (functionName == "asEditable") a("\t\treturn this;\n");
+		for (p in def.property) if (p.isBindable() && !Util.isDefinedInSuperClassOf(def, p)) {
+			a("\t\tthis."); a(p.name); a("."); a(functionName); a("();\n");
+		}
+		
 		a("\t}\n");
 	}
 	
@@ -449,7 +465,7 @@ private class HaxeUtil
 			case Tarray(type, _,_):		("new primevc.core.collections.ArrayList < " + HaxeUtil.haxeType( type, true ) + " >()");
 			
 			case Turi, TfileRef, Tinterval:
-				"new " + HaxeUtil.haxeType(Turi) + "()";
+				"new " + HaxeUtil.haxeType(ptype) + "()";
 			
 			case Tdef(type):
 				getClassConstructorCall(Util.unpackPTypedef(type));

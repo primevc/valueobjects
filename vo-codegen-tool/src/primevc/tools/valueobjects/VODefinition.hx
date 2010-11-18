@@ -875,7 +875,7 @@ class Property
 	public function isDisposable ()
 	{
 		return isBindable() || switch (this.type) {
-			case Tdef(type):				true;
+		//	case Tdef(type):				true;
 			case Tarray(type,min,max):		true;
 			case Tbitmap:					true;
 			case Tbinding(p):				true;

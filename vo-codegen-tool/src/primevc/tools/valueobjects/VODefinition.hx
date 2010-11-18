@@ -872,6 +872,18 @@ class Property
 		return hasOption(PropertyOption.bindable);
 	}
 	
+	public function isDisposable ()
+	{
+		return isBindable() || switch (this.type) {
+			case Tdef(type):				true;
+			case Tarray(type,min,max):		true;
+			case Tbitmap:					true;
+			case Tbinding(p):				true;
+			case TlinkedList:				true;
+			default:						false;
+		}
+	}
+	
 	public function hasOption(option:PropertyOption) {
 		if (opts != null) for (opt in opts) if (opt == option) return true;
 		return false;

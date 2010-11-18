@@ -114,6 +114,9 @@ class Haxe implements CodeGenerator
 		// Constructor
 		genClassConstructor(def, def.superClass != null, magic);
 		
+		// Dispose
+		genDispose(def);
+		
 		// Validation
 		genValidation(def.superClass != null);
 		
@@ -128,6 +131,8 @@ class Haxe implements CodeGenerator
 		write(def.name + "VO");
 	}
 	
+	
+	
 	static var dummyMagic = new MagicClassGenerator();
 	
 	private function getMagicGenerator(def:ClassDef) : MagicClassGenerator
@@ -136,6 +141,7 @@ class Haxe implements CodeGenerator
 		
 		return dummyMagic;
 	}
+	
 	
 	private function genValidation(genOverride:Bool = false)
 	{
@@ -148,6 +154,7 @@ class Haxe implements CodeGenerator
 		a("\t}\n#end\n");
 	}
 	
+	
 	private function genEditFunctions(def:ClassDef)
 	{
 		genBindindableFunctionCalls(def, "beginEdit");
@@ -155,9 +162,10 @@ class Haxe implements CodeGenerator
 		genBindindableFunctionCalls(def, "cancelEdit");
 	}
 	
-	private function genBindindableFunctionCalls(def:ClassDef, functionName)
+	
+	private function openFunctionDeclaration (def:ClassDef, functionName)
 	{
-/*		if (def.superClass != null)
+	/*	if (def.superClass != null)
 		{
 			// Check if this function should be overridden
 			var doOverride = false;
@@ -165,26 +173,58 @@ class Haxe implements CodeGenerator
 				doOverride = true;
 				break;
 			}
-			
+
 			if (!doOverride) return; // no need to override
 		}
 */		
-		
 		var a = code.add;
 		a("\n\t");
 		if (def.superClass != null) a("override ");
-		
+
 		a("public function "); a(functionName); a("() : Void\n\t{\n");
-		
+
 		if (def.superClass != null) {
 			a("\t\tsuper."); a(functionName); a("();\n");
 		}
+	}
+	
+	
+	private function closeFunctionDeclaration (def:ClassDef, functionName)
+	{
+		code.add("\t}\n");
+	}
+	
+	
+	private function generateFunctionCall (p:Property, functionName:String)
+	{
+		code.add("\t\tthis.");
+		code.add(p.name);
+		code.add(".");
+		code.add(functionName);
+		code.add("();\n");
+	}
+	
+	
+	private function genDispose (def:ClassDef)
+	{	
+		openFunctionDeclaration( def, "dispose");
 		
-		for (p in def.property) if (p.isBindable() && !Util.isDefinedInSuperClassOf(def, p)) {
-			a("\t\tthis."); a(p.name); a("."); a(functionName); a("();\n");
-		}
+		for (p in def.property)
+			if (!Util.isDefinedInSuperClassOf(def, p) && p.isDisposable())
+				generateFunctionCall( p, "dispose" );
 		
-		a("\t}\n");
+		closeFunctionDeclaration( def, "dispose");
+	}
+	
+	
+	private function genBindindableFunctionCalls(def:ClassDef, functionName)
+	{
+		openFunctionDeclaration( def, functionName);
+		
+		for (p in def.property) if (p.isBindable() && !Util.isDefinedInSuperClassOf(def, p))
+			generateFunctionCall( p, functionName );
+		
+		closeFunctionDeclaration( def, functionName);
 	}
 	
 	private function genClassConstructor(def:ClassDef, genSuperCall:Bool = false, magic)

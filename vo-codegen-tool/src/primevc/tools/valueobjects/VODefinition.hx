@@ -1,6 +1,7 @@
 package primevc.tools.valueobjects;
  import primevc.utils.ArrayUtils;
  import Type;
+  using primevc.utils.NumberUtil;
 
 enum ModuleMember {
 	MModule(m:Module);
@@ -22,6 +23,7 @@ class Module
 {
 	static public var root		(default,null)	: Module;
 	static public var traits	(default,null)	: Module;
+	static public var types		(default,null)	: IntHash<TypeDefinition>;
 	
 	static public function declare(path:String):Module
 	{
@@ -35,6 +37,7 @@ class Module
 	
 	static public function reinitialize() { 
 		root   = new Module("", null);
+		types  = new IntHash();
 		traits = declare("primevc.tools.types");
 	}
 	static var initialize = reinitialize();
@@ -184,7 +187,15 @@ class Module
 		return s;
 	}
 	
-	private function addPendingDefition(kind:PTypedef, name:String, metadata:Dynamic, definition:Dynamic, ?options:Array<ClassOption>) : TypeDefinition
+	static public function defineTypeIndex(index:Int, type:TypeDefinition)
+	{
+		if (types.exists(index))
+			throw "Type index: " + index + " for '"+ type.fullName +"' already used: " + types.get(index);
+		
+		types.set(index, type);
+	}
+	
+	private function addPendingDefition(index:Int, kind:PTypedef, name:String, metadata:Dynamic, definition:Dynamic, ?options:Array<ClassOption>) : TypeDefinition
 	{
 		var s = this.splitPath(name);
 		var defName = s[s.length - 1];
@@ -217,50 +228,65 @@ class Module
 		var def:TypeDefinition;
 		switch (kind)
 		{
-			case Tclass(d):		kind = Tclass	(cast def = new ClassDef	(defName, mod));
-			case Tenum(e):		kind = Tenum	(cast def = new EnumDef	(defName, mod));
+			case Tclass(d):		kind = Tclass	(cast def = new ClassDef(index, defName, mod));
+			case Tenum(e):		kind = Tenum	(cast def = new EnumDef (index, defName, mod));
 		}
 		mod.members.set(defName, MPending(kind, metadata, definition, options));
+		defineTypeIndex(index, def);
 		
 		return def;
 	}
 	
-	public function _class(name:String, metadata:Dynamic, definition:Dynamic, ?options:Array<ClassOption>) : ClassDef {
-		var def = this.addPendingDefition(Tclass(null), name,metadata,definition,options);
+	public function _class(index:Int, name:String, metadata:Dynamic, definition:Dynamic, ?options:Array<ClassOption>) : ClassDef {
+		var def = this.addPendingDefition(index, Tclass(null), name,metadata,definition,options);
 	//	trace("Defined class: "+ def.fullName);
 		return cast def;
 	}
 	
-	public function mixin(name:String, definition:Dynamic) : ClassDef {
-		var def : ClassDef = cast this.addPendingDefition(Tclass(null), name, {}, definition, []);
+	public function mixin(index:Int, name:String, definition:Dynamic) : ClassDef {
+		var def : ClassDef = cast this.addPendingDefition(index, Tclass(null), name, {}, definition, []);
 		def.isMixin = true;
-		trace("Defined mixin: "+ def.fullName);
+	//	trace("Defined mixin: "+ def.fullName);
 		return def;
 	}
 	
-	public function _enum(name:String, metadata:Dynamic, definition:Dynamic) {
-		trace("Defining enum "+name);
-		return cast this.addPendingDefition(Tenum(null), name, metadata, definition, []);
+	public function _enum(index:Int, name:String, metadata:Dynamic, definition:Dynamic) {
+	//	trace("Defining enum "+name);
+		return cast this.addPendingDefition(index, Tenum(null), name, metadata, definition, []);
 	}
 	
 	public function finalize()
-	{	
-		for (m in this.members) switch(m)
+	{
+	//	trace("Finalizing module: "+this.fullName);
+		
+		var pass = 0;
+		var pendingCount = 0;
+		do 
 		{
-			case MModule(m):	m.finalize();
-			case MType(t):		Util.unpackPTypedef(t).finalize();
+			if (pass > 100) throw pass;
 			
-		 	case MPending(t,m,d,o):
-				var target:TypeDefinition = Util.unpackPTypedef(t);
-				target.finalize();
-				this.members.set(target.name, MType(t));
+	//		trace("Module pass: " + (++pass));
+			pendingCount = 0;
 			
-			case MUndefined(n,m):	throw "error ?";
+			for (m in this.members) switch(m)
+			{
+				case MModule(m):	m.finalize();
+				case MType(t):		Util.unpackPTypedef(t).finalize();
+				
+			 	case MPending(t,m,d,o):
+					var target:TypeDefinition = Util.unpackPTypedef(t);
+					target.finalize();
+					this.members.set(target.name, MType(t));
+					++pendingCount;
+				
+				case MUndefined(n,m):	throw "error ?";
+			}
 		}
+		while (pendingCount != 0);
 	}
 	
 	public function finalizeOptions()
-	{	
+	{
 		for (m in this.members) switch(m)
 		{
 			case MModule(m): m.finalizeOptions();
@@ -330,6 +356,10 @@ class Util
 		if (found.length > 1) throw "Only 1 unique ID property per VO supported";
 		
 		return found.first();
+	}
+	
+	static public function inPType(type:PType, def:TypeDefinition) : Bool {
+		return def == unpackPTypedef(getPTypedef(type));
 	}
 	
 	static public function isArray(type:PType) return switch (type) {
@@ -635,9 +665,12 @@ class PropertyTypeResolver
 				throw Err_UnknownType(this, runtimeType);
 			
 			case
+			  TInt:
+				this.prop.index = Std.int(def);
+			
+			case
 			  TFloat,
 			  TFunction,
-			  TInt,
 			  TNull,
 			  TUnknown:
 				throw Err_UnknownType(this, runtimeType);
@@ -662,8 +695,8 @@ class PropertyTypeResolver
 			case UniqueID:		TuniqueID;
 			case FileRef:		TfileRef;
 			
-			case subclass(_, _),
-				namedSetOf(_,_,_),
+			case subclass(_,_,_),
+				namedSetOf(_,_,_,_),
 				is(_),
 				getter(_,_),
 				bindTo(_),
@@ -698,11 +731,11 @@ class PropertyTypeResolver
 					case MPending(t,m,d,o):	Tdef(t);
 				}
 			
-			case subclass(meta, propertyMap):
+			case subclass(index, meta, propertyMap):
 				var sname = prop.parent.name + Util.capitalize(prop.name);
-				trace(" -- Subclass: "+sname);
+			//	trace(" -- Subclass: "+sname);
 				
-				Tdef(Tclass( prop.parent.module._class(sname, meta, propertyMap, []) ));
+				Tdef(Tclass( prop.parent.module._class(index, sname, meta, propertyMap, []) ));
 			
 			case arrayOfType(t):
 				Tarray(t);
@@ -713,7 +746,7 @@ class PropertyTypeResolver
 			case arrayOf(basetype):
 				Tarray(Tdef( Util.unpackMType(prop.parent.module.find(basetype)) ));
 				
-			case namedSetOf(atype, uniqueKeys, propertyMap):
+			case namedSetOf(atype, index, uniqueKeys, propertyMap):
 				var itemName = Util.capitalize(prop.name) + 's';
 				var nsName = prop.parent.name + itemName;
 				var base:PType = switch(atype)
@@ -733,8 +766,8 @@ class PropertyTypeResolver
 					case integer, decimal, color, date, datetime, interval, bitmap, string, URI, EMail, UniqueID, FileRef:
 						builtinAbstractPType(atype);
 					
-					case namedSetOf	(_, _, _):	throw "namedSetOf(namedSetOf(...)) unsupported";
-					case subclass	(_,_):		throw "namedSetOf(subclass(...)) unsupported";
+					case namedSetOf	(_,_,_,_):	throw "namedSetOf(namedSetOf(...)) unsupported";
+					case subclass	(_,_,_):	throw "namedSetOf(subclass(...)) unsupported";
 					case getter		(_,_):		throw "namedSetOf(getter) unsupported";
 					case bindTo		(_):		throw "namedSetOf(bindTo(...)) unsupported";
 					case LinkedList:			throw "namedSetOf(linked-list) unsupported";
@@ -742,9 +775,11 @@ class PropertyTypeResolver
 				
 				Assert.that(base != null);
 				
-				var ns = new NamedSetDef(nsName, Util.capitalize(prop.name)+'s', prop.parent.module, base);
+				var ns = new NamedSetDef(index, nsName, Util.capitalize(prop.name)+'s', prop.parent.module, base);
 				ns.setUniqueKeys(uniqueKeys);
 				ns.setPropertyMap(propertyMap);
+				
+				Module.defineTypeIndex(index, ns);
 				
 				var nt = Tclass(ns);
 				prop.parent.module.defineType(nsName, MPending(nt,uniqueKeys,propertyMap,null));
@@ -837,6 +872,7 @@ class Property
 {
 	private var mappings					: Array<MappingType>;
 	
+	public var index						: Int;
 	public var name			(default,null)	: String;
 	public var parent		(default,null)	: TypeDefinitionWithProperties;
 	public var definedIn	(default,null)	: TypeDefinitionWithProperties;
@@ -848,14 +884,16 @@ class Property
 	
 	
 	public function new(name:String, parent:TypeDefinitionWithProperties) {
-		this.mappings = [];
+		this.index = primevc.types.Number.INT_NOT_SET;
 		this.name = name;
+		this.mappings = [];
 		this.parent = this.definedIn = parent;
 	}
 	
 	public function copyFor(newParent:TypeDefinitionWithProperties)
 	{
 		var p			= new Property(this.name, newParent);
+		p.index			= this.index;
 		p.definedIn		= this.definedIn;
 		p.type			= this.type;
 		p.description	= this.description;
@@ -925,6 +963,9 @@ class Property
 					
 					case Tclass(def):	base = def;
 				}
+				try {
+					base.finalize();
+				} catch(e:Dynamic) {}
 				
 				if (Type.typeof(defaultval) != TObject) throw Err_IncompatibleDefaultValue;
 				
@@ -943,7 +984,7 @@ class Property
 	}
 	
 	public function toString():String {
-		return "\n\t\t<Property name='"+name+"' parent='"+parent.fullName+"'>"+Std.string(type)+"</Property>";
+		return "\n\t\t<Property idx='"+index+"' name='"+name+"' defined-in='"+ this.definedIn.fullName +"' parent='"+parent.fullName+"'>"+Std.string(type)+"</Property>";
 	}
 	
 	public function isMappedTo(t:MappingType):Bool {
@@ -951,17 +992,18 @@ class Property
 	}
 	
 	public function copyOptions(prop:Property) {
-		trace("copyOptions not implemented");
+		trace("copyOptions not implemented ("+ this.definedIn.fullName +"."+ prop.name +")");
 	}
 }
 
 interface TypeDefinition
 {
+	public var index		(default,null)		: Int;
 	public var name			(default,null)		: String;
 	public var fullName		(getFullName,null)	: String;
 	public var module		(default,null)		: Module;
 	public var description						: String;
-	
+	public var finalized	(default,null)		: Bool;
 	
 	public function finalize() : Void;
 	public function finalizeOptions() : Void;
@@ -981,8 +1023,10 @@ class Enumeration
 	public var conversions : Hash<String>;
 	public var description : String;
 	public var type : PType;
+	public var intValue (default, null) : Int;
 	
 	public function new(name:String, parent:EnumDef) {
+		this.intValue = primevc.types.Number.INT_NOT_SET;
 		this.description = "";
 		this.name = name;
 		this.parent = parent;
@@ -1047,8 +1091,9 @@ class Enumeration
 		}
 		else switch (Type.typeof(opt))
 		{
-			case TBool:
 			case TInt:
+				this.intValue = cast opt;
+			
 			case TFloat:
 			
 			case TObject:
@@ -1057,21 +1102,18 @@ class Enumeration
 					
 					if (field == "desc" || field == "description")
 						this.description = val;
+					else if (field == "value")
+						this.intValue = Std.is(val, Int)? cast val : throw "Not an int: '"+ val + "', in: "+this;
+					
 					else if(StringTools.startsWith(field, "to"))
-					{
 						this.conversions.set(field, Std.string(val));
-					}
 				}
-				return;
 			
-			case TUnknown:
-			case TNull:
-			case TFunction:
-			case TClass(c):
-			case TEnum(e):
+			case TBool, TUnknown, TNull, TFunction, TClass(_), TEnum(_):
+				throw "Currently unsupported enum option: "+Std.string(opt) + ", for: "+ this;
 		}
 		
-		throw "Currently unsupported enum option: "+Std.string(opt);
+		
 	}
 }
 
@@ -1082,7 +1124,7 @@ typedef EnumConversionTuple = {
 
 class EnumConversionProperty extends Property
 {
-	public var enums			(default,null)	: List<Enumeration>;
+	public var enums		(default,null)	: List<Enumeration>;
 	public var definition	(default,null)	: EnumDef;
 	
 	public function new(name:String, parent)
@@ -1096,6 +1138,7 @@ class EnumConversionProperty extends Property
 
 class EnumDef implements TypeDefinitionWithProperties
 {
+//	public var numProperties(default,null)		: Int;
 	public var name			(default,null)		: String;
 	public var module		(default,null)		: Module;
 	public var description						: String;
@@ -1103,6 +1146,7 @@ class EnumDef implements TypeDefinitionWithProperties
 	public var enumerations	(default,null)		: Hash<Enumeration>;
 	public var catchAll							: Enumeration;
 	public var conversions	(default,null)		: Hash<EnumConversionProperty>;
+	public var finalized	(default,null)		: Bool;
 	
 	public var fullName		(getFullName,null)	: String;
 	private var supertypes	(default,null)		: List<EnumDef>;
@@ -1113,8 +1157,9 @@ class EnumDef implements TypeDefinitionWithProperties
 	public var propTodo		(default,null)		: TodoList;
 	
 	public var defaultXMLMap(default,null)		: XMLMapping;
+	public var index		(default,null)		: Int;
 	
-	public var propertiesSorted	(getPropertiesSorted,null) : Array<Property>;
+	public var propertiesSorted	(getPropertiesSorted,null) : Array<Property>;	
 	private function getPropertiesSorted()
 	{
 		if (propertiesSorted != null) return propertiesSorted;
@@ -1135,7 +1180,9 @@ class EnumDef implements TypeDefinitionWithProperties
 			return getFullName() + "_utils";
 		}
 	
-	public function new(name:String, module:Module) {
+	public function new(index:Int, name:String, module:Module) {
+//		this.numProperties = 0;
+		this.index = index;
 		this.description = "";
 		this.module = module;
 		this.name = name;
@@ -1163,9 +1210,15 @@ class EnumDef implements TypeDefinitionWithProperties
 		else
 			e.parseOption(def);
 		
+		Assert.that(e.intValue.isSet(), "\n\tEnumeration '"+ name +"' in '"+ this.fullName +"' has no value\n");
+		
+		var conversionNum = 0;
 		for (k in e.conversions.keys()) {
 			var c:EnumConversionProperty = this.conversions.get(k);
-			if (c == null) this.conversions.set(k, c = new EnumConversionProperty(k, this));
+			if (c == null) {
+				this.conversions.set(k, c = new EnumConversionProperty(k, this));
+				c.index = ++conversionNum;
+			}
 			
 			if (!Lambda.has(c.enums, e))
 				c.enums.add(e);
@@ -1176,6 +1229,8 @@ class EnumDef implements TypeDefinitionWithProperties
 	
 	public function finalize():Void
 	{
+		if (finalized) return;
+		
 		var member = this.module.getMember(this.name);
 		
 		switch (member) {
@@ -1204,6 +1259,7 @@ class EnumDef implements TypeDefinitionWithProperties
 			default: //throw "impossible";
 		}
 		
+		finalized = true;
 	//	trace("Fully resolved: "+this.fullName);
 	}
 	
@@ -1799,10 +1855,14 @@ interface TypeDefinitionWithProperties implements TypeDefinition
 
 class BaseTypeDefinition implements TypeDefinitionWithProperties
 {
+	public var index		(default,null)		: Int;
+	public var finalized	(default,null)		: Bool;
+	
 	public var name			(default,null)		: String;
 	public var module		(default,null)		: Module;
 	public var description						: String;
 	public var property		(default,null)		: Hash<Property>;
+	public var propertyByNum(default,null)		: IntHash<Property>;
 	public var supertypes	(default,null)		: List<BaseTypeDefinition>;
 	public var fullName		(getFullName,null)	: String;
 	
@@ -1859,11 +1919,14 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	
 	public var propTodo		(default,null)		: TodoList;
 	
-	public function new(name:String, module:Module) {
+	public function new(index:Int, name:String, module:Module)
+	{
+		this.index = index;
 		this.description = "";
 		this.module = module;
 		this.name = name;
 		this.property = new Hash();
+		this.propertyByNum = new IntHash();
 		this.implementedBy = new Hash();
 		this.options = new List();
 		this.supertypes = new List();
@@ -1945,16 +2008,18 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		}
 	}
 	
-	var final:Bool;
+	private function propertyTypeFinalized(p:Property) {
+		var t = Util.unpackPTypedef(Util.getPTypedef(p.type));
+		return if (t != null) t.finalized else true;
+	}
 	
 	public function finalize():Void
 	{
-		for (s in this.supertypes) if (!s.final) {
-			this.final = false;
+		for (s in this.supertypes) if (!s.finalized) {
+			this.finalized = false;
 			break;
 		}
-		
-		if (final) return;
+		if (finalized) return;
 		
 		var member = this.module.getMember(this.name);
 		
@@ -1966,15 +2031,19 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		for (type in this.supertypes)
 		{
 			type.finalize();
+			Assert.that(type.finalized);
 			
 			for (p in type.property)
-			{
+			{	
+				Assert.that(p.index >= 0, "Index < 0: " + p);
+				
 				try this.addProperty(p.copyFor(this))
 				catch (err:PropertyDefinitionError) switch(err)
 				{
 					default: throw err;
 					case Err_PropertyExists(newProp,current):
 						current.copyOptions(newProp);
+						Assert.that(current.index >= 0, "Copied index < 0: " + current);
 				}
 			}
 		}
@@ -1990,7 +2059,21 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		this.propTodo.tryToComplete();
 		this.todo.tryToComplete();
 		
-		final = true;
+		for (p in this.property) checkPropertyIsNumbered(p);
+		
+		finalized = true;
+	}
+	
+	private function checkPropertyIsNumbered(p:Property)
+	{
+		Assert.that(p.index >= 0, "\n\tProperty has no Index: " + p);
+		
+		if (p.definedIn == this) {
+			if (this.propertyByNum.exists(p.index))
+				Assert.that(this.propertyByNum.get(p.index) == p, "\n\tIndex of property:" + p + "\n\tis the same as: "+ this.propertyByNum.get(p.index));
+			else
+				this.propertyByNum.set(p.index, p);
+		}
 	}
 	
 	public function extend(type:TypeDefinition) : Void { throw "Abstract method"; }
@@ -1999,7 +2082,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	{
 		if (!Std.is(type,BaseTypeDefinition)) throw Err_CannotImplementType(type);
 		
-		final = false;
+		finalized = false;
 		
 		var btype:BaseTypeDefinition = cast type;
 		this.supertypes.add(btype);
@@ -2062,7 +2145,8 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	}
 	
 	
-	public function addProperty(p:Property) {
+	public function addProperty(p:Property)
+	{
 		if (property.exists(p.name))
 			throw Err_PropertyExists(p, property.get(p.name));
 		property.set(p.name, p);
@@ -2121,8 +2205,8 @@ class ClassDef extends BaseTypeDefinition
 	public  var superClass (default, null) : Null<ClassDef>;
 	private var subclasses : Null<List<ClassDef>>;
 	
-	public function new(name:String, module:Module) {
-		super(name,module);
+	public function new(index:Int, name:String, module:Module) {
+		super(index,name,module);
 	}
 	
 	override function getPropertiesSorted()
@@ -2176,15 +2260,16 @@ class NamedSetDef extends MagicClassDef
 	public var baseType	: PType;
 	public var keys		: Array<{ path:String, prop:Property }>;
 	
-	public function new(name:String, itemName:String, module:Module, baseType:PType) {
+	public function new(index:Int, name:String, itemName:String, module:Module, baseType:PType) {
 		Assert.that(baseType != null);
 		
-		super(name,module);
+		super(index,name,module);
 		this.itemName = itemName;
 		this.keys = [];
 		this.pendingKeys = [];
 		this.pendingProps = {};
 		this.baseType = baseType;
+		this.finalized = false;
 	}
 	
 	override public function setDefinition(v)	{}
@@ -2205,23 +2290,34 @@ class NamedSetDef extends MagicClassDef
 	
 	override public function finalize() : Void
 	{
-		if (this.pendingProps == null) return; // already done
-		
 		var btype = Util.unpackPTypedef(Util.getPTypedef(baseType));
 		if (btype != null) {
 			btype.finalize();
+			Assert.that(btype.finalized);
 		}
+		if (this.finalized) return; // already done
 		
 		for (field in Reflect.fields(pendingProps))
 		{
-			var valueMap = Reflect.field(pendingProps, field);
-			
 			var p = new Property(field, this);
 			p.type = baseType;
 			
+			var def:Array<Dynamic> = Reflect.field(pendingProps, field);
+			if (Std.is(def, Int)) def = [def];
+			
+			Assert.that(Std.is(def,Array), "NamedSet '"+ fullName +"' Not an array: "+def);
+			
+			var valueMap = null;
+			for (v in def) if (Std.is(v, Int)) {
+				p.index = Std.int(v);
+			} else {
+				Assert.that(valueMap == null);
+				valueMap = v;
+			}
+			
 			if (valueMap != null && Reflect.fields(valueMap).length > 0) try p.setDefaultValue(valueMap) catch(err:ResolveError) switch(err) {
 				case Err_PropertyNotFound(name):
-					throw "Property '"+name+"' for NamedSet "+this.fullName+" does not exist in basetype: "+baseType;
+					throw "Property '"+name+"' for NamedSet "+this.fullName+" does not exist in basetype: "+baseType + "in map: "+ valueMap;
 				default: throw err;
 			}
 			
@@ -2235,6 +2331,7 @@ class NamedSetDef extends MagicClassDef
 		
 		this.pendingProps = null;
 		this.pendingKeys  = null;
+		this.finalized    = true;
 	}
 	
 	
@@ -2250,14 +2347,15 @@ class UniqueIDTrait extends MagicClassDef
 	static var init = function(){ type = new UniqueIDTrait(); }();
 	
 	private function new() {
-		super("UniqueID", Module.traits);
+		super(-1337, "UniqueID", Module.traits);
 		
 		var p = new Property("id", this);
-		p.type = TuniqueID;
-		p.opts = [unique];
+		p.index = 0;
+		p.type  = TuniqueID;
+		p.opts  = [unique];
 		this.property.set(p.name, p);
 		
-		this.final = true;
+		this.finalized = true;
 	}
 }
 
@@ -2308,10 +2406,10 @@ enum AbstractPType
 	arrayOfType(type:PType);
 	arrayOf(cl:String);
 //	arrayViewOfType(property:String, typeFilter:String);
-	namedSetOf(basetype:AbstractPType, uniqueKeys:Array<String>, properties:Dynamic);
+	namedSetOf(basetype:AbstractPType, index:Int, uniqueKeys:Array<String>, properties:Dynamic);
 	
 	is(path:String);
-	subclass(options:Dynamic, properties:Dynamic);
+	subclass(index:Int, options:Dynamic, properties:Dynamic);
 	getter(value:AbstractPType, ?options:Dynamic);
 	bindTo(property:String); // Make this property point to some other data
 	

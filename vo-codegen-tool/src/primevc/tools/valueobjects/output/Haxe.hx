@@ -114,6 +114,9 @@ class Haxe implements CodeGenerator
 		// Constructor
 		genClassConstructor(def, def.superClass != null, magic);
 		
+		// Dispose
+		genDispose(def);
+		
 		// Validation
 		genValidation(def.superClass != null);
 		
@@ -128,6 +131,8 @@ class Haxe implements CodeGenerator
 		write(def.name + "VO");
 	}
 	
+	
+	
 	static var dummyMagic = new MagicClassGenerator();
 	
 	private function getMagicGenerator(def:ClassDef) : MagicClassGenerator
@@ -136,6 +141,7 @@ class Haxe implements CodeGenerator
 		
 		return dummyMagic;
 	}
+	
 	
 	private function genValidation(genOverride:Bool = false)
 	{
@@ -148,16 +154,18 @@ class Haxe implements CodeGenerator
 		a("\t}\n#end\n");
 	}
 	
+	
 	private function genEditFunctions(def:ClassDef)
 	{
-		genBindindableFunctionCalls(def, "beginEdit");
-		genBindindableFunctionCalls(def, "commitEdit");
-		genBindindableFunctionCalls(def, "cancelEdit");
+		genEditableVOFunctionCalls(def, "beginEdit");
+		genEditableVOFunctionCalls(def, "commitEdit");
+		genEditableVOFunctionCalls(def, "cancelEdit");
 	}
 	
-	private function genBindindableFunctionCalls(def:ClassDef, functionName)
+	
+	private function openFunctionDeclaration (def:ClassDef, functionName)
 	{
-/*		if (def.superClass != null)
+	/*	if (def.superClass != null)
 		{
 			// Check if this function should be overridden
 			var doOverride = false;
@@ -165,26 +173,59 @@ class Haxe implements CodeGenerator
 				doOverride = true;
 				break;
 			}
-			
+
 			if (!doOverride) return; // no need to override
 		}
 */		
-		
 		var a = code.add;
 		a("\n\t");
 		if (def.superClass != null) a("override ");
-		
+
 		a("public function "); a(functionName); a("() : Void\n\t{\n");
-		
+
 		if (def.superClass != null) {
 			a("\t\tsuper."); a(functionName); a("();\n");
 		}
+	}
+	
+	
+	private function closeFunctionDeclaration (def:ClassDef, functionName)
+	{
+		code.add("\t}\n");
+	}
+	
+	
+	private function generateFunctionCall (p:Property, functionName:String)
+	{
+		code.add("\t\tthis.");
+		code.add(p.name);
+		code.add(".");
+		code.add(functionName);
+		code.add("();\n");
+	}
+	
+	
+	private function genDispose (def:ClassDef)
+	{	
+		openFunctionDeclaration( def, "dispose");
 		
-		for (p in def.property) if (p.isBindable() && !Util.isDefinedInSuperClassOf(def, p)) {
-			a("\t\tthis."); a(p.name); a("."); a(functionName); a("();\n");
-		}
+		for (p in def.property)
+			if (!Util.isDefinedInSuperClassOf(def, p) && p.isDisposable())
+				generateFunctionCall( p, "dispose" );
 		
-		a("\t}\n");
+		closeFunctionDeclaration( def, "dispose");
+	}
+	
+	
+	private function genEditableVOFunctionCalls(def:ClassDef, functionName)
+	{
+		openFunctionDeclaration( def, functionName);
+		
+		for (p in def.property)
+			if (!Util.isDefinedInSuperClassOf(def, p) && (p.isBindable() || p.isArray()))
+				generateFunctionCall( p, functionName );
+		
+		closeFunctionDeclaration( def, functionName);
 	}
 	
 	private function genClassConstructor(def:ClassDef, genSuperCall:Bool = false, magic)
@@ -462,7 +503,7 @@ private class HaxeUtil
 		{
 			case Tstring:				"''";
 			case Tbool(val):			val? "true" : "false";
-			case Tarray(type, _,_):		("new primevc.core.collections.ArrayList < " + HaxeUtil.haxeType( type, true ) + " >()");
+			case Tarray(type, _,_):		("new primevc.core.collections.RevertableArrayList < " + HaxeUtil.haxeType( type, true ) + " >()");
 			
 			case Turi, TfileRef, Tinterval:
 				"new " + HaxeUtil.haxeType(ptype) + "()";
@@ -470,14 +511,15 @@ private class HaxeUtil
 			case Tdef(type):
 				getClassConstructorCall(Util.unpackPTypedef(type));
 			
-			case Tinteger(_,_,_), Tdecimal(_,_,_), TuniqueID, TlinkedList, TenumConverter(_),
-				Temail, Tdate, Tdatetime, Tcolor, Tbitmap, Tbinding(_):
+			case Tinteger(_,_,_):		'primevc.types.Number.INT_NOT_SET';
+			case Tdecimal(_,_,_):		'primevc.types.Number.FLOAT_NOT_SET';
+			case TuniqueID, Temail:		"''";
+			
+			case TlinkedList, TenumConverter(_), Tdate, Tdatetime, Tcolor, Tbitmap, Tbinding(_):
 				null;
 		}
 		
-		if (code == null) return null;
-		
-		return bindable? "new primevc.core.RevertableBindable("+ code +");" : code + ";";
+		return bindable? "new primevc.core.RevertableBindable("+ code +");" : if (code == null) null else code + ";";
 	}
 	
 	public static function getClassConstructorCall(tdef:TypeDefinition)
@@ -514,7 +556,7 @@ private class HaxeUtil
 			case TenumConverter(enums):		'String';
 			
 			case TlinkedList:				'';
-			case Tarray(type, min, max):	'primevc.core.collections.ArrayList<'+ haxeType(type, true) +'>';
+			case Tarray(type, min, max):	'primevc.core.collections.RevertableArrayList<'+ haxeType(type, true) +'>';
 		}
 		
 		if (bindable)

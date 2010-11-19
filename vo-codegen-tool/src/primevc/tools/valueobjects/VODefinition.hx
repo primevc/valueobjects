@@ -872,6 +872,14 @@ class Property
 		return hasOption(PropertyOption.bindable);
 	}
 	
+	public function isArray ()
+	{
+		return switch (this.type) {
+			case Tarray(type,min,max):	true;
+			default:					false;
+		}
+	}
+	
 	public function isDisposable ()
 	{
 		return isBindable() || switch (this.type) {

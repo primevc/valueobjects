@@ -157,9 +157,9 @@ class Haxe implements CodeGenerator
 	
 	private function genEditFunctions(def:ClassDef)
 	{
-		genBindindableFunctionCalls(def, "beginEdit");
-		genBindindableFunctionCalls(def, "commitEdit");
-		genBindindableFunctionCalls(def, "cancelEdit");
+		genEditableVOFunctionCalls(def, "beginEdit");
+		genEditableVOFunctionCalls(def, "commitEdit");
+		genEditableVOFunctionCalls(def, "cancelEdit");
 	}
 	
 	
@@ -217,12 +217,13 @@ class Haxe implements CodeGenerator
 	}
 	
 	
-	private function genBindindableFunctionCalls(def:ClassDef, functionName)
+	private function genEditableVOFunctionCalls(def:ClassDef, functionName)
 	{
 		openFunctionDeclaration( def, functionName);
 		
-		for (p in def.property) if (p.isBindable() && !Util.isDefinedInSuperClassOf(def, p))
-			generateFunctionCall( p, functionName );
+		for (p in def.property)
+			if (!Util.isDefinedInSuperClassOf(def, p) && (p.isBindable() || p.isArray()))
+				generateFunctionCall( p, functionName );
 		
 		closeFunctionDeclaration( def, functionName);
 	}
@@ -502,7 +503,7 @@ private class HaxeUtil
 		{
 			case Tstring:				"''";
 			case Tbool(val):			val? "true" : "false";
-			case Tarray(type, _,_):		("new primevc.core.collections.ArrayList < " + HaxeUtil.haxeType( type, true ) + " >()");
+			case Tarray(type, _,_):		("new primevc.core.collections.RevertableArrayList < " + HaxeUtil.haxeType( type, true ) + " >()");
 			
 			case Turi, TfileRef, Tinterval:
 				"new " + HaxeUtil.haxeType(ptype) + "()";
@@ -555,7 +556,7 @@ private class HaxeUtil
 			case TenumConverter(enums):		'String';
 			
 			case TlinkedList:				'';
-			case Tarray(type, min, max):	'primevc.core.collections.ArrayList<'+ haxeType(type, true) +'>';
+			case Tarray(type, min, max):	'primevc.core.collections.RevertableArrayList<'+ haxeType(type, true) +'>';
 		}
 		
 		if (bindable)

@@ -35,8 +35,8 @@ class Format
 		}
 		else if (value < 0 && value >= -0x8000)
 		{
-			if (value >= -31) {
-				o.writeByte(0xE0 | -value);
+			if (value >= -32) {
+				o.writeByte(0xE0 | (-1 - value));
 				return 1;
 			}
 			else if (value >= -0x80) {
@@ -57,11 +57,34 @@ class Format
 		}
 	}
 	
+	static public function packString(o : Output, value : String) : Int
+	{
+		var b;
+		
+		if (value.length <= 31) {
+			b = 1;
+			o.writeByte(0xA0 | value.length);
+		}
+		else if (value.length <= 65535) {
+			b = 3;
+			o.writeByte(0xda);
+			o.writeUInt16(value.length);
+		}
+		else {
+			b = 5;
+			o.writeByte(0xdb);
+			o.writeUInt30(value.length);
+		}
+		o.writeString(value);
+		
+		return b + value.length;
+	}
+	
 	/**
 	 * Writes a MessagePack 'double'.
 	 * Returns: 9 (bytes written).
 	 */
-	static inline public function writeDouble(o : Output, value : Float)
+	static inline public function packDouble(o : Output, value : Float)
 	{
 		o.writeByte(0xcb);
 		o.writeDouble(value);
@@ -73,7 +96,7 @@ class Format
 	 * After calling this, write the array elements.
 	 * Returns: bytes written.
 	 */
-	static public function writeArrayHeader(o : Output, arrayLength : Int)
+	static public function packArrayHeader(o : Output, arrayLength : Int)
 	{
 		Assert.that(arrayLength > 0);
 		if (arrayLength <= 15) {
@@ -96,7 +119,7 @@ class Format
 		case 1: o.writeByte(value);
 		case 2: o.writeInt16(value);
 		case 3: o.writeInt24(value);
-		case 4: o.writeInt32(value);
+		case 4: o.writeInt32(haxe.Int32.ofInt(value));
 		
 		default: Assert.that(false);
 	}
@@ -110,56 +133,54 @@ class Format
 	
 	
 	/**
-	 *  Builtin VO value type:
-	 *  +-byte-+---bits---+-------------------+
-	 *  | 0xD7 | 1XXXXXXX | ... type data ... |
-	 *  +------+----------+-------------------+
-	 *  Type id: 0 - 127, per type different length
-	 *  
 	 *  Custom VO Type:
-	 *  +-byte-+---bits---+-------------------+-----------------------+
-	 *  | 0xD7 | 0stttfff | 1..n TypeID bytes | 1..n fields-set bytes |
-	 *  +------+----------+-------------------+-----------------------+
-	 *    s: 1 == object-start: all (non-starting) custom vo types following the last field are part of this object ('supertypes) until object-end
-	 *  ttt: Type id		 				length: 1 - 16 bytes  (all bits 0 == 1 byte)
-	 *  fff: Field bitflags					length: 0 - 15 bytes
-	*/
-	static public function writeValueObjectHeader(o : Output, voType : Int, objectStart : Bool, fieldsSet : Int32, ?fieldsSet2 : Int32 = 0)
+	 *  +-byte-+-----------+
+	 *  | 0xD7 | VO Header |
+	 *  +------+-----------+
+	 *  
+	 *  VO Header:
+	 *  +---bits---+---------------------+----------------------------------+------------------------------------+
+	 *  | tsssffff | 1 or 2 TypeID bytes | 0..s supertype VO Headers + data | 0..f Field bitflags + values group |
+	 *  +----------+---------------------+----------------------------------+------------------------------------+
+	 *     t: When set, TypeID data is ushort (2 bytes, max 65535) otherwise ubyte (max 255).
+	 *   sss: Number of super type "VO Header, Field bitflags + values group" combinations following the TypeID.
+	 *  ffff: 'Field bitflags + values group' count: 0 - 15 bytes.
+	 *  
+	 *  Field bitflags + values group
+	 *  +----byte----+-----------------------------+
+	 *  | 7654  3210 | VOMsgPack value per set bit |
+	 *  +------------+-----------------------------+
+	 *  Each bit in the first byte indicates whether a value is available.
+	 *  The deserializer keeps track of the group number. 
+	 *  
+	 *  For example: bits "1000 0100" indicate:
+	 *  - there are 2 Values following
+	 *  - first value is for field index: $groupnumber + 2
+	 *  - second value for field index:   $groupnumber + 7
+	 */
+	static inline public function packValueObjectHeader(o : Output, voType : Int, superTypes : Int, fieldFlagBytes : Int)
 	{
-		var typeBytes  = intSize(voType);
-		var fieldBytes = if (fieldsSet2 != 0) intSize(fieldsSet2) + 4 else intSize(fieldsSet);
+		Assert.that(fieldFlagBytes >= 0 && fieldFlagBytes <= 15);
+		Assert.that(superTypes >= 0 && superTypes <= 7);
 		
-		o.writeByte(0xd7);
-		o.writeByte(objectStart? 0x40 : 0 | ((typeBytes << 3) | fieldBytes);
+	//	var h = 0xD700 /* 0xd7 << 8 */ | superTypes << 4 | fieldFlagBytes;
 		
-		writeInt(o, typeBytes, voType);
-		
-		if (fieldBytes <= 4)
-			writeInt(o, fieldBytes, fieldsSet);
-		if (fieldBytes >  4) {
-			o.writeInt32(fieldsSet);
-			writeInt(o, intSize(fieldsSet2), fieldsSet2);
+		if (voType <= 255) {
+			o.writeUInt24((0xD700 /* 0xd7 << 8 */ | superTypes << 4 | fieldFlagBytes) << 8 | voType); // hopefully optimized by haXe
+			return 3;
 		}
-		
-		// 0xD7 | typeID | supertype-count | fieldsSet | [ supertype 1 .. n: typeID+fieldsSet length | typeID | fieldsSet | supertypes field 1 .. n ] | fields x .. n
-		// 0xD7 | typeID byteCount + supertype byteCount + fieldsSet byteCount | typeID [| supertype count] [| fieldsSet] | [| supertype 1..n: typeID | 0 | fieldsSet-bytes | fieldsSet | value 1..n] | fieldsSet-bytes | fieldsSet | value x..n
-		/*
-		 *  +-byte-+--8-bits---+---------------------+-[--------------]-+-[--------------------+--------------------]-+
-		 *  | 0xD7 | tsss ffff | 1..t+1 TypeID bytes | [supertype data] | 0..f fields-set data | per set field values |
-		 *  +------+-----------+---------------------+-[--------------]-+-[--------------------+--------------------]-+
-		 *  TypeID: 1-2 bytes. (Max 65536 unique types supported - in the TypeID bytes)
-		 *  Supertype count: 0-7 - per supertype should be a header in "supertype data"
-		 *  Fields-set byte count: 0-15 bytes (Max 120 field flags supported per type)
-		 *    When more then 4 bytes are used for fiels-set flags, field data is grouped per 32:  32 flags, 32 values, ...remainder
-		 */
-		return 2 + typeBytes + fieldBytes;
+		else {
+			o.writeUInt16(0xD700 /* 0xd7 << 8 */ | 0x8000 | superTypes << 4 | fieldFlagBytes); // write header in one go
+			o.writeUInt16(voType);
+			return 4;
+		}
 	}
 	
 	
 	/**
 	 * 0xd8
 	 */
-	static public function writeBuiltin(o : Output)
+	static public function packBuiltin(o : Output)
 	{
 		o.writeByte(0xD8);
 		return 1;
@@ -169,7 +190,7 @@ class Format
 	 * Writes a MessagePack 'nil'.
 	 * Returns: 1 (bytes written).
 	 */
-	static public inline function writeNil(o : Output) : Int {
+	static public inline function packNil(o : Output) : Int {
 		o.writeByte(0xc0);
 		return 1;
 	}
@@ -178,7 +199,7 @@ class Format
 	 * Writes a MessagePack boolean.
 	 * Returns: 1 (bytes written).
 	 */
-	static public inline function writeBool(o : Output, value : Bool) : Int {
+	static public inline function packBool(o : Output, value : Bool) : Int {
 		o.writeByte(if (value) 0xc3 else 0xc2);
 		return 1;
 	}

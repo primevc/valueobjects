@@ -50,8 +50,11 @@ class Haxe implements CodeGenerator
 		
 		if (immutable)
 			a("\ninterface I"); 
-		else
+		else {
+			a("  using primevc.utils.IfUtil;\n");
+			a("  using primevc.utils.msgpack.Format;\n");
 			a("\nclass ");
+		}
 		
 		a(def.name); a("VO");
 		
@@ -81,7 +84,7 @@ class Haxe implements CodeGenerator
 	*/	
 		a("\n{\n");
 		
-		for (p in def.property) if (!Util.isDefinedInSuperClassOf(def, p)) {
+		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p)) {
 			
 			if (immutable) {
 				genGetter(p, true);
@@ -111,6 +114,9 @@ class Haxe implements CodeGenerator
 		var magic = getMagicGenerator(def);
 		magic.inject(code);
 		
+		// Meta data
+		genClassMetaData(def);
+		
 		// Constructor
 		genClassConstructor(def, def.superClass != null, magic);
 		
@@ -119,6 +125,9 @@ class Haxe implements CodeGenerator
 		
 		// Validation
 		genValidation(def.superClass != null);
+		
+		// Serialization
+		genSerialization(def);
 		
 		// XMLMapping
 		genXMLMapFunctions(def, magic);
@@ -142,12 +151,375 @@ class Haxe implements CodeGenerator
 		return dummyMagic;
 	}
 	
+	function a(str:String) code.add(str)
+	
+	
+	private function genClassMetaData(def:ClassDef)
+	{
+		a("\n\tstatic inline public var TypeID = ");
+		a(def.index + ";\n\t");
+		for (p in def.propertiesSorted) {
+		 	a("\n\tstatic inline public var P_"); a(p.name); a(" = "); a("0x" + StringTools.hex(p.definedIn.index << 8 | p.index, 4)); a("; // "); a(p.definedIn.name);
+		}
+		a("\n\t");
+	}
+	
+	private function genMsgpackMaxSetPropertyCheck(def:ClassDef)
+	{
+		if (def.numPropertiesDefined == 0) return; // no props
+		
+		a("\n\tstatic public function msgpack_maxNonEmptyPropertyID(obj : "); a(def.name); a("VO) : Int\n\t{");
+		a("\n		return ");
+		var p, i = def.propertiesSorted.length, noIf = true;
+		while (i-->0)
+		{
+			p = def.propertiesSorted[i];
+			if (p.definedIn != def) continue;
+
+			noIf = addIfPropertyIsSetExpr("obj.", p, Std.string(p.index));
+			if (noIf) i = 0;
+			break;
+		}
+		while (i-->0) {
+			p = def.propertiesSorted[i];
+			if (p.definedIn != def) continue;
+
+			a("\n\t\t  else ");
+			noIf = addIfPropertyIsSetExpr("obj.", p, Std.string(p.index));
+			if (noIf) i = 0;
+		}
+		if (!noIf) {
+			a("\n\t\t  else -1;");
+		}
+		a("\n\t}");
+	}
+	
+	private function genSerialization(def:ClassDef)
+	{
+		// Count bits/properties for this 'def
+		var lastProp = null;
+		var thisProps = new IntHash<Property>();
+		var totalPropsToPack = def.numPropertiesDefined;
+		for (p in def.propertiesDefined) lastProp = p;
+		
+		var totalProps = totalPropsToPack;
+		
+		
+		genMsgpackMaxSetPropertyCheck(def);
+		var hasSuper = def.superClass != null;
+		
+		a("\n\t"); if (hasSuper) a("override "); a("public function messagePack(o : BytesOutput) : Int\n\t{");
+		a("\n\t\treturn msgpack_packVO(o, this, true);");
+		a("\n\t}");
+		a("\n");
+		
+		a("\n\tstatic public function msgpack_packVO(o : BytesOutput, obj : "); a(def.name); a("VO, prependMsgpackType : Bool = false) : Int\n\t{");
+		a("\n		Assert.that(o != null && obj != null);");
+		a("\n		var ");
+		if (lastProp != null)
+			a("maxID = msgpack_maxNonEmptyPropertyID(obj)");
+		
+		var processEmbeddedTypes = (def.superClass == null && def.supertypes.length > 0) || (hasSuper && def.supertypes.length > 1);
+		
+		if (processEmbeddedTypes) {
+			if (lastProp != null) a(", ");
+			a("i = obj.msgpack_interfacesToPack()");
+		}
+		
+		if (hasSuper) {
+			if (lastProp != null || processEmbeddedTypes) a(",\n\t\t\t");
+			a("superPacker = obj.msgpack_superClassPacker();");
+		}
+		else
+			a(";");
+		a("\n\t\t");
+		a("\n\t\tvar b /* bytes written */ : Int;");
+		a("\n\t\tif (prependMsgpackType) {");
+		
+		a("\n\t\t\tif (");
+		 	if (hasSuper) {
+				a("!superPacker.notNull()");
+				if (lastProp != null || processEmbeddedTypes) a(" && ");
+			}
+		 	if (processEmbeddedTypes) a(lastProp != null? "i + " : "i.not0()");
+		 	if (lastProp != null) a("maxID == -1");
+		a(") return o.packNil();");
+		
+		a("\n\t\t\telse b = o.packValueObject();");
+		a("\n\t\t}");
+		a("\n\t\telse b = 0;");
+		
+		a("\n\t\t");
+		a("\n\t\tb += o.packValueObjectHeader(TypeID, ");
+		
+		if (processEmbeddedTypes) a(def.supertypes.length == (def.superClass == null? 1 : 2)? "i" : "(i & 0xFF)"); 
+		else if (def.superClass == null) a("0");
+		
+		if (hasSuper) {
+			if (def.supertypes.length > 1) a(" + ");
+			a("(superPacker != null).boolCalc()");
+		}
+		if (lastProp != null)
+			a(", maxID == -1? 0 : 1 + (maxID >> 3));");
+		else
+			a(", 0);");
+		
+		a("\n\t\t");
+		
+		if (hasSuper)
+			a("\n\t\tif (superPacker.notnull()) superPacker(o, this);");
+		
+		
+		if (processEmbeddedTypes)
+		{
+			a("\n\t\tif (i.not0())");
+			a("\n\t\t{");
+		
+			// Pack mixins/embedded/interface types
+			var i = 0;
+			if (hasSuper) {
+				for (t in def.supertypes) if (!t.implementedBy.exists(def.superClass.fullName))
+					addEmbedMessagePackCall(i++, t, def.supertypes.length - 1);
+			}
+			else {
+				for (t in def.supertypes)
+					addEmbedMessagePackCall(i++, t, def.supertypes.length);
+			}
+		
+			if (totalProps > 1) a("\n\t\t\ti = 0;");
+			a("\n\t\t}");
+		}
+		
+		if (totalPropsToPack == 1 && lastProp.index < 8)
+		{
+			// Single Property optimization
+			var p = lastProp;
+			
+			a("\n\t\tif (maxID == P_"); a(p.name); a(") {");
+			a("\n\t\t\to.writeByte(0x"); a(StringTools.hex(1 << p.index, 2)); a("); ++b;");
+			a("\n\t\t\t"); addPropertyPackerCall("obj." + p.name, p.type, p.isBindable()); ac(";".code);
+			a("\n\t\t}");
+			a("\n\t\telse Assert.that(maxID == -1);");
+		}
+		else if (lastProp != null) // at least one Property to pack
+		{
+			a("\n\t\tif (maxID == -1) return b;");
+			a("\n\t\t");
+			
+			if (!processEmbeddedTypes && totalPropsToPack > 1) a("\n\t\tvar i = 0;");
+			
+			var bit = 0;
+			for (i in 0 ... lastProp.index + 1)
+			{
+				var p = thisProps.get(i);
+				++bit;
+				
+				if (p == null)
+				{
+					if (thisProps.exists(i+1))
+					{
+						if (bit >= 8) while (bit >= 8)
+						{
+							     if (bit >= 32) { a("\n\t\to.writeInt31(0); b += 4;");	bit -= 32; }
+							else if (bit >= 24) { a("\n\t\to.writeInt24(0); b += 3;");	bit -= 24; }
+							else if (bit >= 16) { a("\n\t\to.writeInt16(0); b += 2;");	bit -= 16; }
+							else if (bit >=  8) { a("\n\t\to.writeByte(0); ++b;");		bit -=  8; }
+						}
+					}
+				}
+				else
+				{
+					if (totalPropsToPack == 1 && lastProp.index % 8 == 0)
+					{
+						--totalPropsToPack;
+					
+						if (bit <= 8 && p == lastProp)
+						{
+							a("\n\t\t");
+							// Single last Property: optimize if + packing
+							a("\n\t\tAssert.that(P_"); a(lastProp.name); a(" == maxID);");
+							a("\n\t\to.writeByte(" + (1 << (bit-1))); a("); ++b;\n\t\t");
+							addPropertyPackerCall("obj." + p.name, p.type, p.isBindable()); ac(";".code);
+							
+							break;
+						}
+						else throw "huh?";
+					}
+					else
+					{
+						--totalPropsToPack;
+						a("\n\t\t"); addIfPropertyIsSetExpr("obj.", p, "i |= 0x" + StringTools.hex(1 << (bit-1), 2));
+					
+						//TODO: Add basic circular reference check ?  Maybe cache all object references and throw on circle?
+					
+						if (bit == 8 || p == lastProp)
+						{
+							a("\n\t\to.writeByte(i); ++b;");
+							a("\n\t\t");
+							if (totalProps <= 8)	a("\n\t\tAssert.that(i.not0());");
+							else					a("\n\t\tif (i.not0())");
+							a("\n\t\t{");
+						
+							for (b in 0 ... bit) {
+								var p = thisProps.get(i+1 - bit + b);
+								if (p == null) continue;
+								a("\n\t\t	if ((i & 0x"); a(StringTools.hex(1 << b, 2)); a(").not0()) "); 
+								addPropertyPackerCall("obj." + p.name, p.type, p.isBindable()); ac(";".code);
+							}
+						
+							a("\n\t\t}");
+							if (totalPropsToPack > 0) {
+								a("\n\t\tif (maxID <= P_"); a(p.name);  a(") return b;");
+								a("\n\t\t");
+							}
+							
+							bit = 0;
+						}
+	//					else throw "wtf?";
+					}
+				}
+			}
+		}
+		a("\n\t\t");
+		a("\n\t\treturn b;");
+		a("\n\t}\n");
+		
+		if (processEmbeddedTypes)
+		{
+			a("\n\t");
+			if (hasSuper) a("override "); a("private function msgpack_interfacesToPack() : Int\n\t{");
+			
+			if (def.superClass == null? def.supertypes.length == 1 : def.supertypes.length == 2) {
+				var t = def.supertypes.first();
+				a("\n\t\treturn ("); a(t.fullName); a(".msgpack_maxNonEmptyPropertyID(this) != -1).boolCalc();");
+			}
+			else {
+				a("\n\t\tvar i = 0, n = 0;");
+				var i = 0;
+				for (t in def.supertypes) {
+					a("\n\t\tif ("); a(t.fullName); a(".msgpack_maxNonEmptyPropertyID(this) != -1) { ++n; i |= 0x"); addEmbedMessagePackTypeBitmask(i++); a("; }");
+				}
+				a("\n\t\treturn i |= n;");
+			}
+			a("\n\t}\n");
+		}
+		
+		if (hasSuper)
+		{
+			a("\n\t");
+			if (def.superClass.superClass != null) a("override ");
+			a("private function msgpack_superClassPacker() : Output -> IValueObject -> Int\n\t{\n\t\t\t");
+			a("var sc = "); a(def.superClass.fullName); a(";\n\t\t\t");
+			a("return if (sc.msgpack_maxNonEmptyPropertyID(this) != -1 || super.msgpack_interfacesToPack().not0()) cast sc.msgpack_packVO;\n\t\t\t");
+			a("     else "); if (def.superClass.superClass != null) a("super.superClassPacker();"); else a("null;");
+			a("\n\t}\n");
+		}
+	}
+	
+	private inline function ac(char:Int) code.addChar(char)
+	
+	private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool) switch (pType)
+	{
+		case Tbool(val):				a('b += o.packBool(');			a(path); ac(")".code);
+		case Tinteger(min,max,stride):	a('b += o.packInt(');			a(path); ac(")".code);
+		case Tdecimal(min,max,stride):	a('b += o.packDouble(');		a(path); ac(")".code);
+		case Tstring:					a('b += o.packString(');		a(path); ac(")".code);
+		case Tdate:						a('b += o.packDate(');			a(path); ac(")".code);
+		case Tdatetime:					a('b += o.packDateTime(');		a(path); ac(")".code);
+		case Tinterval:					a('b += o.packDateInterval(');	a(path); ac(")".code);
+		case Turi:						a('b += o.packURI(');			a(path); ac(")".code);
+		case TuniqueID:					a('b += o.packUniqueID(');		a(path); ac(")".code);
+		case Temail:					a('b += o.packEMail(');			a(path); ac(")".code);
+		case Tcolor:					a('b += o.packRGBA(');			a(path); ac(")".code);
+		case TfileRef:					a('b += o.packFileRef(');		a(path); ac(")".code);
+		
+		case Tdef(ptypedef): switch (ptypedef) {
+			case Tclass(def):	a('b += ('); a(path); a(".notNull()? "); a(path); a(".messagePack(o) : o.packNil())");
+			case Tenum(def):	a('b += o.packInt('); a(def.fullName); a("_utils.toValue("); a(path); a(")");
+		}
+		case Tarray(type, min, max):
+			a("{");
+			a("\n\t\t\t\tvar a = "); a(path); ac(";".code);
+			a("\n\t\t\t\tb += o.packArrayHeader(a.length);");
+			a("\n\t\t\t\tfor (i in 0 ... a.length) "); addPropertyPackerCall("a.get(i)", type, false); ac(";".code);
+			a("\n\t\t\t}");
+			
+
+		case TenumConverter(_), Tbinding(_), TlinkedList:	throw "Not implemented";
+	
+	}
+	
+	/** Returns true when no if statement was added  (Property is always set) */
+	private function addIfPropertyIsSetExpr(propPrefix:String, p:Property, expr:String)
+	{
+		var path, nullCheck;
+		
+		if (p.isBindable())
+		{
+			switch (p.type) {
+				case Tarray(_,_,_), Turi:
+					path = propPrefix + p.name;
+				default:
+					path = propPrefix + p.name + ".value";
+			}
+			nullCheck = propPrefix + p.name + ".notNull() && " + path + ".notNull()";
+		}
+		else {
+			path = propPrefix + p.name;
+			nullCheck = path + ".notNull()";
+		}
+		
+		var extraChecks = null;
+		
+		switch (p.type)
+		{
+			case Tstring, Temail:
+				extraChecks = path + ".length.not0()";
+	
+			case Tarray(_,_,_):
+				extraChecks = path + ".length.not0()";
+	
+			case Turi, TfileRef, Tinteger(_,_,_), Tdecimal(_,_,_):
+				extraChecks = path + ".isSet()";
+			
+			case Tbool(_):
+				nullCheck = null; // no way to figure out if the value was changed...
+			
+			case Tdef(type):
+				extraChecks = "!" + path + ".isEmpty()";
+			
+			case TuniqueID, Tinterval, TlinkedList, TenumConverter(_), Tdate, Tdatetime, Tcolor, Tbinding(_):
+		}
+		
+		if (nullCheck != null) {
+			a("if ("); a(nullCheck);
+			if (extraChecks != null) { a(" && "); a(extraChecks); }
+			a(") ");
+		}
+		
+	 	a(expr);
+		a(";"); // a(p.name);
+		
+		return nullCheck == null;
+	}
+	
+	private function addEmbedMessagePackTypeBitmask(i:Int) {
+		a(StringTools.hex(1 << (i + 8), 4));
+	}
+	
+	private function addEmbedMessagePackCall(i:Int, t:TypeDefinition, numEmbedTypes:Int)
+	{
+		a("\n\t\t\t");
+		if (numEmbedTypes > 1) {
+			a("if ((i & 0x"); addEmbedMessagePackTypeBitmask(i); a(").not0()) ");
+		}
+		a("b += "); a(t.fullName); a("VO.msgpack_packVO(o, this);");
+	}
 	
 	private function genValidation(genOverride:Bool = false)
 	{
 		return;
 		
-		var a = code.add;
 		a("\n#if (VO_Write || !VO_Read)");
 		a("\n\t"); if (genOverride) a("override "); a("public function isValid():Bool\n\t{\n ");
 		a("\t\treturn true;\n");
@@ -177,7 +549,6 @@ class Haxe implements CodeGenerator
 			if (!doOverride) return; // no need to override
 		}
 */		
-		var a = code.add;
 		a("\n\t");
 		if (def.superClass != null) a("override ");
 
@@ -230,12 +601,11 @@ class Haxe implements CodeGenerator
 	
 	private function genClassConstructor(def:ClassDef, genSuperCall:Bool = false, magic)
 	{
-		var a = code.add;
-		
 		a("\n\tpublic function new()\n\t{\n");
 		if (genSuperCall)
 			a("\t\tsuper();\n");
 		
+		var a = code.add;
 		var setProp = function(p){
 			a("\t\tthis."); a(p.name); a(" = ");
 		}
@@ -263,12 +633,11 @@ class Haxe implements CodeGenerator
 	
 	function genGetter(p:Property, immutable:Bool)
 	{
-		var a = code.add;
 		a("\tpublic var "); a(p.name); 
 		if (immutable) {
-			a("(default,null");
+			a("\t(default,null");
 		} else {
-			a("(default,default");
+			a("\t(default,default");
 //			a("(default,set"); code.addCapitalized(p.name);
 		}
 		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable())); a(";\n");
@@ -515,7 +884,7 @@ private class HaxeUtil
 			case Tdecimal(_,_,_):		'primevc.types.Number.FLOAT_NOT_SET';
 			case TuniqueID, Temail:		"''";
 			
-			case TlinkedList, TenumConverter(_), Tdate, Tdatetime, Tcolor, Tbitmap, Tbinding(_):
+			case TlinkedList, TenumConverter(_), Tdate, Tdatetime, Tcolor, Tbinding(_):
 				null;
 		}
 		
@@ -545,7 +914,6 @@ private class HaxeUtil
 			case TuniqueID:					'primevc.types.UniqueID';
 			case Temail:					'primevc.types.EMail';
 			case Tcolor:					'primevc.types.RGBA';
-			case Tbitmap:					'primevc.types.Bitmap';
 			case TfileRef:					'primevc.types.FileRef';
 			
 			case Tdef(ptypedef):			switch (ptypedef) {
@@ -595,7 +963,7 @@ private class HaxeUtil
 			//	'String';
 				throw "Unsupported value literal";
 			
-			case TlinkedList, Tbitmap, Tdef(_), Tbinding(_), Tinterval, Tarray(_,_,_):
+			case TlinkedList, Tdef(_), Tbinding(_), Tinterval, Tarray(_,_,_):
 				throw "Unsupported value literal: "+type;
 		}
 		/*
@@ -1147,7 +1515,6 @@ private class HaxeXMLMap extends CodeBufferer
 			case Tinterval:					throw "impossible Tinterval";
 			case TuniqueID:					throw "impossible Tuniq";
 			case Temail:					throw "impossible Temail";
-			case Tbitmap:					throw "impossible Tbitmap";
 			case Tdef(ptypedef):			throw "impossible int conversion Tdef: "+ptypedef;
 			
 			case TenumConverter(enums):		throw "not implemented";
@@ -1174,7 +1541,6 @@ private class HaxeXMLMap extends CodeBufferer
 			case TfileRef:					throw "impossible";
 			case TuniqueID:					throw "impossible";
 			case Temail:					throw "impossible";
-			case Tbitmap:					throw "impossible";
 			case Tdef(ptypedef):			throw "impossible";
 			
 			case TenumConverter(enums):		throw "not implemented";
@@ -1206,7 +1572,6 @@ private class HaxeXMLMap extends CodeBufferer
 			case Tcolor:					xmlstring+prefix+'Color';
 			case Tdate:						xmlstring+prefix+'Date';
 			case Tdatetime:					xmlstring+prefix+'Date';
-			case Tbitmap:					xmlstring+prefix+'Bitmap';
 			
 			case Tbinding(p):
 				var f = getXMLConversionFunction(p.type, path, prefix, property);

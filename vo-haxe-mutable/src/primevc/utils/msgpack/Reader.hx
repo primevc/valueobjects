@@ -15,7 +15,7 @@ class Reader
 	
 	public function readMsgPackValue(i : Input) : Dynamic
 	{
-		Assert.that(i.bigEndian);
+//		Assert.that(i.bigEndian);
 		
 		var b = 0;
 		
@@ -65,7 +65,7 @@ class Reader
 	
 	function readArray(input : Input, len:Int)
 	{
-		var arr = FastArrayUtil.create(len, true);
+		var arr = FastArrayUtil.create(len);
 		for (i in 0 ... len)
 		 	arr[i] = readMsgPackValue(input);
 		
@@ -92,7 +92,7 @@ class Reader
 		case 1: i.readByte();
 		case 2: i.readUInt16();
 		case 3: i.readUInt24();
-		case 4: #if neko i.readInt31(); #else i.readInt32(); #end
+		case 4: #if neko i.readUInt30(); #else cast i.readInt32(); #end
 		default: 0;
 	}
 	

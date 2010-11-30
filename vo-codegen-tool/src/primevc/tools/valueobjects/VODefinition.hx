@@ -396,7 +396,7 @@ class Util
 			case Tbinding(prop):			getPTypedef(prop.type);
 			
 			default: null;
-			//Turi,TuniqueID,Tstring,TlinkedList,Tinteger,Temail,Tdecimal,Tcolor,Tbool,Tbitmap
+			//Turi,TuniqueID,Tstring,TlinkedList,Tinteger,Temail,Tdecimal,Tcolor,Tbool
 		}
 	}
 	
@@ -426,7 +426,6 @@ class Util
 			case Tdate:					false;
 			case Tdatetime:				false;
 			case Tinterval:				false;
-			case Tbitmap:				false;
 		}
 	}
 	
@@ -452,7 +451,6 @@ class Util
 			case Tdate:					true;
 			case Tdatetime:				true;
 			case Tinterval:				true;
-			case Tbitmap:				true;
 		}
 	}
 	
@@ -482,7 +480,6 @@ class Util
 			case Tdate:					true;
 			case Tdatetime:				true;
 			case Tinterval:				true;
-			case Tbitmap:				true;
 		}
 	}
 	
@@ -688,7 +685,6 @@ class PropertyTypeResolver
 			case date:			Tdate;
 			case datetime:		Tdatetime;
 			case interval:		Tinterval;
-			case bitmap:		Tbitmap;
 			case string:		Tstring;
 			case URI:			Turi;
 			case EMail:			Temail;
@@ -719,7 +715,7 @@ class PropertyTypeResolver
 	{
 		type = switch(value)
 		{
-			case integer, decimal, color, date, datetime, interval, bitmap, string, URI, EMail, UniqueID, FileRef:
+			case integer, decimal, color, date, datetime, interval, string, URI, EMail, UniqueID, FileRef:
 				builtinAbstractPType(value);
 			
 			case is(typeName):
@@ -763,7 +759,7 @@ class PropertyTypeResolver
 							case MUndefined(n,m):	throw Err_UndefinedType(path);
 						}
 					
-					case integer, decimal, color, date, datetime, interval, bitmap, string, URI, EMail, UniqueID, FileRef:
+					case integer, decimal, color, date, datetime, interval, string, URI, EMail, UniqueID, FileRef:
 						builtinAbstractPType(atype);
 					
 					case namedSetOf	(_,_,_,_):	throw "namedSetOf(namedSetOf(...)) unsupported";
@@ -923,7 +919,6 @@ class Property
 		return isBindable() || switch (this.type) {
 		//	case Tdef(type):				true;
 			case Tarray(type,min,max):		true;
-			case Tbitmap:					true;
 			case Tbinding(p):				true;
 			case TlinkedList:				true;
 			default:						false;
@@ -968,7 +963,6 @@ class Property
 			case Tdate:				throw "not implemented";
 			case Tdatetime:			throw "not implemented";
 			case Tinterval:			throw "not implemented";
-			case Tbitmap:			throw "not implemented";
 			case Tbinding(p):		throw "not implemented";
 			case Tarray(t,x,y):		throw "not implemented";
 			
@@ -1097,7 +1091,6 @@ class Enumeration
 				case namedSetOf(b,u,p):
 				case is(x):
 				case getter(v,o):
-				case bitmap:
 				case bindTo(p):
 				case arrayOfType(t):
 				case arrayOf(t):
@@ -1892,7 +1885,9 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	public var implementedBy(default,null)		: Hash<BaseTypeDefinition>;
 	public var imports		(getImports,null)	: List<TypeDefinition>;
 	
-	public var propertiesSorted	(getPropertiesSorted,null) : Array<Property>;
+	public var propertiesDefined(getPropertiesDefined, null) : IntHash<Property>; // key is property.index
+	public var numPropertiesDefined(getNumPropertiesDefined, null) : Int; // Count(propertiesDefined)
+	public var propertiesSorted	(getPropertiesSorted,  null) : Array<Property>;
 	
 	public var settings		(default, null)		: {
 		var mongo_proxied: MongoProxyType;
@@ -1903,12 +1898,32 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		return false;
 	}
 	
+	private function getNumPropertiesDefined()
+	{
+		getPropertiesDefined();
+		return numPropertiesDefined;
+	}
+	
+	private function getPropertiesDefined()
+	{
+		if (propertiesDefined != null) return propertiesDefined;
+		
+		var n = 0;
+		propertiesDefined = new IntHash();
+		for (p in this.property) if (p.definedIn == this) {
+			++n;
+			propertiesDefined.set(p.index, p);
+		}
+		numPropertiesDefined = n;
+		return propertiesDefined;
+	}
+	
 	private function getPropertiesSorted()
 	{
 		if (propertiesSorted != null) return propertiesSorted;
 		
 		var nameSorted = Lambda.array(property);
-		nameSorted.sort(function(a,b) return ArrayUtils.compareAlphabetically(a.name, b.name));
+		nameSorted.sort(function(a,b) return a.index - b.index);
 		
 		return propertiesSorted = nameSorted;
 	}
@@ -1927,7 +1942,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 				if (t != null) l.add(Util.unpackPTypedef(t));
 			
 			default:
-			//Turi,TuniqueID,Tstring,TlinkedList,Tinteger,Temail,Tdecimal,Tcolor,Tbool,Tbitmap
+			//Turi,TuniqueID,Tstring,TlinkedList,Tinteger,Temail,Tdecimal,Tcolor,Tbool
 		}
 		return l;
 	}
@@ -1958,6 +1973,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	public function getOptionDef<T>(cl:Class<IClassOption>) : T
 	{
 		for (opt in options) switch (opt) {
+			case editable:
 			case xmlmap(mapping): if (Std.is(mapping, cl)) return cast mapping;
 		}
 		
@@ -2204,7 +2220,6 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 			
 			
 			case TenumConverter(e):	throw Err_PropertyHasNoMembers;
-			case Tbitmap:			throw Err_PropertyHasNoMembers;
 			case Tbool(t):			throw Err_PropertyHasNoMembers;
 			case Tcolor:			throw Err_PropertyHasNoMembers;
 			case Tdecimal(a,b,c):	throw Err_PropertyHasNoMembers;
@@ -2233,14 +2248,30 @@ class ClassDef extends BaseTypeDefinition
 	{
 		if (this.propertiesSorted != null) return propertiesSorted;
 		
-		var superProps = superClass != null? superClass.propertiesSorted : [];
-		
 		var myProps = [];
-		for (p in property) if (!Util.isDefinedInSuperClassOf(this, p)) myProps.push(p);
+		myProps = myProps.concat(getSuperProps(this));
+		myProps = myProps.concat(getSortedProps(this));
 		
-		myProps.sort(function(a,b) return ArrayUtils.compareAlphabetically(a.name, b.name));
+		return this.propertiesSorted = myProps;
+	}
+	
+	function getSuperProps(type:BaseTypeDefinition)
+	{
+		var props = [];
+		for (t in type.supertypes) {
+			props = props.concat(getSuperProps(t));
+			props = props.concat(getSortedProps(t));
+		}
 		
-		return this.propertiesSorted = superProps.concat(myProps);
+		return props;
+	}
+	
+	function getSortedProps(type:TypeDefinitionWithProperties) {
+		var props = [];
+		for (p in this.property) if (p.definedIn == type) props.push(p);
+		
+		props.sort(function(a,b) return a.index - b.index); // return ArrayUtils.compareAlphabetically(a.name, b.name));
+		return props;
 	}
 	
 	public function extendsType(t:TypeDefinition) : Bool
@@ -2367,7 +2398,7 @@ class UniqueIDTrait extends MagicClassDef
 	static var init = function(){ type = new UniqueIDTrait(); }();
 	
 	private function new() {
-		super(-1337, "UniqueID", Module.traits);
+		super(0xFFFFF + 1, "UniqueID", Module.traits);
 		
 		var p = new Property("id", this);
 		p.index = 0;
@@ -2398,7 +2429,6 @@ enum PType
 	Tdatetime;
 	Tinterval;
 	Tcolor;
-	Tbitmap;
 	
 	Tstring;
 	Turi;
@@ -2447,7 +2477,6 @@ enum AbstractPType
 	date;
 	datetime;
 	interval;
-	bitmap;
 	
 	// traits
 	UniqueID;
@@ -2472,6 +2501,7 @@ enum PropertyOption
 
 enum ClassOption
 {
+	editable;
 	xmlmap(mapping:Dynamic);
 }
 

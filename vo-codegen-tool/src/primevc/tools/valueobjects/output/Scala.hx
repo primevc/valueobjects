@@ -107,7 +107,6 @@ class Scala implements CodeGenerator
 					++nonEmptyChecks;
 				
 				case TenumConverter(_):		throw p;
-				case Tbitmap:				throw p;
 				case Tbinding(_):			throw p;
 				case TlinkedList:			throw p;
 			}
@@ -522,7 +521,7 @@ class Scala implements CodeGenerator
 		case TenumConverter(enums):
 			throw "Unsupported value literal";
 		
-		case TlinkedList, Tbitmap, Tdef(_), Tbinding(_), Tinterval, Tarray(_,_,_):
+		case TlinkedList, Tdef(_), Tbinding(_), Tinterval, Tarray(_,_,_):
 			throw "Unsupported value literal: "+type;
 	}
 	
@@ -543,7 +542,6 @@ class Scala implements CodeGenerator
 		case Tarray(innerT,_,_):	throw t;
 		case TenumConverter(prop):	throw t;
 		case TlinkedList:			throw t; //"List";
-		case Tbitmap:				throw t; //"";
 		case Tbinding(_):			throw t; //"";
 	}
 	
@@ -769,7 +767,6 @@ class Scala implements CodeGenerator
 				ac('$'.code); a(p.name);
 			
 			case TenumConverter(_):		throw p;
-			case Tbitmap:				throw p;
 			case Tbinding(_):			throw p;
 			case TlinkedList:			throw p;
 		}
@@ -927,7 +924,6 @@ class Scala implements CodeGenerator
 		case TenumConverter(prop):	prop.parent.fullName + ".from" + prop.name.substr(2); //"";
 		
 		case TlinkedList:			throw t; //"List";
-		case Tbitmap:				throw t; //"";
 		case Tbinding(_):			throw t; //"";
 	}
 	
@@ -952,7 +948,6 @@ class Scala implements CodeGenerator
 		
 		case TlinkedList:			throw t; //"List";
 		case TenumConverter(_):		throw t; //"";
-		case Tbitmap:				throw t; //"";
 		case Tbinding(_):			throw t; //"";
 	}
 	
@@ -974,7 +969,6 @@ class Scala implements CodeGenerator
 		
 		case TlinkedList:			throw t; //"List";
 		case TenumConverter(_):		throw t; //"";
-		case Tbitmap:				throw t; //"";
 		case Tbinding(_):			throw t; //"";
 	}
 	
@@ -995,7 +989,6 @@ class Scala implements CodeGenerator
 		case Tdatetime:				false; //"org.joda.time.DateTime";
 		case TlinkedList:			throw t; //"List";
 		case TenumConverter(_):		throw t; //"";
-		case Tbitmap:				throw t; //"";
 		case Tbinding(_):			throw t; //"";
 	}
 	
@@ -1027,7 +1020,6 @@ class Scala implements CodeGenerator
 		
 		case TlinkedList:			throw t; //"List";
 		case TenumConverter(_):		throw t; //"";
-		case Tbitmap:				throw t; //"";
 		case Tbinding(_):			throw t; //"";
 	}
 	
@@ -1065,7 +1057,6 @@ class Scala implements CodeGenerator
 		case Tbool(v):				Std.string(v);
 		
 		case TenumConverter(_):		throw t; //"";
-		case Tbitmap:				throw t; //"";
 		case Tbinding(_):			throw t; //"";
 	}
 	
@@ -1089,7 +1080,6 @@ class Scala implements CodeGenerator
 			case Tdatetime:				"org.joda.time.DateTime";
 			case Tinterval:				"org.joda.time.Interval";
 			case Tcolor:				"primevc.types.RGBA";
-			case Tbitmap:				throw t; //"";
 			case Tbinding(_):			throw t; //"";
 		
 			case Tdef(ptypedef): switch (ptypedef) {

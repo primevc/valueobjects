@@ -1,5 +1,6 @@
 package primevc.utils.msgpack;
  import haxe.io.Output;
+ import haxe.io.BytesOutput;
  import haxe.Int32;
  import primevc.utils.FastArray;
 
@@ -56,28 +57,72 @@ class Format
 			return 5;
 		}
 	}
-	
-	static public function packString(o : Output, value : String) : Int
+
+#if flash9
+	/**
+	 * Writes 'value' in the most compact MsgPack unsigned integer form possible, to output 'o'.
+	 * Returns: bytes written.
+	 */
+	static public function packUInt(o : Output, value : UInt) : Int
+	{
+		if (value <= 127) {
+		 	o.writeByte(value);
+			return 1;
+		}
+		else if (value <= 255) {
+			o.writeByte(0xcc);
+			o.writeByte(value);
+			return 2;
+		}
+		else if (value < 0x10000) {
+			o.writeByte(0xcd);
+			o.writeUInt16(value);
+			return 3;
+		}
+		else {
+			o.writeByte(0xce);
+			o.writeInt32(cast value);
+			return 5;
+		}
+	}
+#end
+
+	static public function packString(o : BytesOutput, value : String) : Int
 	{
 		var b;
 		
-		if (value.length <= 31) {
+	#if flash9
+		var byteArr = new flash.utils.ByteArray();
+		byteArr.length = value.length;
+		byteArr.writeUTFBytes(value);
+		var valueLength = byteArr.length;
+	#else
+		var valueLength = value.length;
+	#end
+		
+		if (valueLength <= 31) {
 			b = 1;
-			o.writeByte(0xA0 | value.length);
+			o.writeByte(0xA0 | valueLength);
 		}
-		else if (value.length <= 65535) {
+		else if (valueLength <= 65535) {
 			b = 3;
 			o.writeByte(0xda);
-			o.writeUInt16(value.length);
+			o.writeUInt16(valueLength);
 		}
 		else {
 			b = 5;
 			o.writeByte(0xdb);
-			o.writeUInt30(value.length);
+			o.writeUInt30(valueLength);
 		}
-		o.writeString(value);
 		
-		return b + value.length;
+	#if flash9	
+		o.write(haxe.io.Bytes.ofData(byteArr));
+		byteArr.length = 0; // does this release the memory ?
+	#else
+		o.writeString(value);
+	#end
+		
+		return b + valueLength;
 	}
 	
 	/**
@@ -115,6 +160,46 @@ class Format
 		}
 	}
 	
+	static public function packMap(o : BytesOutput, map : Hash<Dynamic>)
+	{
+		var keyCount = Lambda.count(map);
+		Assert.that(keyCount >= 0);
+		
+		var b;
+		
+		if (keyCount <= 15) {
+			o.writeByte(0x80 | keyCount);
+			b = 1;
+		}
+		else if (keyCount < 0x10000) {
+			o.writeByte(0xde);
+			o.writeUInt16(keyCount);
+			b = 3;
+		}
+		else {
+			o.writeByte(0xdf);
+			o.writeInt32(haxe.Int32.ofInt(keyCount));
+			b = 5;
+		}
+		
+		for (key in map.keys()) {
+			b += packString(o, key);
+			b += packDynamic(o, map.get(key));
+		}
+		
+		return b;
+	}
+	
+	static public function packDynamic(o : BytesOutput, value : Dynamic)
+	{
+		return if (value == null)					packNil(o);
+		  else if (value == true || value == false)	packBool(o, value);
+		  else if (Std.is(value, Int))				packInt(o, value);
+		  else if (Std.is(value, Float))			packDouble(o, value);
+		  else if (Std.is(value, String))			packString(o, value);
+		  else throw "Don't know how to pack: " + value;
+	}
+	
 	static public function writeInt(o : Output, bytes:Int, value:Int) switch (bytes) {
 		case 1: o.writeByte(value);
 		case 2: o.writeInt16(value);
@@ -137,6 +222,13 @@ class Format
 	 *  +-byte-+-----------+
 	 *  | 0xD7 | VO Header |
 	 *  +------+-----------+
+	 */
+	static inline public function packValueObject(o : Output)
+	{
+		o.writeByte(0xD7);
+	}
+	
+	/**
 	 *  
 	 *  VO Header:
 	 *  +---bits---+---------------------+----------------------------------+------------------------------------+
@@ -146,14 +238,15 @@ class Format
 	 *   sss: Number of super type "VO Header, Field bitflags + values group" combinations following the TypeID.
 	 *  ffff: 'Field bitflags + values group' count: 0 - 15 bytes.
 	 *  
-	 *  Field bitflags + values group
+	 *  
+	 *  Field bitflags + values group:
 	 *  +----byte----+-----------------------------+
 	 *  | 7654  3210 | VOMsgPack value per set bit |
 	 *  +------------+-----------------------------+
 	 *  Each bit in the first byte indicates whether a value is available.
 	 *  The deserializer keeps track of the group number. 
 	 *  
-	 *  For example: bits "1000 0100" indicate:
+	 *  Example: bits "1000 0100" indicate:
 	 *  - there are 2 Values following
 	 *  - first value is for field index: $groupnumber + 2
 	 *  - second value for field index:   $groupnumber + 7
@@ -163,16 +256,13 @@ class Format
 		Assert.that(fieldFlagBytes >= 0 && fieldFlagBytes <= 15);
 		Assert.that(superTypes >= 0 && superTypes <= 7);
 		
-	//	var h = 0xD700 /* 0xd7 << 8 */ | superTypes << 4 | fieldFlagBytes;
-		
 		if (voType <= 255) {
-			o.writeUInt24((0xD700 /* 0xd7 << 8 */ | superTypes << 4 | fieldFlagBytes) << 8 | voType); // hopefully optimized by haXe
-			return 3;
+			o.writeUInt16(voType | (superTypes << 12) | (fieldFlagBytes << 8));
+			return 2;
 		}
 		else {
-			o.writeUInt16(0xD700 /* 0xd7 << 8 */ | 0x8000 | superTypes << 4 | fieldFlagBytes); // write header in one go
-			o.writeUInt16(voType);
-			return 4;
+			o.writeUInt24(voType | 0x80000 | (superTypes << 20) | (fieldFlagBytes << 16));
+			return 3;
 		}
 	}
 	

@@ -38,7 +38,7 @@ class Module
 	static public function reinitialize() { 
 		root   = new Module("", null);
 		types  = new IntHash();
-		traits = declare("primevc.tools.types");
+		traits = declare("primevc.types");
 	}
 	static var initialize = reinitialize();
 	
@@ -131,7 +131,7 @@ class Module
 		
 		var list = new List<Module>();
 		
-		for (member in this.members ) switch(member) {
+		for (member in this.members) switch(member) {
 			case MModule(m):			list.add(m);
 			case MType(t):			switch(t) {
 				case Tclass (def):	code.genClass(def);
@@ -2406,6 +2406,7 @@ class UniqueIDTrait extends MagicClassDef
 		p.opts  = [unique];
 		this.property.set(p.name, p);
 		
+		this.isMixin   = true;
 		this.finalized = true;
 	}
 }

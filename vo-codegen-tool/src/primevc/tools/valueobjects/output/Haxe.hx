@@ -42,7 +42,7 @@ class Haxe implements CodeGenerator
 		}
 	}
 	
-	private function genClassProperties(def:ClassDef, immutable:Bool) //, editable:Bool)
+	private function genClassStart(def:ClassDef, immutable:Bool)
 	{
 		this.code = new StringBuf();
 		var a = this.code.add;
@@ -56,7 +56,12 @@ class Haxe implements CodeGenerator
 			a("\nclass ");
 		}
 		
-		a(def.name); a("VO");
+		a(def.name);
+	}
+	
+	private function genClassProperties(def:ClassDef, immutable:Bool) //, editable:Bool)
+	{
+		genClassStart(def, immutable); a("VO");
 		
 //		var i = def.supertypes.length;
 		if (def.superClass != null)
@@ -103,36 +108,34 @@ class Haxe implements CodeGenerator
 	
 	public function genClass(def:ClassDef) : Void
 	{
-		if (def.isMixin) return;
+		trace(def.fullName);
 		
 		// Interfaces
 		genClassProperties(def, true);
 		
-		// Class properties
-		genClassProperties(def, false);
-		
-		var magic = getMagicGenerator(def);
-		magic.inject(code);
-		
-		// Meta data
-		genClassMetaData(def);
-		
-		// Constructor
-		genClassConstructor(def, def.superClass != null, magic);
-		
-		// Dispose
-		genDispose(def);
-		
-		// Validation
-		genValidation(def.superClass != null);
+		// VO Class
+		if (!def.isMixin)
+		{
+			genClassProperties(def, false);
+			
+			var magic = getMagicGenerator(def);
+			magic.inject(code);
+			
+			genClassMetaData(def);
+			genClassConstructor(def, def.superClass != null, magic);
+			genDispose(def);
+			genValidation(def.superClass != null);
+			genXMLMapFunctions(def, magic);
+			genEditFunctions(def);
+		}
+		else {
+			// mixin
+			genClassStart(def, false);
+			a("\n{");
+		}
 		
 		// Serialization
 		genSerialization(def);
-		
-		// XMLMapping
-		genXMLMapFunctions(def, magic);
-		
-		genEditFunctions(def);
 		
 		// Close class }
 		code.add("}\n");
@@ -168,7 +171,7 @@ class Haxe implements CodeGenerator
 	{
 		if (def.numPropertiesDefined == 0) return; // no props
 		
-		a("\n\tstatic public function msgpack_maxNonEmptyPropertyID(obj : "); a(def.name); a("VO) : Int\n\t{");
+		a("\n\tstatic "); if (def.numPropertiesDefined < 4) a("inline "); a("public function msgpack_maxNonEmptyPropertyID(obj : "); a(def.name); a("VO) : Int\n\t{");
 		a("\n		return ");
 		var p, i = def.propertiesSorted.length, noIf = true;
 		while (i-->0)
@@ -197,10 +200,9 @@ class Haxe implements CodeGenerator
 	private function genSerialization(def:ClassDef)
 	{
 		// Count bits/properties for this 'def
-		var lastProp = null;
-		var thisProps = new IntHash<Property>();
+		var lastProp:Property = null;
 		var totalPropsToPack = def.numPropertiesDefined;
-		for (p in def.propertiesDefined) lastProp = p;
+		for (p in def.propertiesDefined) if (lastProp == null || lastProp.index < p.index) lastProp = p;
 		
 		var totalProps = totalPropsToPack;
 		
@@ -259,8 +261,12 @@ class Haxe implements CodeGenerator
 			if (def.supertypes.length > 1) a(" + ");
 			a("(superPacker != null).boolCalc()");
 		}
-		if (lastProp != null)
-			a(", maxID == -1? 0 : 1 + (maxID >> 3));");
+		if (lastProp != null) {
+			if (def.numPropertiesDefined <= 8)
+				a(", (maxID != -1).boolCalc());");
+			else
+				a(", maxID != -1? 1 + (maxID >> 3) : 0);");
+		}
 		else
 			a(", 0);");
 		
@@ -311,12 +317,12 @@ class Haxe implements CodeGenerator
 			var bit = 0;
 			for (i in 0 ... lastProp.index + 1)
 			{
-				var p = thisProps.get(i);
+				var p = def.propertiesDefined.get(i);
 				++bit;
 				
 				if (p == null)
 				{
-					if (thisProps.exists(i+1))
+					if (def.propertiesDefined.exists(i+1))
 					{
 						if (bit >= 8) while (bit >= 8)
 						{
@@ -328,11 +334,11 @@ class Haxe implements CodeGenerator
 					}
 				}
 				else
-				{
-					if (totalPropsToPack == 1 && lastProp.index % 8 == 0)
-					{
-						--totalPropsToPack;
+				{	
+					--totalPropsToPack;
 					
+					if (totalPropsToPack == 0 && lastProp.index % 8 == 0)
+					{
 						if (bit <= 8 && p == lastProp)
 						{
 							a("\n\t\t");
@@ -347,7 +353,6 @@ class Haxe implements CodeGenerator
 					}
 					else
 					{
-						--totalPropsToPack;
 						a("\n\t\t"); addIfPropertyIsSetExpr("obj.", p, "i |= 0x" + StringTools.hex(1 << (bit-1), 2));
 					
 						//TODO: Add basic circular reference check ?  Maybe cache all object references and throw on circle?
@@ -361,7 +366,7 @@ class Haxe implements CodeGenerator
 							a("\n\t\t{");
 						
 							for (b in 0 ... bit) {
-								var p = thisProps.get(i+1 - bit + b);
+								var p = def.propertiesDefined.get(i+1 - bit + b);
 								if (p == null) continue;
 								a("\n\t\t	if ((i & 0x"); a(StringTools.hex(1 << b, 2)); a(").not0()) "); 
 								addPropertyPackerCall("obj." + p.name, p.type, p.isBindable()); ac(";".code);

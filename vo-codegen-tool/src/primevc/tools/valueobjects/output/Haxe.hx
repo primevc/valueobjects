@@ -38,6 +38,7 @@ class Haxe implements CodeGenerator
 		var a = this.code.add;
 		if (def.module.name.length > 0) {
 			a("package "); a(def.module.fullName); a(";\n");
+			a(" import primevc.tools.valueobjects.ValueObjectBase;\n");
 			a(" import primevc.tools.valueobjects.xmlmap.XMLString;\n");
 		}
 	}
@@ -52,6 +53,7 @@ class Haxe implements CodeGenerator
 			a("\ninterface I"); 
 		else {
 			a("  using primevc.utils.IfUtil;\n");
+			a("  using primevc.utils.NumberUtil;\n");
 			a("  using primevc.utils.msgpack.Format;\n");
 			a("\nclass ");
 		}
@@ -73,6 +75,9 @@ class Haxe implements CodeGenerator
 			}
 			
 //			if (--i > 1) code.addChar(','.code);
+		}
+		else if (!immutable) {
+			a(" extends ValueObjectBase,");
 		}
 		
 		if (immutable)
@@ -159,10 +164,10 @@ class Haxe implements CodeGenerator
 	
 	private function genClassMetaData(def:ClassDef)
 	{
-		a("\n\tstatic inline public var TypeID = ");
+		a("\n\tstatic inline public var TYPE_ID = ");
 		a(def.index + ";\n\t");
 		for (p in def.propertiesSorted) {
-		 	a("\n\tstatic inline public var P_"); a(p.name); a(" = "); a("0x" + StringTools.hex(p.definedIn.index << 8 | p.index, 4)); a("; // "); a(p.definedIn.name);
+		 	a("\n\tstatic inline public var "); a(p.name.toUpperCase()); a(" = "); a("0x" + StringTools.hex(p.definedIn.index << 8 | p.index, 4)); a("; // "); a(p.definedIn.name);
 		}
 		a("\n\t");
 	}
@@ -252,7 +257,7 @@ class Haxe implements CodeGenerator
 		a("\n\t\telse b = 0;");
 		
 		a("\n\t\t");
-		a("\n\t\tb += o.packValueObjectHeader(TypeID, ");
+		a("\n\t\tb += o.packValueObjectHeader(TYPE_ID, ");
 		
 		if (processEmbeddedTypes) a(def.supertypes.length == (def.superClass == null? 1 : 2)? "i" : "(i & 0xFF)"); 
 		else if (def.superClass == null) a("0");
@@ -301,7 +306,7 @@ class Haxe implements CodeGenerator
 			// Single Property optimization
 			var p = lastProp;
 			
-			a("\n\t\tif (maxID == P_"); a(p.name); a(") {");
+			a("\n\t\tif (maxID == "); a(p.name.toUpperCase()); a(") {");
 			a("\n\t\t\to.writeByte(0x"); a(StringTools.hex(1 << p.index, 2)); a("); ++b;");
 			a("\n\t\t\t"); addPropertyPackerCall("obj." + p.name, p.type, p.isBindable()); ac(";".code);
 			a("\n\t\t}");
@@ -343,7 +348,7 @@ class Haxe implements CodeGenerator
 						{
 							a("\n\t\t");
 							// Single last Property: optimize if + packing
-							a("\n\t\tAssert.that(P_"); a(lastProp.name); a(" == maxID);");
+							a("\n\t\tAssert.that("); a(lastProp.name.toUpperCase()); a(" == maxID);");
 							a("\n\t\to.writeByte(" + (1 << (bit-1))); a("); ++b;\n\t\t");
 							addPropertyPackerCall("obj." + p.name, p.type, p.isBindable()); ac(";".code);
 							
@@ -374,7 +379,7 @@ class Haxe implements CodeGenerator
 						
 							a("\n\t\t}");
 							if (totalPropsToPack > 0) {
-								a("\n\t\tif (maxID <= P_"); a(p.name);  a(") return b;");
+								a("\n\t\tif (maxID <= "); a(p.name.toUpperCase());  a(") return b;");
 								a("\n\t\t");
 							}
 							
@@ -457,7 +462,7 @@ class Haxe implements CodeGenerator
 	/** Returns true when no if statement was added  (Property is always set) */
 	private function addIfPropertyIsSetExpr(propPrefix:String, p:Property, expr:String)
 	{
-		var path, nullCheck;
+		var path;
 		
 		if (p.isBindable())
 		{
@@ -467,33 +472,20 @@ class Haxe implements CodeGenerator
 				default:
 					path = propPrefix + p.name + ".value";
 			}
-			nullCheck = propPrefix + p.name + ".notNull() && " + path + ".notNull()";
+//			nullCheck = propPrefix + p.name + ".notNull() && " + path + ".notNull()";
 		}
 		else {
 			path = propPrefix + p.name;
-			nullCheck = path + ".notNull()";
 		}
-		
-		var extraChecks = null;
+		var nullCheck = path + ".notNull()";
+		var extraChecks = extraNullCheck(path, p.type);
 		
 		switch (p.type)
 		{
-			case Tstring, Temail:
-				extraChecks = path + ".length.not0()";
-	
-			case Tarray(_,_,_):
-				extraChecks = path + ".length.not0()";
-	
-			case Turi, TfileRef, Tinteger(_,_,_), Tdecimal(_,_,_):
-				extraChecks = path + ".isSet()";
-			
 			case Tbool(_):
 				nullCheck = null; // no way to figure out if the value was changed...
 			
-			case Tdef(type):
-				extraChecks = "!" + path + ".isEmpty()";
-			
-			case TuniqueID, Tinterval, TlinkedList, TenumConverter(_), Tdate, Tdatetime, Tcolor, Tbinding(_):
+			default:
 		}
 		
 		if (nullCheck != null) {
@@ -506,6 +498,33 @@ class Haxe implements CodeGenerator
 		a(";"); // a(p.name);
 		
 		return nullCheck == null;
+	}
+	
+	private function extraNullCheck(path:String, ptype:PType) return switch(ptype)
+	{
+		case Tstring, Temail:
+			path + ".length.not0()";
+
+		case Tarray(_,_,_):
+			path + ".length.not0()";
+
+		case Turi, TfileRef, Tinteger(_,_,_), Tdecimal(_,_,_):
+			path + ".isSet()";
+		
+		case Tdef(type):
+			"!" + path + ".isEmpty()";
+		
+		case Tbool(_), TuniqueID, Tinterval, TlinkedList, TenumConverter(_), Tdate, Tdatetime, Tcolor, Tbinding(_):
+			null;
+	}
+	
+	private function addIfValueNotNullExpr(valuePath:String, ptype:PType, expr:String)
+	{
+		var extraChecks = extraNullCheck(valuePath, ptype);
+		
+		if (extraChecks != null) {
+			a("if ("); a(extraChecks); a(") "); a(expr); a(";");
+		}
 	}
 	
 	private function addEmbedMessagePackTypeBitmask(i:Int) {
@@ -531,16 +550,56 @@ class Haxe implements CodeGenerator
 		a("\t}\n#end\n");
 	}
 	
+	private function hexBitflag(propertyIndex:Int) {
+		return "0x" + StringTools.hex(1 << propertyIndex, 2);
+	}
 	
 	private function genEditFunctions(def:ClassDef)
 	{
 		genEditableVOFunctionCalls(def, "beginEdit");
-		genEditableVOFunctionCalls(def, "commitEdit");
+		genEditableVOFunctionCalls(def, "commitBindables");
 		genEditableVOFunctionCalls(def, "cancelEdit");
+		
+		// addChanges()
+		a("\n\toverride public function addChanges(changeSet:ObjectChangeSet)\n\t{");
+		a("\n\t\tif (_changedFlags.not0())\n\t\t{");
+		for (i in 0 ... def.propertiesSorted.length)
+		{
+			var p = def.propertiesSorted[i];
+			if (p.isBindable())		a("\n\t\t\taddBindableChange("); 
+			else if (p.isArray())	a("\n\t\t\taddListChanges(");
+			else					a("\n\t\t\taddChange(");
+			
+			a(p.name.toUpperCase()); a(", "); a(hexBitflag(i)); a(", "); a(p.name); a(");");
+		}
+		a("\n\t\t}\n\t}\n");
+		
+		// change listeners
+		for (i in 0 ... def.propertiesSorted.length)
+		{
+			var p = def.propertiesSorted[i];
+			if (Util.isDefinedInSuperClassOf(def, p)) continue;
+			
+			if (p.isBindable() || p.isArray()) {
+				a("\tprivate function "); a(p.name); a("Changed(value, old) : Void { _changedFlags |= "); a(hexBitflag(i)); a("; ");
+				addPropChangeFlagSetter(i,p);
+				a(" }\n");
+			}
+			else {
+				a("\tprivate function set_"); a(p.name); a("(value) : Void { _changedFlags |= "); a(hexBitflag(i)); a("; ");
+				addPropChangeFlagSetter(i,p);
+				a(" return value; }\n");
+			}
+		}
+	}
+	
+	private function addPropChangeFlagSetter(i,p)
+	{
+		addIfValueNotNullExpr("value", p.type, "_propertiesSet |= " + hexBitflag(i) + "; else _propertiesSet &= 0x" + StringTools.hex(0xFFFFFF ^ (i << 1)));
 	}
 	
 	
-	private function openFunctionDeclaration (def:ClassDef, functionName)
+	private function openFunctionDeclaration (def:ClassDef, functionName, forceOverride = false, doSuperCall = true)
 	{
 	/*	if (def.superClass != null)
 		{
@@ -555,11 +614,11 @@ class Haxe implements CodeGenerator
 		}
 */		
 		a("\n\t");
-		if (def.superClass != null) a("override ");
+		if (forceOverride || def.superClass != null) a("override ");
 
 		a("public function "); a(functionName); a("() : Void\n\t{\n");
 
-		if (def.superClass != null) {
+		if ((forceOverride || def.superClass != null) && doSuperCall) {
 			a("\t\tsuper."); a(functionName); a("();\n");
 		}
 	}
@@ -581,13 +640,13 @@ class Haxe implements CodeGenerator
 	}
 	
 	
-	private function genDispose (def:ClassDef)
+	private function genDispose(def:ClassDef)
 	{	
 		openFunctionDeclaration( def, "dispose");
 		
-		for (p in def.property)
-			if (!Util.isDefinedInSuperClassOf(def, p) && p.isDisposable())
-				generateFunctionCall( p, "dispose" );
+		for (p in def.property) if (!Util.isDefinedInSuperClassOf(def, p) && p.isDisposable()) {
+			a("\t\tif (this."); a(p.name); a(".notNull())\t\t{ "); a(p.name); a(".dispose(); "); a(p.name); a(" = null; }\n");
+		}
 		
 		closeFunctionDeclaration( def, "dispose");
 	}
@@ -595,31 +654,60 @@ class Haxe implements CodeGenerator
 	
 	private function genEditableVOFunctionCalls(def:ClassDef, functionName)
 	{
-		openFunctionDeclaration( def, functionName);
+		var functionCalls = new List<Property>();
 		
 		for (p in def.property)
 			if (!Util.isDefinedInSuperClassOf(def, p) && (p.isBindable() || p.isArray()))
-				generateFunctionCall( p, functionName );
+				functionCalls.add(p);
 		
-		closeFunctionDeclaration( def, functionName);
+		if (functionCalls.length > 0)
+		{
+			openFunctionDeclaration( def, functionName, functionName == "commitBindables", def.superClass != null );
+			for (p in functionCalls)
+				generateFunctionCall( p, functionName );
+			
+			closeFunctionDeclaration( def, functionName);
+		}
 	}
 	
 	private function genClassConstructor(def:ClassDef, genSuperCall:Bool = false, magic)
 	{
-		a("\n\tpublic function new()\n\t{\n");
+		a("\n\tpublic function new(");
+		for (i in 0 ... def.propertiesSorted.length) {
+			var p = def.propertiesSorted[i];
+			a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type)); a(" = "); a(HaxeUtil.getConstructorInitializer(p.type, true));
+			if (i + 1 != def.propertiesSorted.length) a(", ");
+		}
+		a(")\n\t{\n");
+		
 		if (genSuperCall)
-			a("\t\tsuper();\n");
+		{
+			a("\t\tsuper(");
+			var first = true;
+			for (i in 0 ... def.propertiesSorted.length)
+			{
+				var p = def.propertiesSorted[i];
+				if (Util.isDefinedInSuperClassOf(def, p)) {
+					if (first) first = false; else a(", ");
+					a(p.name); a("_");
+				}
+			}
+			a(");\n");
+		}
 		
 		var a = code.add;
 		var setProp = function(p){
 			a("\t\tthis."); a(p.name); a(" = ");
 		}
 		
-		for (p in def.property) if (!Util.isDefinedInSuperClassOf(def, p)) {
-			var c = HaxeUtil.getConstructorCall(p.type, p.isBindable());
+		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p)) {
+			var c = HaxeUtil.getConstructorCall(p.type, p.isBindable(), p.name + "_");
 			if (c != null) {
 				setProp(p);
 				a(c); a("\n");
+			}
+			if (p.isArray() || p.isBindable()) {
+				a("\t\t"); a(p.name); a(".change.bind(this, "); a(p.name); a("Changed);\n");
 			}
 		}
 		
@@ -859,7 +947,7 @@ private class NamedSetDefGenerator extends MagicClassGenerator
 		a("\t\tfor (child in node.elements()) {\n");
 		
 		a("\t\t\tvar tmp"); 
-		var c = HaxeUtil.getConstructorCall(ns.baseType, false);
+		var c = HaxeUtil.getConstructorCall(ns.baseType, false, HaxeUtil.getConstructorInitializer(ns.baseType));
 		if (c != null) { a(" = "); a(c); }
 		else throw "non constructable type? " + ns;
 		
@@ -871,31 +959,45 @@ private class NamedSetDefGenerator extends MagicClassGenerator
 
 private class HaxeUtil
 {
-	public static function getConstructorCall(ptype:PType, bindable:Bool)
+	public static function getConstructorCall(ptype:PType, bindable:Bool, initializer:String)
 	{
 		var code = switch (ptype)
 		{
-			case Tstring:				"''";
-			case Tbool(val):			val? "true" : "false";
-			case Tarray(type, _,_):		("new primevc.core.collections.RevertableArrayList < " + HaxeUtil.haxeType( type, true ) + " >()");
+			case Tarray(type, _,_):
+				("new primevc.core.collections.RevertableArrayList < " + HaxeUtil.haxeType( type, true ) + " >("+ initializer +")");
 			
 			case Turi, TfileRef, Tinterval:
-				"new " + HaxeUtil.haxeType(ptype) + "()";
+				"new " + HaxeUtil.haxeType(ptype) + "("+ initializer +")";
 			
-			case Tdef(type):
-				getClassConstructorCall(Util.unpackPTypedef(type));
-			
-			case Tinteger(_,_,_):		'primevc.types.Number.INT_NOT_SET';
-			case Tdecimal(_,_,_):		'primevc.types.Number.FLOAT_NOT_SET';
-			case TuniqueID, Temail:		"''";
-			
-			case TlinkedList, TenumConverter(_), Tdate, Tdatetime, Tcolor, Tbinding(_):
-				null;
+			case Tdef(_):
+				"(" + initializer + ".notNull()? " + initializer + " : " + getConstructorInitializer(ptype) + ")";
+			case Tinteger(_,_,_), Tdecimal(_,_,_), TuniqueID, Temail, Tstring, Tbool(_), TlinkedList, TenumConverter(_), Tdate, Tdatetime, Tcolor, Tbinding(_):
+				initializer;
 		}
 		
 		return bindable? "new primevc.core.RevertableBindable("+ code +");" : if (code == null) null else code + ";";
 	}
 	
+	public static function getConstructorInitializer(ptype:PType, constOnly = false) return switch (ptype)
+	{
+		case Tstring:				"''";
+		case Tbool(val):			val? "true" : "false";
+		case Tarray(type, _,_):		"[]";
+		
+		case Turi, TfileRef, Tinterval:
+			"new " + HaxeUtil.haxeType(ptype) + "()";
+		
+		case Tdef(type):
+			if (constOnly) null else getClassConstructorCall(Util.unpackPTypedef(type));
+		
+		case Tinteger(_,_,_):		'primevc.types.Number.INT_NOT_SET';
+		case Tdecimal(_,_,_):		'primevc.types.Number.FLOAT_NOT_SET';
+		case TuniqueID, Temail:		"''";
+		
+		case TlinkedList, TenumConverter(_), Tdate, Tdatetime, Tcolor, Tbinding(_):
+			null;
+	}
+		
 	public static function getClassConstructorCall(tdef:TypeDefinition)
 	{
 		// Dont 'new' enums.

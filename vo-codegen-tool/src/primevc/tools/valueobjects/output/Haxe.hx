@@ -175,7 +175,7 @@ class Haxe implements CodeGenerator
 		a("\n\t");
 	}
 	
-	private function genMsgpackMaxSetPropertyCheck(def:ClassDef)
+/*	private function genMsgpackMaxSetPropertyCheck(def:ClassDef)
 	{
 		if (def.numPropertiesDefined == 0) return; // no props
 		
@@ -204,7 +204,7 @@ class Haxe implements CodeGenerator
 		}
 		a("\n\t}");
 	}
-	
+*/	
 	private function genSerialization(def:ClassDef)
 	{
 		// Count bits/properties for this 'def
@@ -215,33 +215,43 @@ class Haxe implements CodeGenerator
 		var totalProps = totalPropsToPack;
 		
 		
-		genMsgpackMaxSetPropertyCheck(def);
+//		genMsgpackMaxSetPropertyCheck(def);
 		var hasSuper = def.superClass != null;
 		
 		a("\n\t"); if (hasSuper) a("override "); a("public function messagePack(o : BytesOutput) : Int\n\t{");
-		a("\n\t\treturn msgpack_packVO(o, this, true);");
+		a("\n\t\treturn msgpack_packVO(o, this, true, 0);");
 		a("\n\t}");
 		a("\n");
 		
-		a("\n\tstatic public function msgpack_packVO(o : BytesOutput, obj : "); a(def.name); a("VO, prependMsgpackType : Bool = false) : Int\n\t{");
+		a("\n\tstatic public function msgpack_packVO(o : BytesOutput, obj : "); if (def.isMixin){ a("I"); } a(def.name); a("VO, prependMsgpackType : Bool = false, propertyBitsOffset : Int) : Int\n\t{");
+		
 		a("\n		Assert.that(o != null && obj != null);");
-		a("\n		var ");
-		if (lastProp != null)
-			a("maxID = msgpack_maxNonEmptyPropertyID(obj)");
+		a("\n		");
 		
 		var processEmbeddedTypes = (def.superClass == null && def.supertypes.length > 0) || (hasSuper && def.supertypes.length > 1);
+		var i_undefined = true;
 		
-		if (processEmbeddedTypes) {
-			if (lastProp != null) a(", ");
-			a("i = obj.msgpack_interfacesToPack()");
-		}
+		if (processEmbeddedTypes || hasSuper)
+		{
+			a("\n		var ");
 		
-		if (hasSuper) {
-			if (lastProp != null || processEmbeddedTypes) a(",\n\t\t\t");
-			a("superPacker = obj.msgpack_superClassPacker();");
-		}
-		else
+			if (processEmbeddedTypes) {
+				a("i = obj.msgpack_interfacesToPack()");
+				i_undefined = false;
+			}
+		
+			if (hasSuper) {
+				if (processEmbeddedTypes) a(",\n\t\t\t");
+				a("superPacker = obj.msgpack_superClassPacker();");
+			}
 			a(";");
+		}
+		
+		if (def.numPropertiesDefined > 0) {
+			a("\n\t\tvar myPropertyBits = (ValueObjectBase.propertiesSet(obj) >>> (propertyBitsOffset + "); a((def.propertiesSorted.length - def.numPropertiesDefined) + "))");
+			a(" & 0x"); a(StringTools.hex(0x7FFFFFFF >>> 32 - def.numPropertiesDefined)); a(";");
+		}
+		
 		a("\n\t\t");
 		a("\n\t\tvar b /* bytes written */ : Int;");
 		a("\n\t\tif (prependMsgpackType) {");
@@ -251,12 +261,12 @@ class Haxe implements CodeGenerator
 				a("!superPacker.notNull()");
 				if (lastProp != null || processEmbeddedTypes) a(" && ");
 			}
-		 	if (processEmbeddedTypes) a(lastProp != null? "i + " : "i.not0()");
-		 	if (lastProp != null) a("maxID == -1");
-		a(") return o.packNil();");
-		
-		a("\n\t\t\telse b = o.packValueObject();");
+		 	if (processEmbeddedTypes) a(lastProp != null? "(i + " : "i.not0()");
+		 	if (lastProp != null) a(processEmbeddedTypes? "myPropertyBits).not0()" : "myPropertyBits.not0()");
+			a(") b = o.packValueObject();");
+		a("\n\t\t\telse return o.packNil();");
 		a("\n\t\t}");
+		
 		a("\n\t\telse b = 0;");
 		
 		a("\n\t\t");
@@ -269,11 +279,13 @@ class Haxe implements CodeGenerator
 			if (def.supertypes.length > 1) a(" + ");
 			a("(superPacker != null).boolCalc()");
 		}
-		if (lastProp != null) {
-			if (def.numPropertiesDefined <= 8)
-				a(", (maxID != -1).boolCalc());");
-			else
-				a(", maxID != -1? 1 + (maxID >> 3) : 0);");
+		if (lastProp != null)
+		{
+			if (def.numPropertiesDefined == 1)
+				a(", myPropertyBits);");
+			else {
+				a(", myPropertyBits.not0()? "); a(def.numPropertiesDefined > 8? "ValueObjectBase.bytesUsedInInt(myPropertyBits)" : "1"); a(" : 0);");
+			}
 		}
 		else
 			a(", 0);");
@@ -292,15 +304,21 @@ class Haxe implements CodeGenerator
 			// Pack mixins/embedded/interface types
 			var i = 0;
 			if (hasSuper) {
-				for (t in def.supertypes) if (!t.implementedBy.exists(def.superClass.fullName))
-					addEmbedMessagePackCall(i++, t, def.supertypes.length - 1);
+				var bitsOffset = def.superClass.propertiesSorted.length;
+				for (t in def.supertypes) if (!t.implementedBy.exists(def.superClass.fullName)) {
+					addEmbedMessagePackCall(i++, t, def.supertypes.length - 1, bitsOffset);
+					bitsOffset += t.propertiesSorted.length;
+				}
 			}
 			else {
-				for (t in def.supertypes)
-					addEmbedMessagePackCall(i++, t, def.supertypes.length);
+				var bitsOffset = 0;
+				for (t in def.supertypes) {
+					addEmbedMessagePackCall(i++, t, def.supertypes.length, bitsOffset);
+					bitsOffset += t.propertiesSorted.length;
+				}
 			}
 		
-			if (totalProps > 1) a("\n\t\t\ti = 0;");
+//			if (totalProps > 1) a("\n\t\t\ti = 0;");
 			a("\n\t\t}");
 		}
 		
@@ -309,20 +327,17 @@ class Haxe implements CodeGenerator
 			// Single Property optimization
 			var p = lastProp;
 			
-			a("\n\t\tif (maxID == "); a(p.name.toUpperCase()); a(") {");
+			a("\n\t\tif (myPropertyBits.not0()) {");
 			a("\n\t\t\to.writeByte(0x"); a(StringTools.hex(1 << p.index, 2)); a("); ++b;");
 			a("\n\t\t\t"); addPropertyPackerCall("obj." + p.name, p.type, p.isBindable()); ac(";".code);
 			a("\n\t\t}");
-			a("\n\t\telse Assert.that(maxID == -1);");
 		}
 		else if (lastProp != null) // at least one Property to pack
 		{
-			a("\n\t\tif (maxID == -1) return b;");
+			a("\n\t\tif (!myPropertyBits.not0()) return b;");
 			a("\n\t\t");
 			
-			if (!processEmbeddedTypes && totalPropsToPack > 1) a("\n\t\tvar i = 0;");
-			
-			var bit = 0;
+			var bit = 0, mask = 0;
 			for (i in 0 ... lastProp.index + 1)
 			{
 				var p = def.propertiesDefined.get(i);
@@ -361,12 +376,23 @@ class Haxe implements CodeGenerator
 					}
 					else
 					{
-						a("\n\t\t"); addIfPropertyIsSetExpr("obj.", p, "i |= 0x" + StringTools.hex(1 << (bit-1), 2));
-					
+					//	a("\n\t\t"); addIfPropertyIsSetExpr("obj.", p, "i |= 0x" + StringTools.hex(1 << (bit-1), 2));
+						mask |= 1 << (bit-1);
+						
 						//TODO: Add basic circular reference check ?  Maybe cache all object references and throw on circle?
 					
 						if (bit == 8 || p == lastProp)
 						{
+							a("\n\t\t"); 
+							
+							if (def.numPropertiesDefined > 8 && def.numPropertiesDefined - i > 1) {
+								if (i_undefined) { a("var "); i_undefined = false; }
+								a("i = myPropertyBits & 0x"); a(StringTools.hex(mask, 2)); a(";");
+							}
+							else {
+								a("i = myPropertyBits;");
+							}
+							
 							a("\n\t\to.writeByte(i); ++b;");
 							a("\n\t\t");
 							if (totalProps <= 8)	a("\n\t\tAssert.that(i.not0());");
@@ -382,7 +408,7 @@ class Haxe implements CodeGenerator
 						
 							a("\n\t\t}");
 							if (totalPropsToPack > 0) {
-								a("\n\t\tif (maxID <= "); a(p.name.toUpperCase());  a(") return b;");
+								a("\n\t\tif (!(myPropertyBits >>>= 8).not0()) return b;");
 								a("\n\t\t");
 							}
 							
@@ -404,13 +430,19 @@ class Haxe implements CodeGenerator
 			
 			if (def.superClass == null? def.supertypes.length == 1 : def.supertypes.length == 2) {
 				var t = def.supertypes.first();
-				a("\n\t\treturn ("); a(t.fullName); a(".msgpack_maxNonEmptyPropertyID(this) != -1).boolCalc();");
+				
+				if (t.numPropertiesDefined == 1)
+					a("\n\t\treturn _propertiesSet & 1");
+				else {
+					a("\n\t\treturn (_propertiesSet & 0x"); a(StringTools.hex(interfacePropertiesBitmask(t, 0), 8)); a(").not0()? 1 : 0;");
+				}
 			}
 			else {
 				a("\n\t\tvar i = 0, n = 0;");
-				var i = 0;
+				var i = 0, offset = 0;
 				for (t in def.supertypes) {
-					a("\n\t\tif ("); a(t.fullName); a(".msgpack_maxNonEmptyPropertyID(this) != -1) { ++n; i |= 0x"); addEmbedMessagePackTypeBitmask(i++); a("; }");
+					a("\n\t\tif ((_propertiesSet & 0x"); a(StringTools.hex(interfacePropertiesBitmask(t, offset), 8)); a(").not0()) { ++n; i |= 0x"); addEmbedMessagePackTypeBitmask(i++); a("; }");
+					offset += t.propertiesSorted.length;
 				}
 				a("\n\t\treturn i |= n;");
 			}
@@ -427,6 +459,16 @@ class Haxe implements CodeGenerator
 			a("     else "); if (def.superClass.superClass != null) a("super.superClassPacker();"); else a("null;");
 			a("\n\t}\n");
 		}
+	}
+	
+	private static function interfacePropertiesBitmask(t:BaseTypeDefinition, offset:Int)
+	{
+		var mask = 0;
+		for (bit in 0 ... t.propertiesSorted.length) {
+			mask |= 1 << (bit + offset);
+		}
+		
+		return mask;
 	}
 	
 	private inline function ac(char:Int) code.addChar(char)
@@ -531,13 +573,13 @@ class Haxe implements CodeGenerator
 		a(StringTools.hex(1 << (i + 8), 4));
 	}
 	
-	private function addEmbedMessagePackCall(i:Int, t:TypeDefinition, numEmbedTypes:Int)
+	private function addEmbedMessagePackCall(i:Int, t:TypeDefinition, numEmbedTypes:Int, bitsOffset:Int)
 	{
 		a("\n\t\t\t");
 		if (numEmbedTypes > 1) {
 			a("if ((i & 0x"); addEmbedMessagePackTypeBitmask(i); a(").not0()) ");
 		}
-		a("b += "); a(t.fullName); a("VO.msgpack_packVO(o, this);");
+		a("b += "); a(t.fullName); a("VO.msgpack_packVO(o, this, "); a(bitsOffset + ");");
 	}
 	
 	private function genValidation(genOverride:Bool = false)

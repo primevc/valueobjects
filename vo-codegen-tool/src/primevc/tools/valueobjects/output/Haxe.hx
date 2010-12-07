@@ -94,13 +94,16 @@ class Haxe implements CodeGenerator
 	*/	
 		a("\n{\n");
 		
-		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p)) {
+		for (i in 0 ... def.propertiesSorted.length)
+		{
+			var p = def.propertiesSorted[i];
+			if (Util.isDefinedInSuperClassOf(def, p)) continue;
 			
 			if (immutable) {
 				genGetter(p, true);
 			} else {
 				genGetter(p, false);
-			//	genSetter(p, def.fullName);
+				genSetter(i, p, def.fullName);
 			}
 		}
 		
@@ -462,42 +465,39 @@ class Haxe implements CodeGenerator
 	/** Returns true when no if statement was added  (Property is always set) */
 	private function addIfPropertyIsSetExpr(propPrefix:String, p:Property, expr:String)
 	{
-		var path;
-		
-		if (p.isBindable())
-		{
-			switch (p.type) {
-				case Tarray(_,_,_), Turi:
-					path = propPrefix + p.name;
-				default:
-					path = propPrefix + p.name + ".value";
-			}
-//			nullCheck = propPrefix + p.name + ".notNull() && " + path + ".notNull()";
-		}
-		else {
-			path = propPrefix + p.name;
-		}
+		return addIfVarIsSetExpr(propPrefix + p.name, p.type, p.isBindable(), expr);
+	}
+	
+	private function addIfVarIsSetExpr(path:String, ptype:PType, bindable:Bool, expr:String)
+	{	
 		var nullCheck = path + ".notNull()";
-		var extraChecks = extraNullCheck(path, p.type);
+		if (bindable)
+			path = path + ".value";
 		
-		switch (p.type)
-		{
-			case Tbool(_):
-				nullCheck = null; // no way to figure out if the value was changed...
+		switch (ptype) {
+			case Tarray(_,_,_), Turi:
+			
+			case Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
+				if (!bindable) nullCheck = null; // Simple types can't be null...
 			
 			default:
+				if (bindable) nullCheck += " && " + path + ".notNull()";
 		}
 		
-		if (nullCheck != null) {
-			a("if ("); a(nullCheck);
-			if (extraChecks != null) { a(" && "); a(extraChecks); }
+		var extraChecks = extraNullCheck(path, ptype);
+		
+		if (nullCheck != null || extraChecks != null)
+		{
+			a("if (");
+			if (nullCheck != null) a(nullCheck);
+			if (extraChecks != null) { if (nullCheck != null) a(" && "); a(extraChecks); }
 			a(") ");
 		}
 		
 	 	a(expr);
 		a(";"); // a(p.name);
 		
-		return nullCheck == null;
+		return nullCheck == null && extraChecks == null;
 	}
 	
 	private function extraNullCheck(path:String, ptype:PType) return switch(ptype)
@@ -573,31 +573,7 @@ class Haxe implements CodeGenerator
 			a(p.name.toUpperCase()); a(", "); a(hexBitflag(i)); a(", "); a(p.name); a(");");
 		}
 		a("\n\t\t}\n\t}\n");
-		
-		// change listeners
-		for (i in 0 ... def.propertiesSorted.length)
-		{
-			var p = def.propertiesSorted[i];
-			if (Util.isDefinedInSuperClassOf(def, p)) continue;
-			
-			if (p.isBindable() || p.isArray()) {
-				a("\tprivate function "); a(p.name); a("Changed(value, old) : Void { _changedFlags |= "); a(hexBitflag(i)); a("; ");
-				addPropChangeFlagSetter(i,p);
-				a(" }\n");
-			}
-			else {
-				a("\tprivate function set_"); a(p.name); a("(value) : Void { _changedFlags |= "); a(hexBitflag(i)); a("; ");
-				addPropChangeFlagSetter(i,p);
-				a(" return value; }\n");
-			}
-		}
 	}
-	
-	private function addPropChangeFlagSetter(i,p)
-	{
-		addIfValueNotNullExpr("value", p.type, "_propertiesSet |= " + hexBitflag(i) + "; else _propertiesSet &= 0x" + StringTools.hex(0xFFFFFF ^ (i << 1)));
-	}
-	
 	
 	private function openFunctionDeclaration (def:ClassDef, functionName, forceOverride = false, doSuperCall = true)
 	{
@@ -706,13 +682,10 @@ class Haxe implements CodeGenerator
 				setProp(p);
 				a(c); a("\n");
 			}
-			if (p.isArray() || p.isBindable()) {
-				a("\t\t"); a(p.name); a(".change.bind(this, "); a(p.name); a("Changed);\n");
-			}
 		}
 		
 		magic.constructor(code);
-		a("\t}\n");
+		a("\t\t_changedFlags = 0;\n\t}\n");
 	}
 	
 	function write(name:String)
@@ -730,24 +703,57 @@ class Haxe implements CodeGenerator
 		if (immutable) {
 			a("\t(default,null");
 		} else {
-			a("\t(default,default");
-//			a("(default,set"); code.addCapitalized(p.name);
+//			a("\t(default,default");
+			a("\t(default,set"); code.addCapitalized(p.name);
 		}
 		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable())); a(";\n");
 	}
-/*	
-	function genSetter(p:Property, fullName:String)
+	
+	function genSetter(i:Int, p:Property, fullName:String)
 	{
-		var a = code.add;
+		a("\tprivate function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, false, p.isBindable())); a(") {\n");
 		
-		a("\t#if (VO_Write || !VO_Read)\n");
-		a("\tinline private function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type)); a(") {\n");
-		a("\t\tthis."); a(p.name); a(" = v;\n");
-		a("\t\treturn this;\n");
+		a("\t\t_changedFlags |= "); a(hexBitflag(i)); a(";\n");
+		
+		if (p.isArray() || p.isBindable()) {
+			a("\t\tif ("); a(p.name); a(".notNull()) this."); a(p.name); a(".change.unbind(this);\n");
+			a("\t\tif (v.notNull()) {\n\t\t\tv.change.bind(this, "); a(p.name); a("Changed);\n\t");
+		}
+		a("\t\t");
+		var ifExprAdded = addPropChangeFlagSetter(i, "v" + (p.isBindable()? ".value" : ""), p.type, false);
+		if (p.isArray() || p.isBindable()) {
+			a("\n\t\t}");
+			if (ifExprAdded) {
+				a("\n\t\t");
+				addPropChangeFlagUnsetter(i);
+			}
+		}
+		
+		a("\n\t\treturn this."); a(p.name); a(" = v;\n");
 		a("\t}\n");
-		a("\t#end\n\n");
+		
+		if (p.isBindable() || p.isArray()) {
+			a("\tprivate function "); a(p.name); a("Changed(value, old) : Void {\n\t\t_changedFlags |= "); a(hexBitflag(i));
+			a(";\n\t\t"); addPropChangeFlagSetter(i, "value", p.type, false);
+			a("\n\t}\n\n");
+		}
 	}
-*/	
+	
+	private function addPropChangeFlagSetter(i, path, ptype, bindable)
+	{
+		var ifAdded = !addIfVarIsSetExpr(path, ptype, bindable, "_propertiesSet |= " + hexBitflag(i));
+		
+		if (ifAdded) {
+			a(" "); addPropChangeFlagUnsetter(i);
+		}
+		
+		return ifAdded;
+	}
+	
+	private function addPropChangeFlagUnsetter(i) {
+		a("else _propertiesSet &= 0x" + StringTools.hex(0xFFFFFF ^ (1 << i)) + ";");
+	}
+	
 	
 	public function genEnum(def:EnumDef) : Void
 	{

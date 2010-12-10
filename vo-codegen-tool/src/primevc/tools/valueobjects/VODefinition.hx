@@ -2295,6 +2295,10 @@ class ClassDef extends BaseTypeDefinition
 	
 	override public function extend(type:TypeDefinition):Void {
 		this.implement(type);
+		var btype = supertypes.last();
+		this.supertypes.remove(btype);
+		this.supertypes.push(btype); // Add superclass to front of the list.
+		
 		if (Std.is(type,ClassDef)) this.superClass = cast type;
 		else throw Err_CannotExtendType(type);
 	}

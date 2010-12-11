@@ -74,6 +74,9 @@ class Haxe implements CodeGenerator
 			a(" implements primevc.core.traits.IEditableValueObject");
 		}
 		
+		if (def.superClass == null)
+			a(", implements primevc.core.traits.IClonable < I" + def.name + "VO >");
+		
 	/*	for (t in def.supertypes) if (t != def.superClass) {
 			a(" implements "); a(t.fullName);
 			if (--i > 0) code.addChar(','.code);
@@ -125,6 +128,8 @@ class Haxe implements CodeGenerator
 		
 		genEditFunctions(def);
 		
+		genCloneFunction(def);
+		
 		// Close class }
 		code.add("}\n");
 		
@@ -163,7 +168,37 @@ class Haxe implements CodeGenerator
 	}
 	
 	
-	private function openFunctionDeclaration (def:ClassDef, functionName)
+	private function genCloneFunction(def:ClassDef)
+	{
+		var a = code.add;
+		
+		var returnType	= def.superClass == null ? def.name : def.getFirstSuperClass().name;
+		returnType		= "I" + returnType + "VO";
+		
+		openFunctionDeclaration( def, "clone", returnType, false);
+		a("\t\tvar inst = new "+def.name + "VO();\n");
+		
+		for (p in def.property)
+		{
+			a("\t\tinst."); a(p.name);
+			
+			if (p.isBindable())			a(".value = "+p.name+".value")
+			else if (p.isClonable())	a(" = cast " + p.name + ".clone()" );
+			else						a(" = " + p.name);
+			
+			a(";\n");
+		}
+		
+		if (def.superClass == null)
+			a("\t\treturn inst;\n");
+		else
+			a("\t\treturn cast inst;\n");
+		
+		closeFunctionDeclaration( def, "clone");
+	}
+	
+	
+	private function openFunctionDeclaration (def:ClassDef, functionName, returnType:String = "Void", makeSuperCall:Bool = true)
 	{
 	/*	if (def.superClass != null)
 		{
@@ -180,10 +215,15 @@ class Haxe implements CodeGenerator
 		var a = code.add;
 		a("\n\t");
 		if (def.superClass != null) a("override ");
+		
+		a("public function "); a(functionName); a("()");
+		
+		if (returnType != null && returnType != "")
+			a(" : " + returnType);
+		
+		a("\n\t{\n");
 
-		a("public function "); a(functionName); a("() : Void\n\t{\n");
-
-		if (def.superClass != null) {
+		if (def.superClass != null && makeSuperCall) {
 			a("\t\tsuper."); a(functionName); a("();\n");
 		}
 	}

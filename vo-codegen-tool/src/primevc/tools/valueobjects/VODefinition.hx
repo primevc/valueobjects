@@ -930,6 +930,17 @@ class Property
 		}
 	}
 	
+	public function isClonable ()
+	{
+		return isBindable() || switch (this.type) {
+		//	case Tdef(type):				true;
+			case Tarray(type,min,max):		true;
+			case Tbinding(p):				true;
+			case TlinkedList:				true;
+			default:						false;
+		}
+	}
+	
 	public function hasOption(option:PropertyOption) {
 		if (opts != null) for (opt in opts) if (opt == option) return true;
 		return false;
@@ -2266,6 +2277,16 @@ class ClassDef extends BaseTypeDefinition
 		this.implement(type);
 		if (Std.is(type,ClassDef)) this.superClass = cast type;
 		else throw Err_CannotExtendType(type);
+	}
+	
+	
+	public function getFirstSuperClass () : ClassDef
+	{
+		var superDef = superClass;
+		if (superDef != null && superDef.superClass != null)
+			superDef = superDef.getFirstSuperClass();
+		
+		return superDef;	
 	}
 }
 

@@ -38,9 +38,11 @@ class Haxe implements CodeGenerator
 		var a = this.code.add;
 		if (def.module.name.length > 0) {
 			a("package "); a(def.module.fullName); a(";\n");
+			a(" import haxe.io.BytesOutput;\n");
+			a(" import primevc.core.traits.IMessagePackable;\n");
+			a(" import primevc.core.traits.IEditEnabledValueObject;\n");
 			a(" import primevc.tools.valueobjects.ValueObjectBase;\n");
 			a(" import primevc.tools.valueobjects.xmlmap.XMLString;\n");
-			a(" import haxe.io.BytesOutput;\n");
 		}
 	}
 	
@@ -64,35 +66,28 @@ class Haxe implements CodeGenerator
 	
 	private function genClassProperties(def:ClassDef, immutable:Bool) //, editable:Bool)
 	{
-		genClassStart(def, immutable); a("VO");
+		genClassStart(def, immutable); if (!def.isMixin) a("VO");
 		
-//		var i = def.supertypes.length;
-		if (def.superClass != null)
-		{
-			if (immutable) {
-				a(" implements "); a(def.superClass.module.fullName); a(".I"); a(def.superClass.name); a("VO,");
-			} else {
+		if (!immutable) {
+			if (def.superClass != null) {
 				a(" extends "); a(def.superClass.fullName); a("VO,");
 			}
+			else
+				a(" extends ValueObjectBase,");
 			
-//			if (--i > 1) code.addChar(','.code);
-		}
-		else if (!immutable) {
-			a(" extends ValueObjectBase,");
-		}
-		
-		if (immutable)
-			a(" implements primevc.core.traits.IEditEnabledValueObject, implements primevc.core.traits.IValueObject");
-		else {
 			a(" implements "); a(def.module.fullName); a(".I"); a(def.name); a("VO,");
 			a(" implements primevc.core.traits.IEditableValueObject");
 		}
-		
-	/*	for (t in def.supertypes) if (t != def.superClass) {
-			a(" implements "); a(t.fullName);
-			if (--i > 0) code.addChar(','.code);
+		else
+		{	
+			for (t in def.supertypes) {
+				a(" implements "); addFullName(t, true); a(",");
+			}
+			
+			a(" implements IEditEnabledValueObject, implements IMessagePackable");
+			
 		}
-	*/	
+		
 		a("\n{\n");
 		
 		for (i in 0 ... def.propertiesSorted.length)
@@ -111,7 +106,7 @@ class Haxe implements CodeGenerator
 		if (immutable) {
 			// Write immutable interface to disk
 			a("}\n");
-			write("I" + def.name + "VO");
+			write("I" + def.name + (def.isMixin? "" : "VO"));
 		}
 	}
 	
@@ -130,7 +125,6 @@ class Haxe implements CodeGenerator
 			var magic = getMagicGenerator(def);
 			magic.inject(code);
 			
-			genClassMetaData(def);
 			genClassConstructor(def, def.superClass != null, magic);
 			genDispose(def);
 			genValidation(def.superClass != null);
@@ -143,13 +137,13 @@ class Haxe implements CodeGenerator
 			a("\n{");
 		}
 		
-		// Serialization
+		genClassMetaData(def);
 		genSerialization(def);
 		
 		// Close class }
 		code.add("}\n");
 		
-		write(def.name + "VO");
+		write(def.name + (def.isMixin? "" : "VO"));
 	}
 	
 	
@@ -217,6 +211,16 @@ class Haxe implements CodeGenerator
 		a(" /* "); a(t.name); a(" */).not0()) "); a(expr);
 	}
 	
+	private function addFullName(t:TypeDefinition, interfaceT = false)
+	{
+		if (interfaceT) {
+			a(t.module.fullName); a(".I"); a(t.name);
+		}
+		else a(t.fullName);
+		
+		if (Std.is(t,ClassDef) && !cast(t, ClassDef).isMixin) a("VO");
+	}
+	
 	private function genSerialization(def:ClassDef)
 	{
 		// Count bits/properties for this 'def
@@ -228,12 +232,15 @@ class Haxe implements CodeGenerator
 		
 		var hasSuper = def.superClass != null;
 		
-		a("\n\t"); if (hasSuper) a("override "); a("public function messagePack(o : BytesOutput) : Int\n\t{");
-		a("\n\t\treturn msgpack_packVO(o, this, true, _propertiesSet);");
-		a("\n\t}");
-		a("\n");
+		if (!def.isMixin)
+		{
+			a("\n\t"); if (hasSuper) a("override "); a("public function messagePack(o : BytesOutput) : Int\n\t{");
+			a("\n\t\treturn msgpack_packVO(o, this, true, _propertiesSet);");
+			a("\n\t}");
+			a("\n");
+		}
 		
-		a("\n\tstatic public function msgpack_packVO(o : BytesOutput, obj : "); if (def.isMixin){ a("I"); } a(def.name); a("VO, prependMsgpackType : Bool = false, propertyBits : Int) : Int\n\t{");
+		a("\n\tstatic public function msgpack_packVO(o : BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a(def.name); a("VO"); } a(", prependMsgpackType : Bool = false, propertyBits : Int) : Int\n\t{");
 		
 		a("\n		Assert.that(o != null && obj != null);");
 		a("\n		");
@@ -306,7 +313,8 @@ class Haxe implements CodeGenerator
 			
 			if (def.supertypes.length == 1)
 			{
-				a("\n\t\t\tb += "); a(def.fullName); a("VO.msgpack_packVO(o, obj, false, ");
+				var t = def.supertypes.first();
+				a("\n\t\t\tb += "); addFullName(t); a(".msgpack_packVO(o, obj, false, ");
 				a(mixinBits == 1? "1);" : "mixBits);");
 			}
 			else for (t in def.supertypes)
@@ -319,7 +327,7 @@ class Haxe implements CodeGenerator
 				}
 				a(" /* "); a(t.name); a(" */;");
 				
-				a("\n			if (mixin.not0()) "); a("b += "); a(t.fullName); a("VO.msgpack_packVO(o, obj, false, mixin);");
+				a("\n			if (mixin.not0()) "); a("b += "); a(t.fullName); if (Std.is(t,ClassDef) && !cast(t, ClassDef).isMixin) a("VO"); a(".msgpack_packVO(o, obj, false, mixin);");
 				
 				if (t != def.supertypes.last()) {
 					a("\n\t\t\tmixBits >>>= "); a(t.propertiesSorted.length+";");
@@ -449,35 +457,40 @@ class Haxe implements CodeGenerator
 	
 	private inline function ac(char:Int) code.addChar(char)
 	
-	private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool) switch (pType)
+	private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)
 	{
-		case Tbool(val):				a('b += o.packBool(');			a(path); ac(")".code);
-		case Tinteger(min,max,stride):	a('b += o.packInt(');			a(path); ac(")".code);
-		case Tdecimal(min,max,stride):	a('b += o.packDouble(');		a(path); ac(")".code);
-		case Tstring:					a('b += o.packString(');		a(path); ac(")".code);
-		case Tdate:						a('b += o.packDate(');			a(path); ac(")".code);
-		case Tdatetime:					a('b += o.packDateTime(');		a(path); ac(")".code);
-		case Tinterval:					a('b += o.packDateInterval(');	a(path); ac(")".code);
-		case Turi:						a('b += o.packURI(');			a(path); ac(")".code);
-		case TuniqueID:					a('b += o.packUniqueID(');		a(path); ac(")".code);
-		case Temail:					a('b += o.packEMail(');			a(path); ac(")".code);
-		case Tcolor:					a('b += o.packRGBA(');			a(path); ac(")".code);
-		case TfileRef:					a('b += o.packFileRef(');		a(path); ac(")".code);
+		if (bindable) path += ".value";
 		
-		case Tdef(ptypedef): switch (ptypedef) {
-			case Tclass(def):	a('b += ('); a(path); a(".notNull()? "); a(path); a(".messagePack(o) : o.packNil())");
-			case Tenum(def):	a('b += o.packInt('); a(def.fullName); a("_utils.toValue("); a(path); a(")");
-		}
-		case Tarray(type, min, max):
-			a("{");
-			a("\n\t\t\t\tvar a = "); a(path); ac(";".code);
-			a("\n\t\t\t\tb += o.packArrayHeader(a.length);");
-			a("\n\t\t\t\tfor (i in 0 ... a.length) "); addPropertyPackerCall("a.get(i)", type, false); ac(";".code);
-			a("\n\t\t\t}");
+		switch (pType)
+		{
+			case Tbool(val):				a('b += o.packBool(');			a(path); ac(")".code);
+			case Tinteger(min,max,stride):	a('b += o.packInt(');			a(path); ac(")".code);
+			case Tdecimal(min,max,stride):	a('b += o.packDouble(');		a(path); ac(")".code);
+			case Tstring:					a('b += o.packString(');		a(path); ac(")".code);
+			case Tdate:						a('b += o.packDate(');			a(path); ac(")".code);
+			case Tdatetime:					a('b += o.packDateTime(');		a(path); ac(")".code);
+			case Tinterval:					a('b += o.packDateInterval(');	a(path); ac(")".code);
+			case Turi:						a('b += o.packURI(');			a(path); ac(")".code);
+			case TuniqueID:					a('b += o.packUniqueID(');		a(path); ac(")".code);
+			case Temail:					a('b += o.packEMail(');			a(path); ac(")".code);
+			case Tcolor:					a('b += o.packRGBA(');			a(path); ac(")".code);
+			case TfileRef:					a('b += o.packFileRef(');		a(path); ac(")".code);
+		
+			case Tdef(ptypedef): switch (ptypedef) {
+				case Tclass(def):	a('b += ('); a(path); a(".notNull()? "); a(path); a(".messagePack(o) : o.packNil())");
+				case Tenum(def):	a('b += o.packInt('); a(def.fullName); a("_utils.toValue("); a(path); a(")");
+			}
+			case Tarray(type, min, max):
+				a("{");
+				a("\n\t\t\t\tvar a = "); a(path); ac(";".code);
+				a("\n\t\t\t\tb += o.packArrayHeader(a.length);");
+				a("\n\t\t\t\tfor (i in 0 ... a.length) "); addPropertyPackerCall("a.getItemAt(i)", type, false); ac(";".code);
+				a("\n\t\t\t}");
 			
 
-		case TenumConverter(_), Tbinding(_), TlinkedList:	throw "Not implemented";
+			case TenumConverter(_), Tbinding(_), TlinkedList:	throw "Not implemented";
 	
+		}
 	}
 	
 	/** Returns true when no if statement was added  (Property is always set) */
@@ -526,7 +539,10 @@ class Haxe implements CodeGenerator
 		case Tarray(_,_,_):
 			path + ".length.not0()";
 
-		case Turi, TfileRef, Tinteger(_,_,_), Tdecimal(_,_,_):
+		case Turi, TfileRef:
+			path + ".isSet";
+		
+		case Tinteger(_,_,_), Tdecimal(_,_,_):
 			path + ".isSet()";
 		
 		case Tdef(type):
@@ -549,13 +565,13 @@ class Haxe implements CodeGenerator
 		a(StringTools.hex(1 << (i + 8), 4));
 	}
 	
-	private function addEmbedMessagePackCall(i:Int, t:TypeDefinition, numEmbedTypes:Int, bitsOffset:Int)
+	private function addEmbedMessagePackCall(i:Int, t:ClassDef, numEmbedTypes:Int, bitsOffset:Int)
 	{
 		a("\n\t\t\t");
 		if (numEmbedTypes > 1) {
 			a("if ((i & 0x"); addEmbedMessagePackTypeBitmask(i); a(").not0()) ");
 		}
-		a("b += "); a(t.fullName); a("VO.msgpack_packVO(o, this, "); a(bitsOffset + ");");
+		a("b += "); a(t.fullName); if (!t.isMixin) a("VO"); a(".msgpack_packVO(o, this, "); a(bitsOffset + ");");
 	}
 	
 	private function genValidation(genOverride:Bool = false)
@@ -677,7 +693,11 @@ class Haxe implements CodeGenerator
 		a("\n\tpublic function new(");
 		for (i in 0 ... def.propertiesSorted.length) {
 			var p = def.propertiesSorted[i];
-			a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type)); a(" = "); a(HaxeUtil.getConstructorInitializer(p.type, true));
+			a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type));
+			var init = HaxeUtil.getConstructorInitializer(p.type, true);
+			if (init != null) {
+			 	a(" = "); a(init);
+			}
 			if (i + 1 != def.propertiesSorted.length) a(", ");
 		}
 		a(")\n\t{\n");
@@ -697,15 +717,10 @@ class Haxe implements CodeGenerator
 			a(");\n");
 		}
 		
-		var a = code.add;
-		var setProp = function(p){
-			a("\t\tthis."); a(p.name); a(" = ");
-		}
-		
 		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p)) {
 			var c = HaxeUtil.getConstructorCall(p.type, p.isBindable(), p.name + "_");
 			if (c != null) {
-				setProp(p);
+				a("\t\tthis."); a(p.name); a(" = ");
 				a(c); a("\n");
 			}
 		}
@@ -737,25 +752,28 @@ class Haxe implements CodeGenerator
 	
 	function genSetter(i:Int, p:Property, fullName:String)
 	{
-		a("\tprivate function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable() || p.isArray())); a(") {\n");
+		a("\tprivate function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable() || p.isArray())); a(")\n\t{\n");
 		
-		a("\t\t_changedFlags |= "); a(hexBitflag(i)); a(";\n");
+		a("\t\treturn if (v == this."); a(p.name); a(") v;\n");
+		a("\t\telse {\n\t\t\t_changedFlags |= "); a(hexBitflag(i)); a(";\n");
 		
 		if (p.isArray() || p.isBindable()) {
-			a("\t\tif ("); a(p.name); a(".notNull()) this."); a(p.name); a(".change.unbind(this);\n");
-			a("\t\tif (v.notNull()) {\n\t\t\tv.change.bind(this, "); a(p.name); a("Changed);\n\t");
+			a("\t\t\tif ("); a(p.name); a(".notNull()) this."); a(p.name); a(".change.unbind(this);\n");
+			a("\t\t\tif (v.notNull()) {\n\t\t\tv.change.bind(this, "); a(p.name); a("Changed);\n\t");
 		}
-		a("\t\t");
+		a("\t\t\t");
 		var ifExprAdded = addPropChangeFlagSetter(i, "v" + (p.isBindable()? ".value" : ""), p.type, false);
 		if (p.isArray() || p.isBindable()) {
-			a("\n\t\t}");
+			a("\n\t\t\t}");
 			if (ifExprAdded) {
-				a("\n\t\t");
+				a("\n\t\t\t");
 				addPropChangeFlagUnsetter(i);
 			}
 		}
 		
-		a("\n\t\treturn this."); a(p.name); a(" = v;\n");
+		a("\n\t\t\t");
+		a("\n\t\t\tthis."); a(p.name); a(" = v;\n");
+		a("\t\t}\n");
 		a("\t}\n");
 		
 		if (p.isBindable() || p.isArray())
@@ -770,8 +788,19 @@ class Haxe implements CodeGenerator
 					HaxeUtil.haxeType(p.type, false, false);
 			}
 			
-			a("\tprivate function "); a(p.name); a("Changed(value : "); a(typeName); a(", old : "); a(typeName); a(") : Void {\n\t\t_changedFlags |= "); a(hexBitflag(i));
-			a(";\n\t\t"); addPropChangeFlagSetter(i, "value", p.type, false);
+			a("\tprivate function "); a(p.name); a("Changed(value : "); a(typeName); 
+			if (!listChangeHandler) {
+				a(", old : "); a(typeName);
+			}
+			a(") : Void {\n\t\t_changedFlags |= "); a(hexBitflag(i));
+			a(";\n\t\t");
+			
+			if (listChangeHandler)
+			{
+				
+			}
+			else
+			 	addPropChangeFlagSetter(i, "value", p.type, false);
 			a("\n\t}\n\n");
 		}
 	}
@@ -1010,7 +1039,7 @@ private class HaxeUtil
 				("new primevc.core.collections.RevertableArrayList < " + HaxeUtil.haxeType( type, true ) + " >("+ initializer +")");
 			
 			case Turi, TfileRef, Tinterval:
-				"new " + HaxeUtil.haxeType(ptype) + "("+ initializer +")";
+				initializer; //"new " + HaxeUtil.haxeType(ptype) + "("+ initializer +")";
 			
 			case Tdef(_):
 				"(" + initializer + ".notNull()? " + initializer + " : " + getConstructorInitializer(ptype) + ")";
@@ -1027,17 +1056,17 @@ private class HaxeUtil
 		case Tbool(val):			val? "true" : "false";
 		case Tarray(type, _,_):		constOnly? "null" : "[]";
 		
-		case Turi, TfileRef, Tinterval:
-			"new " + HaxeUtil.haxeType(ptype) + "()";
+//		case Turi, TfileRef, Tinterval:
+//			"new " + HaxeUtil.haxeType(ptype) + "()";
 		
 		case Tdef(type):
 			if (constOnly) null else getClassConstructorCall(Util.unpackPTypedef(type));
 		
 		case Tinteger(_,_,_):		'primevc.types.Number.INT_NOT_SET';
-		case Tdecimal(_,_,_):		'primevc.types.Number.FLOAT_NOT_SET';
-		case TuniqueID, Temail:		"''";
+//		case Tdecimal(_,_,_):		'primevc.types.Number.FLOAT_NOT_SET';
+		case Temail:				"''";
 		
-		case TlinkedList, TenumConverter(_), Tdate, Tdatetime, Tcolor, Tbinding(_):
+		case Turi, TfileRef, Tinterval, Tdecimal(_,_,_), TuniqueID, TlinkedList, TenumConverter(_), Tdate, Tdatetime, Tcolor, Tbinding(_):
 			null;
 	}
 		

@@ -367,6 +367,14 @@ class Util
 		default: false;
 	}
 	
+	static public function isMixin(type:PType) return switch (type) {
+		case Tdef(type): switch(type) {
+			case Tclass (def):	def.isMixin;
+			case Tenum  (def):	false;
+		}
+		default: false;
+	}
+	
 	static public function isEnum(type:PType) return switch (type) {
 		case Tdef(type): switch(type) {
 			case Tclass (def):	false;
@@ -723,7 +731,7 @@ class PropertyTypeResolver
 					case MModule(m):		throw Err_ModuleInsteadOfType(this, typeName);
 					case MUndefined(n,m):	throw Err_UndefinedType(typeName);
 					
-					case MType(t):			Tdef(t);
+					case MType(t):			if (Util.isMixin(Tdef(t))) throw "Cannot use mixins as member variables, property: '"+this.prop.name+"', in type: '"+this.prop.parent.fullName+"'\n"+t; Tdef(t);
 					case MPending(t,m,d,o):	Tdef(t);
 				}
 			
@@ -1914,6 +1922,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 			++n;
 			propertiesDefined.set(p.index, p);
 		}
+		Assert.that(n <= 31, "Max index used: "+ n + ", class: "+fullName);
 		numPropertiesDefined = n;
 		return propertiesDefined;
 	}
@@ -2412,6 +2421,7 @@ class UniqueIDTrait extends MagicClassDef
 		
 		this.isMixin   = true;
 		this.finalized = true;
+//		untyped Module.traits.members.set(name, MType(Tclass(this)));
 	}
 }
 

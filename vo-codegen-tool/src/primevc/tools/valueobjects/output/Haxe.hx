@@ -71,6 +71,7 @@ class Haxe implements CodeGenerator
 		if (!immutable) {
 			if (def.superClass != null) {
 				a(" extends "); a(def.superClass.fullName); a("VO,");
+				if (!def.isMixin && def.superClass == null) a(" implements primevc.core.traits.IClonable < I" + def.name + "VO >,");
 			}
 			else
 				a(" extends ValueObjectBase,");
@@ -85,7 +86,6 @@ class Haxe implements CodeGenerator
 			}
 			
 			a(" implements IEditEnabledValueObject, implements IMessagePackable");
-			
 		}
 		
 		a("\n{\n");
@@ -139,6 +139,9 @@ class Haxe implements CodeGenerator
 		
 		genClassMetaData(def);
 		genSerialization(def);
+		
+		if (!def.isMixin)
+			genCloneFunction(def);
 		
 		// Close class }
 		code.add("}\n");
@@ -614,26 +617,50 @@ class Haxe implements CodeGenerator
 		a("\n\t\t}\n\t}\n");
 	}
 	
-	private function openFunctionDeclaration (def:ClassDef, functionName, forceOverride = false, doSuperCall = true, isPublic = true)
+	
+	private function genCloneFunction(def:ClassDef)
 	{
-	/*	if (def.superClass != null)
+		var a = code.add;
+		
+		var returnType	= def.superClass == null ? def.name : def.getRootSuperClass().name;
+		returnType		= "I" + returnType + "VO";
+		
+		openFunctionDeclaration( def, "clone", false, returnType, false);
+		a("\t\tvar inst = new "+def.name + "VO();\n");
+		
+		for (p in def.property)
 		{
-			// Check if this function should be overridden
-			var doOverride = false;
-			for (p in def.property) if (p.isBindable() && !Util.isDefinedInSuperClassOf(def, p)) {
-				doOverride = true;
-				break;
-			}
-
-			if (!doOverride) return; // no need to override
+			a("\t\tinst."); a(p.name);
+			
+			if (p.isBindable())			a(".value = "+p.name+".value")
+			else if (p.isClonable())	a(" = cast " + p.name + ".clone()" );
+			else						a(" = " + p.name);
+			
+			a(";\n");
 		}
-*/		
+		
+		if (def.superClass == null)
+			a("\t\treturn inst;\n");
+		else
+			a("\t\treturn cast inst;\n");
+		
+		closeFunctionDeclaration( def, "clone");
+	}
+	
+	
+	private function openFunctionDeclaration (def:ClassDef, functionName, forceOverride = false, returnType:String = "Void", makeSuperCall = true, isPublic = true)
+	{
 		a("\n\t");
 		if (forceOverride || def.superClass != null) a("override ");
 
-		a(isPublic? "public " : "private "); a("function "); a(functionName); a("() : Void\n\t{\n");
-
-		if ((forceOverride || def.superClass != null) && doSuperCall) {
+		a(isPublic? "public " : "private "); a("function "); a(functionName); a("()");
+		
+		if (returnType != null && returnType != "")
+			a(" : " + returnType);
+		
+		a("\n\t{\n");
+		
+		if ((forceOverride || def.superClass != null) && makeSuperCall) {
 			a("\t\tsuper."); a(functionName); a("();\n");
 		}
 	}
@@ -680,7 +707,7 @@ class Haxe implements CodeGenerator
 		
 		if (functionCalls.length > 0)
 		{
-			openFunctionDeclaration( def, functionName, isCommitBindables, def.superClass != null, !isCommitBindables );
+			openFunctionDeclaration( def, functionName, isCommitBindables, "Void", def.superClass != null, !isCommitBindables );
 			for (p in functionCalls)
 				generateFunctionCall( p, callFunctionName );
 			

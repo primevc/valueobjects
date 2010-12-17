@@ -177,6 +177,7 @@ class Haxe implements CodeGenerator
 		
 		openFunctionDeclaration( def, "clone", returnType, false);
 		a("\t\tvar inst = new "+def.name + "VO();\n");
+		a("\t\tinst.beginEdit();\n");
 		
 		for (p in def.property)
 		{
@@ -188,6 +189,8 @@ class Haxe implements CodeGenerator
 			
 			a(";\n");
 		}
+		
+		a("\t\tinst.commitEdit();\n");
 		
 		if (def.superClass == null)
 			a("\t\treturn inst;\n");

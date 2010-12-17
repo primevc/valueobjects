@@ -548,8 +548,9 @@ class Haxe implements CodeGenerator
 		case Tinteger(_,_,_), Tdecimal(_,_,_):
 			path + ".isSet()";
 		
-		case Tdef(type):
-			"!" + path + ".isEmpty()";
+		case Tdef(_):
+			if (Util.isEnum(ptype)) null
+			else "!" + path + ".isEmpty()";
 		
 		case Tbool(_), TuniqueID, Tinterval, TlinkedList, TenumConverter(_), Tdate, Tdatetime, Tcolor, Tbinding(_):
 			null;
@@ -710,7 +711,7 @@ class Haxe implements CodeGenerator
 		
 		if (functionCalls.length > 0)
 		{
-			openFunctionDeclaration( def, functionName, isCommitBindables, "Void", def.superClass != null, !isCommitBindables );
+			openFunctionDeclaration( def, functionName, true, "Void", def.superClass != null, !isCommitBindables );
 			for (p in functionCalls)
 				generateFunctionCall( p, callFunctionName );
 			
@@ -909,6 +910,36 @@ class Haxe implements CodeGenerator
 		}
 		a("class "); a(def.utilClassName); a("\n{\n");
 		
+		// toValue
+		a("\tstatic public function toValue(e:"); a(def.fullName); a(") : Int\n\t{\n\t\t");
+		a("Assert.that(e != null); return switch (e) {");
+		for (e in def.enumerations)
+		{
+			a("\n\t\t  case "); a(e.name);
+			if (e.type != null) {
+				a("(_): ");
+			}
+			else {
+				a(': ');
+			}
+		 	a(e.intValue + ";");
+		}
+		a("\n\t\t}\n\t}\n");
+		// fromValue
+		a("\tstatic public function fromValue(i:Int) : "); a(def.fullName); a("\n\t{\n\t\t");
+		a("return switch (i) {");
+		for (e in def.enumerations)
+		{
+			a("\n\t\t  case ");
+			a(e.intValue + ': ');
+			a(def.fullName); a("."); a(e.name);
+			if (e.type != null) a("(null)");
+			a(";");
+		}
+		a("\n\t\t}\n\t}\n");
+		
+		
+		// other conversions
 		for (conv in def.conversions)
 		{
 			//to method

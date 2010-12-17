@@ -71,13 +71,13 @@ class Haxe implements CodeGenerator
 		if (!immutable) {
 			if (def.superClass != null) {
 				a(" extends "); a(def.superClass.fullName); a("VO,");
-				if (!def.isMixin && def.superClass == null) a(" implements primevc.core.traits.IClonable < I" + def.name + "VO >,");
 			}
 			else
 				a(" extends ValueObjectBase,");
 			
 			a(" implements "); a(def.module.fullName); a(".I"); a(def.name); a("VO,");
 			a(" implements primevc.core.traits.IEditableValueObject");
+			if (!def.isMixin && def.superClass == null) a(", implements primevc.core.traits.IClonable < I" + def.name + "VO >");
 		}
 		else
 		{	
@@ -481,7 +481,8 @@ class Haxe implements CodeGenerator
 		
 			case Tdef(ptypedef): switch (ptypedef) {
 				case Tclass(def):	a('b += ('); a(path); a(".notNull()? "); a(path); a(".messagePack(o) : o.packNil())");
-				case Tenum(def):	a('b += o.packInt('); a(def.fullName); a("_utils.toValue("); a(path); a("))");
+			//	case Tenum(def):	a('b += o.packInt('); a(def.fullName); a("_utils.toValue("); a(path); a("))");
+				case Tenum(def):	a('b += 0');
 			}
 			case Tarray(type, min, max):
 				a("{");
@@ -747,6 +748,8 @@ class Haxe implements CodeGenerator
 			}
 			a(");\n");
 		}
+		else
+			a("\t\tsuper();");
 		
 		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p))
 		{

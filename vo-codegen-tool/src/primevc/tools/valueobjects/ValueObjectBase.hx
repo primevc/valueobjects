@@ -22,6 +22,12 @@ class ValueObjectBase implements IValueObject
 	private var _changedFlags	: Int;
 	private var _propertiesSet	: Int;
 	
+	public function new ()
+	{
+		changed = new Signal1();
+	}
+	
+	
 	public function dispose()
 	{
 		if (changed.notNull()) {
@@ -48,6 +54,8 @@ class ValueObjectBase implements IValueObject
 	
 	private function addChanges(changeSet:ObjectChangeSet); // Creates and adds all PropertyChangeVO and ListChangeVO
 	private function commitBindables();
+	public function beginEdit();
+	public function cancelEdit();
 	
 /*
 	Kijken wat kleinere SWF geeft: calls hiernaar, of methods genereren...

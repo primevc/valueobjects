@@ -22,7 +22,7 @@ class ValueObjectBase implements IValueObject
 	private var _changedFlags	: Int;
 	private var _propertiesSet	: Int;
 	
-	public function new ()
+	private function new ()
 	{
 		changed = new Signal1();
 	}

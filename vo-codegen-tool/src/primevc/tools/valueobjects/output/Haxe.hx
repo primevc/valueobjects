@@ -481,8 +481,7 @@ class Haxe implements CodeGenerator
 		
 			case Tdef(ptypedef): switch (ptypedef) {
 				case Tclass(def):	a('b += ('); a(path); a(".notNull()? "); a(path); a(".messagePack(o) : o.packNil())");
-			//	case Tenum(def):	a('b += o.packInt('); a(def.fullName); a("_utils.toValue("); a(path); a("))");
-				case Tenum(def):	a('b += 0');
+				case Tenum(def):	a('b += o.packInt('); a(def.fullName); a("_utils.toValue("); a(path); a("))");
 			}
 			case Tarray(type, min, max):
 				a("{");
@@ -749,7 +748,7 @@ class Haxe implements CodeGenerator
 			a(");\n");
 		}
 		else
-			a("\t\tsuper();");
+			a("\t\tsuper();\n");
 		
 		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p))
 		{
@@ -786,25 +785,24 @@ class Haxe implements CodeGenerator
 	
 	function genGetter(p:Property, immutable:Bool)
 	{
-		a("\tpublic var "); a(p.name); 
+		a("\tpublic var "); a(p.name);
+		
+		if (Util.isPTypeBuiltin(p.type) || Util.isEnum(p.type))
+			a("\t(default");
+		else {
+			a("\t(get"); code.addCapitalized(p.name);
+		}
+		
 		if (immutable) {
-			if (Util.isPTypeBuiltin(p.type))
-				a("\t(default,null");
-			else {
-				a("\t(get"); code.addCapitalized(p.name); a(",null");
-			}
+			a(",null");
 		} else {
-			if (Util.isPTypeBuiltin(p.type))
-				a("\t(default");
-			else {
-				a("\t(get"); code.addCapitalized(p.name);
-			}
 			a(",set"); code.addCapitalized(p.name);
 		}
 		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable() || p.isArray())); a(";\n");
 		
-		if (!immutable && !Util.isPTypeBuiltin(p.type)) {
-			a("\tprivate function get"); code.addCapitalized(p.name); a("() return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = "); a(HaxeUtil.getConstructorInitializer(p.type));
+		if (!immutable && !Util.isPTypeBuiltin(p.type) && !Util.isEnum(p.type)) {
+			a("\tprivate function get"); code.addCapitalized(p.name); a("() return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = ");
+			a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type)));
 			a("\n");
 		}
 	}
@@ -1129,11 +1127,9 @@ private class HaxeUtil
 			case Tarray(type, _,_):
 				("new primevc.core.collections.RevertableArrayList < " + HaxeUtil.haxeType( type, true ) + " >("+ initializer +")");
 			
-			case Turi, TfileRef, Tinterval:
+			case Tdef(_), Turi, TfileRef, Tinterval:
 				initializer; //"new " + HaxeUtil.haxeType(ptype) + "("+ initializer +")";
 			
-			case Tdef(_):
-				"(" + initializer + ".notNull()? " + initializer + " : " + getConstructorInitializer(ptype) + ")";
 			case Tinteger(_,_,_), Tdecimal(_,_,_), TuniqueID, Temail, Tstring, Tbool(_), TlinkedList, TenumConverter(_), Tdate, Tdatetime, Tcolor, Tbinding(_):
 				initializer;
 		}

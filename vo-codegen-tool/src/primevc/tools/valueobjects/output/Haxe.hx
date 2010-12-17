@@ -627,21 +627,33 @@ class Haxe implements CodeGenerator
 		returnType		= "I" + returnType + "VO";
 		
 		openFunctionDeclaration( def, "clone", false, returnType, false);
-		a("\t\tvar inst = new "+def.name + "VO();\n");
-		a("\t\tinst.beginEdit();\n");
+		a("\t\tvar inst = new "+def.name + "VO(\n");
 		
-		for (p in def.property)
+		var first = true;
+		for (p in def.propertiesSorted)
 		{
-			a("\t\tinst."); a(p.name);
+			if (first) {
+				first = false;
+				a("\t\t\t");
+			}
+			else a(",\n\t\t\t");
 			
-			if (p.isBindable())			a(".value = "+p.name+".value")
-			else if (p.isClonable())	a(" = cast " + p.name + ".clone()" );
-			else						a(" = " + p.name);
-			
-			a(";\n");
+			if (p.isArray()) {
+				a("null"); // handle array cloning seperately
+			} else {
+				a("this."); a(p.name);
+				if (p.isBindable())	a(".value");
+				if (p.isClonable())	a(".clone()");
+			}
+		}
+		a("\n\t\t);\n");
+		
+		for (p in def.propertiesSorted) if (p.isArray())
+		{
+			a("\n\t\tinst."); a(p.name); a(" = this."); a(p.name); a(".clone();");
 		}
 		
-		a("\t\tinst.commitEdit();\n");
+		a("\n\t\tinst._changedFlags = 0;\n");
 		
 		if (def.superClass == null)
 			a("\t\treturn inst;\n");

@@ -776,7 +776,7 @@ class Haxe implements CodeGenerator
 		
 		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p))
 		{
-			if (!Util.isPTypeBuiltin(p.type)) {
+			if (!Util.isPTypeBuiltin(p.type) && !Util.isEnum(p.type)) {
 				if (p.isBindable())		{ a("\t\tthis."); a(p.name); a(".value"); a(" = "); a(p.name); a("_;"); }
 				else					{ a("\t\tthis."); a(p.name); a(" = "); a(p.name); a("_;"); }
 			}
@@ -835,7 +835,7 @@ class Haxe implements CodeGenerator
 	{
 		a("\tprivate function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable() || p.isArray())); a(")\n\t{\n");
 		
-		a("\t\treturn if (v == "); if (Util.isPTypeBuiltin(p.type)) a("this."); else a("(untyped this)."); a(p.name); a(") v;\n");
+		a("\t\treturn if (v == "); if (Util.isEnum(p.type) || Util.isPTypeBuiltin(p.type)) a("this."); else a("(untyped this)."); a(p.name); a(") v;\n");
 		a("\t\telse {\n\t\t\t_changedFlags |= "); a(hexBitflag(i)); a(";\n");
 		
 		if (p.isArray() || p.isBindable()) {

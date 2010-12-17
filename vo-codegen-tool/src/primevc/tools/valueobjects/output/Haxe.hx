@@ -56,6 +56,7 @@ class Haxe implements CodeGenerator
 			a("\ninterface I"); 
 		else {
 			a("  using primevc.utils.IfUtil;\n");
+			a("  using primevc.utils.TypeUtil;\n");
 			a("  using primevc.utils.NumberUtil;\n");
 			a("  using primevc.utils.msgpack.Format;\n");
 			a("\nclass ");
@@ -618,6 +619,14 @@ class Haxe implements CodeGenerator
 		a("\n\t\t}\n\t}\n");
 	}
 	
+	private function addAsClass(ptype:PType) switch (ptype) {
+		case Tdef(innerT): switch (innerT) {
+			case Tclass(cl):	a(".as("); addFullName(cl, false); a(")");
+			case Tenum(_):
+		}
+		default:
+	}
+	
 	
 	private function genCloneFunction(def:ClassDef)
 	{
@@ -643,14 +652,17 @@ class Haxe implements CodeGenerator
 			} else {
 				a("this."); a(p.name);
 				if (p.isBindable())			a(".value");
+				
+				addAsClass(p.type);
 				if (p.hasClonableType())	a(".clone()");
+				addAsClass(p.type);
 			}
 		}
 		a("\n\t\t);\n");
 		
 		for (p in def.propertiesSorted) if (p.isArray())
 		{
-			a("\n\t\tinst."); a(p.name); a(" = this."); a(p.name); a(".clone();");
+			a("\n\t\tinst."); a(p.name); a(" = cast this."); a(p.name); a(".clone();");
 		}
 		
 		a("\n\t\tinst._changedFlags = 0;\n");
@@ -813,9 +825,9 @@ class Haxe implements CodeGenerator
 		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable() || p.isArray())); a(";\n");
 		
 		if (!immutable && !Util.isPTypeBuiltin(p.type) && !Util.isEnum(p.type)) {
-			a("\tprivate function get"); code.addCapitalized(p.name); a("() return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = ");
+			a("\tprivate function get"); code.addCapitalized(p.name); a("() { return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = ");
 			a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type)));
-			a("\n");
+			a(" }\n");
 		}
 	}
 	

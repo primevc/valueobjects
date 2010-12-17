@@ -936,7 +936,7 @@ class Property
 	public function hasClonableType ()
 	{
 		return switch (this.type) {
-			case Tdef()):					!Util.isEnum(this.type);
+			case Tdef(_):					!Util.isEnum(this.type);
 			case Tarray(_,min,max):			true;
 			case Tbinding(p):				true;
 			case TlinkedList:				true;

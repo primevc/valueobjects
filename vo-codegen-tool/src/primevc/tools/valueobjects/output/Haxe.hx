@@ -747,12 +747,23 @@ class Haxe implements CodeGenerator
 			a(");\n");
 		}
 		
-		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p)) {
-			var c = HaxeUtil.getConstructorCall(p.type, p.isBindable(), p.name + "_");
-			if (c != null) {
-				a("\t\tthis."); a(p.name); a(" = ");
-				a(c); a("\n");
+		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p))
+		{
+			if (!Util.isPTypeBuiltin(p.type)) {
+				a("\t\tthis."); a(p.name); a(" = "); a(p.name); a("_;");
 			}
+			else switch (p.type) {
+				case Tdecimal(_,_,_):
+					a("\t\tif ("); a(p.name); a("_.notNull()) this."); a(p.name); a(" = "); a(p.name); a("_;");
+				
+				default:
+					var c = HaxeUtil.getConstructorCall(p.type, p.isBindable(), p.name + "_");
+					if (c != null) {
+						a("\t\tthis."); a(p.name); a(" = ");
+						a(c);
+					}
+			}
+		 	a("\n");
 		}
 		
 		magic.constructor(code);
@@ -772,19 +783,32 @@ class Haxe implements CodeGenerator
 	{
 		a("\tpublic var "); a(p.name); 
 		if (immutable) {
-			a("\t(default,null");
+			if (Util.isPTypeBuiltin(p.type))
+				a("\t(default,null");
+			else {
+				a("\t(get"); code.addCapitalized(p.name); a(",null");
+			}
 		} else {
-//			a("\t(default,default");
-			a("\t(default,set"); code.addCapitalized(p.name);
+			if (Util.isPTypeBuiltin(p.type))
+				a("\t(default");
+			else {
+				a("\t(get"); code.addCapitalized(p.name);
+			}
+			a(",set"); code.addCapitalized(p.name);
 		}
 		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable() || p.isArray())); a(";\n");
+		
+		if (!immutable && !Util.isPTypeBuiltin(p.type)) {
+			a("\tprivate function get"); code.addCapitalized(p.name); a("() return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = "); a(HaxeUtil.getConstructorInitializer(p.type));
+			a("\n");
+		}
 	}
 	
 	function genSetter(i:Int, p:Property, fullName:String)
 	{
 		a("\tprivate function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable() || p.isArray())); a(")\n\t{\n");
 		
-		a("\t\treturn if (v == this."); a(p.name); a(") v;\n");
+		a("\t\treturn if (v == "); if (Util.isPTypeBuiltin(p.type)) a("this."); else a("(untyped this)."); a(p.name); a(") v;\n");
 		a("\t\telse {\n\t\t\t_changedFlags |= "); a(hexBitflag(i)); a(";\n");
 		
 		if (p.isArray() || p.isBindable()) {

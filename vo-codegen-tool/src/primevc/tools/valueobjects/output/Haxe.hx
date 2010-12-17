@@ -642,8 +642,8 @@ class Haxe implements CodeGenerator
 				a("null"); // handle array cloning seperately
 			} else {
 				a("this."); a(p.name);
-				if (p.isBindable())	a(".value");
-				if (p.isClonable())	a(".clone()");
+				if (p.isBindable())			a(".value");
+				if (p.hasClonableType())	a(".clone()");
 			}
 		}
 		a("\n\t\t);\n");

@@ -933,10 +933,10 @@ class Property
 		}
 	}
 	
-	public function isClonable ()
+	public function hasClonableType ()
 	{
-		return isBindable() || switch (this.type) {
-		//	case Tdef(type):				true;
+		return switch (this.type) {
+			case Tdef(type):				true;
 			case Tarray(type,min,max):		true;
 			case Tbinding(p):				true;
 			case TlinkedList:				true;

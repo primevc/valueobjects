@@ -243,7 +243,7 @@ class Haxe implements CodeGenerator
 			a("\n");
 		}
 		
-		a("\n\tstatic public function msgpack_packVO(o : BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a(def.name); a("VO"); } a(", prependMsgpackType : Bool = false, propertyBits : Int) : Int\n\t{");
+		a("\n\tstatic public function msgpack_packVO(o : BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", prependMsgpackType : Bool = false, propertyBits : Int) : Int\n\t{");
 		
 		a("\n		Assert.that(o != null && obj != null);");
 		a("\n		");
@@ -481,7 +481,7 @@ class Haxe implements CodeGenerator
 		
 			case Tdef(ptypedef): switch (ptypedef) {
 				case Tclass(def):	a('b += ('); a(path); a(".notNull()? "); a(path); a(".messagePack(o) : o.packNil())");
-				case Tenum(def):	a('b += o.packInt('); a(def.fullName); a("_utils.toValue("); a(path); a(")");
+				case Tenum(def):	a('b += o.packInt('); a(def.fullName); a("_utils.toValue("); a(path); a("))");
 			}
 			case Tarray(type, min, max):
 				a("{");
@@ -750,7 +750,8 @@ class Haxe implements CodeGenerator
 		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p))
 		{
 			if (!Util.isPTypeBuiltin(p.type)) {
-				a("\t\tthis."); a(p.name); a(" = "); a(p.name); a("_;");
+				if (p.isBindable())		{ a("\t\tthis."); a(p.name); a(".value"); a(" = "); a(p.name); a("_;"); }
+				else					{ a("\t\tthis."); a(p.name); a(" = "); a(p.name); a("_;"); }
 			}
 			else switch (p.type) {
 				case Tdecimal(_,_,_):
@@ -910,6 +911,7 @@ class Haxe implements CodeGenerator
 		
 		for (conv in def.conversions)
 		{
+			//to method
 			a("\tstatic public function "); a(conv.name); a("(e:"); a(def.fullName); a(") : String\n\t{\n\t\t");
 			a("return e == null? '"); Std.string(conv.defaultValue); a("' : switch (e) {");
 			for (e in conv.enums) {
@@ -927,6 +929,7 @@ class Haxe implements CodeGenerator
 			
 			a("\n\t\t}\n\t}\n");
 			
+			//from method
 			a("\tstatic public function from"); a(conv.name.substr(2)); a("(str:String) : "); a(def.fullName); a("\n\t{\n\t\t");
 			a("return switch (str) {");
 			for (e in conv.enums) if (e != def.catchAll)

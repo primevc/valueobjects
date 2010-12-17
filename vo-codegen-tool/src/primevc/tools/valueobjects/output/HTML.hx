@@ -77,7 +77,6 @@ class HTML implements CodeGenerator
 				Tstring,
 				Temail,
 				TlinkedList,
-				Tbitmap,
 				Tcolor:
 				return '<b>'+ Std.string(ptype).substr(1) +'</b>';
 		}

@@ -65,7 +65,6 @@ class HTML implements CodeGenerator
 			case Tinteger(min,max,stride):	'<b>integer</b>'+ minmax(min,max);
 			case Tdecimal(min,max,stride):	'<b>decimal</b>'+ minmax(min,max);
 			case Tbool(bool):				'<b>boolean</b><span title="default value">'+bool+'</span>';
-			case Tbinding(prop):			'<b>reference to </b><span>'+typeHTML(prop.name, prop.type)+'</span>(property: '+prop.parent.fullName +'::'+ prop.name+')';
 			case TenumConverter(prop):		'<b>conversion </b>' + Lambda.map(prop.enums, function(e:Enumeration){ return "<span>"+e.name +" &harr; "+ e.conversions.get(prop.name)  +"</span>"; }).join(" ");
 			case Tarray(etype, min, max):	'<b>array of </b>'+typeHTML(pname, etype)+' '+ minmax(min,max);
 			
@@ -76,7 +75,6 @@ class HTML implements CodeGenerator
 				TfileRef,
 				Tstring,
 				Temail,
-				TlinkedList,
 				Tcolor:
 				return '<b>'+ Std.string(ptype).substr(1) +'</b>';
 		}

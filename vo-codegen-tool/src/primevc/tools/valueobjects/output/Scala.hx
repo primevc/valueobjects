@@ -107,8 +107,6 @@ class Scala implements CodeGenerator
 					++nonEmptyChecks;
 				
 				case TenumConverter(_):		throw p;
-				case Tbinding(_):			throw p;
-				case TlinkedList:			throw p;
 			}
 			else switch (p.type) {
 				case TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
@@ -521,7 +519,7 @@ class Scala implements CodeGenerator
 		case TenumConverter(enums):
 			throw "Unsupported value literal";
 		
-		case TlinkedList, Tdef(_), Tbinding(_), Tinterval, Tarray(_,_,_):
+		case Tdef(_), Tinterval, Tarray(_,_,_):
 			throw "Unsupported value literal: "+type;
 	}
 	
@@ -541,8 +539,6 @@ class Scala implements CodeGenerator
 		case Tinterval:				throw t;
 		case Tarray(innerT,_,_):	throw t;
 		case TenumConverter(prop):	throw t;
-		case TlinkedList:			throw t; //"List";
-		case Tbinding(_):			throw t; //"";
 	}
 	
 	function genNamedSetKeyMatcher(def: NamedSetDef, wildcardMethod:String, action:Int->Property->String)
@@ -767,8 +763,6 @@ class Scala implements CodeGenerator
 				ac('$'.code); a(p.name);
 			
 			case TenumConverter(_):		throw p;
-			case Tbinding(_):			throw p;
-			case TlinkedList:			throw p;
 		}
 		a("\n  @inline final def "); a(p.name); a("_=(v:"); a(tdef.name); a(") : Unit = { ");
 		
@@ -922,9 +916,6 @@ class Scala implements CodeGenerator
 		case Tbool(_):				"ConvertTo.boolean";
 		case Tcolor:				"ConvertTo.color";
 		case TenumConverter(prop):	prop.parent.fullName + ".from" + prop.name.substr(2); //"";
-		
-		case TlinkedList:			throw t; //"List";
-		case Tbinding(_):			throw t; //"";
 	}
 	
 	function mongoConversionHelper(t:PType, path:String, ?v:String = "v") return switch(t) {
@@ -946,9 +937,7 @@ class Scala implements CodeGenerator
 		case TuniqueID, Tstring, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
 			v;
 		
-		case TlinkedList:			throw t; //"List";
 		case TenumConverter(_):		throw t; //"";
-		case Tbinding(_):			throw t; //"";
 	}
 	
 	function needsMongoHelperClass(t:PType) return switch(t) {
@@ -967,9 +956,7 @@ class Scala implements CodeGenerator
 			 Tcolor,
 		 	 Tbool(_):				false; //"Boolean";
 		
-		case TlinkedList:			throw t; //"List";
 		case TenumConverter(_):		throw t; //"";
-		case Tbinding(_):			throw t; //"";
 	}
 	
 	function isBasicMongoType(t:PType) return switch(t) {
@@ -987,9 +974,7 @@ class Scala implements CodeGenerator
 		case Tbool(v):				true; //"Boolean";
 		case Tdate:					false; //"org.joda.time.DateTime";
 		case Tdatetime:				false; //"org.joda.time.DateTime";
-		case TlinkedList:			throw t; //"List";
 		case TenumConverter(_):		throw t; //"";
-		case Tbinding(_):			throw t; //"";
 	}
 	
 	static function mongoType(t:PType, ref:Bool) return switch(t) {
@@ -1018,9 +1003,7 @@ class Scala implements CodeGenerator
 		case Turi, Temail, TfileRef:
 			"String";
 		
-		case TlinkedList:			throw t; //"List";
 		case TenumConverter(_):		throw t; //"";
-		case Tbinding(_):			throw t; //"";
 	}
 	
 	function arrayInnerType(p:Property) return switch(p.type) {
@@ -1051,13 +1034,11 @@ class Scala implements CodeGenerator
 		case Turi, TuniqueID, Tstring, Tinterval, Tdate, Tdatetime, Temail, Tdef(_), Tarray(_,_,_), Tcolor, TfileRef:
 			"null";
 		
-		case TlinkedList:			"Nil";
 		case Tinteger(_,_,_):		"0";
 		case Tdecimal(_,_,_):		"Double.NaN";
 		case Tbool(v):				Std.string(v);
 		
 		case TenumConverter(_):		throw t; //"";
-		case Tbinding(_):			throw t; //"";
 	}
 	
 	static function getType(t:PType, ?surroundWithType:String) : {name:String, mongoOptionGetter:String, defaultValue:Dynamic}
@@ -1070,7 +1051,6 @@ class Scala implements CodeGenerator
 			case TuniqueID:				"ObjectId";
 			case TfileRef:				"FileRef";
 			case Tstring:				"String";
-			case TlinkedList:			"List";
 			case Tinteger(_,_,_):		res.mongoOptionGetter = ".map(ConvertTo.integer(_))";    "Int";
 			case Tdecimal(_,_,_):		res.mongoOptionGetter = ".map(ConvertTo.decimal(_))"; "Double";
 			case Tbool(v):				res.defaultValue = v; res.mongoOptionGetter = ".map(_.booleanValue)"; "Boolean";
@@ -1080,7 +1060,6 @@ class Scala implements CodeGenerator
 			case Tdatetime:				"org.joda.time.DateTime";
 			case Tinterval:				"org.joda.time.Interval";
 			case Tcolor:				"primevc.types.RGBA";
-			case Tbinding(_):			throw t; //"";
 		
 			case Tdef(ptypedef): switch (ptypedef) {
 				case Tclass		(def):	def.fullName + "VO";
@@ -1781,9 +1760,6 @@ class XMLProxyGenerator
 					addPathEscaped(path);
 				 	a(".iterator.map({ i => "); add_toXMLChildren("i", t); a(" })"); // _.toXML())");
 				
-				case Tbinding(p):
-					throw p;
-				
 				default: throw "impossible";
 			}
 	}
@@ -1809,7 +1785,6 @@ class XMLProxyGenerator
 		case Tdecimal(min,max,stride):	addPathEscaped(path); a(".toInt");
 		case Tstring:					addPathEscaped(path); throw "Int String? "+path+" : "+type;
 		case Tcolor:					addPathEscaped(path); a(".toInt");
-		case Tbinding(p):				addIntString(path, p.type);
 		case Tdate:						addPathEscaped(path); a(".getMillis()");
 		case Tdatetime:					addPathEscaped(path); a(".getMillis()");
 		

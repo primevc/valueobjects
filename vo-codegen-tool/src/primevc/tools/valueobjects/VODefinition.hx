@@ -401,10 +401,9 @@ class Util
 		return switch (type) {
 			case Tdef(type): 				type;
 			case Tarray(type, min, max):	getPTypedef(type);
-			case Tbinding(prop):			getPTypedef(prop.type);
 			
 			default: null;
-			//Turi,TuniqueID,Tstring,TlinkedList,Tinteger,Temail,Tdecimal,Tcolor,Tbool
+			//Turi,TuniqueID,Tstring,Tinteger,Temail,Tdecimal,Tcolor,Tbool
 		}
 	}
 	
@@ -416,9 +415,7 @@ class Util
 	{
 		return switch(ptype)
 		{
-			case TlinkedList:			true;
 			case Tarray(_,_,_):			true;
-			case Tbinding(p):			isPTypeIterable(p.type);
 			
 			case Tdef(_):				false;
 			case Turi:					false;
@@ -442,14 +439,12 @@ class Util
 		return switch(ptype)
 		{
 			case Tdef(p):				false;
-			case Tbinding(p):			isPTypeBuiltin(p.type);
 			
 			case Tarray(_,_,_):			true;
 			case Turi:					true;
 			case TuniqueID:				true;
 			case TfileRef:				true;
 			case Tstring:				true;
-			case TlinkedList:			true;
 			case Tinteger(_,_,_):		true;
 			case TenumConverter(_):		true;
 			case Temail:				true;
@@ -471,14 +466,12 @@ class Util
 					case Tenum		(_): true;
 					case Tclass		(_): false;
 				}
-			case Tbinding(p):			isSingleValue(p.type);
 			
 			case Tarray(t,_,_):			isSingleValue(t);
 			case Turi:					true;
 			case TuniqueID:				true;
 			case Tstring:				true;
 			case TfileRef:				true;
-			case TlinkedList:			false;
 			case Tinteger(_,_,_):		true;
 			case TenumConverter(_):		true;
 			case Temail:				true;
@@ -527,9 +520,6 @@ enum PropertyDefinitionError {
 	
 	/** Tried to define a type which didn't start with an Uppercase letter. **/
 	Err_NotUppercaseType		(m:Module, name:String);
-	
-	/** A binding ended up pointing to itself **/
-	Err_CircularBinding(p:PropertyTypeResolver);
 	
 	/** The property got a value supplied which was of an incompatible type **/
 	Err_IncompatibleDefaultValue(p:Property, value:Dynamic);
@@ -702,11 +692,8 @@ class PropertyTypeResolver
 			case subclass(_,_,_),
 				namedSetOf(_,_,_,_),
 				is(_),
-				getter(_,_),
-				bindTo(_),
 				arrayOfType(_),
-				arrayOf(_),
-				LinkedList:
+				arrayOf(_):
 				throw "Non-primitive: "+type;
 		}
 	}
@@ -744,9 +731,6 @@ class PropertyTypeResolver
 			case arrayOfType(t):
 				Tarray(t);
 			
-			case LinkedList:
-				TlinkedList;
-			
 			case arrayOf(basetype):
 				Tarray(Tdef( Util.unpackMType(prop.parent.module.find(basetype)) ));
 				
@@ -772,9 +756,6 @@ class PropertyTypeResolver
 					
 					case namedSetOf	(_,_,_,_):	throw "namedSetOf(namedSetOf(...)) unsupported";
 					case subclass	(_,_,_):	throw "namedSetOf(subclass(...)) unsupported";
-					case getter		(_,_):		throw "namedSetOf(getter) unsupported";
-					case bindTo		(_):		throw "namedSetOf(bindTo(...)) unsupported";
-					case LinkedList:			throw "namedSetOf(linked-list) unsupported";
 				}
 				
 				Assert.that(base != null);
@@ -789,28 +770,6 @@ class PropertyTypeResolver
 				prop.parent.module.defineType(nsName, MPending(nt,uniqueKeys,propertyMap,null));
 				
 				Tdef(nt);
-			
-	//		case arrayViewOfType(property:String, typeFilter:String):
-			
-			case getter(value, options):
-				trace("Warning: Getter properties not implemented yet - "+ prop.parent.fullName+'::'+prop.name +'='+ value +', '+Std.string(options));
-				prop.parent.property.remove(prop.name);
-				/* !! */ null;
-			
-			case bindTo(propertyPath):
-				var self = this;
-				prop.parent.propTodo.tryOrQueue(function(v)
-				{
-					var target;
-					try target = self.prop.parent.findProperty(propertyPath) catch (err:ResolveError) return false;
-					
-					self.type = Tbinding(target);
-					if (self.prop == target || Type.enumEq(target.type, Tbinding(self.prop)))
-						throw Err_CircularBinding(self);
-					
-					return true;
-				});
-				self.type;
 		}
 	}
 	
@@ -925,10 +884,8 @@ class Property
 	public function isDisposable ()
 	{
 		return isBindable() || switch (this.type) {
-		//	case Tdef(type):				true;
+			case Tdef(type):				!Util.isEnum(this.type);
 			case Tarray(type,min,max):		true;
-			case Tbinding(p):				true;
-			case TlinkedList:				true;
 			default:						false;
 		}
 	}
@@ -938,8 +895,6 @@ class Property
 		return switch (this.type) {
 			case Tdef(_):					!Util.isEnum(this.type);
 			case Tarray(_,min,max):			true;
-			case Tbinding(p):				true;
-			case TlinkedList:				true;
 			default:						false;
 		}
 	}
@@ -978,11 +933,9 @@ class Property
 			case TfileRef:			assert(hasType(String));
 			
 			case TenumConverter(e):	throw "not implemented";
-			case TlinkedList:		throw "not implemented";
 			case Tdate:				throw "not implemented";
 			case Tdatetime:			throw "not implemented";
 			case Tinterval:			throw "not implemented";
-			case Tbinding(p):		throw "not implemented";
 			case Tarray(t,x,y):		throw "not implemented";
 			
 			case Tdef(td):
@@ -1109,11 +1062,8 @@ class Enumeration
 				case subclass(o,p):
 				case namedSetOf(b,u,p):
 				case is(x):
-				case getter(v,o):
-				case bindTo(p):
 				case arrayOfType(t):
 				case arrayOf(t):
-				case LinkedList:
 			*/
 			}
 			if (this.parent.catchAll != null) throw "Only one catchall enum property allowed ("+this.name+" tried to overwrite "+this.parent.catchAll.name+") for: "+this.parent.fullName;
@@ -1954,15 +1904,12 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		{
 			case Tdef(type): 
 				l.add(Util.unpackPTypedef(type));
-			case Tbinding(prop):
-				var t = Util.getPTypedef(prop.type);
-				if (t != null) l.add(Util.unpackPTypedef(t));
 			case Tarray(type, min,max):
 				var t = Util.getPTypedef(type);
 				if (t != null) l.add(Util.unpackPTypedef(t));
 			
 			default:
-			//Turi,TuniqueID,Tstring,TlinkedList,Tinteger,Temail,Tdecimal,Tcolor,Tbool
+			//Turi,TuniqueID,Tstring,Tinteger,Temail,Tdecimal,Tcolor,Tbool
 		}
 		return l;
 	}
@@ -2035,7 +1982,6 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 							this.implement(Util.unpackPTypedef(Util.unpackMType( module.find(t) )));
 						else if (Std.is(t,AbstractPType)) switch(cast(t,AbstractPType))
 						{
-							case LinkedList:
 							case UniqueID:
 								this.implement(UniqueIDTrait.type);
 							case is(type):
@@ -2219,10 +2165,6 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		if (node.length == 1) return p;
 		
 		var nextPropType = p.type;
-		while (true) nextPropType = switch(nextPropType) {
-			case Tbinding(p): p.type;
-			default: break;
-		}
 		
 		var def:TypeDefinition;
 		switch (nextPropType)
@@ -2232,7 +2174,6 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 			case Tstring:			throw("TODO: implement binding to string properties");		throw Err_PropertyHasNoMembers;
 			case Turi:				throw("TODO: implement binding to URI    properties");		throw Err_PropertyHasNoMembers;
 			case Temail:			throw("TODO: implement binding to e-mail properties");		throw Err_PropertyHasNoMembers;
-			case TlinkedList:		throw("TODO: implement binding to linked-list properties");	throw Err_PropertyHasNoMembers;
 			case Tdate:				throw("TODO: implement binding to date properties");		throw Err_PropertyHasNoMembers;
 			case Tdatetime:			throw("TODO: implement binding to datetime properties");	throw Err_PropertyHasNoMembers;
 			case Tinterval:			throw("TODO: implement binding to interval properties");	throw Err_PropertyHasNoMembers;
@@ -2246,8 +2187,6 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 			case Tinteger(a,b,c):	throw Err_PropertyHasNoMembers;
 			case TuniqueID:			throw Err_PropertyHasNoMembers;
 			case TfileRef:			throw Err_PropertyHasNoMembers;
-			
-			case Tbinding(p):		throw "Impossible error";
 		}
 		
 		return def.doFindProperty(node.slice(1));
@@ -2470,17 +2409,10 @@ enum PType
 	Turi;
 	Temail;
 	
-	Tbinding(p:Property);
-	
 	TuniqueID;
 	TfileRef;
-	TlinkedList;
 	
 	TenumConverter	(prop:EnumConversionProperty);
-/*
-	Ttype(t:TypeDefinition);
-	Tgetter;
-*/
 }
 
 // ----------------
@@ -2491,13 +2423,10 @@ enum AbstractPType
 {
 	arrayOfType(type:PType);
 	arrayOf(cl:String);
-//	arrayViewOfType(property:String, typeFilter:String);
 	namedSetOf(basetype:AbstractPType, index:Int, uniqueKeys:Array<String>, properties:Dynamic);
 	
 	is(path:String);
 	subclass(index:Int, options:Dynamic, properties:Dynamic);
-	getter(value:AbstractPType, ?options:Dynamic);
-	bindTo(property:String); // Make this property point to some other data
 	
 	// numeric
 	decimal;
@@ -2517,9 +2446,7 @@ enum AbstractPType
 	// traits
 	UniqueID;
 	FileRef;
-	LinkedList;
 	
-//	bool; // Nullable boolean
 	//true = non-nullable bool default true
 	//false = non-nullable bool default false
 }

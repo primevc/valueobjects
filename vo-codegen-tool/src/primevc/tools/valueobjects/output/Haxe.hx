@@ -347,7 +347,7 @@ class Haxe implements CodeGenerator
 				a("\n");
 			}
 			else {
-				// single mixin with 1 field optimization (like UniqueID)
+				// single mixin with 1 field optimization (like ObjectId)
 				a("\n\t\tvar mixin = propertyBits & 1; // Single field mixin: "); a(def.supertypes.first().fullName);
 			}
 			
@@ -539,7 +539,7 @@ class Haxe implements CodeGenerator
 			case Tdatetime:					a('b += o.packDateTime(');		a(path); ac(")".code);
 			case Tinterval:					a('b += o.packDateInterval(');	a(path); ac(")".code);
 			case Turi:						a('b += o.packURI(');			a(path); ac(")".code);
-			case TuniqueID:					a('b += o.packUniqueID(');		a(path); ac(")".code);
+			case TuniqueID:					a('b += o.packObjectId(');		a(path); ac(")".code);
 			case Temail:					a('b += o.packEMail(');			a(path); ac(")".code);
 			case Tcolor:					a('b += o.packRGBA(');			a(path); ac(")".code);
 			case TfileRef:					a('b += o.packFileRef(');		a(path); ac(")".code);
@@ -1297,7 +1297,7 @@ private class HaxeUtil
 			case Tdatetime:					'Date';
 			case Tinterval:					'primevc.types.DateInterval';
 			case Turi:						bindable? 'primevc.types.BindableURI' : 'primevc.types.URI';
-			case TuniqueID:					'primevc.types.UniqueID';
+			case TuniqueID:					'primevc.types.ObjectId';
 			case Temail:					'primevc.types.EMail';
 			case Tcolor:					'primevc.types.RGBA';
 			case TfileRef:					'primevc.types.FileRef';
@@ -1953,7 +1953,7 @@ private class HaxeXMLMap extends CodeBufferer
 			case Tdecimal(min,max,stride):	xmlstring+prefix+'Float';
 			case Tstring, TfileRef:			if (prefix == "to") xmlstring+prefix+'String'; else null;
 			case Turi:						if (prefix == "to") { setProp = false; "this." + property + ".parse"; } else xmlstring+prefix+'URI';
-			case TuniqueID:					xmlstring+prefix+'UniqueID';
+			case TuniqueID:					xmlstring+prefix+'ObjectId';
 			case Temail:					xmlstring+prefix+'EMail';
 			case Tcolor:					xmlstring+prefix+'Color';
 			case Tdate:						xmlstring+prefix+'Date';

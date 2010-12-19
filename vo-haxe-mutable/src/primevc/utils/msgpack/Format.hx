@@ -258,7 +258,7 @@ import primevc.types.EMail;
 import primevc.types.URI;
 import primevc.types.FileRef;
 import primevc.types.DateInterval;
-import primevc.types.UniqueID;
+import primevc.types.ObjectId;
 
 
 /**
@@ -382,7 +382,7 @@ class VOFormat
 	{
 		#if MessagePackDebug trace("packDateTime: "+value); #end
 		
-		return Format.packInt(o, Std.int(value.getTime() #if (flash || js) / 1000) #end);
+		return Format.packInt(o, Std.int(value.getTime() #if (flash || js) / 1000 #end));
 	}
 	
 	static inline public function packDate(o : Output, value : Date)
@@ -403,10 +403,12 @@ class VOFormat
 	}
 	
 	
-	static inline public function packUniqueID(o : BytesOutput, value : UniqueID)
+	static inline public function packObjectId(o : Output, value : ObjectId)
 	{
-		#if MessagePackDebug trace("packUniqueID: "+value); #end
+		#if MessagePackDebug trace("packObjectId: "+value); #end
 		
-		return Format.packString(o, value.toString());
+		packVOValueTypeHeader(o, ObjectId.TYPE_ID);
+		value.writeBytes(o);
+		return 13;
 	}
 }

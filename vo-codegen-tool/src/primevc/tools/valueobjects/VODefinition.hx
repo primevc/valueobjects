@@ -2371,7 +2371,7 @@ class UniqueIDTrait extends MagicClassDef
 	static var init = function(){ type = new UniqueIDTrait(); }();
 	
 	private function new() {
-		super(0xFFFFF + 1, "UniqueID", Module.traits);
+		super(0xFFFFF + 1, "ObjectId", Module.traits);
 		
 		var p = new Property("id", this);
 		p.index = 0;

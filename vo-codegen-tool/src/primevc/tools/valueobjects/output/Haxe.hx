@@ -546,7 +546,12 @@ class Haxe implements CodeGenerator
 		
 			case Tdef(ptypedef): switch (ptypedef) {
 				case Tclass(def):	a('b += ('); a(path); a(".notNull()? "); a(path); a(".messagePack(o) : o.packNil())");
-				case Tenum(def):	a('b += o.packInt('); a(def.fullName); a("_utils.toValue("); a(path); a("))");
+				case Tenum(def):
+				if (def.catchAll != null) {
+					a('{\n\t\t\t\tvar v = '); a(def.fullName); a("_utils.toValue("); a(path); a(");\n\t\t\t\tb += v.isSet()? o.packInt(v) : o.packString("); a(def.fullName); a("_utils.toString("); a(path); a("));\n\t\t\t}");
+				} else {
+					a('b += o.packInt('); a(def.fullName); a("_utils.toValue("); a(path); a("))");
+				}
 			}
 			case Tarray(type, min, max):
 				a("{");
@@ -1008,12 +1013,12 @@ class Haxe implements CodeGenerator
 		{
 			a("\n\t\t  case "); a(e.name);
 			if (e.type != null) {
-				a("(_): ");
+				a("(_): primevc.types.Number.INT_NOT_SET");
 			}
 			else {
-				a(': ');
+				a(': ' + e.intValue);
 			}
-		 	a(e.intValue + ";");
+		 	a(";");
 		}
 		a("\n\t\t}\n\t}\n");
 		// fromValue

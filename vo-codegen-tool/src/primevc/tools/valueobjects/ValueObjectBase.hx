@@ -70,8 +70,8 @@ class ValueObjectBase implements IValueObject
 	
 	private function objectChangedHandler(propertyID : Int) : ObjectChangeSet -> Void
 	{
-		var changed  = this.changed;
-		var pathNode = ObjectPathVO.make(this, propertyID); // Same ObjectPathVO instance reused
+		var changedEvent	= this.changed;
+		var pathNode		= ObjectPathVO.make(this, propertyID); // Same ObjectPathVO instance reused
 		
 		return function(change:ObjectChangeSet)
 		{
@@ -81,7 +81,7 @@ class ValueObjectBase implements IValueObject
 			while (p.notNull() && p.parent.notNull() && p.parent != pathNode) p = p.parent;
 			
 			untyped p.parent = pathNode;
-			changed.send(change);
+			changedEvent.send(change);
 		}
 	}
 	

@@ -114,26 +114,14 @@ class ObjectId
 	// Timestamping
 	//
 	
-	static var counter			= 0;
-	static var nextSecond		= flash.Lib.getTimer() + 1000;
-	static var currentSecond	= getTimestamp();
-	
-	static function getTimestamp() {
-		return
-		 	#if flash9	untyped    Date.now().getTime() * 0.001 ; #end
-			#if js		Math.floor(Date.now().getTime() * 0.001); #end
-	}
-	
+	static var counter		= -1;
 	private function setTimeAndIncrement()
 	{
-		if (flash.Lib.getTimer() < nextSecond) {
-			this.timestamp = currentSecond;
-			this.increment = ObjectId.counter++;
-		}
-		else {
-			this.increment = ObjectId.counter = 0;
-			nextSecond = flash.Lib.getTimer() + 1000;
-			this.timestamp = currentSecond = getTimestamp();
-		}
+		this.timestamp =
+		 	#if flash9	untyped    Date.now().getTime() * 0.001 ; #end
+			#if js		Math.floor(Date.now().getTime() * 0.001); #end
+		
+		if ((this.increment = ++ObjectId.counter) == 0xFFFFFF)
+		 	ObjectId.counter = -1;
 	}
 }

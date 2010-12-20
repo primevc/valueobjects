@@ -17,22 +17,22 @@ package primevc.tools.valueobjects;
  */
 class ValueObjectBase implements IValueObject
 {
-	public var changed (default, null) : Signal1<ObjectChangeSet>;
+	public var change (default, null) : Signal1<ObjectChangeSet>;
 	
 	private var _changedFlags	: Int;
 	private var _propertiesSet	: Int;
 	
 	private function new ()
 	{
-		changed = new Signal1();
+		change = new Signal1();
 	}
 	
 	
 	public function dispose()
 	{
-		if (changed.notNull()) {
-			changed.dispose();
-			changed = null;
+		if (change.notNull()) {
+			change.dispose();
+			change = null;
 		}
 		_changedFlags = 0;
 	}
@@ -47,7 +47,7 @@ class ValueObjectBase implements IValueObject
 		{
 			var set = ObjectChangeSet.make(this, _changedFlags);
 			addChanges(set);
-			this.changed.send(set);
+			this.change.send(set);
 		}
 		commitBindables();
 	}
@@ -67,23 +67,6 @@ class ValueObjectBase implements IValueObject
 		}
 	}
 */
-	
-	private function objectChangedHandler(propertyID : Int) : ObjectChangeSet -> Void
-	{
-		var changed  = this.changed;
-		var pathNode = ObjectPathVO.make(this, propertyID); // Same ObjectPathVO instance reused
-		
-		return function(change:ObjectChangeSet)
-		{
-			var p = change.parent;
-			
-			// Find either pathNode, or the last parent
-			while (p.notNull() && p.parent.notNull() && p.parent != pathNode) p = p.parent;
-			
-			untyped p.parent = pathNode;
-			changed.send(change);
-		}
-	}
 	
 	
 	static inline public function bytesUsedInInt(n:Int)
@@ -176,6 +159,23 @@ ObjectChangeVO {
 
 class ObjectChangeSet extends ChangeVO
 {
+	static public function objectChangedHandler(changeSignal:Signal1<ObjectChangeSet>, propertyID : Int) : ObjectChangeSet -> Void
+	{
+		var pathNode = ObjectPathVO.make(this, propertyID); // Same ObjectPathVO instance reused
+		
+		return function(change:ObjectChangeSet)
+		{
+			var p = change.parent;
+			
+			// Find either pathNode, or the last parent
+			while (p.notNull() && p.parent.notNull() && p.parent != pathNode) p = p.parent;
+			
+			untyped p.parent = pathNode;
+			changeSignal.send(change);
+		}
+	}
+	
+	
 	public var vo					(default, null) : IValueObject;
 	public var parent				(default, null) : ObjectPathVO;
 	public var timestamp			(default, null) : Float;

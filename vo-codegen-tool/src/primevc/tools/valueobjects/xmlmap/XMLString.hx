@@ -1,5 +1,5 @@
 package primevc.tools.valueobjects.xmlmap;
- import primevc.types.UniqueID;
+ import primevc.types.ObjectId;
  import primevc.types.EMail;
  import primevc.types.URI;
  import primevc.types.RGBA;
@@ -12,7 +12,7 @@ class XMLString
 	static public inline function fromInt		(v:Int)		: String	{ return Std.string(v); }
 	static public inline function fromFloat		(v:Float)	: String	{ return Std.string(v); }
 	
-	static public inline function fromUniqueID	(v:UniqueID): String	{ return Std.string(v); }
+	static public inline function fromUniqueID	(v:ObjectId): String	{ return Std.string(v); }
 	static public inline function fromURI		(v:URI)		: String	{ return v.string; }
 	static public inline function fromEMail		(v:EMail)	: String	{ return v; }
 	
@@ -30,7 +30,7 @@ class XMLString
 	static public inline function toInt			(v:String)	: Int		{ return Std.parseInt(v); }
 	static public inline function toFloat		(v:String)	: Float		{ return Std.parseFloat(v); }
 	
-	static public inline function toUniqueID	(v:String)	: UniqueID	{ return cast v; }
+	static public inline function toUniqueID	(v:String)	: ObjectId	{ return cast v; }
 	static public inline function toURI			(v:String)	: URI		{ return new URI().parse(v); }
 	static public inline function toEMail		(v:String)	: EMail		{ return v; }
 	

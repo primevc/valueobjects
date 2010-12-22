@@ -9,8 +9,10 @@ package primevc.tools.valueobjects;
   using primevc.utils.IfUtil;
   using primevc.utils.TypeUtil;
 
+typedef PropertyID = Int;
+
 /**
- * Class description
+ * Base class for all generated ValueObjects
  * 
  * @author Danny Wilson
  * @creation-date Dec 03, 2010
@@ -50,6 +52,23 @@ class ValueObjectBase implements IValueObject
 			this.change.send(set);
 		}
 		commitBindables();
+	}
+	
+	public function objectChangedHandler(propertyID : Int) : ObjectChangeSet -> Void
+	{
+		var changeSignal = this.change;
+		var pathNode = ObjectPathVO.make(this, propertyID); // Same ObjectPathVO instance reused
+		
+		return function(change:ObjectChangeSet)
+		{
+			var p = change.parent;
+			
+			// Find either pathNode, or the last parent
+			while (p.notNull() && p.parent.notNull() && p.parent != pathNode) p = p.parent;
+			
+			untyped p.parent = pathNode;
+			changeSignal.send(change);
+		}
 	}
 	
 	private function addChanges(changeSet:ObjectChangeSet); // Creates and adds all PropertyChangeVO and ListChangeVO
@@ -159,24 +178,7 @@ ObjectChangeVO {
 
 class ObjectChangeSet extends ChangeVO
 {
-	static public function objectChangedHandler(changeSignal:Signal1<ObjectChangeSet>, propertyID : Int) : ObjectChangeSet -> Void
-	{
-		var pathNode = ObjectPathVO.make(this, propertyID); // Same ObjectPathVO instance reused
-		
-		return function(change:ObjectChangeSet)
-		{
-			var p = change.parent;
-			
-			// Find either pathNode, or the last parent
-			while (p.notNull() && p.parent.notNull() && p.parent != pathNode) p = p.parent;
-			
-			untyped p.parent = pathNode;
-			changeSignal.send(change);
-		}
-	}
-	
-	
-	public var vo					(default, null) : IValueObject;
+	public var vo					(default, null) : ValueObjectBase;
 	public var parent				(default, null) : ObjectPathVO;
 	public var timestamp			(default, null) : Float;
 	public var propertiesChanged	(default, null) : Int;

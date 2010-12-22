@@ -21,9 +21,23 @@ class MessagePackTest extends TestCase
 	var inp	: Input;
 	var out	: BytesOutput;
 	
+	function initReader()
+	{
+		var b = out.getBytes();
+		inp	= new BytesInput(b);
+		r	= new Reader(inp, new IntHash());
+	
+		return b;
+	}
+	
 	override function setup() {
-		r	= new Reader();
 		out	= new BytesOutput();
+	}
+	
+	override function tearDown() {
+		r   = null;
+		inp = null;
+		out = null;
 	}
 	
 	function test__tinyint()		checkInt(1,  0, 0)
@@ -66,9 +80,7 @@ class MessagePackTest extends TestCase
 		out.writeByte(0xca);
 		out.writeFloat(10.0);
 		
-		var b = out.getBytes();
-		
-		inp	= new BytesInput(b);
+		initReader();
 		assertEquals(10.0, r.readMsgPackValue(inp));
 	}
 	
@@ -261,23 +273,21 @@ class MessagePackTest extends TestCase
 	
 	function unpack(bytes:Int, v:Dynamic)
 	{	
-		var b = out.getBytes();
+		var b = initReader();
 		Assert.that(b != null);
 		assertEquals(bytes, b.length);
 		
-		inp	= new BytesInput(b);
-		assertEquals(v, r.readMsgPackValue(inp));
+		assertEquals(v, r.readMsgPackValue());
 		
 		return b;
 	}
 	
 	function unpackArray(bytes:Int, v:FastArray<Dynamic>)
 	{
-		var b = out.getBytes();
+		var b = initReader();
 		Assert.that(b != null);
 		assertEquals(bytes, b.length);
 		
-		inp	= new BytesInput(b);
 		var arr : FastArray<Dynamic> = r.readMsgPackValue(inp);
 		
 	#if flash10
@@ -294,11 +304,10 @@ class MessagePackTest extends TestCase
 	
 	function unpackMap(bytes:Int, size:Int)
 	{
-		var b = out.getBytes();
+		var b = initReader();
 		Assert.that(b != null);
 		assertEquals(bytes, b.length);
 		
-		inp	= new BytesInput(b);
 		var map : Hash<Int> = r.readMsgPackValue(inp);
 		assertTrue(Std.is(map, Hash));
 		

@@ -5,14 +5,15 @@ package primevc.types;
 
 class ObjectId
 {
-	static var sessionMID = 0xABCDEF; // TODO: Get from flashVar ?
+	static var sessionMID = Std.int(Math.random() * 0xFFFFFF);
 	static var sessionPID = Std.int(Math.random() * 0xFFFF);
 	
 	static inline public var TYPE_ID = 1;
 	
-	static public function msgpack_packVO(o : BytesOutput, obj : IObjectId, prependMsgpackType : Bool = false, propertyBits : Int) : Int
+	static public function msgpack_packVO(o : BytesOutput, obj : IObjectId, propertyBits : Int, prependMsgpackType : Bool = false) : Int
 	{
-		Assert.that(o != null && obj != null);
+		Assert.notNull(o);
+		Assert.notNull(obj);
 		
 		var b /* bytes written */ : Int;
 		if (prependMsgpackType) {
@@ -104,9 +105,18 @@ class ObjectId
 		out.writeUInt24(increment);
 	}
 	
-	public function toString() {
+	public function toString()
+	{
 		var S = StringTools;
 		return S.hex(cast timestamp, 8) + S.hex(machine, 6) + S.hex(pid, 4) + S.hex(increment, 6);
+	}
+	
+	public inline function equals(other : ObjectId)
+	{
+		return this.timestamp == other.timestamp
+		 	&& this.machine   == other.machine
+			&& this.pid		  == other.pid
+			&& this.increment == other.increment;
 	}
 	
 	

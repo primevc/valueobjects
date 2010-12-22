@@ -2,6 +2,58 @@ package primevc.tools.valueobjects.output;
  import primevc.tools.valueobjects.VODefinition;
   using primevc.tools.valueobjects.output.Util;
 
+class HaxeTypeMap implements CodeGenerator
+{
+	var map : IntHash<String>;
+	
+	public function new() {
+		map = new IntHash();
+	}
+	
+	public function genClass(def : ClassDef) {
+		map.set(def.index, if (def.isMixin) def.fullName; else def.fullName + "VO");
+	}
+	
+	public function write(module : Module)
+	{
+		var dir = module.mkdir();
+		var filename = dir + "/VO.hx";
+		
+		var file = neko.io.File.write(filename, false);
+
+		file.writeString("package " +module.fullName+";\n");
+
+		file.writeString("
+class VO
+{
+	static public var typeMap = function() {
+		var map : IntHash<Class<Dynamic>> = new IntHash();
+");
+
+		for (typeID in map.keys()) {
+			file.writeString("\n\t\tmap.set(");
+			file.writeString(typeID + ", ");
+			file.writeString(map.get(typeID));
+			file.writeString(");");
+		}
+
+file.writeString("
+		return map;
+	}();
+}
+");
+
+		file.close();
+	}
+	
+	public function genEnum(def:EnumDef);
+	
+	public function newModule(module:Module) {
+		module.generateWith(this);
+		return cast this;
+	}
+}
+
 class Haxe implements CodeGenerator
 {
 	static var haxeModules : List<Haxe>;
@@ -14,6 +66,13 @@ class Haxe implements CodeGenerator
 	public static function generate()
 	{
 		Module.root.generateWith(new Haxe(Module.root));
+		
+		for (m in Module.pkgRoots) {
+			neko.Lib.print("\t - " + m.fullName + "\n");
+			var map = new HaxeTypeMap();
+			m.generateWith(map);
+			map.write(m);
+		}
 	}
 	
 	var mod		: Module;
@@ -40,8 +99,6 @@ class Haxe implements CodeGenerator
 			a("package "); a(def.module.fullName); a(";\n");
 			a(" import primevc.core.traits.IMessagePackable;\n");
 			a(" import primevc.core.traits.IEditEnabledValueObject;\n");
-			a(" import primevc.tools.valueobjects.ValueObjectBase;\n");
-			a(" import primevc.tools.valueobjects.xmlmap.XMLString;\n");
 		}
 	}
 	
@@ -52,8 +109,11 @@ class Haxe implements CodeGenerator
 		addPackage(def);
 		
 		if (immutable)
-			a("\ninterface I"); 
+			a("\ninterface I");
 		else {
+			a(" import primevc.tools.valueobjects.ValueObjectBase;\n");
+			a(" import primevc.tools.valueobjects.xmlmap.XMLString;\n");
+			a(" import primevc.utils.msgpack.Reader;\n");
 			a("  using primevc.utils.IfUtil;\n");
 			a("  using primevc.utils.TypeUtil;\n");
 			a("  using primevc.utils.NumberUtil;\n");
@@ -242,15 +302,16 @@ class Haxe implements CodeGenerator
 	{
 		if (lastProp == null) return;
 		
-		a("\n\tstatic public function msgpack_unpackVO(input : haxe.io.Input, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBits : Int, converter : Dynamic -> Int -> Class<Dynamic> -> Dynamic) : Void\n\t{");
-		a("\n		Assert.that(input != null && obj != null);");
-		a("\n		var bits:Int;");
+		a("\n\tstatic public function msgpack_unpackVO(reader : Reader, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBytes : Int, converter : ValueConverter) : Void\n\t{");
+		a("\n		Assert.that(reader != null && obj != null);");
+		a("\n		var input = reader.input, bits:Int;");
 		
 		var bit = 8;
 		
 		for (i in 0 ... lastProp.index + 1)
 		{
 			if (bit == 8) {
+				a("\n\t\n\t\tif (propertyBytes-- == 0) return;");
 				a("\n\t\n\t\tbits = input.readByte();");
 				bit = 0;
 			}
@@ -261,29 +322,24 @@ class Haxe implements CodeGenerator
 				continue;
 			}
 			
-			a("\n\t\tif ((propertyBits & 0x"); a(StringTools.hex(1 << bit, 2)); a(").not0()) { var v = input."); 
+			a("\n\t\tif ((bits & 0x"); a(StringTools.hex(1 << bit, 2)); a(").not0()) (untyped obj).");
+			a(p.name);
+			if (p.isBindable() && Util.isSingleValue(p.type)) a(".value");
+			a(" = reader.");
 			
 			switch (p.type) {
 				case Tarray(innerT,_,_):
-					a("readMsgPackArray(converter, "); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(innerT)); a(")");
+					a("readMsgPackArray("); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(innerT)); a(");");
 				
 				default:
-					a("readMsgPackValue");
+					a("readMsgPackValue("); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(p.type)); a(");");
 			}
 			
-			a("(); (untyped obj)."); a(p.name);
-			
-			if (p.isArray()) {
-				 a(" = v");
-			}
-			else {
-				if (p.isBindable() && Util.isSingleValue(p.type)) a(".value");
-				a(" = v.is("); a(HaxeUtil.haxeType(p.type)); a(")? v : converter(v, "); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(p.type)); a(")");
-			}
-			
-			a("; }");
 			++bit;
 		}
+		
+		a("\n\t\t\n\t\tif (propertyBytes.not0()) reader.discardRemainingVOProperties(propertyBytes);");
+		
 		a("\n\t}");
 	}
 	
@@ -303,7 +359,7 @@ class Haxe implements CodeGenerator
 		if (!def.isMixin)
 		{
 			a("\n\t"); if (hasSuper) a("override "); a("public function messagePack(o : haxe.io.BytesOutput) : Int\n\t{");
-			a("\n\t\treturn msgpack_packVO(o, this, true, _propertiesSet);");
+			a("\n\t\treturn msgpack_packVO(o, this, _propertiesSet, true);");
 			a("\n\t}");
 			a("\n");
 		}
@@ -382,8 +438,9 @@ class Haxe implements CodeGenerator
 			if (def.supertypes.length == 1)
 			{
 				var t = def.supertypes.first();
-				a("\n\t\t\tb += "); addFullName(t); a(".msgpack_packVO(o, obj, false, ");
-				a(mixinBits == 1? "1);" : "mixBits);");
+				a("\n\t\t\tb += "); addFullName(t); a(".msgpack_packVO(o, obj, ");
+				a(mixinBits == 1? "1" : "mixBits");
+				a(", false);");
 			}
 			else for (t in def.supertypes)
 			{	
@@ -395,7 +452,7 @@ class Haxe implements CodeGenerator
 				}
 				a(" /* "); a(t.name); a(" */;");
 				
-				a("\n			if (mixin.not0()) "); a("b += "); a(t.fullName); if (Std.is(t,ClassDef) && !cast(t, ClassDef).isMixin) a("VO"); a(".msgpack_packVO(o, obj, false, mixin);");
+				a("\n			if (mixin.not0()) "); a("b += "); a(t.fullName); if (Std.is(t,ClassDef) && !cast(t, ClassDef).isMixin) a("VO"); a(".msgpack_packVO(o, obj, mixin, false);");
 				
 				if (t != def.supertypes.last()) {
 					a("\n\t\t\tmixBits >>>= "); a(t.propertiesSorted.length+";");
@@ -469,7 +526,7 @@ class Haxe implements CodeGenerator
 					
 						if (bit == 8 || p == lastProp)
 						{
-							a("\n\t\t"); 
+							a("\n\t\t");
 							
 							if (def.numPropertiesDefined > 8 && def.numPropertiesDefined - i > 1) {
 								a("\n\t\to.writeByte(propertyBits & 0x"); a(StringTools.hex(mask, 2));
@@ -487,7 +544,7 @@ class Haxe implements CodeGenerator
 							for (b in 0 ... bit) {
 								var p = def.propertiesDefined.get(i+1 - bit + b);
 								if (p == null) continue;
-								a("\n\t\t	if ((propertyBits & 0x"); a(StringTools.hex(1 << b, 2)); a(").not0()) "); 
+								a("\n\t\t	if ((propertyBits & 0x"); a(StringTools.hex(1 << b, 2)); a(").not0()) ");
 								addPropertyPackerCall("obj." + p.name, p.type, p.isBindable()); ac(";".code);
 							}
 						
@@ -679,7 +736,7 @@ class Haxe implements CodeGenerator
 			var p = def.propertiesSorted[i];
 			if (Util.isDefinedInSuperClassOf(def, p)) continue;
 			
-			if (p.isBindable())		a("\n\t\t\tchangeSet.addBindableChange("); 
+			if (p.isBindable())		a("\n\t\t\tchangeSet.addBindableChange(");
 			else if (p.isArray())	a("\n\t\t\tchangeSet.addListChanges(");
 			else					a("\n\t\t\tchangeSet.addChange(");
 			
@@ -908,7 +965,7 @@ class Haxe implements CodeGenerator
 		var listChangeHandler = false;
 		if (p.isBindable() || p.isArray())
 		{
-			var typeName = switch (p.type) {
+			typeName = switch (p.type) {
 				case Tarray(innerType, _, _):
 					listChangeHandler = true;
 					"primevc.core.collections.ListChange<" + HaxeUtil.haxeType(innerType, true, false) + ">";
@@ -924,17 +981,26 @@ class Haxe implements CodeGenerator
 		a("\t\treturn if (v == "); if (Util.isEnum(p.type) || Util.isPTypeBuiltin(p.type)) a("this."); else a("(untyped this)."); a(p.name); a(") v;\n");
 		a("\t\telse\n\t\t{\n\t\t\t_changedFlags |= "); a(hexBitflag(i)); a(";\n");
 		
-		if (p.isArray() || p.isBindable())
+		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type))
 		{
-			a("\t\t\tif ("); a(p.name); a(".notNull()) this."); a(p.name); a(".change.unbind(this);\n");
-			a("\t\t\tif (v.notNull()) {\n\t\t\t\tv.change.");
-			if (listChangeHandler) a("observe("); else a("bind(this, ");
-			a(p.name); a("Changed);\n\t\t\t\t");
-			a("v.setChangeHandler(ObjectChangeSet.objectChangedHandler(this.change, "); a(p.name.toUpperCase()); a("));\n\t");
+			a("\t\t\tif (this."); a(p.name); a(".notNull()) this."); a(p.name); a(".as(ValueObjectBase).change.unbind(this);\n");
+			a("\t\t\tif (v.notNull()) {\n\t\t\t\tv.");
+			
+			if (p.isArray() || p.isBindable())
+			{
+				a("change.");
+				a(listChangeHandler? "observe(this, " : "bind(this, "); a(p.name); a("Changed);\n\t");
+				if (listChangeHandler && !Util.isSingleValue(p.type)) {
+					a("\t\t\tv.setChangeHandler(objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t");
+				}
+			}
+			else if (!Util.isSingleValue(p.type)) {
+				a("as(ValueObjectBase).change.bind(this, objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t");
+			}
 		}
 		a("\t\t\t");
 		var ifExprAdded = addPropChangeFlagSetter(i, "v" + (p.isBindable()? ".value" : ""), p.type, false);
-		if (p.isArray() || p.isBindable()) {
+		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type)) {
 			a("\n\t\t\t}");
 			if (ifExprAdded) {
 				a("\n\t\t\t");
@@ -949,13 +1015,10 @@ class Haxe implements CodeGenerator
 		
 		if (p.isBindable() || p.isArray())
 		{
-			a("\tprivate function "); a(p.name); a("Changed");
+			a("\tprivate function "); a(p.name); a("Changed(");
 			
-			if (listChangeHandler) {
-				a("(");
-			}
-			else {
-				a(", old : "); a(typeName);
+			if (!listChangeHandler) {
+				a("value : "); a(typeName); a(", old : "); a(typeName);
 			}
 			a(") : Void {\n\t\t_changedFlags |= "); a(hexBitflag(i));
 			a(";\n\t\t");
@@ -1215,7 +1278,7 @@ private class NamedSetDefGenerator extends MagicClassGenerator
 		
 		a("\t\tfor (child in node.elements()) {\n");
 		
-		a("\t\t\tvar tmp"); 
+		a("\t\t\tvar tmp");
 		var c = HaxeUtil.getConstructorCall(ns.baseType, false, HaxeUtil.getConstructorInitializer(ns.baseType));
 		if (c != null) { a(" = "); a(c); }
 		else throw "non constructable type? " + ns;
@@ -1233,7 +1296,7 @@ private class HaxeUtil
 		var code = switch (ptype)
 		{
 			case Tarray(type, _,_):
-				("new primevc.core.collections.RevertableArrayList < " + HaxeUtil.haxeType( type, true ) + " >("+ initializer +")");
+				"new " + HaxeUtil.haxeType( ptype, true, true ) + "("+ initializer +")";
 			
 			case Tdef(_), Turi, TfileRef, Tinterval:
 				initializer; //"new " + HaxeUtil.haxeType(ptype) + "("+ initializer +")";
@@ -1314,7 +1377,7 @@ private class HaxeUtil
 			case Tdate:						'Date';
 			case Tdatetime:					'Date';
 			case Tinterval:					'primevc.types.DateInterval';
-			case Turi:						bindable? 'primevc.types.BindableURI' : 'primevc.types.URI';
+			case Turi:						'primevc.types.URI';
 			case TuniqueID:					'primevc.types.ObjectId';
 			case Temail:					'primevc.types.EMail';
 			case Tcolor:					'primevc.types.RGBA';
@@ -1329,7 +1392,10 @@ private class HaxeUtil
 			case Tarray(type, min, max):
 				if (bindable) {
 					bindable = false;
-			 		'primevc.core.collections.RevertableArrayList<'+ haxeType(type, true) +'>';
+					if (Util.isSingleValue(type))
+			 			'primevc.core.collections.RevertableArrayList<'+ haxeType(type, true) +'>';
+					else
+			 			'primevc.core.collections.VOArrayList<'+ haxeType(type, true) +'>';
 				}
 				else
 				 	'primevc.utils.FastArray<'+ haxeType(type, true) +'>';

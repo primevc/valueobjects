@@ -21,24 +21,27 @@ interface CodeGenerator
 
 class Module
 {
+	static public var pkgRoots	(default,null)	: List<Module>;
+	
 	static public var root		(default,null)	: Module;
 	static public var traits	(default,null)	: Module;
 	static public var types		(default,null)	: IntHash<TypeDefinition>;
 	
-	static public function declare(path:String):Module
+	static public function declare(path:String, isPackageRoot = false):Module
 	{
 		return switch(Module.root.find(path)) {
-			case MModule(m):		m;
+			case MModule(m):		if (m.packageRoot = isPackageRoot) pkgRoots.add(m); m;
 			case MType(t):			throw "Cannot redeclare type: '"+path+"' "+Std.string(t)+" as module";
 			case MUndefined(n,m):	throw "Cannot declare modules that start in Uppercase";
 			case MPending(a,b,c,d):	throw "Impossible error?";
 		}
 	}
 	
-	static public function reinitialize() { 
-		root   = new Module("", null);
-		types  = new IntHash();
-		traits = declare("primevc.types");
+	static public function reinitialize() {
+		pkgRoots = new List();
+		root     = new Module("", null);
+		types    = new IntHash();
+		traits   = declare("primevc.types");
 	}
 	static var initialize = reinitialize();
 	
@@ -76,7 +79,7 @@ class Module
 		return dir;
 	}
 	
-	
+	public  var packageRoot (default,null)		: Bool;
 	public  var name		(default,null)		: String;
 	private var members		(default,null)		: Hash<ModuleMember>;
 	public  var parent		(default,null)		: Module;

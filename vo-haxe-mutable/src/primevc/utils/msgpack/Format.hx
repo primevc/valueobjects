@@ -17,7 +17,7 @@ class Format
 	 */
 	static public function packInt(o : Output, value : Int) : Int
 	{
-		#if MessagePackDebug trace("packInt: "+value); #end
+		#if MessagePackDebug_Pack trace("packInt: "+value); #end
 		
 		if (value >= 0 && value < 0x10000)
 		{
@@ -67,7 +67,7 @@ class Format
 	 */
 	static public function packUInt(o : Output, value : UInt) : Int
 	{
-		#if MessagePackDebug trace("packUInt: "+value); #end
+		#if MessagePackDebug_Pack trace("packUInt: "+value); #end
 		
 		if (value <= 127) {
 		 	o.writeByte(value);
@@ -93,7 +93,7 @@ class Format
 
 	static public function packString(o : BytesOutput, value : String) : Int
 	{
-		#if MessagePackDebug trace("packString: "+value); #end
+		#if MessagePackDebug_Pack trace("packString: "+value); #end
 		
 		var b;
 		
@@ -137,7 +137,7 @@ class Format
 	 */
 	static inline public function packDouble(o : Output, value : Float)
 	{
-		#if MessagePackDebug trace("packDouble: "+value); #end
+		#if MessagePackDebug_Pack trace("packDouble: "+value); #end
 		
 		o.writeByte(0xcb);
 		o.writeDouble(value);
@@ -151,7 +151,7 @@ class Format
 	 */
 	static public function packArrayHeader(o : Output, arrayLength : Int)
 	{
-		#if MessagePackDebug trace("packArrayHeader: "+arrayLength); #end
+		#if MessagePackDebug_Pack trace("packArrayHeader: "+arrayLength); #end
 		
 		Assert.that(arrayLength > 0);
 		if (arrayLength <= 15) {
@@ -172,7 +172,7 @@ class Format
 	
 	static public function packMap(o : BytesOutput, map : Hash<Dynamic>)
 	{
-		#if MessagePackDebug trace("packMap: "+map); #end
+		#if MessagePackDebug_Pack trace("packMap: "+map); #end
 		
 		var keyCount = Lambda.count(map);
 		Assert.that(keyCount >= 0);
@@ -204,7 +204,7 @@ class Format
 	
 	static public function packDynamic(o : BytesOutput, value : Dynamic)
 	{
-		#if MessagePackDebug trace("packDynamic: "+value); #end
+		#if MessagePackDebug_Pack trace("packDynamic: "+value); #end
 		
 		return if (value == null)					packNil(o);
 		  else if (value == true || value == false)	packBool(o, value);
@@ -235,7 +235,7 @@ class Format
 	 * Returns: 1 (bytes written).
 	 */
 	static public inline function packNil(o : Output) : Int {
-		#if MessagePackDebug trace("packNil"); #end
+		#if MessagePackDebug_Pack trace("packNil"); #end
 		
 		o.writeByte(0xc0);
 		return 1;
@@ -246,7 +246,7 @@ class Format
 	 * Returns: 1 (bytes written).
 	 */
 	static public inline function packBool(o : Output, value : Bool) : Int {
-		#if MessagePackDebug trace("packBool: "+value); #end
+		#if MessagePackDebug_Pack trace("packBool: "+value); #end
 		
 		o.writeByte(if (value) 0xc3 else 0xc2);
 		return 1;
@@ -277,7 +277,7 @@ class VOFormat
 	 */
 	static inline public function packValueObject(o : Output)
 	{
-		#if MessagePackDebug trace("packValueObject"); #end
+		#if MessagePackDebug_Pack trace("packValueObject"); #end
 		
 		o.writeByte(0xD7);
 		return 1;
@@ -287,7 +287,7 @@ class VOFormat
 	 *  
 	 *  VO Header:
 	 *  +---bits---+---------------------+----------------------------------+------------------------------------+
-	 *  | 0tsssfff | 1 or 2 TypeID bytes | 0..s supertype VO Headers + data | 0..f Field bitflags + values group |
+	 *  | 1tsssfff | 1 or 2 TypeID bytes | 0..s supertype VO Headers + data | 0..f Field bitflags + values group |
 	 *  +----------+---------------------+----------------------------------+------------------------------------+
 	 *     t: When set, TypeID data is ushort (2 bytes, max 65535) otherwise ubyte (max 255).
 	 *   sss: Number of super type "VO Header, Field bitflags + values group" combinations following the TypeID.
@@ -308,17 +308,25 @@ class VOFormat
 	 */
 	static inline public function packValueObjectHeader(o : Output, voType : Int, superTypes : Int, fieldFlagBytes : Int)
 	{
-		#if MessagePackDebug trace("packValueObjectHeader { voType: "+ voType + ", superTypes: "+ superTypes + ", fieldFlagBytes: "+fieldFlagBytes); #end
-		
 		Assert.that(fieldFlagBytes >= 0 && fieldFlagBytes <= 4);
 		Assert.that(superTypes     >= 0 && superTypes     <= 7);
 		
 		if (voType <= 255) {
-			o.writeUInt16((superTypes << 11) | (fieldFlagBytes << 8) | voType);
+			#if MessagePackDebug_Pack
+			 	trace("packValueObjectHeader { voType: "+ voType + ", superTypes: "+ superTypes + ", fieldFlagBytes: "+fieldFlagBytes +", hex: "+ StringTools.hex(0x80 | superTypes << 3 | fieldFlagBytes, 4));
+			#end
+			o.writeByte(0x80 | superTypes << 3 | fieldFlagBytes);
+			o.writeByte(voType);
+		//	o.writeUInt16((superTypes << 11) | (fieldFlagBytes << 8) | voType);
 			return 2;
 		}
 		else {
-			o.writeUInt24(0x40000 | (superTypes << 19) | (fieldFlagBytes << 16) | voType);
+			#if MessagePackDebug_Pack
+				trace("packValueObjectHeader { voType: "+ voType + ", superTypes: "+ superTypes + ", fieldFlagBytes: "+fieldFlagBytes +", hex: "+ StringTools.hex(0xC0 | superTypes << 3 | fieldFlagBytes, 4));
+			#end
+			o.writeByte(0xC0 | superTypes << 3 | fieldFlagBytes);
+			o.writeUInt16(voType);
+		//	o.writeUInt24(0x40000 | (superTypes << 19) | (fieldFlagBytes << 16) | voType);
 			return 3;
 		}
 	}
@@ -327,24 +335,33 @@ class VOFormat
 	 *  
 	 *  VO valuetype Header:
 	 *  +---bits---+-------+
-	 *  | 1xxxxxxx | Value |
+	 *  | 0xxxxxxx | Value |
 	 *  +----------+-------+
 	 *  x: TypeID of value
 	 *  
 	 */
 	static inline public function packVOValueTypeHeader(o : Output, valueType : Int)
 	{
-		#if MessagePackDebug trace("packVOValueTypeHeader: "+valueType); #end
-		
+		#if MessagePackDebug_Pack trace("packVOValueTypeHeader: "+valueType);
+		switch (valueType)
+		{
+			case DateInterval.TYPE_ID,
+				 ObjectId.TYPE_ID:
+			
+			default:
+			 	throw "What type is '" + valueType + "' ??";
+		}
+		#end
 		Assert.that(valueType <= 127);
 		
-		o.writeByte(0x8000 | valueType);
-		return 1;
+		packValueObject(o);
+		o.writeByte(valueType);
+		return 2;
 	}
 	
 	static inline public function packRGBA(o : Output, value : RGBA)
 	{
-		#if MessagePackDebug trace("packRGBA: "+value); #end
+		#if MessagePackDebug_Pack trace("packRGBA: "+value); #end
 		
 		o.writeByte(0xce);
 		
@@ -359,42 +376,42 @@ class VOFormat
 	
 	static inline public function packEMail(o : BytesOutput, value : EMail)
 	{
-		#if MessagePackDebug trace("packEMail: "+value); #end
+		#if MessagePackDebug_Pack trace("packEMail: "+value); #end
 		
 		return Format.packString(o, value.toString());
 	}
 	
 	static inline public function packURI(o : BytesOutput, value : URI)
 	{
-		#if MessagePackDebug trace("packURI: "+value); #end
+		#if MessagePackDebug_Pack trace("packURI: "+value); #end
 		
 		return Format.packString(o, value.string);
 	}
 	
 	static inline public function packFileRef(o : BytesOutput, value : FileRef)
 	{
-		#if MessagePackDebug trace("packFileRef: "+value); #end
+		#if MessagePackDebug_Pack trace("packFileRef: "+value); #end
 		
 		return Format.packString(o, value.string);
 	}
 	
 	static inline public function packDateTime(o : Output, value : Date)
 	{
-		#if MessagePackDebug trace("packDateTime: "+value); #end
+		#if MessagePackDebug_Pack trace("packDateTime: "+value + ", float = "+ value.getTime() +", uint = " + Std.int(value.getTime() / 1000)); #end
 		
-		return Format.packInt(o, Std.int(value.getTime() #if (flash || js) / 1000 #end));
+		return Format.packDouble(o, value.getTime());
 	}
 	
 	static inline public function packDate(o : Output, value : Date)
 	{
-		#if MessagePackDebug trace("packDate: "+value); #end
+		#if MessagePackDebug_Pack trace("packDate: "+value); #end
 		
 		return packDateTime(o, value);
 	}
 	
 	static inline public function packDateInterval(o : Output, value : DateInterval)
 	{
-		#if MessagePackDebug trace("packDateInterval: "+value); #end
+		#if MessagePackDebug_Pack trace("packDateInterval: "+value); #end
 		
 		return
 			packVOValueTypeHeader(o, DateInterval.TYPE_ID)
@@ -405,7 +422,7 @@ class VOFormat
 	
 	static inline public function packObjectId(o : Output, value : ObjectId)
 	{
-		#if MessagePackDebug trace("packObjectId: "+value); #end
+		#if MessagePackDebug_Pack trace("packObjectId: "+value); #end
 		
 		packVOValueTypeHeader(o, ObjectId.TYPE_ID);
 		value.writeBytes(o);

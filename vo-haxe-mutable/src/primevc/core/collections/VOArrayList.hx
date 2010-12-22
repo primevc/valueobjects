@@ -29,6 +29,7 @@
 package primevc.core.collections;
  import primevc.core.collections.RevertableArrayList;
  import primevc.core.dispatcher.Signal1;
+ import primevc.core.traits.IValueObject;
  import primevc.tools.valueobjects.ValueObjectBase;
  import primevc.utils.FastArray;
   using primevc.utils.IfUtil;
@@ -41,7 +42,7 @@ package primevc.core.collections;
  * @author Danny Wilson
  * @creation-date Dec 20, 2010
  */
-class VOArrayList< DataType : ValueObjectBase > extends RevertableArrayList<DataType>
+class VOArrayList< DataType : IValueObject > extends RevertableArrayList<DataType>
 {
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;
@@ -52,7 +53,7 @@ class VOArrayList< DataType : ValueObjectBase > extends RevertableArrayList<Data
 		itemChange = new Signal1();
 	}
 	
-	public function dispose()
+	override public function dispose()
 	{
 		super.dispose();
 		
@@ -62,24 +63,33 @@ class VOArrayList< DataType : ValueObjectBase > extends RevertableArrayList<Data
 		}
 	}
 	
-	public function setChangeListener(changeHandler : ObjectChangeSet -> Void)
+	public function setChangeHandler(changeHandler : ObjectChangeSet -> Void)
 	{
 		itemChange.dispose();
 		this.changeHandlerFn = changeHandler;
 		
-		for (item in wrapAroundList)
-		 	item.changed.bind(this, changeHandler);
+		if (changeHandler.notNull()) {
+			for (i in 0 ... this.list.length)
+			 	cast(list[i], ValueObjectBase).change.bind(this, changeHandler);
+		} else {
+			for (i in 0 ... this.list.length)
+			 	cast(list[i], ValueObjectBase).change.unbind(this);
+		}
 	}
 	
 	override public function add (item:DataType, pos:Int = -1) : DataType
 	{
 		super.add(item);
-		item.changed.bind(this, changeHandlerFn);
+		cast(item, ValueObjectBase).change.bind(this, changeHandlerFn);
+		
+		return item;
 	}
 	
 	override public function remove (item:DataType, oldPos:Int = -1) : DataType
 	{
 		super.remove(item);
-		item.changed.unbind(this);
+		cast(item, ValueObjectBase).change.unbind(this);
+		
+		return item;
 	}
 }

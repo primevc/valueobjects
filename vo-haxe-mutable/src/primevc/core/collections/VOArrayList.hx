@@ -47,7 +47,7 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType> #if Gener
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;
 	
-	public function new ( wrapAroundList:FastArray #if GenericArrays<DataType> #else <Dynamic> #end = null )
+	public function new ( wrapAroundList:FastArray<#if GenericArrays DataType #else Dynamic #end> = null )
 	{
 		super(untyped wrapAroundList);
 		itemChange = new Signal1();
@@ -63,12 +63,14 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType> #if Gener
 		}
 	}
 	
+	
 	public function setChangeHandler(changeHandler : ObjectChangeSet -> Void)
 	{
 		itemChange.dispose();
 		this.changeHandlerFn = changeHandler;
 		VOArrayListUtil.setChangeHandler(this, #if !GenericArrays untyped #end list, changeHandler);
 	}
+	
 	
 	override public function add (item:DataType, pos:Int = -1) : DataType
 	{
@@ -78,12 +80,19 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType> #if Gener
 		return item;
 	}
 	
+	
 	override public function remove (item:DataType, oldPos:Int = -1) : DataType
 	{
 		super.remove(item);
 		cast(item, ValueObjectBase).change.unbind(this);
 		
 		return item;
+	}
+	
+	
+	override public function clone () : IReadOnlyList<DataType>
+	{
+		return untyped new VOArrayList<DataType>( #if !GenericArrays untyped #end list.concat() /* copy */ );
 	}
 }
 

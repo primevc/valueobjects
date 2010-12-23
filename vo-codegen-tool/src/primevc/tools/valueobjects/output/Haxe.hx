@@ -115,6 +115,7 @@ class Haxe implements CodeGenerator
 			a(" import primevc.tools.valueobjects.ValueObjectBase;\n");
 			a(" import primevc.tools.valueobjects.xmlmap.XMLString;\n");
 			a(" import primevc.utils.msgpack.Reader;\n");
+			a(" import primevc.utils.IfUtil;\n");
 			a("  using primevc.utils.IfUtil;\n");
 			a("  using primevc.utils.TypeUtil;\n");
 			a("  using primevc.utils.NumberUtil;\n");
@@ -1004,7 +1005,7 @@ class Haxe implements CodeGenerator
 		
 		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type))
 		{
-			a("\t\t\tif (this."); a(p.name); a(".notNull()) this."); a(p.name); if(!p.isArray()) a(".as(ValueObjectBase)"); a(".change.unbind(this);\n");
+			a("\t\t\tif (IfUtil.notNull((untyped this)."); a(p.name); a(")) this."); a(p.name); if(!p.isArray()) a(".as(ValueObjectBase)"); a(".change.unbind(this);\n");
 			a("\t\t\tif (v.notNull()) {\n\t\t\t\tv.");
 			
 			if (p.isArray() || p.isBindable())

@@ -64,12 +64,14 @@ class RevertableVOArrayList<DataType : IValueObject> extends RevertableArrayList
 		}
 	}
 	
+	
 	public function setChangeHandler(changeHandler : ObjectChangeSet -> Void)
 	{
 		itemChange.dispose();
 		this.changeHandlerFn = changeHandler;
 		VOArrayListUtil.setChangeHandler(this, #if !GenericArrays untyped #end list, changeHandler);
 	}
+	
 	
 	override public function add (item:DataType, pos:Int = -1) : DataType
 	{
@@ -79,11 +81,20 @@ class RevertableVOArrayList<DataType : IValueObject> extends RevertableArrayList
 		return item;
 	}
 	
+	
 	override public function remove (item:DataType, oldPos:Int = -1) : DataType
 	{
 		super.remove(item);
 		cast(item, ValueObjectBase).change.unbind(this);
 		
 		return item;
+	}
+	
+	
+	override public function clone ()
+	{
+		var l = new RevertableVOArrayList<DataType>(list.concat() /* copy */);
+		l.flags = flags;
+		return untyped l;
 	}
 }

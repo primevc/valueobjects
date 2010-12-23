@@ -48,29 +48,35 @@ class Reader
 	}
 	
 	
-	public function readMsgPackArray<T>(pid : PropertyID, itemType : Dynamic) : FastArray<T>
+	public #if GenericArrays inline #end function readMsgPackArray<T>(pid : PropertyID, itemType : Dynamic) : FastArray<T>
 	{
-		var i = input, b, arr : FastArray<T>;
-		
-		switch (b = i.readByte())
-		{
-			case 0xdc, 0xdd:
-				var len = b == 0xdc? i.readUInt16() : i.readUInt30();
-				arr = readArray(len, pid, itemType);
-			
-			default:
-				arr = FastArrayUtil.create(1);
-				var value = readValue(b, pid, itemType);
-			 	arr[0] = Std.is(value, itemType)? value : converter(value, pid, itemType);
-		}
-		
-		return arr;
+		return readArray(readArrayLength(), pid, itemType);
 	}
 	
 	
 	//
 	// Privates
 	//
+	
+	private function readArrayLength() : Int
+	{
+		var i = input, b = input.readByte();
+		
+		return switch (b)
+		{
+			case 0xdc:	i.readUInt16();
+			case 0xdd:	i.readUInt30();
+			default:
+				return if (b & 0xF0 == 0x90) b & 15;
+				else 1;
+		}
+	}
+	
+	private function readConvert(packedType : Int, propertyID : PropertyID, typeClass : Dynamic) : Dynamic
+	{
+		var value = readValue(packedType, propertyID, typeClass);
+		return Std.is(value, typeClass)? value : converter(value, propertyID, typeClass);
+	}
 	
 	private function converter(value : Dynamic, propertyID : PropertyID, typeClass : Dynamic) : Dynamic
 	{
@@ -130,7 +136,31 @@ class Reader
 			 	throw "unknown type: " + StringTools.hex(b, 2);
 	}
 	
-	function readArray<T>(len:Int, pid : PropertyID, itemType : Dynamic) : FastArray<T>
+	
+	#if GenericArrays inline #end function readArray<T>(len:Int, pid : PropertyID, itemType : Dynamic) : FastArray<T>
+	{
+		var arr = FastArrayUtil.create(len);
+		for (i in 0 ... len)
+		 	arr[i] = readMsgPackValue(pid, itemType);
+		
+		return arr;
+	}/*		
+	#if flash10
+		var isVO = false, sc = itemType;
+		while ((sc = Type.getSuperClass(sc)) != null)
+			if (sc == ValueObjectBase) {
+				isVO = true;
+				break;
+			}
+		
+		if (isVO) return readVOArray(len, pid, itemType);
+		else return readObjectArray(len, pid, itemType);
+	#else
+		return readObjectArray(len, pid, itemType);
+	#end
+	}
+	
+	function readObjectArray(len:Int, pid : PropertyID, itemType : Dynamic) : FastArray<Dynamic>
 	{
 		var arr = FastArrayUtil.create(len);
 		for (i in 0 ... len)
@@ -138,6 +168,18 @@ class Reader
 		
 		return arr;
 	}
+	
+	#if flash10
+	function readVOArray(len:Int, pid : PropertyID, itemType : Dynamic) : FastArray<IValueObject>
+	{
+		var arr : FastArray<IValueObject> = FastArrayUtil.create(len);
+		for (i in 0 ... len)
+		 	arr[i] = readMsgPackValue(pid, itemType);
+		
+		return arr;
+	}
+	#end
+*/
 	
 	function readMap(elem:Int, pid : PropertyID, itemType : Dynamic)
 	{

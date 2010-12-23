@@ -42,14 +42,14 @@ package primevc.core.collections;
  * @author Danny Wilson
  * @creation-date Dec 20, 2010
  */
-class VOArrayList< DataType : IValueObject > extends RevertableArrayList<DataType>
+class VOArrayList<DataType : IValueObject> extends RevertableArrayList<DataType> #if GenericArrays, implements haxe.rtti.Generic #end
 {
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;
 	
-	public function new( wrapAroundList:FastArray<DataType> = null )
+	public function new ( wrapAroundList:FastArray #if GenericArrays<DataType> #else <Dynamic> #end = null )
 	{
-		super(wrapAroundList);
+		super(untyped wrapAroundList);
 		itemChange = new Signal1();
 	}
 	

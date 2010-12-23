@@ -26,8 +26,10 @@ class HaxeTypeMap implements CodeGenerator
 		file.writeString("
 class VO
 {
-	static public var typeMap = function() {
-		var map : IntHash<Class<Dynamic>> = new IntHash();
+	static public var typeMap : IntHash<Class<Dynamic>>;
+	static function __init__ ()
+	{
+		var map : IntHash<Class<Dynamic>> = typeMap = new IntHash();
 ");
 
 		for (typeID in map.keys()) {
@@ -38,8 +40,7 @@ class VO
 		}
 
 file.writeString("
-		return map;
-	}();
+	}
 }
 ");
 
@@ -322,17 +323,32 @@ class Haxe implements CodeGenerator
 				continue;
 			}
 			
-			a("\n\t\tif ((bits & 0x"); a(StringTools.hex(1 << bit, 2)); a(").not0()) (untyped obj).");
-			a(p.name);
-			if (p.isBindable() && Util.isSingleValue(p.type)) a(".value");
-			a(" = reader.");
+			a("\n\t\tif ((bits & 0x"); a(StringTools.hex(1 << bit, 2)); a(").not0()) ");
 			
-			switch (p.type) {
+			if (p.isArray())
+			{
+				a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
+				a( Util.isSingleValue(p.type)
+				 	? p.isBindable()? "new primevc.core.collections.RevertableArrayList(" : "new primevc.core.collections.ArrayList("
+					: 'new ' + HaxeUtil.haxeType(p.type, true) + '('
+				);
+			}
+			else {
+				a("((untyped obj).");
+				a(p.name);
+				if (p.isBindable() && Util.isSingleValue(p.type)) a(".value");
+				a(" = ");
+			}
+			
+			a("reader.");
+			switch (p.type)
+			{
 				case Tarray(innerT,_,_):
-					a("readMsgPackArray("); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(innerT)); a(");");
+					a("readMsgPackArray(");
+					a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(innerT)); a(")));");
 				
 				default:
-					a("readMsgPackValue("); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(p.type)); a(");");
+					a("readMsgPackValue("); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(p.type)); a("));");
 			}
 			
 			++bit;
@@ -736,9 +752,9 @@ class Haxe implements CodeGenerator
 			var p = def.propertiesSorted[i];
 			if (Util.isDefinedInSuperClassOf(def, p)) continue;
 			
-			if (p.isBindable())		a("\n\t\t\tchangeSet.addBindableChange(");
-			else if (p.isArray())	a("\n\t\t\tchangeSet.addListChanges(");
-			else					a("\n\t\t\tchangeSet.addChange(");
+			if (p.isArray() && p.isBindable())	a("\n\t\t\tchangeSet.addListChanges(");
+			else if (p.isBindable())			a("\n\t\t\tchangeSet.addBindableChange(");
+			else								a("\n\t\t\tchangeSet.addChange(");
 			
 			a(p.name.toUpperCase()); a(", _changedFlags & "); a(hexBitflag(i)); a(", "); a(p.name); a(");");
 		}
@@ -855,7 +871,7 @@ class Haxe implements CodeGenerator
 		var functionCalls = new List<Property>();
 		
 		for (p in def.property)
-			if (!Util.isDefinedInSuperClassOf(def, p) && (p.isBindable() || p.isArray()))
+			if (!Util.isDefinedInSuperClassOf(def, p) && p.isBindable())
 				functionCalls.add(p);
 		
 		var callFunctionName = functionName == "commitBindables"? "commitEdit" : functionName;
@@ -876,7 +892,7 @@ class Haxe implements CodeGenerator
 		a("\n\tpublic function new(");
 		for (i in 0 ... def.propertiesSorted.length) {
 			var p = def.propertiesSorted[i];
-			a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type));
+			a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true));
 			var init = HaxeUtil.getConstructorInitializer(p.type, true);
 			if (init != null) {
 			 	a(" = "); a(init);
@@ -950,7 +966,7 @@ class Haxe implements CodeGenerator
 		} else {
 			a(",set"); code.addCapitalized(p.name);
 		}
-		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable() || p.isArray())); a(";\n");
+		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable())); a(";\n");
 		
 		if (!immutable && !Util.isPTypeBuiltin(p.type) && !Util.isEnum(p.type)) {
 			a("\tprivate function get"); code.addCapitalized(p.name); a("() { return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = ");
@@ -976,14 +992,14 @@ class Haxe implements CodeGenerator
 		}
 		
 		
-		a("\tprivate function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable() || p.isArray())); a(")\n\t{\n");
+		a("\tprivate function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable())); a(")\n\t{\n");
 		
 		a("\t\treturn if (v == "); if (Util.isEnum(p.type) || Util.isPTypeBuiltin(p.type)) a("this."); else a("(untyped this)."); a(p.name); a(") v;\n");
 		a("\t\telse\n\t\t{\n\t\t\t_changedFlags |= "); a(hexBitflag(i)); a(";\n");
 		
 		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type))
 		{
-			a("\t\t\tif (this."); a(p.name); a(".notNull()) this."); a(p.name); a(".as(ValueObjectBase).change.unbind(this);\n");
+			a("\t\t\tif (this."); a(p.name); a(".notNull()) this."); a(p.name); if(!p.isArray()) a(".as(ValueObjectBase)"); a(".change.unbind(this);\n");
 			a("\t\t\tif (v.notNull()) {\n\t\t\t\tv.");
 			
 			if (p.isArray() || p.isBindable())
@@ -1296,7 +1312,7 @@ private class HaxeUtil
 		var code = switch (ptype)
 		{
 			case Tarray(type, _,_):
-				"new " + HaxeUtil.haxeType( ptype, true, true ) + "("+ initializer +")";
+				"new " + HaxeUtil.haxeType( ptype, true, bindable ) + "("+ initializer +")";
 			
 			case Tdef(_), Turi, TfileRef, Tinterval:
 				initializer; //"new " + HaxeUtil.haxeType(ptype) + "("+ initializer +")";
@@ -1366,7 +1382,7 @@ private class HaxeUtil
 			 	'ConvertTo.fastArray('+ haxeType(type, true, false) +', ';
 	}
 */	
-	public static function haxeType(ptype:PType, ?immutableInterface:Bool = false, ?bindable:Bool = false)
+	public static function haxeType(ptype:PType, ?immutableInterface:Bool = false, ?bindable:Bool = false, ?constructorArg = false)
 	{
 		var type = switch (ptype)
 		{
@@ -1390,10 +1406,13 @@ private class HaxeUtil
 			case TenumConverter(enums):		'String';
 			
 			case Tarray(type, min, max):
-				if (bindable) {
-					bindable = false;
-					if (Util.isSingleValue(type))
-			 			'primevc.core.collections.RevertableArrayList<'+ haxeType(type, true) +'>';
+				return
+				if (!constructorArg) {
+					if (Util.isSingleValue(type)) {
+			 			(bindable
+			 				? 'primevc.core.collections.RevertableArrayList<'
+							: 'primevc.core.collections.ArrayList<') + haxeType(type, true) +'>';
+					}
 					else
 			 			'primevc.core.collections.VOArrayList<'+ haxeType(type, true) +'>';
 				}
@@ -1408,6 +1427,31 @@ private class HaxeUtil
 		}
 		
 		return type;
+	}
+	
+	public static function haxeValueTypeEnum(ptype:PType) return "ValueType." + switch (ptype)
+	{
+		case Tbool(val):				'TBool';
+		case Tinteger(min,max,stride):	'TInt';
+		case Tdecimal(min,max,stride):	'TFloat';
+		case Tstring:					'TClass(String)';
+		case Tdate:						'TClass(Date)';
+		case Tdatetime:					'TClass(Date)';
+		case Tinterval:					'TClass(primevc.types.DateInterval)';
+		case Turi:						'TClass(primevc.types.URI)';
+		case TuniqueID:					'TClass(primevc.types.ObjectId)';
+		case Temail:					'TClass(primevc.types.EMail)';
+		case Tcolor:					'TClass(primevc.types.RGBA)';
+		case TfileRef:					'TClass(primevc.types.FileRef)';
+		
+		case Tdef(ptypedef):			switch (ptypedef) {
+			case Tclass		(def): "TClass("+ def.module.fullName + "VO)";
+			case Tenum		(def): "TEnum(" + def.fullName + ")";
+		}
+		case TenumConverter(enums):		'TClass(String)';
+		
+		case Tarray(type, min, max):
+		 	'TClass(primevc.utils.FastArray<'+ haxeType(type, true) +'>)';
 	}
 	
 	public static function compareValueCode(path:String, type:PType, val:Dynamic) : String

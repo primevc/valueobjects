@@ -600,7 +600,11 @@ class Haxe implements CodeGenerator
 	
 	private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)
 	{
-		if (bindable) path += ".value";
+		switch (pType) {
+			case Tarray(_,_,_):
+			default:
+				if (bindable) path += ".value";
+		}
 		
 		switch (pType)
 		{
@@ -648,8 +652,6 @@ class Haxe implements CodeGenerator
 	private function addIfVarIsSetExpr(path:String, ptype:PType, bindable:Bool, expr:String)
 	{	
 		var nullCheck = path + ".notNull()";
-		if (bindable)
-			path = path + ".value";
 		
 		switch (ptype) {
 			case Tarray(_,_,_), Turi:
@@ -658,7 +660,10 @@ class Haxe implements CodeGenerator
 				if (!bindable) nullCheck = null; // Simple types can't be null...
 			
 			default:
-				if (bindable) nullCheck += " && " + path + ".notNull()";
+				if (bindable) {
+					path = path + ".value";
+					nullCheck += " && " + path + ".notNull()";
+				}
 		}
 		
 		var extraChecks = extraNullCheck(path, ptype);
@@ -1015,7 +1020,7 @@ class Haxe implements CodeGenerator
 			}
 		}
 		a("\t\t\t");
-		var ifExprAdded = addPropChangeFlagSetter(i, "v" + (p.isBindable()? ".value" : ""), p.type, false);
+		var ifExprAdded = addPropChangeFlagSetter(i, "v" + ((!p.isArray() && p.isBindable())? ".value" : ""), p.type, false);
 		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type)) {
 			a("\n\t\t\t}");
 			if (ifExprAdded) {
@@ -1312,7 +1317,7 @@ private class HaxeUtil
 		var code = switch (ptype)
 		{
 			case Tarray(type, _,_):
-				"new " + HaxeUtil.haxeType( ptype, true, bindable ) + "("+ initializer +")";
+				return "new " + HaxeUtil.haxeType( ptype, true, bindable ) + "("+ initializer +");";
 			
 			case Tdef(_), Turi, TfileRef, Tinterval:
 				initializer; //"new " + HaxeUtil.haxeType(ptype) + "("+ initializer +")";
@@ -1406,15 +1411,13 @@ private class HaxeUtil
 			case TenumConverter(enums):		'String';
 			
 			case Tarray(type, min, max):
-				return
-				if (!constructorArg) {
-					if (Util.isSingleValue(type)) {
-			 			(bindable
-			 				? 'primevc.core.collections.RevertableArrayList<'
-							: 'primevc.core.collections.ArrayList<') + haxeType(type, true) +'>';
-					}
-					else
-			 			'primevc.core.collections.VOArrayList<'+ haxeType(type, true) +'>';
+				return if (!constructorArg)
+				{
+					'primevc.core.collections.' +
+					 	(Util.isSingleValue(type)
+							? (bindable? 'RevertableArrayList<'   : 'ArrayList<')
+							: (bindable? 'RevertableVOArrayList<' : 'VOArrayList<'))
+						+ haxeType(type, true)  + '>';
 				}
 				else
 				 	'primevc.utils.FastArray<'+ haxeType(type, true) +'>';

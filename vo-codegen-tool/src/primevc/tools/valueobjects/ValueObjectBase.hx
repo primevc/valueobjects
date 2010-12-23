@@ -61,12 +61,16 @@ class ValueObjectBase implements IValueObject
 		
 		return function(change:ObjectChangeSet)
 		{
+			Assert.notNull(changeSignal);
+			Assert.notNull(change);
+			
 			var p = change.parent;
 			
-			// Find either pathNode, or the last parent
-			while (p.notNull() && p.parent.notNull() && p.parent != pathNode) p = p.parent;
-			
-			untyped p.parent = pathNode;
+			if (p.notNull()) {
+				// Find either pathNode, or the last parent
+				while (p.notNull() && p.parent.notNull() && p.parent != pathNode) p = p.parent;
+				untyped p.parent = pathNode;
+			}
 			changeSignal.send(change);
 		}
 	}

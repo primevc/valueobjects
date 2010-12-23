@@ -28,6 +28,7 @@
  */
 package primevc.core.collections;
  import primevc.core.collections.RevertableArrayList;
+ import primevc.core.collections.VOArrayList;
  import primevc.core.dispatcher.Signal1;
  import primevc.core.traits.IValueObject;
  import primevc.tools.valueobjects.ValueObjectBase;
@@ -42,7 +43,7 @@ package primevc.core.collections;
  * @author Danny Wilson
  * @creation-date Dec 20, 2010
  */
-class VOArrayList<DataType : IValueObject> extends ArrayList<DataType> #if GenericArrays, implements haxe.rtti.Generic #end
+class RevertableVOArrayList<DataType : IValueObject> extends RevertableArrayList<DataType> #if GenericArrays, implements haxe.rtti.Generic #end
 {
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;
@@ -84,19 +85,5 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType> #if Gener
 		cast(item, ValueObjectBase).change.unbind(this);
 		
 		return item;
-	}
-}
-
-class VOArrayListUtil
-{
-	static inline public function setChangeHandler<T>(owner:Dynamic, list:FastArray<T>, changeHandler : ObjectChangeSet -> Void)
-	{
-		if (changeHandler.notNull()) {
-			for (i in 0 ... list.length)
-			 	cast(list[i], ValueObjectBase).change.bind(owner, changeHandler);
-		} else {
-			for (i in 0 ... list.length)
-			 	cast(list[i], ValueObjectBase).change.unbind(owner);
-		}
 	}
 }

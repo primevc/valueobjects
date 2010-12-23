@@ -9,30 +9,32 @@ package primevc.tools.valueobjects;
   using primevc.utils.IfUtil;
   using primevc.utils.TypeUtil;
 
+typedef PropertyID = Int;
+
 /**
- * Class description
+ * Base class for all generated ValueObjects
  * 
  * @author Danny Wilson
  * @creation-date Dec 03, 2010
  */
 class ValueObjectBase implements IValueObject
 {
-	public var changed (default, null) : Signal1<ObjectChangeSet>;
+	public var change (default, null) : Signal1<ObjectChangeSet>;
 	
 	private var _changedFlags	: Int;
 	private var _propertiesSet	: Int;
 	
 	private function new ()
 	{
-		changed = new Signal1();
+		change = new Signal1();
 	}
 	
 	
 	public function dispose()
 	{
-		if (changed.notNull()) {
-			changed.dispose();
-			changed = null;
+		if (change.notNull()) {
+			change.dispose();
+			change = null;
 		}
 		_changedFlags = 0;
 	}
@@ -47,9 +49,26 @@ class ValueObjectBase implements IValueObject
 		{
 			var set = ObjectChangeSet.make(this, _changedFlags);
 			addChanges(set);
-			this.changed.send(set);
+			this.change.send(set);
 		}
 		commitBindables();
+	}
+	
+	public function objectChangedHandler(propertyID : Int) : ObjectChangeSet -> Void
+	{
+		var changeSignal = this.change;
+		var pathNode = ObjectPathVO.make(this, propertyID); // Same ObjectPathVO instance reused
+		
+		return function(change:ObjectChangeSet)
+		{
+			var p = change.parent;
+			
+			// Find either pathNode, or the last parent
+			while (p.notNull() && p.parent.notNull() && p.parent != pathNode) p = p.parent;
+			
+			untyped p.parent = pathNode;
+			changeSignal.send(change);
+		}
 	}
 	
 	private function addChanges(changeSet:ObjectChangeSet); // Creates and adds all PropertyChangeVO and ListChangeVO
@@ -67,23 +86,6 @@ class ValueObjectBase implements IValueObject
 		}
 	}
 */
-	
-	private function objectChangedHandler(propertyID : Int) : ObjectChangeSet -> Void
-	{
-		var changedEvent	= this.changed;
-		var pathNode		= ObjectPathVO.make(this, propertyID); // Same ObjectPathVO instance reused
-		
-		return function(change:ObjectChangeSet)
-		{
-			var p = change.parent;
-			
-			// Find either pathNode, or the last parent
-			while (p.notNull() && p.parent.notNull() && p.parent != pathNode) p = p.parent;
-			
-			untyped p.parent = pathNode;
-			changedEvent.send(change);
-		}
-	}
 	
 	
 	static inline public function bytesUsedInInt(n:Int)
@@ -176,7 +178,7 @@ ObjectChangeVO {
 
 class ObjectChangeSet extends ChangeVO
 {
-	public var vo					(default, null) : IValueObject;
+	public var vo					(default, null) : ValueObjectBase;
 	public var parent				(default, null) : ObjectPathVO;
 	public var timestamp			(default, null) : Float;
 	public var propertiesChanged	(default, null) : Int;
@@ -203,13 +205,13 @@ class ObjectChangeSet extends ChangeVO
 			add(PropertyValueChangeVO.make(id, null, value));
 	}
 	
-	inline public function addBindableChange(id:Int, flagBit:Int, bindable:RevertableBindable<Dynamic>)
+	inline public function addBindableChange<T>(id:Int, flagBit:Int, bindable:RevertableBindable<T>)
 	{
 		if (flagBit.not0())
 			add(PropertyValueChangeVO.make(id, bindable.shadowValue, bindable.value));
 	}
 	
-	inline public function addListChanges(id:Int, flagBit:Int, list:RevertableArrayList<Dynamic>)
+	inline public function addListChanges<T>(id:Int, flagBit:Int, list:RevertableArrayList<T>)
 	{
 		if (flagBit.not0())
 			add(ListChangeVO.make(id, list.changes));

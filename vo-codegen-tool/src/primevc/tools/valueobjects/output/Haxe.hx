@@ -838,9 +838,14 @@ class Haxe implements CodeGenerator
 		
 		a("\n\t{\n");
 		
-		if ((forceOverride || def.superClass != null) && makeSuperCall) {
-			a("\t\tsuper."); a(functionName); a("();\n");
-		}
+		if ((forceOverride || def.superClass != null) && makeSuperCall)
+			callSuperFunction(def, functionName);
+	}
+	
+	
+	private function callSuperFunction (def:ClassDef, functionName)
+	{
+		a("\t\tsuper."); a(functionName); a("();\n");
 	}
 	
 	
@@ -889,6 +894,8 @@ class Haxe implements CodeGenerator
 			for (p in functionCalls)
 				generateFunctionCall( p, callFunctionName );
 			
+			callSuperFunction(def, functionName);
+			
 			closeFunctionDeclaration( def, functionName);
 		}
 	}
@@ -896,16 +903,18 @@ class Haxe implements CodeGenerator
 	private function genClassConstructor(def:ClassDef, genSuperCall:Bool = false, magic)
 	{
 		a("\n\tpublic function new(");
-		for (i in 0 ... def.propertiesSorted.length) {
+		for (i in 0 ... def.propertiesSorted.length)
+		{
 			var p = def.propertiesSorted[i];
-			a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true));
+			a("\n\t\t\t"); a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true));
 			var init = HaxeUtil.getConstructorInitializer(p.type, true);
 			if (init != null) {
 			 	a(" = "); a(init);
 			}
 			if (i + 1 != def.propertiesSorted.length) a(", ");
+			a("\t\t\t\t//"+i);
 		}
-		a(")\n\t{\n");
+		a("\n\t\t)\n\t{\n");
 		
 		if (genSuperCall)
 		{

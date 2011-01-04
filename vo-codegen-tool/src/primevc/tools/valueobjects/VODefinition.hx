@@ -41,7 +41,7 @@ class Module
 		pkgRoots = new List();
 		root     = new Module("", null);
 		types    = new IntHash();
-		traits   = declare("primevc.types");
+		traits   = declare("primevc.core.traits");
 	}
 	static var initialize = reinitialize();
 	
@@ -869,6 +869,11 @@ class Property
 			p.opts = this.opts.copy();
 		
 		return p;
+	}
+	
+	public function propertyID()
+	{
+		return definedIn.index << 8 | this.index;
 	}
 	
 	public function isBindable()
@@ -1969,7 +1974,8 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 			var opt:Dynamic = Reflect.field(obj, name);
 			switch (name) {
 				case "mongo_proxied":
-					 this.settings.mongo_proxied = opt;
+					if (!Std.is(opt, MongoProxyType)) throw "'"+ opt +"' is not a MongoProxyType.\n[!] mongo_proxied requires MongoProxyType configuration value: none, singleType or typeCast.";
+					this.settings.mongo_proxied = opt;
 				
 				case "_extends":
 					if (!Std.is(opt,String)) throw Err_InvalidArgument("_extends", Std.string(opt), "expected a String");
@@ -2213,6 +2219,8 @@ class ClassDef extends BaseTypeDefinition
 		var myProps = [];
 		myProps = myProps.concat(getSuperProps(this));
 		myProps = myProps.concat(getSortedProps(this));
+		
+//		if (this.name == "VideoFrame") throw myProps;
 		
 		return this.propertiesSorted = myProps;
 	}
@@ -2462,7 +2470,7 @@ enum PropertyOption
 	unique;
 	mongo_transient;
 	mongo_reference;
-	mongo_typeCast(mapping: Array<Dynamic>);
+	mongo_typeCast;
 }
 
 enum ClassOption
@@ -2492,8 +2500,8 @@ enum MongoProxyType
 {
 	/** Don't generate a Proxy */
 	none;
-	/** Generate one Proxy that can contain this VO and all subclasses as specified in the mapping */
-	typeCast(mapping: Array<Dynamic>);
+	/** Generate one Proxy that can contain this VO and all subclasses using a hidden 'cast' property with the type number */
+	typeCast;
 	/** Generate a proxy which only takes this VO into account */
 	singleType;
 }

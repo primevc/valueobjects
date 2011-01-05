@@ -19,6 +19,7 @@ import scala.collection.JavaConversions
 import scala.xml.NodeSeq
 import primevc.types._
 import primevc.utils._
+import primevc.utils.msgpack._
 import primevc.core.traits._
 import primevc.mvc.mongodb._
 import com.mongodb.casbah.Imports._
@@ -70,7 +71,6 @@ import com.mongodb.casbah.Imports._
 	public function genClass	(def:ClassDef)	: Void
 	{
 		shouldWrite = true;
-		if (def.isMixin) return;
 		
 		trace("  - Scala class:  "+def.name);
 		
@@ -79,9 +79,9 @@ import com.mongodb.casbah.Imports._
 			nonEmptyChecks = 0, emptyChecks = new List<{expr:String, id:Int}>();
 		
 		var hasSubtypes = false;
-		var subtypes = new List();
+		var subtypes : List<ClassDef> = new List();
 		for (imp in def.implementedBy) if (cast(imp, ClassDef).extendsType(def)) {
-			subtypes.add(imp);
+			subtypes.add(cast imp);
 			hasSubtypes = true;
 		}
 		
@@ -134,22 +134,7 @@ import com.mongodb.casbah.Imports._
 			}
 		}
 		
-		a("\n\n//---\n\nsealed class "); a(def.name); a("VO");
-/*		// concrete VO types
-		i = 0; for (p in properties) if (needsMongoHelperClass(p.type)) {
-			if (i == 0) ac('['.code);
-			var clname = className(p.type);
-			a(clname); //a(" : "); a(clname); a("VO");
-			if (++i != typeParamCount) a(", ");
-			else ac(']'.code);
-		}
-*/		
-		if (idType != null) {
-			a(def.superClass != null? " (_id:" : " (val _id:");
-			a(idType); a(" = "); a(nilValue(idProperty.type)); a(")");
-		}
-		
-		a(" extends ");
+		a("\n\n//---\n\nsealed trait "); a(def.name); a(" extends ");
 		// extra stuff
 		if (ns != null)
 		{
@@ -167,8 +152,7 @@ import com.mongodb.casbah.Imports._
 			a("]");
 		}
 		else if (def.superClass != null) {
-			a(def.superClass.fullName); a("VO");
-			if (idType != null) a("(_id)");
+			a(def.superClass.fullName);
 		}
 		else {
 			a("ValueObject"); if (idType != null) a("WithID");
@@ -176,19 +160,61 @@ import com.mongodb.casbah.Imports._
 		
 		
 		//TODO: Generate traits for supertypes ?
-		for (t in def.supertypes) if (Std.is(t, MagicClassDef)) {
+		for (t in def.supertypes) if (Std.is(t, MagicClassDef) || def.superClass != t) {
 			 a("\n with "); a(t.fullName);
 		}
 		
 		a("\n{");
+		
+		// properties
+		var requiredProps = new List<Int>();
+		currentFieldBitNum = thisPropsStartIndex;
+		
+		for (p in def.propertiesDefined)
+			writeVarGetter(p);
+		a("\n}\n\n");
+		
+		if (def.isMixin) {
+			genCompanion(def, idProperty, ns, thisPropsStartIndex, hasSubtypes, subtypes);
+			return;
+		}
+		
+		// -- end trait
+		//
+		// VO Class
+		
+		a("\n\nsealed class "); a(def.name); a("VO");
+		
+		if (idType != null) {
+			a(def.superClass != null? " (_id:" : " (val _id:");
+			a(idType); a(" = "); a(nilValue(idProperty.type)); a(")");
+		}
+		a(" extends ");
+		
+		if (def.superClass != null) {
+			a(def.superClass.fullName); a("VO");
+			if (idType != null) a("(_id)");
+			a(" with ");
+		}
+		
+		a(def.name); a("\n{");
+		
+		for (i in thisPropsStartIndex ... def.propertiesSorted.length) {
+			var p = def.propertiesSorted[i];
+			var r = p.hasOption(required);
+			if (r) requiredProps.add(i);
+			writeSetter(i, p);
+		}
+		
+		
 		
 		// IDType
 		if(idType != null && !idFromSuperclassOrTrait) {
 			a("\n  type IDType = "); a(idType); ac("\n".code);
 		}
 		
-		// Companion
-		a("\n  override def Companion : VOCompanion[_] = "); a(def.name); a("VO");
+		// Companion getter
+		a("\n  override def Companion : VOCompanion[_] with VOMessagePacker[_] = "); a(def.name); a("VO");
 		
 		// partial_?
 		if (def.propertiesSorted.length != 0) {
@@ -237,17 +263,6 @@ import com.mongodb.casbah.Imports._
 			a("\n  }");
 		}
 		
-		var requiredProps = new List<Int>();
-		
-		// properties
-		currentFieldBitNum = thisPropsStartIndex;
-		
-		for (i in thisPropsStartIndex ... def.propertiesSorted.length) {
-			var p = def.propertiesSorted[i];
-			var r = p.hasOption(required);
-			if (r) requiredProps.add(i);
-			writeVar(i, p, r, i != def.propertiesSorted.length - 1);
-		}
 		
 		// validation
 		if (requiredProps.length != 0)
@@ -267,14 +282,38 @@ import com.mongodb.casbah.Imports._
 		a("}\n\n");
 		
 	// --- End VO class
-		
-		// VO Companion accessor object
+		genCompanion(def, idProperty, ns, thisPropsStartIndex, hasSubtypes, subtypes);
+	}
+	
+	private function genCompanion(def:ClassDef, idProperty:Property, ns, thisPropsStartIndex, hasSubtypes, subtypes:List<ClassDef>)
+	{
+		// VO MessagePacker object
 		a("object "); a(def.name);
-		a("VO extends VOCompanion["); a(def.name); a("VO]");
+		
+		if (def.isMixin)
+		{
+			a(" extends VOMessagePacker["); a(def.name); a("]\n{");
+			
+			// MessagePack serialization
+			new ScalaMessagePacking(code, def).genSerialization();
+			
+			a("}\n\n");
+			return;
+		}
+		
+		// ---
+		// Regular VO class Companion
+		// ---
+		a("VO extends VOCompanion["); a(def.name); a("VO"); a("] with VOMessagePacker["); a(def.name); a("]");
+		
 		if (idProperty != null) {
 			a(" with "); a(def.name); a("IDAccessor");
 		}
 		a("\n{");
+		
+		// MessagePack serialization
+		new ScalaMessagePacking(code, def).genSerialization();
+		
 		a("\n  override def empty: "); a(def.name); a("VO = new "); a(def.name); a("VO;\n");
 		
 		// afasjfakjfhaf
@@ -328,13 +367,6 @@ import com.mongodb.casbah.Imports._
 			a("\n  }");
 		}
 		
-/* Discard? Probably not needed for Accessors?			
-			// Ref implicits
-			for (p in properties) if (p.hasOption(mongo_reference)) {
-				var type = getType(p.type).name;
-				a("  val proxyFor_"); a(type.split('.').join('_')); a(": VOProxy["); a(type); a("] = implicitly;\n");
-			}
-*/
 		if (def.propertiesSorted.length == 0)
 		{
 			a("\n  def getValue(vo:"); a(def.name); a("VO, index:Int) : AnyRef = null");
@@ -372,6 +404,7 @@ import com.mongodb.casbah.Imports._
 				a("  }; vo; }\n");
 			}
 		}
+		
 		a("}\n\n");
 		
 		// VOAccessor
@@ -389,6 +422,8 @@ import com.mongodb.casbah.Imports._
 		// IDAccessor & VOProxy
 		if (idProperty != null)
 		{
+			var idType = getType(idProperty.type).name;
+			
 			a("trait "); a(def.name); a("IDAccessor extends IDAccessor["); a(def.name); a("VO] {\n");
 				a("  val idField = " ); a(idProperty.definedIn.fullName); a("VO."); a(idProperty.name); a('\n');
 				a("  def idValue(vo:"); a(def.name); a("VO): "); a(idType); a(" = if(vo == null) "); a(nilValue(idProperty.type)); a(" else vo."); a(idProperty.name); ac("\n".code);
@@ -532,6 +567,23 @@ import com.mongodb.casbah.Imports._
 //		if (def.options.length > 0)
 //			trace(def.options.first().toString());
 	}
+	
+	
+	static function bitmask(numBits:Int, offset:Int=0)
+	{
+		var mask = 0;
+		for (bit in 0 ... numBits) {
+			mask |= 1 << (bit + offset);
+		}
+		return "0x" + StringTools.hex(mask, 4);
+	}
+	
+	
+	private function genSerialization(def:ClassDef)
+	{	
+		new ScalaMessagePacking(code, def).genSerialization();
+	}
+	
 	
 	function addPropnameCase(p:Property) {
 		a('      case "'); a(p.name); a('" => ');
@@ -780,21 +832,19 @@ import com.mongodb.casbah.Imports._
 		default: name;
 	}
 	
-	function writeVar(i:Int, p:Property, required, comma)
+	function writeVarGetter(p:Property)
 	{
-//		trace("              "+p.type+" "+p.name);
 		a("\n  ");
-//		if (required)							a("@Required ");
-//		if (p.hasOption(unique))				a("@ID  ");
-//		else if (!p.hasOption(mongo_transient))	a("@Key ");
 		
 		var propName = propertyName(p);
 		
-		a("/*@field*/ protected var $"); a(p.name); a(": ");
+		// Storage
+		a("/*@field*/ protected[this] var $"); a(p.name); a(": ");
 		var tdef = getPropertyTypename(p);
 		a(tdef.name);
 		a(" = "); a((tdef.defaultValue != null)? tdef.defaultValue : nilValue(p.type));
 		
+		// Getter
 		a("\n  final def "); a(propName); a(" : "); a(tdef.name); a(" = ");
 		switch (p.type)
 		{
@@ -818,6 +868,13 @@ import com.mongodb.casbah.Imports._
 			
 			case TenumConverter(_):		throw p;
 		}
+	}
+	
+	function writeSetter(i:Int, p:Property)
+	{
+		var tdef = getPropertyTypename(p);
+		
+		// Setter
 		a("\n  final def "); a(p.name); a("_=(v:"); a(tdef.name); a(") : Unit = { ");
 		
 		switch (p.type) {
@@ -1870,4 +1927,66 @@ class XMLProxyGenerator
 	
 	inline function a(str) code.add(str)
 	inline function ac(ch) code.addChar(ch)
+}
+
+class ScalaMessagePacking extends MessagePacking
+{
+	override private function definePackerFunction()
+	{
+		a("\n\tdef msgpack_packVO(o : VOPacker, obj : "); a(def.name); a(", flagsToPack : Int)\n\t{"); //"); a(Module.pkgRoots.first().name); a("]
+		a("\n		require(o != null && obj != null);");
+		a("\n		");
+		a("\n		var propertyBits = flagsToPack;");
+	}
+	
+	override private function expr_incrementMixinCount()	return "mixin += 1"
+	override private function a_return() a("return")
+	override private function a_not0(v:String) {
+		a(v); a(" != 0");
+	}
+	
+	override private function a_is0(v:String) {
+		a("("); a(v); a(") == 0");
+	}
+	
+	override private function a_packVOHeaderCallStart() {
+		a("\n\t\to.packValueObjectHeader("); a(Std.string(def.index)); a(", ");
+	}
+	
+	override private function a_msgpackVOCallStart(t : TypeDefinition) {
+		a("\n\t\t\t"); addFullName(t); a(".msgpack_packVO(o, obj, ");
+	}
+	
+	override private function a_assert(v:String) {
+		a("require("); a(v); a(");");
+	}
+	override private function a_writeByte(byte:String) {
+		a("o.writeByte("); a(byte); a(");");
+	}
+	override private function endPackerFunction() {
+		a("\n\t}\n");
+	}
+	
+	override private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)
+	{
+		if (path.indexOf("obj.") == 0) {
+			path = "obj." + Scala.quote(path.substr(4));
+		}
+		
+		switch (pType)
+		{
+			case Tdef(_), Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tstring, Tdate, Tdatetime, Tinterval, Turi, TuniqueID, Temail, Tcolor, TfileRef:
+				a('o.pack('); a(path); ac(")".code);
+			
+			case Tarray(type, min, max):
+				a("{");
+				a("\n\t\t\t\tval arr = "); a(path); ac(";".code);
+				a("\n\t\t\t\to.packArray(arr.length);");
+				a("\n\t\t\t\tfor (item <- arr) "); addPropertyPackerCall("item", type, false); ac(";".code);
+				a("\n\t\t\t}");
+			
+			
+			case TenumConverter(_):	throw "Not implemented";
+		}
+	}
 }

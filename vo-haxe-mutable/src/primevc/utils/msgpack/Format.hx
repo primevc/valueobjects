@@ -306,29 +306,37 @@ class VOFormat
 	 *  - first value is for field index: $groupnumber + 2
 	 *  - second value for field index:   $groupnumber + 7
 	 */
-	static inline public function packValueObjectHeader(o : Output, voType : Int, superTypes : Int, fieldFlagBytes : Int)
+	static inline public function packValueObjectHeader(o : Output, voType : Int, superTypes : Int, fieldFlags : Int)
 	{
-		Assert.that(fieldFlagBytes >= 0 && fieldFlagBytes <= 4);
-		Assert.that(superTypes     >= 0 && superTypes     <= 7);
+		Assert.that(superTypes >= 0 && superTypes <= 7);
 		
 		if (voType <= 255) {
 			#if MessagePackDebug_Pack
-			 	trace("packValueObjectHeader { voType: "+ voType + ", superTypes: "+ superTypes + ", fieldFlagBytes: "+fieldFlagBytes +", hex: "+ StringTools.hex(0x80 | superTypes << 3 | fieldFlagBytes, 4));
+			 	trace("packValueObjectHeader { voType: "+ voType + ", superTypes: "+ superTypes + ", fieldFlags: "+fieldFlags +", hex: "+ StringTools.hex(0x80 | superTypes << 3 | bytesUsedInInt(fieldFlags), 4));
 			#end
-			o.writeByte(0x80 | superTypes << 3 | fieldFlagBytes);
+			o.writeByte(0x80 | superTypes << 3 | bytesUsedInInt(fieldFlags));
 			o.writeByte(voType);
 		//	o.writeUInt16((superTypes << 11) | (fieldFlagBytes << 8) | voType);
 			return 2;
 		}
 		else {
 			#if MessagePackDebug_Pack
-				trace("packValueObjectHeader { voType: "+ voType + ", superTypes: "+ superTypes + ", fieldFlagBytes: "+fieldFlagBytes +", hex: "+ StringTools.hex(0xC0 | superTypes << 3 | fieldFlagBytes, 4));
+				trace("packValueObjectHeader { voType: "+ voType + ", superTypes: "+ superTypes + ", fieldFlags: "+fieldFlags +", hex: "+ StringTools.hex(0xC0 | superTypes << 3 | bytesUsedInInt(fieldFlags), 4));
 			#end
-			o.writeByte(0xC0 | superTypes << 3 | fieldFlagBytes);
+			o.writeByte(0xC0 | superTypes << 3 | bytesUsedInInt(fieldFlags));
 			o.writeUInt16(voType);
 		//	o.writeUInt24(0x40000 | (superTypes << 19) | (fieldFlagBytes << 16) | voType);
 			return 3;
 		}
+	}
+	
+	static inline function bytesUsedInInt(n:Int)
+	{
+		return if (n == 0x000000)	0;
+		  else if (n <= 0x0000FF)	1;
+		  else if (n <= 0x00FFFF)	2;
+		  else if (n <= 0xFFFFFF)	3;
+		  else 						4;
 	}
 	
 	/**

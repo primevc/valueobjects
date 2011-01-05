@@ -305,6 +305,18 @@ class Module
 
 class Util
 {
+	static public function addFullName(code:StringBuf, t:TypeDefinition, interfaceT = false)
+	{
+		var a = code.add;
+		
+		if (interfaceT) {
+			a(t.module.fullName); a(".I"); a(t.name);
+		}
+		else a(t.fullName);
+		
+		if (Std.is(t,ClassDef) && !cast(t, ClassDef).isMixin) a("VO");
+	}
+	
 	static public function toString(v:Dynamic)
 	{
 		if (Std.is(v,String)) return v;

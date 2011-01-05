@@ -3,7 +3,6 @@ package primevc.mvc.mongodb
  import primevc.types._
  import org.bson.BSONObject
  import org.joda.time.Interval
- import com.mongodb.casbah.Imports._
  import scala.collection.JavaConversions
  import scala.collection.JavaConversions._
  import scala.collection.mutable.ListBuffer
@@ -31,7 +30,7 @@ class IntervalDBObject(val interval:Interval) extends DBObject with BSONObject
   def containsField(name: String) = name == "s" || name == "e"
   def containsKey(k: String) = containsField(k);
 
-  private object _keySet extends java.util.HashSet[String] {
+  private object _keySet extends java.util.TreeSet[String] {
     add("s")
     add("e")
   }

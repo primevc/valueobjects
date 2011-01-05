@@ -55,6 +55,70 @@ file.writeString("
 	}
 }
 
+class HaxeMessagePacking extends MessagePacking
+{
+	override private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)
+	{
+		switch (pType) {
+			case Tarray(_,_,_):
+			default:
+				if (bindable) path += ".value";
+		}
+		
+		switch (pType)
+		{
+			case Tbool(val):				a('b += o.packBool(');			a(path); ac(")".code);
+			case Tinteger(min,max,stride):	a('b += o.packInt(');			a(path); ac(")".code);
+			case Tdecimal(min,max,stride):	a('b += o.packDouble(');		a(path); ac(")".code);
+			case Tstring:					a('b += o.packString(');		a(path); ac(")".code);
+			case Tdate:						a('b += o.packDate(');			a(path); ac(")".code);
+			case Tdatetime:					a('b += o.packDateTime(');		a(path); ac(")".code);
+			case Tinterval:					a('b += o.packDateInterval(');	a(path); ac(")".code);
+			case Turi:						a('b += o.packURI(');			a(path); ac(")".code);
+			case TuniqueID:					a('b += o.packObjectId(');		a(path); ac(")".code);
+			case Temail:					a('b += o.packEMail(');			a(path); ac(")".code);
+			case Tcolor:					a('b += o.packRGBA(');			a(path); ac(")".code);
+			case TfileRef:					a('b += o.packFileRef(');		a(path); ac(")".code);
+		
+			case Tdef(ptypedef): switch (ptypedef) {
+				case Tclass(def):	a('b += ('); a(path); a(".notNull()? "); a(path); a(".messagePack(o) : o.packNil())");
+				case Tenum(def):
+				if (def.catchAll != null) {
+					a('{\n\t\t\t\tvar v = '); a(def.fullName); a("_utils.toValue("); a(path); a(");\n\t\t\t\tb += v.isSet()? o.packInt(v) : o.packString("); a(def.fullName); a("_utils.toString("); a(path); a("));\n\t\t\t}");
+				} else {
+					a('b += o.packInt('); a(def.fullName); a("_utils.toValue("); a(path); a("))");
+				}
+			}
+			case Tarray(type, min, max):
+				a("{");
+				a("\n\t\t\t\tvar a = "); a(path); ac(";".code);
+				a("\n\t\t\t\tb += o.packArrayHeader(a.length);");
+				a("\n\t\t\t\tfor (i in 0 ... a.length) "); addPropertyPackerCall("a.getItemAt(i)", type, false); ac(";".code);
+				a("\n\t\t\t}");
+				
+			case TenumConverter(_):	throw "Not implemented";
+			
+		}
+	}
+	
+	override private function definePackerFunction() {
+		a("\n\tstatic public function msgpack_packVO(o : haxe.io.BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBits : Int, prependMsgpackType : Bool = false) : Int\n\t{");
+		
+		a("\n		Assert.that(o != null && obj != null);");
+		a("\n		");
+		
+		a("\n\t\tvar b /* bytes written */ : Int;");
+		a("\n\t\tif (prependMsgpackType) {");
+		
+		a("\n\t\t\tif ("); a_not0("propertyBits"); a(") b = o.packValueObject();");
+		a("\n\t\t\telse return o.packNil();");
+		a("\n\t\t}");
+		
+		a("\n\t\telse b = 0;");
+		a("\n\t\t");
+	}
+}
+
 class Haxe implements CodeGenerator
 {
 	static var haxeModules : List<Haxe>;
@@ -266,25 +330,10 @@ class Haxe implements CodeGenerator
 		a("\n\t}");
 	}
 */	
-	private function addIfMixinBitsSet(t:BaseTypeDefinition, offset:Int, expr:String)
-	{
-		a("\n			if ((propertyBits & ");
-		if (t.propertiesSorted.length == 1)
-			a("1");
-		else {
-			a(interfacePropertiesBitmask(t, offset));
-		}
-		a(" /* "); a(t.name); a(" */).not0()) "); a(expr);
-	}
 	
 	private function addFullName(t:TypeDefinition, interfaceT = false)
 	{
-		if (interfaceT) {
-			a(t.module.fullName); a(".I"); a(t.name);
-		}
-		else a(t.fullName);
-		
-		if (Std.is(t,ClassDef) && !cast(t, ClassDef).isMixin) a("VO");
+		Util.addFullName(code, t, interfaceT);
 	}
 
 /*	
@@ -362,225 +411,15 @@ class Haxe implements CodeGenerator
 	
 	private function genSerialization(def:ClassDef)
 	{	
-		// Count bits/properties for this 'def
-		var lastProp:Property = null;
-		var totalPropsToPack = def.numPropertiesDefined;
-		for (p in def.propertiesDefined) if (lastProp == null || lastProp.index < p.index) lastProp = p;
-		
-		genDeSerialization(def, lastProp);
-		
-		var totalProps = totalPropsToPack;
-		
-		var hasSuper = def.superClass != null;
-		
 		if (!def.isMixin)
 		{
-			a("\n\t"); if (hasSuper) a("override "); a("public function messagePack(o : haxe.io.BytesOutput) : Int\n\t{");
+			a("\n\t"); if (def.superClass != null) a("override "); a("public function messagePack(o : haxe.io.BytesOutput) : Int\n\t{");
 			a("\n\t\treturn msgpack_packVO(o, this, _propertiesSet, true);");
 			a("\n\t}");
 			a("\n");
 		}
 		
-		a("\n\tstatic public function msgpack_packVO(o : haxe.io.BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBits : Int, prependMsgpackType : Bool = false) : Int\n\t{");
-		
-		a("\n		Assert.that(o != null && obj != null);");
-		a("\n		");
-		
-		a("\n\t\tvar b /* bytes written */ : Int;");
-		a("\n\t\tif (prependMsgpackType) {");
-		
-		a("\n\t\t\tif (propertyBits.not0()) b = o.packValueObject();");
-		a("\n\t\t\telse return o.packNil();");
-		a("\n\t\t}");
-		
-		a("\n\t\telse b = 0;");
-		a("\n\t\t");
-		
-		
-		var mixinBits = 0;
-		var hasMixins = def.supertypes.length > 0;
-		
-		if (hasMixins)
-		{	
-			for (t in def.supertypes) mixinBits += t.propertiesSorted.length;
-			
-			if (mixinBits > 1)
-			{
-				a("\n\t\tvar mixin = 0;");
-				a("\n\t\tvar mixBits = propertyBits & "); a(bitmask(mixinBits)); a(";");
-				var offset = 0;
-				
-				if (def.supertypes.length == 1) {
-					a("\n\t\tif (mixBits.not0()) ++mixin; // "); a(def.supertypes.first().fullName);
-				}
-				else for (t in def.supertypes) {
-					addIfMixinBitsSet(t, offset, "++mixin;");
-					offset += t.propertiesSorted.length;
-				}
-				a("\n");
-			}
-			else {
-				// single mixin with 1 field optimization (like ObjectId)
-				a("\n\t\tvar mixin = propertyBits & 1; // Single field mixin: "); a(def.supertypes.first().fullName);
-			}
-			
-			a("\n\t\tpropertyBits >>>= "); a(mixinBits + ";");
-		}
-		
-		a("\n\t\tb += o.packValueObjectHeader(TYPE_ID, ");
-		
-		if (hasMixins) a("mixin");
-		else if (!hasSuper) a("0");
-		
-		if (lastProp != null)
-		{
-			if (def.numPropertiesDefined == 1)
-				a(", propertyBits);");
-			else {
-				a(", propertyBits.not0()? "); a(def.numPropertiesDefined > 8? "ValueObjectBase.bytesUsedInInt(propertyBits)" : "1"); a(" : 0);");
-			}
-		}
-		else
-			a(", 0);");
-		
-		a("\n\t\t");
-		
-		if (hasMixins)
-		{
-			if (lastProp != null)	a("\n\t\tif (mixin.not0())");
-			else					a("\n\t\tAssert.that(mixin.not0());");
-			
-			a("\n\t\t{");
-			
-			if (def.supertypes.length == 1)
-			{
-				var t = def.supertypes.first();
-				a("\n\t\t\tb += "); addFullName(t); a(".msgpack_packVO(o, obj, ");
-				a(mixinBits == 1? "1" : "mixBits");
-				a(", false);");
-			}
-			else for (t in def.supertypes)
-			{	
-				a("\n			mixin = mixBits & ");
-				if (t.propertiesSorted.length == 1)
-					a("1");
-				else {
-					a(interfacePropertiesBitmask(t, 0));
-				}
-				a(" /* "); a(t.name); a(" */;");
-				
-				a("\n			if (mixin.not0()) "); a("b += "); a(t.fullName); if (Std.is(t,ClassDef) && !cast(t, ClassDef).isMixin) a("VO"); a(".msgpack_packVO(o, obj, mixin, false);");
-				
-				if (t != def.supertypes.last()) {
-					a("\n\t\t\tmixBits >>>= "); a(t.propertiesSorted.length+";");
-					a("\n\t\t\t");
-				}
-			}
-			
-			a("\n\t\t}");
-			a("\n\t\t");
-		}
-		
-		if (totalPropsToPack == 1 && lastProp.index < 8)
-		{
-			// Single Property optimization
-			var p = lastProp;
-			
-			a("\n\t\tif (propertyBits.not0()) {");
-			a("\n\t\t\to.writeByte(0x"); a(StringTools.hex(1 << p.index, 2)); a("); ++b;");
-			a("\n\t\t\t"); addPropertyPackerCall("obj." + p.name, p.type, p.isBindable()); ac(";".code);
-			a("\n\t\t}");
-		}
-		else if (lastProp != null) // at least one Property to pack
-		{
-			a("\n\t\tif (!propertyBits.not0()) return b;");
-			a("\n\t\t");
-			
-			var bit = 0, mask = 0;
-			for (i in 0 ... lastProp.index + 1)
-			{
-				var p = def.propertiesDefined.get(i);
-				++bit;
-				
-				if (p == null)
-				{
-					if (def.propertiesDefined.exists(i+1))
-					{
-						if (bit >= 8) while (bit >= 8)
-						{
-							     if (bit >= 32) { a("\n\t\to.writeInt31(0); b += 4;");	bit -= 32; }
-							else if (bit >= 24) { a("\n\t\to.writeInt24(0); b += 3;");	bit -= 24; }
-							else if (bit >= 16) { a("\n\t\to.writeInt16(0); b += 2;");	bit -= 16; }
-							else if (bit >=  8) { a("\n\t\to.writeByte(0); ++b;");		bit -=  8; }
-						}
-					}
-				}
-				else
-				{	
-					--totalPropsToPack;
-					
-					if (totalPropsToPack == 0 && lastProp.index % 8 == 0)
-					{
-						if (bit <= 8 && p == lastProp)
-						{
-							a("\n\t\t");
-							var bitMask = (1 << (bit-1));
-							// Single last Property: optimize if + packing
-							a("\n\t\tAssert.that(propertyBits & "); a(bitMask + " != 0);");
-							a("\n\t\to.writeByte(" + bitMask); a("); ++b;\n\t\t");
-							addPropertyPackerCall("obj." + p.name, p.type, p.isBindable()); ac(";".code);
-							
-							break;
-						}
-						else throw "huh?";
-					}
-					else
-					{
-					//	a("\n\t\t"); addIfPropertyIsSetExpr("obj.", p, "i |= 0x" + StringTools.hex(1 << (bit-1), 2));
-						mask |= 1 << (bit-1);
-						
-						//TODO: Add basic circular reference check ?  Maybe cache all object references and throw on circle?
-					
-						if (bit == 8 || p == lastProp)
-						{
-							a("\n\t\t");
-							
-							if (def.numPropertiesDefined > 8 && def.numPropertiesDefined - i > 1) {
-								a("\n\t\to.writeByte(propertyBits & 0x"); a(StringTools.hex(mask, 2));
-							}
-							else {
-								a("\n\t\to.writeByte(propertyBits");
-							}
-							a("); ++b;");
-							
-							a("\n\t\t");
-							if (totalProps <= 8)	a("\n\t\tAssert.that(propertyBits.not0());");
-							else					a("\n\t\tif (propertyBits.not0())");
-							a("\n\t\t{");
-						
-							for (b in 0 ... bit) {
-								var p = def.propertiesDefined.get(i+1 - bit + b);
-								if (p == null) continue;
-								a("\n\t\t	if ((propertyBits & 0x"); a(StringTools.hex(1 << b, 2)); a(").not0()) ");
-								addPropertyPackerCall("obj." + p.name, p.type, p.isBindable()); ac(";".code);
-							}
-						
-							a("\n\t\t}");
-							if (totalPropsToPack > 0) {
-								a("\n\t\tif (!(propertyBits >>>= 8).not0()) return b;");
-								a("\n\t\t");
-							}
-							
-							bit = 0;
-						}
-	//					else throw "wtf?";
-					}
-				}
-			}
-		}
-		a("\n\t\t");
-		a("\n\t\treturn b;");
-		a("\n\t}\n");
+		new HaxeMessagePacking(code, def).genSerialization();
 	}
 	
 	static function bitmask(numBits:Int, offset:Int=0)
@@ -592,57 +431,7 @@ class Haxe implements CodeGenerator
 		return "0x" + StringTools.hex(mask, 4);
 	}
 	
-	private static function interfacePropertiesBitmask(t:BaseTypeDefinition, offset:Int)
-	{
-		return bitmask(t.propertiesSorted.length, offset);
-	}
-	
 	private inline function ac(char:Int) code.addChar(char)
-	
-	private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)
-	{
-		switch (pType) {
-			case Tarray(_,_,_):
-			default:
-				if (bindable) path += ".value";
-		}
-		
-		switch (pType)
-		{
-			case Tbool(val):				a('b += o.packBool(');			a(path); ac(")".code);
-			case Tinteger(min,max,stride):	a('b += o.packInt(');			a(path); ac(")".code);
-			case Tdecimal(min,max,stride):	a('b += o.packDouble(');		a(path); ac(")".code);
-			case Tstring:					a('b += o.packString(');		a(path); ac(")".code);
-			case Tdate:						a('b += o.packDate(');			a(path); ac(")".code);
-			case Tdatetime:					a('b += o.packDateTime(');		a(path); ac(")".code);
-			case Tinterval:					a('b += o.packDateInterval(');	a(path); ac(")".code);
-			case Turi:						a('b += o.packURI(');			a(path); ac(")".code);
-			case TuniqueID:					a('b += o.packObjectId(');		a(path); ac(")".code);
-			case Temail:					a('b += o.packEMail(');			a(path); ac(")".code);
-			case Tcolor:					a('b += o.packRGBA(');			a(path); ac(")".code);
-			case TfileRef:					a('b += o.packFileRef(');		a(path); ac(")".code);
-		
-			case Tdef(ptypedef): switch (ptypedef) {
-				case Tclass(def):	a('b += ('); a(path); a(".notNull()? "); a(path); a(".messagePack(o) : o.packNil())");
-				case Tenum(def):
-				if (def.catchAll != null) {
-					a('{\n\t\t\t\tvar v = '); a(def.fullName); a("_utils.toValue("); a(path); a(");\n\t\t\t\tb += v.isSet()? o.packInt(v) : o.packString("); a(def.fullName); a("_utils.toString("); a(path); a("));\n\t\t\t}");
-				} else {
-					a('b += o.packInt('); a(def.fullName); a("_utils.toValue("); a(path); a("))");
-				}
-			}
-			case Tarray(type, min, max):
-				a("{");
-				a("\n\t\t\t\tvar a = "); a(path); ac(";".code);
-				a("\n\t\t\t\tb += o.packArrayHeader(a.length);");
-				a("\n\t\t\t\tfor (i in 0 ... a.length) "); addPropertyPackerCall("a.getItemAt(i)", type, false); ac(";".code);
-				a("\n\t\t\t}");
-			
-
-			case TenumConverter(_):	throw "Not implemented";
-	
-		}
-	}
 	
 	/** Returns true when no if statement was added  (Property is always set) */
 	private function addIfPropertyIsSetExpr(propPrefix:String, p:Property, expr:String)

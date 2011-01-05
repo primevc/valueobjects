@@ -1,12 +1,14 @@
 package primevc.core.traits
  import primevc.types._
  import scala.collection.JavaConversions
-
+ import primevc.utils.msgpack.VOPacker
 
 trait ValueObject
 {
-  protected[primevc] def Companion : VOCompanion[_]
-  protected var $fieldsSet : Int = 0
+  protected[primevc] def updateFieldsSet() { }
+
+  protected[primevc] def Companion : VOCompanion[_] with VOMessagePacker[_]
+  protected[primevc] var $fieldsSet : Int = 0
 
   def fieldIsSet_?(field:Field): Boolean = fieldIsSet_?(Companion.field(field.name.name))
   
@@ -17,7 +19,6 @@ trait ValueObject
   def partial_? : Boolean = true
   def validationErrors_? : List[(Symbol, String)] = Nil
 
-  
   // Courtesy of: http://graphics.stanford.edu/%7Eseander/bithacks.html#CountBitsSetParallel
   def numFieldsSet_? : Int = {
     var v = $fieldsSet
@@ -71,6 +72,10 @@ trait VOFieldInfo
   @inline def fields: IndexedSeq[Field] = (0 until numFields) map(field(_))
 }
 
+trait VOMessagePacker[V <: ValueObject] {
+  protected[primevc] def msgpack_packVO(o : VOPacker, obj : V, flagsToPack : Int) : Unit
+}
+
 trait VOCompanion[V <: ValueObject] extends VOAccessor[V] with VOFieldInfo {
   type VOType = V
   @inline final def field(vo:VOType, key:String): Int   = field(key)
@@ -90,7 +95,7 @@ trait VOCompanion[V <: ValueObject] extends VOAccessor[V] with VOFieldInfo {
   }
 
   def clear(vo:VOType) = for (i <- 0 until numFields) putValue(vo, i, null)
-  
+
   def getValue(vo:VOType, index:Int): AnyRef
   def putValue(vo:VOType, index:Int, value:AnyRef): VOType
   def empty: VOType

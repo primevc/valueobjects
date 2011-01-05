@@ -11,6 +11,7 @@ class Ref[V <: ValueObjectWithID](val ref:V#IDType, _vo:V = null.asInstanceOf[V]
 
 class RefArray[V <: ValueObjectWithID](_ref : Array[V#IDType] = null, _voArray : Array[V] = null)
                                       (implicit manifest_IDType : Manifest[V#IDType], voManifest : Manifest[V])
+  extends Traversable[V#IDType]
 {
   val ref:Array[V#IDType] = if (_ref != null) _ref else new Array[V#IDType](0)
   require(ref != null)
@@ -28,6 +29,8 @@ class RefArray[V <: ValueObjectWithID](_ref : Array[V#IDType] = null, _voArray :
   }
 
   override def toString = if (!empty_?) "RefArray("+ ref.mkString(", ") +")" else "RefArray"
+
+  def foreach[U](f: (V#IDType) => U) = ref.foreach(f)
 }
 
 object RefArray

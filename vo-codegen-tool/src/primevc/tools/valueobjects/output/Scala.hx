@@ -1931,14 +1931,6 @@ class XMLProxyGenerator
 
 class ScalaMessagePacking extends MessagePacking
 {
-	override private function definePackerFunction()
-	{
-		a("\n\tdef msgpack_packVO(o : VOPacker, obj : "); a(def.name); a(", flagsToPack : Int)\n\t{"); //"); a(Module.pkgRoots.first().name); a("]
-		a("\n		require(o != null && obj != null);");
-		a("\n		");
-		a("\n		var propertyBits = flagsToPack;");
-	}
-	
 	override private function expr_incrementMixinCount()	return "mixin += 1"
 	override private function a_return() a("return")
 	override private function a_not0(v:String) {
@@ -1988,5 +1980,25 @@ class ScalaMessagePacking extends MessagePacking
 			
 			case TenumConverter(_):	throw "Not implemented";
 		}
+	}
+	
+	override private function definePackerFunction()
+	{
+		a("\n\tdef msgpack_packVO(o : VOPacker, obj : "); a(def.name); a(", flagsToPack : Int)\n\t{"); //"); a(Module.pkgRoots.first().name); a("]
+		a("\n		require(o != null && obj != null);");
+		a("\n		");
+		a("\n		var propertyBits = flagsToPack;");
+	}
+	
+	override private function defineUnPackerFunction()
+	{
+		a("\n\tdef msgpack_unpackVO(input : Unpacker, obj : "); a(def.name); a(", propertyBytes : Int)\n\t{");
+		a("\n		require(reader != null && obj != null);");
+		a("\n		var bits:Int;");
+	}
+	
+	override private function a_unpackProperty(p:Property)
+	{
+		a(p.name); a(" = "); a("input.unpack();");
 	}
 }

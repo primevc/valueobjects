@@ -1,5 +1,6 @@
 package primevc.types;
  import haxe.io.BytesOutput;
+ import primevc.core.traits.IObjectId;
   using primevc.utils.IfUtil;
   using primevc.utils.msgpack.Format;
 
@@ -56,7 +57,9 @@ class ObjectId
 		var str = "47cc67093475061e3d95369d";
 		var o = fromString(str);
 		Assert.that(str == o.toString().toLowerCase());
+#if !neko
 		Assert.that(o.timestamp	== 0x47cc6709);
+#end
 		Assert.that(o.machine	== 0x347506  );
 		Assert.that(o.pid		== 0x1e3d    );
 		Assert.that(o.increment	== 0x95369d  );

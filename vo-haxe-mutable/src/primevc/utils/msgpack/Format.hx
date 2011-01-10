@@ -286,9 +286,9 @@ class VOFormat
 	/**
 	 *  
 	 *  VO Header:
-	 *  +---bits---+---------------------+----------------------------------+------------------------------------+
-	 *  | 1tsssfff | 1 or 2 TypeID bytes | 0..s supertype VO Headers + data | 0..f Field bitflags + values group |
-	 *  +----------+---------------------+----------------------------------+------------------------------------+
+	 *  +---bits---+---------------------+------------------------------------+----------------------------------+
+	 *  | 1tsssfff | 1 or 2 TypeID bytes | 0..f Field bitflags + values group | 0..s supertype VO Headers + data |
+	 *  +----------+---------------------+------------------------------------+----------------------------------+
 	 *     t: When set, TypeID data is ushort (2 bytes, max 65535) otherwise ubyte (max 255).
 	 *   sss: Number of super type "VO Header, Field bitflags + values group" combinations following the TypeID.
 	 *   fff: 'Field bitflags + values group' count: 0 - 4 bytes.
@@ -421,10 +421,10 @@ class VOFormat
 	{
 		#if MessagePackDebug_Pack trace("packDateInterval: "+value); #end
 		
-		return
-			packVOValueTypeHeader(o, DateInterval.TYPE_ID)
-		  +	packDate(o, value.start)
-		  +	packDate(o, value.end);
+		packVOValueTypeHeader(o, DateInterval.TYPE_ID);
+		o.writeDouble(value.start);
+		o.writeDouble(value.end);
+		return 2 + 8 + 8;
 	}
 	
 	
@@ -434,6 +434,6 @@ class VOFormat
 		
 		packVOValueTypeHeader(o, ObjectId.TYPE_ID);
 		value.writeBytes(o);
-		return 13;
+		return 14;
 	}
 }

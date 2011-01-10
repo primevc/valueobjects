@@ -16,7 +16,7 @@ import primevc.core.traits.{VOMessagePacker, VOCompanion, ValueObject}
 class VOPacker (out:OutputStream) extends Packer(out)
 {
   /** Packs a full ValueObject: Updates the VO fields-set bits, and uses those. */
-  def packValueObject[V <: ValueObject](vo : V)
+  def pack[V <: ValueObject](vo : V)
   {
     vo.updateFieldsSet();
     packValueObject(vo, vo.$fieldsSet)

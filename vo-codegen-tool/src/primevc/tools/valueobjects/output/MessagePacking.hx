@@ -25,10 +25,14 @@ class MessagePacking
 		this.def  = def;
 	}
 	
-	private function definePackerFunction()	Assert.abstract()
-	private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)	Assert.abstract()
+	private function definePackerFunction()		Assert.abstract()
+	private function defineUnPackerFunction()	Assert.abstract()
 	
-	private function expr_incrementMixinCount()	return "++mixin"
+	private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)	Assert.abstract()
+	private function a_unpackProperty(p:Property) Assert.abstract()
+	
+	private function expr_incrementMixinCount()		return "++mixin"
+	private function expr_decrementPropertyBytes()	return "--propertyBytes;"
 	
 	private function a_writeByte(byte:String) {
 		a("o.writeByte("); a(byte); a("); ++b;");
@@ -37,12 +41,11 @@ class MessagePacking
 	private function a_return() a("return b;")
 	
 	private function a_not0(v:String) {
-		a(v);
-		a(".not0()");
+		a("("); a(v); a(").not0()");
 	}
 	
 	private function a_is0(v:String) {
-		a_not0("!(" + v + ")");
+		a("!"); a_not0(v);
 	}
 	
 	private function a_assert(v:String) {
@@ -86,10 +89,9 @@ class MessagePacking
 		totalPropsToPack = def.numPropertiesDefined;
 		for (p in def.propertiesDefined) if (lastProp == null || lastProp.index < p.index) lastProp = p;
 		
-//		genDeSerialization(def, lastProp);
+		genDeSerialization(lastProp);
 		
-		totalProps = totalPropsToPack;
-		
+		totalProps = totalPropsToPack;		
 		var hasSuper = def.superClass != null;
 		
 		definePackerFunction();
@@ -141,45 +143,6 @@ class MessagePacking
 			a(", 0);");
 		
 		a("\n\t\t");
-		
-		if (hasMixins)
-		{
-			a("\n\t\t");
-			if (lastProp != null) {	a("if ("); a_not0("mixin"); a(")"); }
-			else				  {	a_assertNot0("mixin"); }
-			
-			a("\n\t\t{");
-			
-			if (def.supertypes.length == 1)
-			{
-				var t = def.supertypes.first();
-				a_msgpackVOCallStart(t);
-				a(mixinBits == 1? "1" : "mixBits");
-				a(");");
-			}
-			else for (t in def.supertypes)
-			{	
-				a("\n			mixin = mixBits & ");
-				if (t.propertiesSorted.length == 1)
-					a("1");
-				else {
-					a(interfacePropertiesBitmask(t, 0));
-				}
-				a(" /* "); a(t.name); a(" */;");
-				
-				a("\n			if ("); a_not0("mixin"); a(") ");
-				a_msgpackVOCallStart(t); // a("b += "); a(t.fullName); if (Std.is(t,ClassDef) && !cast(t, ClassDef).isMixin) a("VO"); a(".msgpack_packVO(o, obj, mixin);");
-				a("mixin);");
-				
-				if (t != def.supertypes.last()) {
-					a("\n\t\t\tmixBits >>>= "); a(t.propertiesSorted.length+";");
-					a("\n\t\t\t");
-				}
-			}
-			
-			a("\n\t\t}");
-			a("\n\t\t");
-		}
 		
 		if (totalPropsToPack == 1 && lastProp.index < 8)
 		{
@@ -272,7 +235,81 @@ class MessagePacking
 			}
 		}
 		
+		if (hasMixins)
+		{
+			a("\n\t\t");
+			if (lastProp != null) {	a("if ("); a_not0("mixin"); a(")"); }
+			else				  {	a_assertNot0("mixin"); }
+			
+			a("\n\t\t{");
+			
+			if (def.supertypes.length == 1)
+			{
+				var t = def.supertypes.first();
+				a_msgpackVOCallStart(t);
+				a(mixinBits == 1? "1" : "mixBits");
+				a(");");
+			}
+			else for (t in def.supertypes)
+			{	
+				a("\n			mixin = mixBits & ");
+				if (t.propertiesSorted.length == 1)
+					a("1");
+				else {
+					a(interfacePropertiesBitmask(t, 0));
+				}
+				a(" /* "); a(t.name); a(" */;");
+				
+				a("\n			if ("); a_not0("mixin"); a(") ");
+				a_msgpackVOCallStart(t); // a("b += "); a(t.fullName); if (Std.is(t,ClassDef) && !cast(t, ClassDef).isMixin) a("VO"); a(".msgpack_packVO(o, obj, mixin);");
+				a("mixin);");
+				
+				if (t != def.supertypes.last()) {
+					a("\n\t\t\tmixBits >>>= "); a(t.propertiesSorted.length+";");
+					a("\n\t\t\t");
+				}
+			}
+			
+			a("\n\t\t}");
+			a("\n\t\t");
+		}
+		
 		endPackerFunction();
+	}
+	
+	private function genDeSerialization(lastProp:Property)
+	{
+		if (lastProp == null) return;
+		
+		defineUnPackerFunction();
+		
+		var bit = 8;
+		
+		for (i in 0 ... lastProp.index + 1)
+		{
+			if (bit == 8) {
+				a("\n\t\n\t\tif ("); a_is0("propertyBytes"); a(") return;");
+				a("\n\t\n\t\t"); a(expr_decrementPropertyBytes());
+				a("\n\t\n\t\tbits = input.readByte();");
+				bit = 0;
+			}
+			
+			var p = def.propertiesDefined.get(i);
+			if (p == null) {
+				++bit;
+				continue;
+			}
+			
+			a("\n\t\tif ("); a_not0("bits & 0x" + StringTools.hex(1 << bit, 2)); a(") ");
+			
+			a_unpackProperty(p);
+			
+			++bit;
+		}
+		
+		a("\n\t\t\n\t\tif ("); a_not0("propertyBytes"); a(") reader.discardRemainingVOProperties(propertyBytes);");
+		
+		a("\n\t}");
 	}
 	
 	static function bitmask(numBits:Int, offset:Int=0)

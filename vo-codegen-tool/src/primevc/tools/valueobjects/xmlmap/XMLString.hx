@@ -35,7 +35,8 @@ class XMLString
 	static public inline function toEMail		(v:String)	: EMail		{ return v; }
 	
 	static public inline function toColor		(v:String)	: RGBA		{
-		return v == null? 0 : Std.parseInt(v.charCodeAt(0) == '#'.code? "0x"+v.substr(1) : v);
+		var rgb = v == null? 0 : Std.parseInt(v.charCodeAt(0) == '#'.code? "0x"+v.substr(1) : v);
+		return #if neko { color: rgb, a:0xFF } #else rgb #end;
 	}
 	static public inline function toBitmap		(v:String)	: Bitmap	{ return Bitmap.fromString(v); }
 	

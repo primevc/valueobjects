@@ -117,6 +117,44 @@ class HaxeMessagePacking extends MessagePacking
 		a("\n\t\telse b = 0;");
 		a("\n\t\t");
 	}
+	
+	override private function defineUnPackerFunction()
+	{
+		a("\n\tstatic public function msgpack_unpackVO(reader : Reader, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBytes : Int, converter : ValueConverter) : Void\n\t{");
+		a("\n		Assert.that(reader != null && obj != null);");
+		a("\n		var input = reader.input, bits:Int;");
+	}
+	
+	override private function a_unpackProperty(p:Property)
+	{
+		if (p.isArray())
+		{
+			a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
+			a( Util.isSingleValue(p.type)
+			 	? p.isBindable()? "new primevc.core.collections.RevertableArrayList(" : "new primevc.core.collections.ArrayList("
+				: 'new ' + HaxeUtil.haxeType(p.type, true) + '('
+			);
+		}
+		else {
+			a("((untyped obj).");
+			a(p.name);
+			if (p.isBindable() && Util.isSingleValue(p.type)) a(".value");
+			a(" = ");
+		}
+		
+		a("reader.");
+		switch (p.type)
+		{
+			case Tarray(innerT,_,_):
+				a("readMsgPackArray(");
+				a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(innerT)); a(")));");
+			
+			case Tcolor:
+				a("readMsgPackValue("); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(p.type)); a("Type));");
+			default:
+				a("readMsgPackValue("); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(p.type)); a("));");
+		}
+	}
 }
 
 class Haxe implements CodeGenerator
@@ -300,113 +338,9 @@ class Haxe implements CodeGenerator
 		a("\n\t");
 	}
 	
-/*	private function genMsgpackMaxSetPropertyCheck(def:ClassDef)
-	{
-		if (def.numPropertiesDefined == 0) return; // no props
-		
-		a("\n\tstatic "); if (def.numPropertiesDefined < 4) a("inline "); a("public function msgpack_maxNonEmptyPropertyID(obj : "); a(def.name); a("VO) : Int\n\t{");
-		a("\n		return ");
-		var p, i = def.propertiesSorted.length, noIf = true;
-		while (i-->0)
-		{
-			p = def.propertiesSorted[i];
-			if (p.definedIn != def) continue;
-
-			noIf = addIfPropertyIsSetExpr("obj.", p, Std.string(p.index));
-			if (noIf) i = 0;
-			break;
-		}
-		while (i-->0) {
-			p = def.propertiesSorted[i];
-			if (p.definedIn != def) continue;
-
-			a("\n\t\t  else ");
-			noIf = addIfPropertyIsSetExpr("obj.", p, Std.string(p.index));
-			if (noIf) i = 0;
-		}
-		if (!noIf) {
-			a("\n\t\t  else -1;");
-		}
-		a("\n\t}");
-	}
-*/	
-	
 	private function addFullName(t:TypeDefinition, interfaceT = false)
 	{
 		Util.addFullName(code, t, interfaceT);
-	}
-
-/*	
-	private function genFieldSetter(def:ClassDef)
-	{
-		a("\n\tstatic public function setByIndex(obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyIndex:Int, value:Dynamic) : Void\n\t{");
-		a("\n		Assert.that(obj != null);");
-		a("\n		switch(propertyIndex) {");
-		for (p in def.propertiesDefined) {
-			a("\n			case "); a(p.index + ":"); a("obj."); a(p.name); a(" = "); a(HaxeUtil.getDynamicConversionCall(p.type, p.isBindable())); a("value);");
-		}
-		a("\n		}");
-		a("\n\t}\n");
-	}
-*/	
-	private function genDeSerialization(def:ClassDef, lastProp:Property)
-	{
-		if (lastProp == null) return;
-		
-		a("\n\tstatic public function msgpack_unpackVO(reader : Reader, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBytes : Int, converter : ValueConverter) : Void\n\t{");
-		a("\n		Assert.that(reader != null && obj != null);");
-		a("\n		var input = reader.input, bits:Int;");
-		
-		var bit = 8;
-		
-		for (i in 0 ... lastProp.index + 1)
-		{
-			if (bit == 8) {
-				a("\n\t\n\t\tif (propertyBytes-- == 0) return;");
-				a("\n\t\n\t\tbits = input.readByte();");
-				bit = 0;
-			}
-			
-			var p = def.propertiesDefined.get(i);
-			if (p == null) {
-				++bit;
-				continue;
-			}
-			
-			a("\n\t\tif ((bits & 0x"); a(StringTools.hex(1 << bit, 2)); a(").not0()) ");
-			
-			if (p.isArray())
-			{
-				a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
-				a( Util.isSingleValue(p.type)
-				 	? p.isBindable()? "new primevc.core.collections.RevertableArrayList(" : "new primevc.core.collections.ArrayList("
-					: 'new ' + HaxeUtil.haxeType(p.type, true) + '('
-				);
-			}
-			else {
-				a("((untyped obj).");
-				a(p.name);
-				if (p.isBindable() && Util.isSingleValue(p.type)) a(".value");
-				a(" = ");
-			}
-			
-			a("reader.");
-			switch (p.type)
-			{
-				case Tarray(innerT,_,_):
-					a("readMsgPackArray(");
-					a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(innerT)); a(")));");
-				
-				default:
-					a("readMsgPackValue("); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(p.type)); a("));");
-			}
-			
-			++bit;
-		}
-		
-		a("\n\t\t\n\t\tif (propertyBytes.not0()) reader.discardRemainingVOProperties(propertyBytes);");
-		
-		a("\n\t}");
 	}
 	
 	private function genSerialization(def:ClassDef)

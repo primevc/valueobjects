@@ -99,6 +99,7 @@ trait VOCompanion[V <: ValueObject] extends VOAccessor[V] with VOFieldInfo {
   def getValue(vo:VOType, index:Int): AnyRef
   def putValue(vo:VOType, index:Int, value:AnyRef): VOType
   def empty: VOType
+  def fieldIndexOffset(vo : VOType, typeID : Int) : Int
 }
 
 trait IDAccessor[V <: ValueObjectWithID]

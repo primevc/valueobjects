@@ -217,8 +217,8 @@ class Reader
 				return ObjectId.fromBytes(input);
 				
 			case DateInterval.TYPE_ID:
-				var start = readMsgPackValue(0, Date);
-				var end   = readMsgPackValue(0, Date);
+				var start = new Date(inp.readDouble());
+				var end   = new Date(inp.readDouble());
 				Assert.that(Std.is(start, Date));
 				Assert.that(Std.is(end,   Date));
 				return new DateInterval(start, end);
@@ -250,11 +250,11 @@ class Reader
 			Assert.notNull(target);
 		}
 		
-		while (superTypeCount-->0)
-			deserializeVO(inp.readByte(), target);
-		
 		if (fieldsSetBytes != 0)
 			(untyped clazz).msgpack_unpackVO(this, target, fieldsSetBytes, this.converter);
+		
+		while (superTypeCount-->0)
+			deserializeVO(inp.readByte(), target);
 		
 		return target; // done
 	}

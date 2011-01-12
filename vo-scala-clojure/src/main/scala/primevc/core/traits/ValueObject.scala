@@ -78,6 +78,8 @@ trait VOMessagePacker[V <: ValueObject] {
 
 trait VOCompanion[V <: ValueObject] extends VOAccessor[V] with VOFieldInfo {
   type VOType = V
+  val TypeID : Int
+
   @inline final def field(vo:VOType, key:String): Int   = field(key)
   @inline final def field(vo:VOType, key:Symbol): Field = fieldNamed(key.name)
   @inline final def field(vo:VOType, index: Int): Field = field(index)
@@ -99,7 +101,7 @@ trait VOCompanion[V <: ValueObject] extends VOAccessor[V] with VOFieldInfo {
   def getValue(vo:VOType, index:Int): AnyRef
   def putValue(vo:VOType, index:Int, value:AnyRef): VOType
   def empty: VOType
-  def fieldIndexOffset(vo : VOType, typeID : Int) : Int
+  def fieldIndexOffset(typeID : Int) : Int
 }
 
 trait IDAccessor[V <: ValueObjectWithID]

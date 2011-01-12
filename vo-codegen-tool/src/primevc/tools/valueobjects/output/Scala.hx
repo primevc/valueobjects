@@ -1,5 +1,6 @@
 package primevc.tools.valueobjects.output;
  import primevc.tools.valueobjects.VODefinition;
+  using primevc.utils.TypeUtil;
 
 class Scala implements CodeGenerator
 {
@@ -106,13 +107,10 @@ import com.mongodb.casbah.Imports._
 					case Tenum(e):		emptyChecks.add({expr: "($"+ p.name +" == null || $"+ p.name + ".toString.isEmpty)", id: i});
 				}
 				
-				case Tstring:
-					emptyChecks.add({expr: "($"+ p.name +" == null || $"+ p.name +".isEmpty)", id: i});
-				
 				case Tarray(_,_,_):
 					emptyChecks.add({expr: "($"+ p.name +" == null || $"+ p.name +".length == 0)", id: i});
 				
-				case TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
+				case Tstring, TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
 					++nonEmptyChecks;
 				
 				case TenumConverter(_):		throw p;
@@ -873,14 +871,30 @@ import com.mongodb.casbah.Imports._
 	function writeSetter(i:Int, p:Property)
 	{
 		var tdef = getPropertyTypename(p);
+		var bit = (1 << this.currentFieldBitNum);
 		
 		// Setter
 		a("\n  final def "); a(p.name); a("_=(v:"); a(tdef.name); a(") : Unit = { ");
 		
 		switch (p.type) {
-			case Tdef(_), Tarray(_,_,_), Tstring: // Don't set any bits
+			case Tdef(_), Tarray(_,_,_): // Don't set any bits
 			default:
-				a("$fieldsSet |= " + (1 << this.currentFieldBitNum)); a("; ");
+				var nilChecked = false;
+				if (nilValue(p.type) == "null")
+				{
+					nilChecked = true;
+					a("if (");
+					if (p.type == Tstring) a("v.length > 0");
+					else {
+						a("v != "); a(nilValue(p.type));
+					}
+				 	a(") ");
+				}
+				a("$fieldsSet |= " + bit);
+				if (nilChecked) {
+					a("; else $fieldsSet &= ~0x" + StringTools.hex(bit));
+				}
+				a("; ");
 		}
 		a("$"); a(p.name); a(" = v } ");
 		
@@ -911,13 +925,13 @@ import com.mongodb.casbah.Imports._
 //			else
 				a("(v);");
 			
+			a(" $"); a(p.name); a(" = value;");
 			switch (p.type) {
-				case Tdef(_), Tarray(_,_,_), Tstring: // Don't set any bits
+				case Tdef(_), Tarray(_,_,_): // Don't set any bits
 				default:
-					var bit = (1 << this.currentFieldBitNum);
-					a(" if (v != null && value != "); a(nilValue(p.type)); a(") $fieldsSet |= " + bit); a("; else $fieldsSet &= ~0x" + StringTools.hex(bit)); ac(";".code);
+					a(" if (v == null) "); a("$fieldsSet &= ~0x" + StringTools.hex(bit)); //nilValue(p.type)); ac(")".code);
 			}
-			a(" $"); a(p.name); a(" = value }\n");
+			a(" }\n");
 		}
 		
 		// Bit number of next flag
@@ -1144,7 +1158,7 @@ import com.mongodb.casbah.Imports._
 	}
 	
 	function nilValue(t:PType) return switch(t) {
-		case Turi, TuniqueID, Tstring, Tinterval, Tdate, Tdatetime, Temail, Tdef(_), Tarray(_,_,_), Tcolor, TfileRef:
+		case Tstring, Turi, TuniqueID, Tinterval, Tdate, Tdatetime, Temail, Tdef(_), Tarray(_,_,_), Tcolor, TfileRef:
 			"null";
 		
 		case Tinteger(_,_,_):		"0";
@@ -1990,11 +2004,24 @@ class ScalaMessagePacking extends MessagePacking
 		a("\n		var propertyBits = flagsToPack;");
 	}
 	
-	override private function defineUnPackerFunction()
+	override private function genDeSerialization(lastProp)
 	{
-		a("\n\tdef msgpack_unpackVO(input : Unpacker, obj : "); a(def.name); a(", propertyBytes : Int)\n\t{");
-		a("\n		require(reader != null && obj != null);");
-		a("\n		var bits:Int;");
+		a("\n  val TypeID = "); a(Std.string(def.index));
+		a("\n  def fieldIndexOffset(typeID: Int) = typeID match {");
+		genFieldOffsetCases(def);
+		a("\n  }\n");
+	}
+	
+	private function genFieldOffsetCases(t:TypeDefinition)
+	{
+		if (t.is(ClassDef)) {
+			for (s in t.as(ClassDef).supertypes) genFieldOffsetCases(s);
+		}
+		
+		a("\n    case "); a(Std.string(t.index)); a(" => ");
+		
+		var offset = 0; for (p in def.propertiesSorted) if (p.definedIn != t) ++offset; else break;
+		a(offset + ";"); a(" // "); a(t.fullName);
 	}
 	
 	override private function a_unpackProperty(p:Property)

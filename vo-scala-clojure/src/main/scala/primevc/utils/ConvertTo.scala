@@ -12,6 +12,7 @@ import org.bson.BSONObject
 import org.bson.types.{BasicBSONList, ObjectId}
 import collection.JavaConversions
 import java.net.{URISyntaxException, URL, URI}
+import org.msgpack.`object`.{IntegerType, RawType}
 
 /**
  * Created by IntelliJ IDEA.
@@ -132,16 +133,19 @@ object ConvertTo
 
   def string        (value:Any) : String = unpack(value) match {
     case v:String => string(v)
+    case v:RawType => string(v)
     case v:Array[String] => v.mkString(", ")
     case None => null
     case _ => value.toString
   }
   def string        (value:String) : String = if (value == null || value.isEmpty) null else value
   def string        (value:Double, format:String) = decimalFormatter(format).format(value)
+  def string        (value:RawType) : String = value.asString
 
   def integer       (value:Any) : Int = unpack(value) match {
     case v:Int => v
-    case v:Number => v.intValue
+    case v:Number => integer(v)
+    case v:IntegerType => integer(v)
     case v:String => integer(v)
     case _ => 0
   }
@@ -149,7 +153,8 @@ object ConvertTo
     val v = value.trim
     if (v.isEmpty) 0 else v.toInt
   }
-  def integer       (value:java.lang.Integer) : Int = if (value == null) 0 else value.intValue
+  def integer       (value:java.lang.Number) : Int = if (value == null) 0 else value.intValue
+  def integer       (value:IntegerType) : Int = value.asInt
 
   def decimal       (value:Any, format:String = null) : Double = unpack(value) match {
     case v:Double => v

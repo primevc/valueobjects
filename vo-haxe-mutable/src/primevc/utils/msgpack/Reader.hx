@@ -217,8 +217,9 @@ class Reader
 				return ObjectId.fromBytes(input);
 				
 			case DateInterval.TYPE_ID:
-				var start = new Date(inp.readDouble());
-				var end   = new Date(inp.readDouble());
+				var inp = this.input;
+				var start = Date.fromTime(inp.readDouble());
+				var end   = Date.fromTime(inp.readDouble());
 				Assert.that(Std.is(start, Date));
 				Assert.that(Std.is(end,   Date));
 				return new DateInterval(start, end);

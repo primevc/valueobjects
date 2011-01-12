@@ -422,8 +422,8 @@ class VOFormat
 		#if MessagePackDebug_Pack trace("packDateInterval: "+value); #end
 		
 		packVOValueTypeHeader(o, DateInterval.TYPE_ID);
-		o.writeDouble(value.start);
-		o.writeDouble(value.end);
+		o.writeDouble(value.start.getTime());
+		o.writeDouble(value.end.getTime());
 		return 2 + 8 + 8;
 	}
 	

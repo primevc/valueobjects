@@ -34,39 +34,39 @@ class VOUnpacker(voCompanionMap : IntMap[VOCompanion[_]], voValueMap : IntMap[Sp
   // Value Objects
   protected var vo           : ValueObject = _
   protected var voc          : VOCompanion[ValueObject] = _
-  protected var fields       : Byte = 0;
-  protected var currentBit   : Int = 0;
-  protected var currentIndex : Int = 0
+  protected var fields       : Int = 0;
+  protected var currentIndex : Int = 0;
 
   def prepareValueObject(typeID: Int) {
     if (vo == null) {
       voc = voCompanionMap(typeID).asInstanceOf[VOCompanion[ValueObject]]
       vo  = voc.empty
     }
-    currentIndex = voc.fieldIndexOffset(vo, typeID)
+    currentIndex = voc.fieldIndexOffset(typeID)
   }
 
   def putValue(value: AnyRef) {
-    var i = currentBit;
-    do if ((fields & (1 << i)) != 0) {
+    var i = 0;
+    do if ((fields & (1 << i)) == 0) i += 1;
+    else {
       vo.Companion.putValue(vo, currentIndex + i, value)
+      fields >>>= (i + 1);
+      currentIndex += (if (fields != 0) i + 1 else 8 - i); // index fixup for last bit
       return;
     }
-    else  i += 1;
-    while (i < 7)
+    while (i < 8)
 
     assert(false);
   }
 
-  def fieldgroupRequiresMoreValues = currentBit != 7
+  def fieldgroupRequiresMoreValues = fields != 0
 
   def prepareForNext8Fields(fields: Byte) {
-    this.fields = fields;
-    this.currentBit = if (fields != 0) 0 else 7; // 7 == done
+    this.fields = fields & 0xFF;
   }
 
   def getData = {
-    val d = data;
+    val d = if (data != null) data else new MessagePackValueObject(vo);
     data = null; vo = null; voc = null;
     d
   }

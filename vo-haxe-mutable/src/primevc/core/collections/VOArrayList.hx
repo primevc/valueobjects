@@ -32,6 +32,7 @@ package primevc.core.collections;
  import primevc.core.traits.IValueObject;
  import primevc.tools.valueobjects.ValueObjectBase;
  import primevc.utils.FastArray;
+  using primevc.utils.FastArray;
   using primevc.utils.IfUtil;
 
 /**
@@ -92,7 +93,7 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType> #if Gener
 	
 	override public function clone () : IReadOnlyList<DataType>
 	{
-		return untyped new VOArrayList<DataType>( #if !GenericArrays untyped #end list.concat() /* copy */ );
+		return untyped new VOArrayList<DataType>( #if !GenericArrays untyped #end list.clone() );
 	}
 }
 

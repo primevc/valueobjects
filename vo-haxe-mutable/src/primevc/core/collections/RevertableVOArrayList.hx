@@ -33,6 +33,7 @@ package primevc.core.collections;
  import primevc.core.traits.IValueObject;
  import primevc.tools.valueobjects.ValueObjectBase;
  import primevc.utils.FastArray;
+  using primevc.utils.FastArray;
   using primevc.utils.IfUtil;
 
 /**
@@ -93,7 +94,7 @@ class RevertableVOArrayList<DataType : IValueObject> extends RevertableArrayList
 	
 	override public function clone ()
 	{
-		var l = new RevertableVOArrayList<DataType>(list.concat() /* copy */);
+		var l = new RevertableVOArrayList<DataType>( list.clone() );
 		l.flags = flags;
 		return untyped l;
 	}

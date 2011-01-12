@@ -3,6 +3,7 @@ package primevc.utils.msgpack
 import primevc.core.traits.{VOCompanion, ValueObject}
 import collection.immutable.IntMap
 import org.msgpack.{Packer, MessagePackObject, UnpackerImpl}
+import org.bson.types.ObjectId
 
 /**
  * Created by IntelliJ IDEA.
@@ -11,23 +12,20 @@ import org.msgpack.{Packer, MessagePackObject, UnpackerImpl}
  * Time: 11:21
  * To change this template use File | Settings | File Templates.
  */
-class VOUnpacker(voCompanionMap : IntMap[VOCompanion[_]], voValueMap : IntMap[SpecialValueType]) extends UnpackerImpl.VOHelper {
+class VOUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends UnpackerImpl.VOHelper {
   def newObject = new UnpackerImpl.VOInstance {
 
   var data : MessagePackObject = _
 
   // ---
   // Value Types
-  var special : SpecialValueType = _
 
-  def processValueType(typeID: Int) = {
-    val s = voValueMap(typeID);
-    this.special = s;
-    s.bytes
+  def processValueType(typeID: Int) = typeID match {
+    case 0x1D => 12
   }
 
-  def putValue(bytes: Array[Byte], startIndex: Int) {
-    data = special.factory(bytes, startIndex)
+  def putValue(bytes: Array[Byte], startIndex: Int): Unit = data = bytes(startIndex) match {
+    case 0x1D => new MessagePackObjectId( new ObjectId(bytes.slice(startIndex + 1, startIndex + 13)) )
   }
 
   // ---
@@ -72,11 +70,9 @@ class VOUnpacker(voCompanionMap : IntMap[VOCompanion[_]], voValueMap : IntMap[Sp
   }
 }}
 
-class MessagePackValueObject(val vo : ValueObject) extends MessagePackObject {
-  def messagePack(packer : Packer) {
-    require(packer.isInstanceOf[VOPacker]);
-    packer.asInstanceOf[VOPacker].pack(vo);
-  }
+class MessagePackValueObject(val vo  : ValueObject) extends MessagePackObject {
+  def messagePack(packer : Packer) = packer.asInstanceOf[VOPacker].pack(vo);
 }
-
-case class SpecialValueType(bytes : Int, factory: (Array[Byte], Int) => MessagePackObject)
+class MessagePackObjectId   (val oid : ObjectId)    extends MessagePackObject {
+  def messagePack(packer : Packer) = packer.asInstanceOf[VOPacker].pack(oid);
+}

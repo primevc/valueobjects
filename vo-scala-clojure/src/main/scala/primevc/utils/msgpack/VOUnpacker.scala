@@ -47,7 +47,10 @@ class VOUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends UnpackerImpl.V
     var i = 0;
     do if ((fields & (1 << i)) == 0) i += 1;
     else {
-      vo.Companion.putValue(vo, currentIndex + i, value)
+      val field = currentIndex + i
+      if (field < vo.Companion.numFields)
+        vo.Companion.putValue(vo, field, value)
+
       fields >>>= (i + 1);
       currentIndex += (if (fields != 0) i + 1 else 8 - i); // index fixup for last bit
       return;

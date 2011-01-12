@@ -41,7 +41,7 @@ class Module
 		pkgRoots = new List();
 		root     = new Module("", null);
 		types    = new IntHash();
-		traits   = declare("primevc.core.traits");
+		traits   = declare("primevc.types");
 	}
 	static var initialize = reinitialize();
 	

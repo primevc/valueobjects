@@ -1,4 +1,4 @@
-package primevc.core.traits;
+package primevc.types;
  import haxe.io.BytesOutput;
  import primevc.core.traits.IMessagePackable;
  import primevc.core.traits.IEditEnabledValueObject;

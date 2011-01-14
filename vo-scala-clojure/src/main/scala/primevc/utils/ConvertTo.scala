@@ -125,7 +125,7 @@ object ConvertTo
 
   def uniqueID      (value:Any) : ObjectId = unpack(value) match {
     case v:ObjectId => v
-    case v:String => new ObjectId(v)
+    case v:String => try new ObjectId(v) catch { case _ => null }
     case v:Array[Byte] => new ObjectId(v)
     case None => null
 //    case _ => new ObjectId(value.toString)

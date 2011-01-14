@@ -253,8 +253,7 @@ import com.mongodb.casbah.Imports._
 			for (check in emptyChecks) {
 				a("\n    case " + check.id); a(" => !"); a(check.expr);
 			}
-			if (def.superClass != null || nonEmptyChecks != 0)
-			 	a("\n    case _ => super.fieldIsSet_?(index)");
+		 	a("\n    case _ => super.fieldIsSet_?(index)");
 			a("\n  }");
 		}
 		
@@ -436,7 +435,7 @@ import com.mongodb.casbah.Imports._
 		// Mongo service Component
 		a("\ntrait "); a(def.name); a("VOMongoComponent extends MongoComponent with "); a(def.name); a("VOAccessor\n{"); // ["); a(def.name); a("VO] with "); a(def.name); a("VOAccessor\n { ");
 			// dependencies
-			addMongoComponentDependencies(def);
+			addMongoComponentDependencies(def, subtypes);
 			
 /*			if (implicitRefsDefined)
 			{
@@ -764,7 +763,7 @@ import com.mongodb.casbah.Imports._
 		a("\n  def -(key: A): This = ");
 */	}
 	
-	function addMongoComponentDependencies(def: ClassDef)
+	function addMongoComponentDependencies(def: ClassDef, subtypes: List<ClassDef>)
 	{
 		var dependencies = new Hash<Bool>();
 		var hasDependencies = false;
@@ -786,6 +785,11 @@ import com.mongodb.casbah.Imports._
 		{
 			hasDependencies = true;
 			dependencies.set(def.superClass.fullName, true);
+		}
+		
+		for (t in subtypes) {
+			hasDependencies = true;
+			dependencies.set(t.fullName, true);
 		}
 		
 		if (!hasDependencies) return; // Nothing to do

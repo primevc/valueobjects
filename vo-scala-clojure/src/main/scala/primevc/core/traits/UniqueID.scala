@@ -9,7 +9,7 @@ trait ObjectId {
   /*@field*/ protected[this] var $id: org.bson.types.ObjectId = null
   def id : org.bson.types.ObjectId = $id;
   def id_=(v : org.bson.types.ObjectId);
-  def id_=(v : AnyRef);
+  def id_ (v : AnyRef);
 }
 
 object ObjectIdVO {
@@ -17,7 +17,12 @@ object ObjectIdVO {
 }
 
 object ObjectId {
-  def msgpack_packVO(o : VOPacker, obj:ObjectId, fields:Int) {
+	def msgpack_packVO(o : VOPacker, obj : ObjectId, flagsToPack : Int)
+	{
+		require(o != null && obj != null && flagsToPack != 0);
 
-  }
+		o.packValueObjectHeader(0x1D, 0, 1);
+		o.writeByte(1);
+		o.pack(obj);
+	}
 }

@@ -156,7 +156,7 @@ class MessagePacking
 		}
 		else if (lastProp != null) // at least one Property to pack
 		{
-			a("\n\t\tif ("); a_is0("propertyBits"); a(") "); a_return();
+			a("\n\t\tif ("); a_not0("propertyBits"); a(") {"); //a_return();
 			a("\n\t\t");
 			
 			var bit = 0, mask = 0;
@@ -207,11 +207,18 @@ class MessagePacking
 						if (bit == 8 || p == lastProp)
 						{
 							a("\n\t\t");
-							a("\n\t\t"); a_writeByte((def.numPropertiesDefined > 8 && def.numPropertiesDefined - i > 1)? "propertyBits & 0x" + StringTools.hex(mask, 2) : "propertyBits");
+							
+							if (p.index < 8)
+								a("\n\t\t"); 
+							else {
+								a("\n\t\tif ("); a_not0("propertyBits"); a(") ");
+							}
+							
+							a_writeByte((def.numPropertiesDefined > 8 && def.numPropertiesDefined - i > 1)? "propertyBits & 0x" + StringTools.hex(mask, 2) : "propertyBits");
 							a("\n\t\t");
 							if (totalProps <= 8) {	a("\n\t\t"); a_assertNot0("propertyBits"); }
-							else				 {	a("\n\t\tif ("); a_not0("propertyBits"); a(")"); }
-							a("\n\t\t{");
+							else				 {	a("\n\t\tif ("); a_not0("(propertyBits & 0xFF)"); a(") { // open group"); }
+							a("\n\t\t");
 						
 							for (b in 0 ... bit) {
 								var p = def.propertiesDefined.get(i+1 - bit + b);
@@ -219,11 +226,11 @@ class MessagePacking
 								a("\n\t\t	if ("); a_not0("(propertyBits & 0x" + StringTools.hex(1 << b, 2) + ")"); a(") ");
 								addPropertyPackerCall("obj." + p.name, p.type, p.isBindable()); ac(";".code);
 							}
-						
-							a("\n\t\t}");
+							
+							if (totalProps > 8) {	a("\n\t\t} //end 8"); }
+							a("\n\t\t");
 							if (totalPropsToPack > 0) {
 								a("\n\t\tpropertyBits >>>= 8;");
-								a("\n\t\tif ("); a_is0("propertyBits"); a(") "); a_return();
 								a("\n\t\t");
 							}
 							
@@ -233,6 +240,7 @@ class MessagePacking
 					}
 				}
 			}
+			a("\n\t\t} // end properties");
 		}
 		
 		if (hasMixins)

@@ -33,7 +33,7 @@ class VOPacker (out:OutputStream) extends Packer(out)
   /** Packs a full ValueObject: Updates the VO fields-set bits, and uses those. */
   def pack[V <: ValueObject](vo : V)
   {
-    vo.updateFieldsSet();
+    vo.updateFieldsSet_!;
     packValueObject(vo, vo.$fieldsSet)
   }
 

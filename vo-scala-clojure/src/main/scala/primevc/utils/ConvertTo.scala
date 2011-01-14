@@ -85,7 +85,7 @@ object ConvertTo
 
     case v:String => toVOArray[T](v.split(splitStringOn))
     case v:Traversable[_] => toVOArray[T](v)
-    case _ => null // throw "Don't know what to do with: " + value.toString
+    // throw "Don't know what to do with: " + value.toString
   }
 
   def fileRef			(value:Any) : FileRef = unpack(value) match {
@@ -155,6 +155,11 @@ object ConvertTo
   }
   def integer       (value:java.lang.Number) : Int = if (value == null) 0 else value.intValue
   def integer       (value:IntegerType) : Int = value.asInt
+
+  def long          (value:String) : Long = {
+    val v = value.trim
+    if (v.isEmpty) 0 else v.toLong
+  }
 
   def decimal       (value:Any, format:String = null) : Double = unpack(value) match {
     case v:Double => v

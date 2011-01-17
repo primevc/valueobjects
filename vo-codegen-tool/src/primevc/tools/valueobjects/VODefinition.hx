@@ -41,7 +41,7 @@ class Module
 		pkgRoots = new List();
 		root     = new Module("", null);
 		types    = new IntHash();
-		traits   = declare("primevc.types");
+		traits   = declare("primevc.core.traits");
 	}
 	static var initialize = reinitialize();
 	
@@ -2232,6 +2232,14 @@ class ClassDef extends BaseTypeDefinition
 		myProps = myProps.concat(getSuperProps(this));
 		myProps = myProps.concat(getSortedProps(this));
 		
+		// Remove duplicate (by inheritance) properties
+		for (p in myProps) {
+			var count = 0;
+			for (p2 in myProps) if (p.name == p2.name && p.definedIn == p2.definedIn && count++ > 0) {
+				myProps.remove(p2);
+			}
+		}
+		
 //		if (this.name == "VideoFrame") throw myProps;
 		
 		return this.propertiesSorted = myProps;
@@ -2394,7 +2402,7 @@ class UniqueIDTrait extends MagicClassDef
 	static var init = function(){ type = new UniqueIDTrait(); }();
 	
 	private function new() {
-		super(0xFFFFF + 1, "ObjectId", Module.traits);
+		super(0xFF01D, "ObjectId", Module.traits);
 		
 		var p = new Property("id", this);
 		p.index = 0;

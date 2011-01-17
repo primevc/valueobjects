@@ -5,7 +5,7 @@ package primevc.core.traits
 
 trait ValueObject
 {
-  protected[primevc] def updateFieldsSet() { }
+  protected[primevc] def updateFieldsSet_!() { }
 
   protected[primevc] def Companion : VOCompanion[_] with VOMessagePacker[_]
   protected[primevc] var $fieldsSet : Int = 0
@@ -14,13 +14,14 @@ trait ValueObject
   
   /** Which field (as defined by the companion object fields Vector indices) is set? */
   def fieldIsSet_?(index:Int): Boolean = ($fieldsSet & (1 << index)) != 0
-  def empty_? = $fieldsSet == 0
+  def empty_? = { updateFieldsSet_! ; $fieldsSet == 0 }
 
   def partial_? : Boolean = true
   def validationErrors_? : List[(Symbol, String)] = Nil
 
   // Courtesy of: http://graphics.stanford.edu/%7Eseander/bithacks.html#CountBitsSetParallel
   def numFieldsSet_? : Int = {
+    updateFieldsSet_!
     var v = $fieldsSet
     v = v - ((v >> 1) & 0x55555555);                    // reuse input as temporary
     v = (v & 0x33333333) + ((v >> 2) & 0x33333333);     // temp

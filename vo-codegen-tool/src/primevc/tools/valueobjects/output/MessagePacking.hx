@@ -35,7 +35,7 @@ class MessagePacking
 	private function expr_decrementPropertyBytes()	return "--propertyBytes;"
 	
 	private function a_writeByte(byte:String) {
-		a("o.writeByte("); a(byte); a("); ++b;");
+		a("{ o.writeByte("); a(byte); a("); ++b; }");
 	}
 	
 	private function a_return() a("return b;")
@@ -133,11 +133,7 @@ class MessagePacking
 		
 		if (lastProp != null)
 		{
-			if (def.numPropertiesDefined == 1)
-				a(", propertyBits);");
-			else {
-				a(", "); a(def.numPropertiesDefined > 8? "propertyBits" : "1"); a(");");
-			}
+			a(", propertyBits);");
 		}
 		else
 			a(", 0);");

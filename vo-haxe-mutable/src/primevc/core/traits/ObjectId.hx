@@ -1,5 +1,6 @@
 package primevc.core.traits;
  import haxe.io.BytesOutput;
+ import primevc.utils.msgpack.Reader;
  import primevc.core.traits.IObjectId;
   using primevc.utils.IfUtil;
   using primevc.utils.msgpack.Format;
@@ -28,5 +29,19 @@ class ObjectId
 		}
 		
 		return b;
+	}
+	
+	static public function msgpack_unpackVO(reader : Reader, obj : IObjectId, propertyBytes : Int, converter : ValueConverter) : Void
+	{
+		Assert.that(reader != null && obj != null);
+		var input = reader.input, bits:Int;
+		
+		--propertyBytes;
+		
+		if (input.readByte() != 0) {
+			(untyped obj).id = reader.readMsgPackValue(0, primevc.types.ObjectId);
+		}
+		
+		if ((propertyBytes).not0()) reader.discardRemainingVOProperties(propertyBytes);
 	}
 }

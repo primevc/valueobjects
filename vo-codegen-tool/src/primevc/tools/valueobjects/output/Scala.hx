@@ -1218,12 +1218,12 @@ import com.mongodb.casbah.Imports._
 		
 		var overrideValueOf = null;
 		
-		a("class EValue(nextId:Int, name:String");
+		a("class EValue(nextId:Int, name:String, val value:Int");
 		addConversionParams(true);
 		a(") extends Val(nextId, name);\n  ");
-		a("def V(name:String");
+		a("def V(name:String, value:Int");
 		addConversionParams(false);
-		a(") = new EValue(nextId, name");
+		a(") = new EValue(nextId, name, value");
 		for (prop in def.conversions) if (prop.name != "toString") {
 			a(", "); a(quote(prop.name));
 		}
@@ -1236,7 +1236,7 @@ import com.mongodb.casbah.Imports._
 		}
 		a("\n  }\n\n");
 		
-		a('  val Null = V(""');
+		a('  val Null = V("", -1');
 		for (prop in def.conversions) if (prop.name != "toString") a(", null");
 		a(")\n");
 		
@@ -1245,7 +1245,7 @@ import com.mongodb.casbah.Imports._
 			
 			if (e.type != null)
 			{
-				a('  def '); a(e.name); a('(value:'); a(getType(e.type).name); a(') = new EValue(nextId, "'); a(e.name); ac('"'.code);
+				a('  def '); a(e.name); a('(value:'); a(getType(e.type).name); a(') = new EValue(nextId, "'); a(e.name); ac('"'.code); a(", -1");
 				for (key in e.conversions.keys()) if (key != "toString") {
 					var conv = e.conversions.get(key);
 					a(', "'); a(conv); ac('"'.code);
@@ -1255,7 +1255,7 @@ import com.mongodb.casbah.Imports._
 				overrideValueOf = e;
 			}
 			else {
-				a("  val "); a(e.name); a(' = V("'); a(e.name); ac('"'.code);
+				a("  val "); a(e.name); a(' = V("'); a(e.name); ac('"'.code); a(", " + e.intValue);
 				for (prop in def.conversions) if (prop.name != "toString") {
 					var conv = e.conversions.get(prop.name);
 					a(', "'); a(conv != null? conv : e.name); ac('"'.code);
@@ -1983,7 +1983,12 @@ class ScalaMessagePacking extends MessagePacking
 		
 		switch (pType)
 		{
-			case Tdef(_), Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tstring, Tdate, Tdatetime, Tinterval, Turi, TuniqueID, Temail, Tcolor, TfileRef:
+			case Tdef(tdef): switch(tdef) {
+				case Tclass(_):	a('o.pack('); a(path); ac(")".code);
+				case Tenum(_):	a('o.pack('); a(path); a(".value)");
+			} 
+			
+			case Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tstring, Tdate, Tdatetime, Tinterval, Turi, TuniqueID, Temail, Tcolor, TfileRef:
 				a('o.pack('); a(path); ac(")".code);
 			
 			case Tarray(type, min, max):

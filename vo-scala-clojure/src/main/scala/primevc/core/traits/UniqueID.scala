@@ -23,6 +23,6 @@ object ObjectId {
 
 		o.packValueObjectHeader(0x1D, 0, 1);
 		o.writeByte(1);
-		o.pack(obj);
+		o.pack(obj.id);
 	}
 }

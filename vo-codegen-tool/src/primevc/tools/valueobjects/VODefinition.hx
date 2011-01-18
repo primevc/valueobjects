@@ -2233,14 +2233,21 @@ class ClassDef extends BaseTypeDefinition
 		myProps = myProps.concat(getSortedProps(this));
 		
 		// Remove duplicate (by inheritance) properties
-		for (p in myProps) {
+		var i = 0; //(superClass != null? superClass.propertiesSorted.length : 0);
+		while (i < myProps.length)
+		{
 			var count = 0;
-			for (p2 in myProps) if (p.name == p2.name && p.definedIn == p2.definedIn && count++ > 0) {
-				myProps.remove(p2);
+			var p = myProps[i];
+			for (i2 in 0 ... myProps.length) if (p != null) {
+				var p2 = myProps[i2];
+				if (p2 != null && p.name == p2.name && p.definedIn == p2.definedIn && count++ > 0) {
+					myProps[i2] = null;
+					myProps.remove(null);
+				}
 			}
+			
+			++i;
 		}
-		
-//		if (this.name == "VideoFrame") throw myProps;
 		
 		return this.propertiesSorted = myProps;
 	}

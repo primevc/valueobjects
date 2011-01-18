@@ -1,12 +1,12 @@
 package primevc.core.traits;
  import haxe.io.BytesOutput;
- import primevc.types.IObjectId;
+ import primevc.core.traits.IObjectId;
   using primevc.utils.IfUtil;
   using primevc.utils.msgpack.Format;
 
 class ObjectId
 {
-	static inline public var TYPE_ID = 1;
+	static inline public var TYPE_ID = 0x01D;
 	
 	static public function msgpack_packVO(o : BytesOutput, obj : IObjectId, propertyBits : Int, prependMsgpackType : Bool = false) : Int
 	{

@@ -1,4 +1,5 @@
 package primevc.types;
+ import primevc.core.traits.IObjectId;
  import haxe.io.BytesOutput;
   using primevc.utils.IfUtil;
   using primevc.utils.msgpack.Format;

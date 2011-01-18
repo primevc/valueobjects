@@ -36,7 +36,7 @@ package primevc.core.collections;
   using primevc.utils.IfUtil;
 
 /**
- * A specialized RevertableArrayList for ValueObjects.
+ * A specialized ArrayList for ValueObjects.
  * 
  * Used to support bubbling of ObjectChangeSets.
  * 

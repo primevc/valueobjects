@@ -1,6 +1,7 @@
 package primevc.tools.valueobjects.output;
  import primevc.tools.valueobjects.VODefinition;
   using primevc.tools.valueobjects.output.Util;
+  using primevc.utils.TypeUtil;
 
 class HaxeTypeMap implements CodeGenerator
 {
@@ -119,18 +120,46 @@ class HaxeMessagePacking extends MessagePacking
 		a("\n\t\t");
 	}
 	
+	var fieldIndexOffset : IntHash<Bool>;
+	
+	private function genFieldOffsetCases(t:TypeDefinition)
+	{
+		if (t.is(ClassDef)) {
+			for (s in t.as(ClassDef).supertypes) genFieldOffsetCases(s);
+		}
+		
+		if (!fieldIndexOffset.exists(t.index)) {
+			fieldIndexOffset.set(t.index, true);
+			
+			a("\n\t\tcase "); a(Std.string(t.index)); a(": ");
+		
+			var offset = 0; for (p in def.propertiesSorted) if (p.definedIn != t) ++offset; else break;
+			a(offset + ";"); a(" // "); a(t.fullName);
+		}
+	}
+	
+	
 	override private function defineUnPackerFunction()
 	{
+		fieldIndexOffset = new IntHash();
+		
+		a("\n\t");  if (def.superClass != null) a("override ");  a("private function _fieldOffset(typeID:Int) return switch(typeID) {");
+		
+		genFieldOffsetCases(def);
+		
+		a("\n\t}");
+		a("\n");
+		
 		a("\n\tstatic public function msgpack_unpackVO(reader : Reader, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBytes : Int, converter : ValueConverter) : Void\n\t{");
 		a("\n		Assert.that(reader != null && obj != null);");
-		a("\n		var input = reader.input, bits:Int;");
+		a("\n		var input = reader.input, bits:Int, fieldOffset:Int = (untyped obj)._fieldOffset(TYPE_ID);");
 	}
 	
 	override private function a_unpackProperty(p:Property)
 	{	
 		var setFn = false;
 		
-		if (!p.isArray() && p.isBindable()) {
+/*		if (!p.isArray() && p.isBindable()) {
 			a("(cast(obj."); a(p.name); a(", primevc.core.Bindable<"); a(HaxeUtil.haxeType(p.type)); a(">).value = ");
 		}
 		else if (def.isMixin)
@@ -141,22 +170,23 @@ class HaxeMessagePacking extends MessagePacking
 		{
 			a("(cast(obj, "); a(def.name); a("VO)."); a(p.name); a(" = ");
 		}
+*/		
 		
 		if (p.isArray())
 		{
+			a("((untyped obj)."); a(p.name); a(" = ");
 //			a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
 			a( Util.isSingleValue(p.type)
 			 	? p.isBindable()? "new primevc.core.collections.RevertableArrayList(" : "new primevc.core.collections.ArrayList("
 				: 'new ' + HaxeUtil.haxeType(p.type, true, p.isBindable()) + '('
 			);
 		}
-/*		else {
-			a("((untyped obj).");
-			a(p.name);
+		else {
+			a("((untyped obj)."); a(p.name);
 			if (p.isBindable() && Util.isSingleValue(p.type)) a(".value");
 			a(" = ");
 		}
-*/		
+		
 		a("reader.");
 		switch (p.type)
 		{

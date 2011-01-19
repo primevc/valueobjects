@@ -32,7 +32,10 @@ class MessagePacking
 	private function a_unpackProperty(p:Property) Assert.abstract()
 	
 	private function expr_incrementMixinCount()		return "++mixin"
-	private function expr_decrementPropertyBytes()	return "--propertyBytes;"
+	private function expr_decrementPropertyBytes()	return 
+		"(untyped obj)._propertiesSet |= (bits << fieldOffset);" +
+		"\n\t\tfieldOffset += 8;" +
+		"\n\t\t--propertyBytes;"
 	
 	private function a_writeByte(byte:String) {
 		a("{ #if MessagePackDebug_Pack trace('packVO byte: 0x' + StringTools.hex("); a(byte); a(")); #end o.writeByte("); a(byte); a("); ++b; }");
@@ -293,8 +296,8 @@ class MessagePacking
 		{
 			if (bit == 8) {
 				a("\n\t\n\t\tif ("); a_is0("propertyBytes"); a(") return;");
-				a("\n\t\n\t\t"); a(expr_decrementPropertyBytes());
 				a("\n\t\n\t\tbits = input.readByte();");
+				a("\n\t\n\t\t"); a(expr_decrementPropertyBytes());
 				bit = 0;
 			}
 			

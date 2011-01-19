@@ -2,6 +2,27 @@ package primevc.tools.valueobjects.output;
  import primevc.tools.valueobjects.VODefinition;
   using primevc.utils.TypeUtil;
 
+class ScalaTypeMap implements CodeGenerator
+{
+	public var map : IntHash<String>;
+
+	public function new() {
+		map = new IntHash();
+	}
+
+	public function genClass(def : ClassDef) {
+		if (!def.isMixin)
+			map.set(def.index, if (def.isMixin) def.fullName; else def.fullName + "VO");
+	}
+
+	public function genEnum(def:EnumDef);
+
+	public function newModule(module:Module) {
+		module.generateWith(this);
+		return cast this;
+	}
+}
+
 class Scala implements CodeGenerator
 {
 	private static var writelist = new List<Scala>();
@@ -27,6 +48,25 @@ import com.mongodb.casbah.Imports._
 
 ");
 		
+		for (m in Module.pkgRoots)
+		{
+			var map = new ScalaTypeMap();
+			m.generateWith(map);
+			file.writeString("
+package "+ m.fullName +" {
+  object VO { val typeMap : scala.collection.immutable.IntMap[primevc.core.traits.VOCompanion[_]] = scala.collection.immutable.IntMap(");
+			var first = true;
+			for (index in map.map.keys()) {
+				if (first) first = false;
+				else file.writeString(",");
+				file.writeString("\n    " + index + " -> " + map.map.get(index));
+			}
+
+file.writeString("
+  )}
+}
+");
+		}
 		for (m in writelist) m.write(file);
 		
 		file.close();

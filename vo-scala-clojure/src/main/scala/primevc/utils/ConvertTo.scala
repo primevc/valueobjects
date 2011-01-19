@@ -1,5 +1,6 @@
 package primevc.utils
 
+import msgpack.{MessagePackObjectId, MessagePackValueObject}
 import primevc.types._
 import primevc.core.traits._
 import _root_.org.joda.time.format.{DateTimeFormatter, ISODateTimeFormat}
@@ -12,7 +13,7 @@ import org.bson.BSONObject
 import org.bson.types.{BasicBSONList, ObjectId}
 import collection.JavaConversions
 import java.net.{URISyntaxException, URL, URI}
-import org.msgpack.`object`.{IntegerType, RawType}
+import org.msgpack.`object`.{NilType, ArrayType, IntegerType, RawType}
 
 /**
  * Created by IntelliJ IDEA.
@@ -85,12 +86,14 @@ object ConvertTo
 
     case v:String => toVOArray[T](v.split(splitStringOn))
     case v:Traversable[_] => toVOArray[T](v)
+    case v:ArrayType => v.asArray.map(_ match { case none : NilType => null.asInstanceOf[T] ; case v : MessagePackValueObject => v.vo.asInstanceOf[T] })
     // throw "Don't know what to do with: " + value.toString
   }
 
   def fileRef			(value:Any) : FileRef = unpack(value) match {
     case v:FileRef => v
     case s:String => FileRef(s)
+    case v:RawType => FileRef(string(v))
   }
 
   def rgba			(value:Any) : RGBA = unpack(value) match {
@@ -125,6 +128,7 @@ object ConvertTo
 
   def uniqueID      (value:Any) : ObjectId = unpack(value) match {
     case v:ObjectId => v
+    case v:MessagePackObjectId => v.oid
     case v:String => try new ObjectId(v) catch { case _ => null }
     case v:Array[Byte] => new ObjectId(v)
     case None => null

@@ -35,7 +35,7 @@ class MessagePacking
 	private function expr_decrementPropertyBytes()	return "--propertyBytes;"
 	
 	private function a_writeByte(byte:String) {
-		a("{ o.writeByte("); a(byte); a("); ++b; }");
+		a("{ #if MessagePackDebug_Pack trace('packVO byte: 0x' + StringTools.hex("); a(byte); a(")); #end o.writeByte("); a(byte); a("); ++b; }");
 	}
 	
 	private function a_return() a("return b;")

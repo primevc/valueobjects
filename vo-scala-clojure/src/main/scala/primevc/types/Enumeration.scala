@@ -27,6 +27,7 @@ trait Enum
   def convert(value : Any): EValue = ConvertTo.unpack(value) match {
     case v : String => fromString(v)
     case v : Int    => fromValue(v)
+    case v : org.msgpack.`object`.IntegerType => fromValue(v.asInt)
     case v : EValue => v
   }
 }

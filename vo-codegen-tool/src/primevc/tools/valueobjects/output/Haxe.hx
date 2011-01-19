@@ -127,22 +127,36 @@ class HaxeMessagePacking extends MessagePacking
 	}
 	
 	override private function a_unpackProperty(p:Property)
-	{
-		if (p.isArray())
+	{	
+		var setFn = false;
+		
+		if (!p.isArray() && p.isBindable()) {
+			a("(cast(obj."); a(p.name); a(", primevc.core.Bindable<"); a(HaxeUtil.haxeType(p.type)); a(">).value = ");
+		}
+		else if (def.isMixin)
 		{
 			a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
+		}
+		else
+		{
+			a("(cast(obj, "); a(def.name); a("VO)."); a(p.name); a(" = ");
+		}
+		
+		if (p.isArray())
+		{
+//			a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
 			a( Util.isSingleValue(p.type)
 			 	? p.isBindable()? "new primevc.core.collections.RevertableArrayList(" : "new primevc.core.collections.ArrayList("
 				: 'new ' + HaxeUtil.haxeType(p.type, true, p.isBindable()) + '('
 			);
 		}
-		else {
+/*		else {
 			a("((untyped obj).");
 			a(p.name);
 			if (p.isBindable() && Util.isSingleValue(p.type)) a(".value");
 			a(" = ");
 		}
-		
+*/		
 		a("reader.");
 		switch (p.type)
 		{
@@ -486,7 +500,14 @@ class Haxe implements CodeGenerator
 			else if (p.isBindable())			a("\n\t\t\tchangeSet.addBindableChange(");
 			else								a("\n\t\t\tchangeSet.addChange(");
 			
-			a(p.name.toUpperCase()); a(", _changedFlags & "); a(hexBitflag(i)); a(", "); a(p.name); a(");");
+			a(p.name.toUpperCase()); a(", _changedFlags & "); a(hexBitflag(i)); a(", "); 
+			
+			if (!p.isArray() && p.isBindable()) {
+				a(p.name); a(".shadowValue, "); a(p.name); a(".value");
+			}
+			else a(p.name);
+			
+			a(");");
 		}
 		a("\n\t\t}\n\t}\n");
 	}
@@ -1060,7 +1081,7 @@ private class HaxeUtil
 				initializer;
 		}
 		
-		return bindable? "new primevc.core.RevertableBindable("+ code +");" : if (code == null) null else code + ";";
+		return bindable? "new primevc.core.RevertableBindable<"+ HaxeUtil.haxeType(ptype) +">("+ code +");" : if (code == null) null else code + ";";
 	}
 	
 	public static function getConstructorInitializer(ptype:PType, constOnly = false) return switch (ptype)

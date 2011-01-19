@@ -36,11 +36,12 @@ class ObjectId
 		Assert.that(reader != null && obj != null);
 		var input = reader.input, bits:Int;
 		
+		if (!(propertyBytes).not0()) return;
+
 		--propertyBytes;
 		
-		if (input.readByte() != 0) {
-			(untyped obj).id = reader.readMsgPackValue(0, primevc.types.ObjectId);
-		}
+		bits = input.readByte();
+		if ((bits & 0x01).not0()) (untyped obj).setId(reader.readMsgPackValue(0, primevc.types.ObjectId));
 		
 		if ((propertyBytes).not0()) reader.discardRemainingVOProperties(propertyBytes);
 	}

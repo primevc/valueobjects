@@ -243,7 +243,7 @@ class Reader
 		}
 	}
 	
-	function deserializeVO(voHeader : Int, target : IValueObject = null)
+	function deserializeVO(voHeader : Int, target : ValueObjectBase = null)
 	{
 		var inp = this.input;
 		var superTypeCount = (voHeader & 0x38 /* 0b_0011_1000 */) >> 3;
@@ -261,9 +261,11 @@ class Reader
 		var clazz = this.context.get(typeID);
 		Assert.notNull(clazz, "voHeader: " + StringTools.hex(typeID, 2) + ", type: " + typeID + " not found...");
 		
-		if (target == null) {
+		var targetWasNull = target == null;
+		if (targetWasNull) {
 			target = Type.createInstance(clazz, []);
 			Assert.notNull(target);
+			target.beginEdit();
 		}
 		
 		if (fieldsSetBytes != 0)
@@ -271,6 +273,11 @@ class Reader
 		
 		while (superTypeCount-->0)
 			deserializeVO(inp.readByte(), target);
+		
+		if (targetWasNull) {
+			untyped target._changedFlags = 0;
+			target.commitEdit();
+		}
 		
 		return target; // done
 	}

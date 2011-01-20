@@ -159,34 +159,38 @@ class HaxeMessagePacking extends MessagePacking
 	{	
 		var setFn = false;
 		
-/*		if (!p.isArray() && p.isBindable()) {
+		if (!p.isArray() && p.isBindable()) {
 			a("(cast(obj."); a(p.name); a(", primevc.core.Bindable<"); a(HaxeUtil.haxeType(p.type)); a(">).value = ");
-		}
-		else if (def.isMixin)
-		{
-			a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
 		}
 		else
 		{
-			a("(cast(obj, "); a(def.name); a("VO)."); a(p.name); a(" = ");
+			a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
 		}
-*/		
+		
 		
 		if (p.isArray())
 		{
-			a("((untyped obj)."); a(p.name); a(" = ");
+//			a("((untyped obj)."); a(p.name); a(" = ");
 //			a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
 			a( Util.isSingleValue(p.type)
 			 	? p.isBindable()? "new primevc.core.collections.RevertableArrayList(" : "new primevc.core.collections.ArrayList("
 				: 'new ' + HaxeUtil.haxeType(p.type, true, p.isBindable()) + '('
 			);
 		}
-		else {
+/*		else {
 			a("((untyped obj)."); a(p.name);
-			if (p.isBindable() && Util.isSingleValue(p.type)) a(".value");
+			if (!p.isBindable()) a('(');
+			
+//			a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
+			if (p.isBindable() && Util.isSingleValue(p.type)) {
+				a(".value");
+			}
+//			if (p.isBindable()) {
+//				a("new primevc.core.RevertableBindable<"); a(HaxeUtil.haxeType(p.type, true)); a(">(");
+//			}
 			a(" = ");
 		}
-		
+*/		
 		a("reader.");
 		switch (p.type)
 		{
@@ -789,7 +793,12 @@ class Haxe implements CodeGenerator
 		
 		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type))
 		{
-			a("\t\t\tif (IfUtil.notNull((untyped this)."); a(p.name); a(")) this."); a(p.name); if(!p.isArray()) a(".as(ValueObjectBase)"); a(".change.unbind(this);\n");
+			a("\t\t\tif (IfUtil.notNull((untyped this)."); a(p.name); a(")) ");
+				if (!p.isArray()) a("(untyped ");
+			a("this."); a(p.name);
+				if(!p.isArray()) a(")");
+			a(".change.unbind(this);\n");
+			
 			a("\t\t\tif (v.notNull()) {\n\t\t\t\tv.");
 			
 			if (p.isArray() || p.isBindable())

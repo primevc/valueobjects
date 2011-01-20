@@ -23,19 +23,22 @@ typedef ValueConverter = Dynamic -> PropertyID -> Dynamic -> Dynamic
  */
 class Reader
 {
-	public var input (default, null) : Input;
+	public var input : Input;
 	
 	private var context : IntHash<Class<Dynamic>>;
 	
-	public function new(input_ : Input, context_ : IntHash<Class<Dynamic>>)
+	public function new(context_ : IntHash<Class<Dynamic>>, ?input_ : Input)
 	{
-		this.input = input_;
+		Assert.notNull(context_);
 		this.context = context_;
+		this.input = input_;
 	}
 	
 	
 	public function readMsgPackValue(?pid : PropertyID, ?itemType : Dynamic) : Dynamic
 	{
+		Assert.notNull(this.input);
+		
 		var value;
 		try {
 			value = readValue(input.readByte(), pid, itemType);

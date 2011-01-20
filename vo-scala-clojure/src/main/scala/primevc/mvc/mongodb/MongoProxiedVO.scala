@@ -107,7 +107,13 @@ abstract class DBObjectVO[V <: ValueObject] (val vo:V) //(implicit val converter
    * Returns a map representing this BSONObject.
    * @return the map
    */
-  def toMap = throw new Exception("Moet dat echt?");
+  def toMap() = {
+    val map = new java.util.TreeMap[String, AnyRef]
+    for (key <- keySet) map.put(key, this.get(key))
+    map
+  } //throw new Exception("Moet dat echt?");
+
+  override def toString = toMap.toString
 
   def putAll(map: java.util.Map[_,_]) {
     val m = map.asInstanceOf[java.util.Map[String,AnyRef]]

@@ -5,6 +5,7 @@ package primevc.utils.msgpack;
  import primevc.utils.FastArray;
  import primevc.tools.valueobjects.ValueObjectBase;
  import primevc.types.RGBA;
+ import primevc.types.RGBAType;
  import primevc.types.EMail;
  import primevc.types.URI;
  import primevc.types.FileRef;
@@ -84,7 +85,18 @@ class Reader
 			case FileRef:	return new FileRef(Std.string(value));
 			case URI:		return new URI(Std.string(value));
 			case Date:		return Date.fromTime(value);
+			case RGBAType:	return value;
 //			case ObjectId:	
+		}
+		
+		if (Std.is(value, Int) && Type.getEnumName(typeClass) != null)
+		{
+			var utils:Dynamic = Type.resolveClass(Type.getEnumName(typeClass) + "_utils");
+			Assert.that(utils != null, "No converter available for: " + Type.getEnumName(typeClass));
+			
+			var v = utils.fromValue(value);
+			Assert.that(v != null, "Converting to Enum instance by '"+ Type.getClassName(utils) +".fromValue("+value+")' failed");
+			return v;
 		}
 		
 		return value;

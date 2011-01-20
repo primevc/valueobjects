@@ -1,12 +1,13 @@
 package primevc.core.traits;
  import haxe.io.BytesOutput;
- import primevc.types.IObjectId;
+ import primevc.utils.msgpack.Reader;
+ import primevc.core.traits.IObjectId;
   using primevc.utils.IfUtil;
   using primevc.utils.msgpack.Format;
 
 class ObjectId
 {
-	static inline public var TYPE_ID = 1;
+	static inline public var TYPE_ID = 0x01D;
 	
 	static public function msgpack_packVO(o : BytesOutput, obj : IObjectId, propertyBits : Int, prependMsgpackType : Bool = false) : Int
 	{
@@ -28,5 +29,20 @@ class ObjectId
 		}
 		
 		return b;
+	}
+	
+	static public function msgpack_unpackVO(reader : Reader, obj : IObjectId, propertyBytes : Int, converter : ValueConverter) : Void
+	{
+		Assert.that(reader != null && obj != null);
+		var input = reader.input, bits:Int;
+		
+		if (!(propertyBytes).not0()) return;
+
+		--propertyBytes;
+		
+		bits = input.readByte();
+		if ((bits & 0x01).not0()) (untyped obj).setId(reader.readMsgPackValue(0, primevc.types.ObjectId));
+		
+		if ((propertyBytes).not0()) reader.discardRemainingVOProperties(propertyBytes);
 	}
 }

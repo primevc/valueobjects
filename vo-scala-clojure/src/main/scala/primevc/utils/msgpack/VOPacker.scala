@@ -5,6 +5,8 @@ import java.lang.Math
 import java.io.OutputStream
 import primevc.core.traits.{VOMessagePacker, VOCompanion, ValueObject}
 import org.bson.types.ObjectId
+import java.net.URI
+import primevc.types.{Enum, RGBA, FileRef}
 
 /**
  * Created by IntelliJ IDEA.
@@ -30,10 +32,14 @@ class VOPacker (out:OutputStream) extends Packer(out)
     out.write(bytes);
   }
 
+  def pack(fileRef  : FileRef) : Unit = pack(fileRef.toString);
+  def pack(uri      : URI)     : Unit = pack(uri.toString)
+  def pack(rgba     : RGBA)    : Unit = pack(rgba.argb)
+
   /** Packs a full ValueObject: Updates the VO fields-set bits, and uses those. */
   def pack[V <: ValueObject](vo : V)
   {
-    vo.updateFieldsSet();
+    vo.updateFieldsSet_!;
     packValueObject(vo, vo.$fieldsSet)
   }
 

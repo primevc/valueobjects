@@ -17,11 +17,17 @@ trait Enum
 
   val Null: EValue
   def fromValue(v : Int): EValue
-  def fromString(v : String): Option[EValue]
+  def fromString(v : String): EValue
+
+  override def valueOf(str : String) : Option[EValue] = fromString(str) match {
+    case Null => None
+    case e : EValue => Some(e)
+  }
 
   def convert(value : Any): EValue = ConvertTo.unpack(value) match {
-    case v : String => fromString(v).getOrElse(Null)
+    case v : String => fromString(v)
     case v : Int    => fromValue(v)
+    case v : org.msgpack.`object`.IntegerType => fromValue(v.asInt)
     case v : EValue => v
   }
 }

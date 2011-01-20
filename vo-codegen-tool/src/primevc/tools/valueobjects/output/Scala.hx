@@ -2,6 +2,27 @@ package primevc.tools.valueobjects.output;
  import primevc.tools.valueobjects.VODefinition;
   using primevc.utils.TypeUtil;
 
+class ScalaTypeMap implements CodeGenerator
+{
+	public var map : IntHash<String>;
+
+	public function new() {
+		map = new IntHash();
+	}
+
+	public function genClass(def : ClassDef) {
+		if (!def.isMixin)
+			map.set(def.index, if (def.isMixin) def.fullName; else def.fullName + "VO");
+	}
+
+	public function genEnum(def:EnumDef);
+
+	public function newModule(module:Module) {
+		module.generateWith(this);
+		return cast this;
+	}
+}
+
 class Scala implements CodeGenerator
 {
 	private static var writelist = new List<Scala>();
@@ -27,6 +48,25 @@ import com.mongodb.casbah.Imports._
 
 ");
 		
+		for (m in Module.pkgRoots)
+		{
+			var map = new ScalaTypeMap();
+			m.generateWith(map);
+			file.writeString("
+package "+ m.fullName +" {
+  object VO { val typeMap : scala.collection.immutable.IntMap[primevc.core.traits.VOCompanion[_]] = scala.collection.immutable.IntMap(");
+			var first = true;
+			for (index in map.map.keys()) {
+				if (first) first = false;
+				else file.writeString(",");
+				file.writeString("\n    " + index + " -> " + map.map.get(index));
+			}
+
+file.writeString("
+  )}
+}
+");
+		}
 		for (m in writelist) m.write(file);
 		
 		file.close();
@@ -238,26 +278,22 @@ import com.mongodb.casbah.Imports._
 				a(check.expr);
 			}
 			
-			// numFieldsSet_?
-			a("\n  override def numFieldsSet_? = {");
+			// updateFieldsSet_!
+			a("\n  override def updateFieldsSet_! = {");
 			if (def.superClass != null || nonEmptyChecks != 0) {
-				a("\n    var n = super.numFieldsSet_?;");
-				andAnd = true;
-			} else {
-				a("\n    var n = 0;");
+				a("\n    super.updateFieldsSet_!;");
 			}
 			for (check in emptyChecks) {
-				a("\n    if (!"); a(check.expr); a(") n += 1;");
+				a("\n    if (!"); a(check.expr); a(") $fieldsSet |= 0x"); a(StringTools.hex(1 << check.id)); a(";");
 			}
-			a("\n    n;\n  }");
+			a("\n  }");
 			
 			// fieldIsSet_?
 			a("\n  override def fieldIsSet_?(index:Int) = index match {");
 			for (check in emptyChecks) {
 				a("\n    case " + check.id); a(" => !"); a(check.expr);
 			}
-			if (def.superClass != null || nonEmptyChecks != 0)
-			 	a("\n    case _ => super.fieldIsSet_?(index)");
+		 	a("\n    case _ => super.fieldIsSet_?(index)");
 			a("\n  }");
 		}
 		
@@ -277,7 +313,7 @@ import com.mongodb.casbah.Imports._
 		if (Std.is(def, NamedSetDef))
 			genNamedSetDefMethods(cast def);
 		
-		a("}\n\n");
+		a("\n}\n\n");
 		
 	// --- End VO class
 		genCompanion(def, idProperty, ns, thisPropsStartIndex, hasSubtypes, subtypes);
@@ -397,7 +433,7 @@ import com.mongodb.casbah.Imports._
 				a("{ index match {\n");
 				for (i in 0 ... def.propertiesSorted.length) {
 					var p = def.propertiesSorted[i];
-					a('    case '+i); a(' => vo.'); a(propertyName(p)); a(" = "); a("value;\n");
+					a('    case '+i); a(' => vo.'); a(p.name); a("_("); a("value );\n");
 				}
 				a("  }; vo; }\n");
 			}
@@ -439,7 +475,7 @@ import com.mongodb.casbah.Imports._
 		// Mongo service Component
 		a("\ntrait "); a(def.name); a("VOMongoComponent extends MongoComponent with "); a(def.name); a("VOAccessor\n{"); // ["); a(def.name); a("VO] with "); a(def.name); a("VOAccessor\n { ");
 			// dependencies
-			addMongoComponentDependencies(def);
+			addMongoComponentDependencies(def, subtypes);
 			
 /*			if (implicitRefsDefined)
 			{
@@ -767,7 +803,7 @@ import com.mongodb.casbah.Imports._
 		a("\n  def -(key: A): This = ");
 */	}
 	
-	function addMongoComponentDependencies(def: ClassDef)
+	function addMongoComponentDependencies(def: ClassDef, subtypes: List<ClassDef>)
 	{
 		var dependencies = new Hash<Bool>();
 		var hasDependencies = false;
@@ -789,6 +825,11 @@ import com.mongodb.casbah.Imports._
 		{
 			hasDependencies = true;
 			dependencies.set(def.superClass.fullName, true);
+		}
+		
+		for (t in subtypes) {
+			hasDependencies = true;
+			dependencies.set(t.fullName, true);
 		}
 		
 		if (!hasDependencies) return; // Nothing to do
@@ -884,15 +925,15 @@ import com.mongodb.casbah.Imports._
 				{
 					nilChecked = true;
 					a("if (");
-					if (p.type == Tstring) a("v.length > 0");
+					if (p.type == Tstring) a("!v.isEmpty");
 					else {
 						a("v != "); a(nilValue(p.type));
 					}
 				 	a(") ");
 				}
-				a("$fieldsSet |= " + bit);
+				a("$fieldsSet |= 0x"); a(StringTools.hex(bit));
 				if (nilChecked) {
-					a("; else $fieldsSet &= ~0x" + StringTools.hex(bit));
+					a("; else $fieldsSet &= ~0x"); a(StringTools.hex(bit));
 				}
 				a("; ");
 		}
@@ -909,7 +950,7 @@ import com.mongodb.casbah.Imports._
 				default:
 					a(" = new Ref["); a(clname); a("]("); a(clname); a(".idValue(v), v)");
 			}
-			a("\n  final def "); a(p.name); a("_=(v:AnyRef) : Unit = ");
+			a("\n  final def "); a(p.name); a("_(v:AnyRef) : Unit = ");
 			a(quote(p.name));
 			a(" = ");
 			a(convertFromAnyRefTo(p.type, p.hasOption(mongo_reference)));
@@ -917,7 +958,7 @@ import com.mongodb.casbah.Imports._
 		}
 		else
 		{
-			a("\n  final def "); a(p.name); a("_=(v:AnyRef) : Unit = { val value");
+			a("\n  final def "); a(p.name); a("_(v:AnyRef) : Unit = { val value");
 			if (Util.isEnum(p.type)) { a(": "); a(getType(p.type).name); }
 			a(" = "); a(convertFromAnyRefTo(p.type));
 //			if (Util.isEnum(p.type))
@@ -925,7 +966,7 @@ import com.mongodb.casbah.Imports._
 //			else
 				a("(v);");
 			
-			a(" $"); a(p.name); a(" = value;");
+			a(" "); a(quote(p.name)); a(" = value;");
 			switch (p.type) {
 				case Tdef(_), Tarray(_,_,_): // Don't set any bits
 				default:
@@ -1013,7 +1054,9 @@ import com.mongodb.casbah.Imports._
 			case Tarray(innerType,_,_):
 				a('RefArray['); a(getType(innerType).name); a('](v)');
 			default:
+				a('new Ref['); a(getType(p.type).name); a('](');
 				a(mongoConversionHelper(Util.getIDProperty(p.type).type, "obj."+quote(p.name)));
+				a(')');
 		}
 		else { // Handle conversions
 			a(mongoConversionHelper(p.type, pathToProp));
@@ -1176,7 +1219,7 @@ import com.mongodb.casbah.Imports._
 			case Tarray(innerT,_,_):	"Array["+ getType(innerT).name +"]";
 			case Turi:					"java.net.URI";
 			case TuniqueID:				"org.bson.types.ObjectId";
-			case TfileRef:				"FileRef";
+			case TfileRef:				"primevc.types.FileRef";
 			case Tstring:				"String";
 			case Tinteger(_,_,_):		res.mongoOptionGetter = ".map(ConvertTo.integer(_))";    "Int";
 			case Tdecimal(_,_,_):		res.mongoOptionGetter = ".map(ConvertTo.decimal(_))"; "Double";
@@ -1215,12 +1258,12 @@ import com.mongodb.casbah.Imports._
 		
 		var overrideValueOf = null;
 		
-		a("class EValue(nextId:Int, name:String");
+		a("class EValue(nextId:Int, name:String, val value:Int");
 		addConversionParams(true);
 		a(") extends Val(nextId, name);\n  ");
-		a("def V(name:String");
+		a("def V(name:String, value:Int");
 		addConversionParams(false);
-		a(") = new EValue(nextId, name");
+		a(") = new EValue(nextId, name, value");
 		for (prop in def.conversions) if (prop.name != "toString") {
 			a(", "); a(quote(prop.name));
 		}
@@ -1233,7 +1276,7 @@ import com.mongodb.casbah.Imports._
 		}
 		a("\n  }\n\n");
 		
-		a('  val Null = V(""');
+		a('  val Null = V("", -1');
 		for (prop in def.conversions) if (prop.name != "toString") a(", null");
 		a(")\n");
 		
@@ -1242,7 +1285,7 @@ import com.mongodb.casbah.Imports._
 			
 			if (e.type != null)
 			{
-				a('  def '); a(e.name); a('(value:'); a(getType(e.type).name); a(') = new EValue(nextId, "'); a(e.name); ac('"'.code);
+				a('  def '); a(e.name); a('(value:'); a(getType(e.type).name); a(') = new EValue(nextId, "'); a(e.name); ac('"'.code); a(", -1");
 				for (key in e.conversions.keys()) if (key != "toString") {
 					var conv = e.conversions.get(key);
 					a(', "'); a(conv); ac('"'.code);
@@ -1252,7 +1295,7 @@ import com.mongodb.casbah.Imports._
 				overrideValueOf = e;
 			}
 			else {
-				a("  val "); a(e.name); a(' = V("'); a(e.name); ac('"'.code);
+				a("  val "); a(e.name); a(' = V("'); a(e.name); ac('"'.code); a(", " + e.intValue);
 				for (prop in def.conversions) if (prop.name != "toString") {
 					var conv = e.conversions.get(prop.name);
 					a(', "'); a(conv != null? conv : e.name); ac('"'.code);
@@ -1261,21 +1304,20 @@ import com.mongodb.casbah.Imports._
 			}
 		}
 		
-		a("\n  override def valueOf(str:String) = fromString(str)");
   		for (conv in def.conversions)
 		{
-			a("\n\n  final def from"); a(conv.name.substr(2)); a("(str:String) : Option["); a(def.fullName); a(".EValue] = str match\n  {");
+			a("\n\n  final def from"); a(conv.name.substr(2)); a("(str:String) : "); a(def.fullName); a(".EValue = str match\n  {");
 			for (e in conv.enums) if (e != def.catchAll)
 			{
-				a('\n    case "'); a(e.conversions.get(conv.name)); a('" => Some('); a(e.name); a(");");
+				a('\n    case "'); a(e.conversions.get(conv.name)); a('" => '); a(e.name); a(";");
 			}
 			if (overrideValueOf != null) {
-				a("\n    case _ => Some("); a(overrideValueOf.name); a("(str))");
+				a("\n    case _ => "); a(overrideValueOf.name); a("(str);");
 			}
 			else if (conv.name != "toString")
-				a("\n    case _ => fromString(str)");
+				a("\n    case _ => fromString(str);");
 			else
-			 	a("\n    case _ => None");
+			 	a("\n    case _ => Null");
 				
 			a("\n  }");
 		}
@@ -1981,7 +2023,12 @@ class ScalaMessagePacking extends MessagePacking
 		
 		switch (pType)
 		{
-			case Tdef(_), Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tstring, Tdate, Tdatetime, Tinterval, Turi, TuniqueID, Temail, Tcolor, TfileRef:
+			case Tdef(tdef): switch(tdef) {
+				case Tclass(_):	a('o.pack('); a(path); ac(")".code);
+				case Tenum(_):	a('o.pack('); a(path); a(".value)");
+			} 
+			
+			case Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tstring, Tdate, Tdatetime, Tinterval, Turi, TuniqueID, Temail, Tcolor, TfileRef:
 				a('o.pack('); a(path); ac(")".code);
 			
 			case Tarray(type, min, max):
@@ -2004,8 +2051,12 @@ class ScalaMessagePacking extends MessagePacking
 		a("\n		var propertyBits = flagsToPack;");
 	}
 	
+	var fieldIndexOffset : IntHash<Bool>;
+	
 	override private function genDeSerialization(lastProp)
 	{
+		fieldIndexOffset = new IntHash();
+		
 		a("\n  val TypeID = "); a(Std.string(def.index));
 		a("\n  def fieldIndexOffset(typeID: Int) = typeID match {");
 		genFieldOffsetCases(def);
@@ -2018,10 +2069,13 @@ class ScalaMessagePacking extends MessagePacking
 			for (s in t.as(ClassDef).supertypes) genFieldOffsetCases(s);
 		}
 		
-		a("\n    case "); a(Std.string(t.index)); a(" => ");
+		if (!fieldIndexOffset.exists(t.index)) {
+			fieldIndexOffset.set(t.index, true);
+			a("\n    case "); a(Std.string(t.index)); a(" => ");
 		
-		var offset = 0; for (p in def.propertiesSorted) if (p.definedIn != t) ++offset; else break;
-		a(offset + ";"); a(" // "); a(t.fullName);
+			var offset = 0; for (p in def.propertiesSorted) if (p.definedIn != t) ++offset; else break;
+			a(offset + ";"); a(" // "); a(t.fullName);
+		}
 	}
 	
 	override private function a_unpackProperty(p:Property)

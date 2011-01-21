@@ -1,6 +1,7 @@
 package primevc.utils.msgpack;
  import haxe.io.Input;
  import haxe.io.Eof;
+ import primevc.core.traits.IDisposable;
  import primevc.core.traits.IValueObject;
  import primevc.utils.FastArray;
  import primevc.tools.valueobjects.ValueObjectBase;
@@ -21,17 +22,24 @@ typedef ValueConverter = Dynamic -> PropertyID -> Dynamic -> Dynamic
  * @author Danny Wilson
  * @creation-date nov 22, 2010
  */
-class Reader
+class Reader implements IDisposable
 {
-	public var input : Input;
+	public var input	: Input;
+	private var context	: IntHash<Class<Dynamic>>;
 	
-	private var context : IntHash<Class<Dynamic>>;
 	
 	public function new(context_ : IntHash<Class<Dynamic>>, ?input_ : Input)
 	{
 		Assert.notNull(context_);
 		this.context = context_;
 		this.input = input_;
+	}
+	
+	
+	public function dispose ()
+	{
+		input	= null;
+		context	= null;
 	}
 	
 	
@@ -76,11 +84,13 @@ class Reader
 		}
 	}
 	
+	
 	private function readConvert(packedType : Int, propertyID : PropertyID, typeClass : Dynamic) : Dynamic
 	{
 		var value = readValue(packedType, propertyID, typeClass);
 		return Std.is(value, typeClass)? value : converter(value, propertyID, typeClass);
 	}
+	
 	
 	private function converter(value : Dynamic, propertyID : PropertyID, typeClass : Dynamic) : Dynamic
 	{
@@ -196,7 +206,7 @@ class Reader
 	#end
 */
 	
-	function readMap(elem:Int, pid : PropertyID, itemType : Dynamic)
+	private function readMap(elem:Int, pid : PropertyID, itemType : Dynamic)
 	{
 		var map:Hash<Dynamic> = new Hash();
 		
@@ -219,13 +229,13 @@ class Reader
 		case 4: #if neko input.readUInt30(); #else cast input.readInt32(); #end
 		default: 0;
 	}
-*/	
-	function deserializeValue(type : Int) : Dynamic
+*/
+	
+	private function deserializeValue(type : Int) : Dynamic
 	{
-		#if MessagePackDebug_Read
-			trace("deserializeValue { typeID: "+ type);
-		#end
-		
+#if MessagePackDebug_Read
+		trace("deserializeValue { typeID: "+ type);
+#end
 		switch (type)
 		{
 			case ObjectId.TYPE_ID:
@@ -243,7 +253,8 @@ class Reader
 		}
 	}
 	
-	function deserializeVO(voHeader : Int, target : ValueObjectBase = null)
+	
+	private function deserializeVO(voHeader : Int, target : ValueObjectBase = null)
 	{
 		var inp = this.input;
 		var superTypeCount = (voHeader & 0x38 /* 0b_0011_1000 */) >> 3;
@@ -281,6 +292,7 @@ class Reader
 		
 		return target; // done
 	}
+	
 	
 	public function discardRemainingVOProperties(propertyBytes : Int)
 	{

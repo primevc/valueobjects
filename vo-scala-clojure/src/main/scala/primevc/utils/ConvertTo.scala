@@ -75,6 +75,14 @@ object ConvertTo
 
     case _ => throw new Exception("Don't know what to do with: " + value.toString)
   }
+
+  def voIDOrNull[T <: ValueObjectWithID](value:String)(implicit idType:Manifest[T#IDType]) : T#IDType = (if (value == null) null else {
+    val id = value.trim
+    println("vo id = "+id)
+    if (id.isEmpty) null
+    else if (classOf[String] == idType.erasure) id
+    else if (classOf[ObjectId] == idType.erasure) new ObjectId(id)
+  }).asInstanceOf[T#IDType]
   
   def voArray[T <: ValueObject : Manifest](value:Any, splitStringOn:Array[Char] = Array(',', ';', '\n')) : Array[T] = unpack(value) match
   {

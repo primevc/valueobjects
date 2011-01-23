@@ -7,6 +7,7 @@ package primevc.mvc.mongodb
  import scala.collection.JavaConversions._
  import scala.collection.mutable.ListBuffer
  import com.mongodb.casbah.Imports._
+import primevc.utils.ConvertTo
 
 class IntervalDBObject(val interval:Interval) extends DBObject with BSONObject
 {
@@ -236,6 +237,7 @@ abstract class MongoProxy[V <: ValueObjectWithID](implicit voManifest:Manifest[V
     {
       val dbo = asDBObject(valueobject);
 //      dbo.markAsPartialObject();
+      idValue(valueobject, id)
       println("- SAVE: "+dbo);
       coll.underlying.save(dbo)
     }
@@ -255,6 +257,8 @@ abstract class MongoProxy[V <: ValueObjectWithID](implicit voManifest:Manifest[V
   def idType() : Class[_] = manifest_IDType.erasure
 
   def findByID(id: V#IDType): Option[V] = coll.findOne(MongoDBObject("_id" -> id)).map(asObject(_))
+
+  def find() = coll.find.map(asObject(_))
 
 /*
   def fetch(offset:Int = 0, length:Int = 100, orderBy:String = null, orderDirection:String = null, keywords:String = null) = {

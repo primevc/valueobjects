@@ -44,7 +44,7 @@ trait VOAccessor[V <: ValueObject]
   def field(vo:V, index: Int): Field
   def field(vo:V, key:String): Int
   def fieldsFor(vo:V): IndexedSeq[Field]
-//  def getValue(vo:V, key:String): AnyRef
+  def getValue(vo:V, key:String): AnyRef
 //  def putValue(vo:V, key:String, value:AnyRef): V
 
   // concrete

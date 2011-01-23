@@ -25,7 +25,7 @@ class Form(router:RequestRouter, body: => Elem)
   <form method="POST" class={css} enctype={enctype}><input type="hidden" name="_t" value={token}/>
     { body }
     <div class="buttonHolder">
-      <a href="../" class="secondaryAction">← Cancel and go back</a>
+      <a href={router.prefix} class="secondaryAction">← Annuleren</a>
       <button type="submit" class="primaryAction">Opslaan</button>
     </div>
   </form>

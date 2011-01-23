@@ -123,7 +123,7 @@ object RequestVO
       }
     }
 
-    def process[VO <: ValueObject](vo:VO, voc:VOCompanion[VO], data:BufferedIterator[(String, Array[String])], keyStringOffset:Int): VO =
+    def process[VO <: ValueObject](prefix:String, vo:VO, voc:VOCompanion[VO], data:BufferedIterator[(String, Array[String])], keyStringOffset:Int): VO =
     {
       while (data.hasNext)
       {
@@ -140,7 +140,7 @@ object RequestVO
           val dot = key.indexOf('.', keyStringOffset)
           val bracketOpen = key.indexOf('[', keyStringOffset)
 
-          if (dot - bracketOpen == 0) { // No . and no [
+          if (dot - bracketOpen == 0) { // (-1  -  -1 == 0): No . and no [
             if (value.length != 0) voc.putValue(vo, key.substring(keyStringOffset), value)
             data.next()
           }
@@ -155,7 +155,8 @@ object RequestVO
             field.valueType match {
               case Tdef(subvoc, _) =>
                 require(dot >= 0, "Not a property: "+key);
-                voc.putValue(vo, fieldIndex, process(subvoc.getValue(vo, fieldIndex).asInstanceOf[ValueObject], subvoc.asInstanceOf[VOCompanion[ValueObject]], data, dot+1))
+                val subvo = voc.getValue(vo, fieldIndex).asInstanceOf[ValueObject]
+                voc.putValue(vo, fieldIndex, process(key.substring(0, dot+1), subvo, subvoc.asInstanceOf[VOCompanion[ValueObject]], data, dot+1))
 
               case Tarray(innerType,_,_) =>
                 require(bracketOpen > 0 && bracketOpen < key.length - 2, "Not an array setter:" + key)
@@ -185,6 +186,6 @@ object RequestVO
       vo
     }
 
-    process[V](vo, voc, data, prefix.length)
+    process[V](prefix, vo, voc, data, prefix.length)
   }
 }

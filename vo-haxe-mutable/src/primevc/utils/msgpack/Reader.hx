@@ -152,7 +152,7 @@ class Reader implements IDisposable
 			 	return deserializeValue(header);
 		
 		default:
-			     if (b & 0x80 == 0x00){ #if MessagePackDebug_Read trace("readValue, pos-int: "+0x7F); #end				return b & 0x7F;						 } // fixed positive int
+			     if (b & 0x80 == 0x00){ #if MessagePackDebug_Read trace("readValue, pos-int: "+(b & 0x7F)); #end		return b & 0x7F;						 } // fixed positive int
 			else if (b & 0xE0 == 0xE0){ #if MessagePackDebug_Read trace("readValue, neg-int: "+(-1 - (b & 31))); #end	return -1 - (b & 31);					 } // fixed negative int
 			else if (b & 0xE0 == 0xA0){ #if MessagePackDebug_Read trace("readValue,  string: "+(b & 31)); #end			return input.readString(b & 31);		 } // fixed raw
 			else if (b & 0xF0 == 0x90){ #if MessagePackDebug_Read trace("readValue:   array: "+(b & 15)); #end			return readArray(b & 15, pid, itemType); } // fixed array
@@ -165,8 +165,11 @@ class Reader implements IDisposable
 	#if GenericArrays inline #end function readArray<T>(len:Int, pid : PropertyID, itemType : Dynamic) : FastArray<T>
 	{
 		var arr = FastArrayUtil.create(len);
-		for (i in 0 ... len)
+		for (i in 0 ... len) //try {
 		 	arr[i] = readMsgPackValue(pid, itemType);
+//		} catch (e:Dynamic) {
+//			throw "Could not unpack array data with property ID: 0x"+StringTools.hex(pid)+", and itemType: "+itemType;
+//		}
 		
 		return arr;
 	}/*		
@@ -257,7 +260,7 @@ class Reader implements IDisposable
 	private function deserializeVO(voHeader : Int, target : ValueObjectBase = null)
 	{
 		var inp = this.input;
-		var superTypeCount = (voHeader & 0x38 /* 0b_0011_1000 */) >> 3;
+		var superTypeCount = (voHeader & 0x38 /* 0b_0011_1000 */) >>> 3;
 		var fieldsSetBytes =  voHeader & 0x07 /* 0b_0000_0111 */;
 		
 		var typeID = if ((voHeader & 0x40 /* 0b_0100_0000 */).not0())
@@ -266,7 +269,7 @@ class Reader implements IDisposable
 			inp.readByte();   // 1 typeID byte
 		
 		#if MessagePackDebug_Read
-			trace("deserializeVO { typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes);
+			trace("deserializeVO { typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes + ", target: "+target);
 		#end
 		
 		var clazz = this.context.get(typeID);
@@ -274,13 +277,29 @@ class Reader implements IDisposable
 		
 		var targetWasNull = target == null;
 		if (targetWasNull) {
+			#if MessagePackDebug_Read
+				trace("                create Instance: "+ clazz);
+			#end
 			target = Type.createInstance(clazz, []);
 			Assert.notNull(target);
 			target.beginEdit();
 		}
 		
-		if (fieldsSetBytes != 0)
+	#if debug
+		var clazzName = Type.getClassName(clazz);
+		var lastDot = clazzName.lastIndexOf('.');
+		
+		var interfaze = Type.resolveClass(
+			clazzName.substr(0, lastDot) + ".I" + clazzName.substr(lastDot+1)
+		);
+		Assert.that(Std.is(target, interfaze), target +" is not a "+ interfaze + " ; voHeader: 0x"+StringTools.hex(voHeader) + ", typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes);
+	#end
+		
+		if (fieldsSetBytes != 0)// try {
 			(untyped clazz).msgpack_unpackVO(this, target, fieldsSetBytes, this.converter);
+//		} catch (e:Dynamic) {
+//			throw "Could not unpack VO data with typeID: "+typeID+", using: "+clazz;
+//		}
 		
 		while (superTypeCount-->0)
 			deserializeVO(inp.readByte(), target);
@@ -296,6 +315,10 @@ class Reader implements IDisposable
 	
 	public function discardRemainingVOProperties(propertyBytes : Int)
 	{
+		#if MessagePackDebug_Read
+			trace("                discarding propertyBytes: "+ propertyBytes);
+		#end
+		
 		var inp = this.input;
 		while (propertyBytes-->0) {
 			var bits = inp.readByte();

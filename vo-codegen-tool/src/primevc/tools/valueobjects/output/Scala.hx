@@ -143,12 +143,12 @@ file.writeString("
 			if (!Util.isDefinedInSuperClassOf(def, p)) switch (p.type)
 			{
 				case Tdef(cl): switch (cl) {
-					case Tclass(cl):	emptyChecks.add({expr: "($"+ p.name +" == null || $"+ p.name + ".empty_?)", id: i});
-					case Tenum(e):		emptyChecks.add({expr: "($"+ p.name +" == null || $"+ p.name + ".toString.isEmpty)", id: i});
+					case Tclass(cl):	emptyChecks.add({expr: "(__"+ p.name +" == null || __"+ p.name + ".empty_?)", id: i});
+					case Tenum(e):		emptyChecks.add({expr: "(__"+ p.name +" == null || __"+ p.name + ".toString.isEmpty)", id: i});
 				}
 				
 				case Tarray(_,_,_):
-					emptyChecks.add({expr: "($"+ p.name +" == null || $"+ p.name +".length == 0)", id: i});
+					emptyChecks.add({expr: "(__"+ p.name +" == null || __"+ p.name +".length == 0)", id: i});
 				
 				case Tstring, TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
 					++nonEmptyChecks;
@@ -725,7 +725,7 @@ file.writeString("
 		a("\n  override def foreach[U](f: "); a(type.name); a(" => U) {");
 		for (i in 0 ... def.propertiesSorted.length) {
 			var p = def.propertiesSorted[i];
-			a("\n    if ($"); a(p.name); a(" != null && fieldIsSet_?("); a(i+")) f($"); a(p.name); a(");");
+			a("\n    if (__"); a(p.name); a(" != null && fieldIsSet_?("); a(i+")) f(__"); a(p.name); a(");");
 		}
 		if (def.keys.length > 0)
 			a("\n    super.foreach(f);");
@@ -751,7 +751,7 @@ file.writeString("
 		if (cl == null) throw def; // Not a set of VO's, so we're done.
 		
 		a("\n  final override def containsEntry(item:"); a(type.name); a(") = ");
-		genNamedSetKeyMatcher(def, "super.containsEntry", function(i,p) return "$"+ p.name +" != null && fieldIsSet_?("+i+");");
+		genNamedSetKeyMatcher(def, "super.containsEntry", function(i,p) return "__"+ p.name +" != null && fieldIsSet_?("+i+");");
 		a("  }\n");
 		
 		a("\n  final override def addEntry(item:"); a(type.name); a(") = {");
@@ -759,7 +759,7 @@ file.writeString("
 		a("  }; true; }\n");
 		
 		a("\n  final override def removeEntry(item:"); a(type.name); a(") = ");
-		genNamedSetKeyMatcher(def, "super.removeEntry", function(i,p) return "val old = $"+ p.name +"; if (old != null && fieldIsSet_?("+i+")) Some(old) else None;");
+		genNamedSetKeyMatcher(def, "super.removeEntry", function(i,p) return "val old = __"+ p.name +"; if (old != null && fieldIsSet_?("+i+")) Some(old) else None;");
 		a("  }\n");
 		
 		a("}\n");
@@ -878,7 +878,7 @@ file.writeString("
 		var propName = propertyName(p);
 		
 		// Storage
-		a("/*@field*/ protected[this] var $"); a(p.name); a(": ");
+		a("/*@field*/ protected[this] var __"); a(p.name); a(": ");
 		var tdef = getPropertyTypename(p);
 		a(tdef.name);
 		a(" = "); a((tdef.defaultValue != null)? tdef.defaultValue : nilValue(p.type));
@@ -903,7 +903,7 @@ file.writeString("
 				add_ifVarNotNull(p.name, '""');
 			
 			case Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, TuniqueID, TfileRef, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
-				ac('$'.code); a(p.name);
+				a('__'); a(p.name);
 			
 			case TenumConverter(_):		throw p;
 		}
@@ -937,7 +937,7 @@ file.writeString("
 				}
 				a("; ");
 		}
-		a("$"); a(p.name); a(" = v } ");
+		a("__"); a(p.name); a(" = v } ");
 		
 		if (p.hasOption(mongo_reference))
 		{
@@ -986,7 +986,7 @@ file.writeString("
 	
 	function add_ifVarNotNull(name:String, defaultValue:String)
 	{
-		a("{ if ($"); a(name); a(" == null) $"); a(name); a(" = "); a(defaultValue); a("; $"); a(name); a(" }");
+		a("{ if (__"); a(name); a(" == null) __"); a(name); a(" = "); a(defaultValue); a("; __"); a(name); a(" }");
 	}
 	
 	function commaNewline(comma = true) {
@@ -1306,10 +1306,10 @@ file.writeString("
 		
   		for (conv in def.conversions)
 		{
-			a("\n\n  final def from"); a(conv.name.substr(2)); a("(str:String) : "); a(def.fullName); a(".EValue = str match\n  {");
+			a("\n\n  final def from"); a(conv.name.substr(2)); a("(str:String) : EValue = str match\n  {");
 			for (e in conv.enums) if (e != def.catchAll)
 			{
-				a('\n    case "'); a(e.conversions.get(conv.name)); a('" => '); a(e.name); a(";");
+				a('\n    case "'); a(e.conversions.get(conv.name)); a('" => this.'); a(e.name); a(";");
 			}
 			if (overrideValueOf != null) {
 				a("\n    case _ => "); a(overrideValueOf.name); a("(str);");

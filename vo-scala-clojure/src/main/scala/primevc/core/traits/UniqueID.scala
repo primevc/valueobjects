@@ -6,8 +6,8 @@ import primevc.utils.msgpack.VOPacker
 trait ObjectId {
   type IDType = org.bson.types.ObjectId;
   
-  /*@field*/ protected[this] var $id: org.bson.types.ObjectId = null
-  def id : org.bson.types.ObjectId = $id;
+  protected[this] var __id: org.bson.types.ObjectId = null
+  def id : org.bson.types.ObjectId = __id;
   def id_=(v : org.bson.types.ObjectId);
   def id_ (v : AnyRef);
 }

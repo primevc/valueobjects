@@ -103,7 +103,17 @@ class HaxeMessagePacking extends MessagePacking
 		}
 	}
 	
-	override private function definePackerFunction() {
+	override private function definePackerFunction()
+	{
+		fieldIndexOffset = new IntHash();
+		
+		a("\n\t");  if (def.superClass != null) a("override ");  a("private function _fieldOffset(typeID:Int) return switch(typeID) {");
+		
+		genFieldOffsetCases(def);
+		
+		a("\n\t}");
+		a("\n");
+		
 		a("\n\tstatic public function msgpack_packVO(o : haxe.io.BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBits : Int, prependMsgpackType : Bool = false) : Int\n\t{");
 		
 		a("\n		Assert.that(o != null && obj != null);");
@@ -141,15 +151,6 @@ class HaxeMessagePacking extends MessagePacking
 	
 	override private function defineUnPackerFunction()
 	{
-		fieldIndexOffset = new IntHash();
-		
-		a("\n\t");  if (def.superClass != null) a("override ");  a("private function _fieldOffset(typeID:Int) return switch(typeID) {");
-		
-		genFieldOffsetCases(def);
-		
-		a("\n\t}");
-		a("\n");
-		
 		a("\n\tstatic public function msgpack_unpackVO(reader : Reader, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBytes : Int, converter : ValueConverter) : Void\n\t{");
 		a("\n		Assert.that(reader != null && obj != null);");
 		a("\n		var input = reader.input, bits:Int, fieldOffset:Int = (untyped obj)._fieldOffset(TYPE_ID);");

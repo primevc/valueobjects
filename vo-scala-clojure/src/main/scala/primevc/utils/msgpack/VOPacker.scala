@@ -6,7 +6,7 @@ import java.io.OutputStream
 import primevc.core.traits.{VOMessagePacker, VOCompanion, ValueObject}
 import org.bson.types.ObjectId
 import java.net.URI
-import primevc.types.{Enum, RGBA, FileRef}
+import primevc.types.{Ref, Enum, RGBA, FileRef}
 
 /**
  * Created by IntelliJ IDEA.
@@ -49,6 +49,8 @@ class VOPacker (out:OutputStream) extends Packer(out)
     out.write(0xD7);
     vo.Companion.asInstanceOf[VOMessagePacker[V]].msgpack_packVO(this, vo, fields);
   }
+
+  def pack(ref: Ref[_ <: ValueObject]) : Unit = pack(ref.vo_!)
 
   def packValueObjectHeader(voType : Int, mixins : Int, fieldFlagBytes : Int)
   {

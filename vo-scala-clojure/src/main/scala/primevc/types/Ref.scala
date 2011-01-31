@@ -1,10 +1,15 @@
 package primevc.types
  import primevc.core.traits._
 
-class Ref[V <: ValueObjectWithID](val ref:V#IDType, _vo:V = null.asInstanceOf[V])
+class Ref[V <: ValueObjectWithID](val ref:V#IDType, var vo_! : V = null.asInstanceOf[V])
 {
   def empty_? = ref == null
-  def vo(implicit proxy:VOProxy[V]) = if (ref == null) None else if (_vo != null) Some(_vo) else proxy.findByID(ref)
+  def vo(implicit proxy:VOProxy[V]) = if (ref == null) None else if (vo_! != null) Some(vo_!)
+    else {
+      val result = proxy.findByID(ref)
+      if (result != None) vo_! = result.get
+      result
+    }
 
   override def toString = if (ref != null) "Ref("+ ref +")" else "Ref"
 }

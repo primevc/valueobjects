@@ -663,7 +663,7 @@ file.writeString("
 			default:				path;
 		}
 		case Turi, Temail, TuniqueID, TfileRef, Tdate, Tdatetime:
-			path+".toString";
+			'"" + ' + path; //+".toString";
 		case Tstring:				path;
 		case Tinteger(_,_,_):		path;
 		case Tdecimal(_,_,_):		path;
@@ -1277,7 +1277,7 @@ file.writeString("
 		a("\n  }\n\n");
 		
 		a('  val Null = V("", -1');
-		for (prop in def.conversions) if (prop.name != "toString") a(", null");
+		for (prop in def.conversions) if (prop.name != "toString") a(', ""');
 		a(")\n");
 		
 		for (e in def.enumerations)
@@ -1873,7 +1873,7 @@ class XMLProxyGenerator
 	{
 		if (addCheckFieldIsSet(v, pathPrefix)) {
 			addToXMLValue(v, pathPrefix);
-			a('; else null'); // Check if else null will not give problems with the PHP cms
+			a(' else NodeSeq.Empty'); // Check if else null will not give problems with the PHP cms
 		}
 		else
 			addToXMLValue(v, pathPrefix);
@@ -1893,11 +1893,11 @@ class XMLProxyGenerator
 			addToXMLValue(v, "!"+pathPrefix);
 		
 		case XM_format		(path,prop,format):
-			a("ConvertTo.string(");
+			a("xml.Text(ConvertTo.string(");
 			addPathEscaped(pathPrefix + path);
 			a(",\"");
 			a(format);
-			a("\")");
+			a("\"))");
 		
 		case XM_join		(path,val,seperator):
 			var a = a;
@@ -1948,14 +1948,23 @@ class XMLProxyGenerator
 	
 	function addConvertedToString(path, type) switch (type)
 	{
+/*		case Tdef(tdef): switch (tdef) {
+			case Tclass(cl):	throw "class to string?";
+			case Tenum(cl):		a("(if ("); addPathEscaped(path); a(" != null) xml.Text(ConvertTo.string("); addPathEscaped(path); a(")) else NodeSeq.Empty)");
+		}
+*/		
+		case TenumConverter(_): a("(if (!"); addPathEscaped(path); a(".isEmpty) xml.Text("); addPathEscaped(path); a(") else NodeSeq.Empty)");
+		
 		case Tstring:
+			a("xml.Text(");
 			addPathEscaped(path);
+			a(")");
 			
 		case Tbool(_), Tinteger(_,_,_):
 			a("new scala.xml.Unparsed(("); addPathEscaped(path); a(").toString)");
 			
 		default:
-			a("ConvertTo.string("); addPathEscaped(path); ac(")".code);
+			a("xml.Text(ConvertTo.string("); addPathEscaped(path); a("))");
 	}
 	
 	inline function indent(times:Int) for (i in 0 ... times) a("  ")

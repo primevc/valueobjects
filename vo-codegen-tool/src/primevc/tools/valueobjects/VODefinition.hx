@@ -883,6 +883,11 @@ class Property
 		return p;
 	}
 	
+	public function bitIndex()
+	{
+		return if (Std.is(parent, BaseTypeDefinition)) cast(parent,BaseTypeDefinition).bitIndex(this); else this.index;
+	}
+	
 	public function propertyID()
 	{
 		return definedIn.index << 8 | this.index;
@@ -1876,6 +1881,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	
 	public var propertiesDefined(getPropertiesDefined, null) : IntHash<Property>; // key is property.index
 	public var numPropertiesDefined(getNumPropertiesDefined, null) : Int; // Count(propertiesDefined)
+	public var maxPropertyIndex(getMaxPropertyIndex, null) : Int; // max(propertiesDefined.index)
 	public var propertiesSorted	(getPropertiesSorted,  null) : Array<Property>;
 	
 	public var settings		(default, null)		: {
@@ -1887,21 +1893,64 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		return false;
 	}
 	
+	
+	var propertyBitIndex : Hash<Int>;
+	var lastPropertyBitIndex : Int;
+	
+	private function genPropertyBitIndex(t:TypeDefinition)
+	{
+		if (Std.is(t, BaseTypeDefinition)) {
+			for (s in cast(t,BaseTypeDefinition).supertypes) genPropertyBitIndex(s);
+		}
+		
+		for (i in 0 ... propertiesSorted.length) if (propertiesSorted[i].definedIn == t) {
+			// found first prop for this type
+			var maxPropIndex = 0-1;
+			
+			var startIndex = lastPropertyBitIndex;
+			for (j in i ... propertiesSorted.length) { var p = propertiesSorted[j]; if (p.definedIn != t) break; else {
+				if (p.index > maxPropIndex) maxPropIndex = p.index;
+				propertyBitIndex.set(p.name, startIndex + p.index);
+			}}
+			
+			lastPropertyBitIndex += maxPropIndex + 1;
+			break;
+		}
+	}
+	
+	public function bitIndex(prop:Property)
+	{
+		if (propertyBitIndex == null) {
+			lastPropertyBitIndex = 0;
+			propertyBitIndex = new Hash();
+			genPropertyBitIndex(this);
+		}
+		
+		return propertyBitIndex.get(prop.name);
+	}
+	
 	private function getNumPropertiesDefined()
 	{
 		getPropertiesDefined();
 		return numPropertiesDefined;
 	}
 	
+	private function getMaxPropertyIndex()
+	{
+		getPropertiesDefined();
+		return maxPropertyIndex;
+	}
+	
 	private function getPropertiesDefined()
 	{
 		if (propertiesDefined != null) return propertiesDefined;
 		
-		var n = 0;
+		var n = maxPropertyIndex = 0;
 		propertiesDefined = new IntHash();
 		for (p in this.property) if (p.definedIn == this) {
 			++n;
 			propertiesDefined.set(p.index, p);
+			if (p.index > maxPropertyIndex) maxPropertyIndex = p.index;
 		}
 		Assert.that(n <= 31, "Max index used: "+ n + ", class: "+fullName);
 		numPropertiesDefined = n;

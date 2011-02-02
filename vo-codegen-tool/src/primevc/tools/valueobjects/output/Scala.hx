@@ -284,14 +284,14 @@ file.writeString("
 				a("\n    super.updateFieldsSet_!;");
 			}
 			for (check in emptyChecks) {
-				a("\n    if (!"); a(check.expr); a(") $fieldsSet |= 0x"); a(StringTools.hex(1 << check.id)); a(";");
+				a("\n    if (!"); a(check.expr); a(") $fieldsSet |= 0x"); a(StringTools.hex(1 << def.propertiesSorted[check.id].bitIndex())); a(";");
 			}
 			a("\n  }");
 			
 			// fieldIsSet_?
 			a("\n  override def fieldIsSet_?(index:Int) = index match {");
 			for (check in emptyChecks) {
-				a("\n    case " + check.id); a(" => !"); a(check.expr);
+				a("\n    case " + def.propertiesSorted[check.id].bitIndex()); a(" => !"); a(check.expr);
 			}
 		 	a("\n    case _ => super.fieldIsSet_?(index)");
 			a("\n  }");
@@ -385,7 +385,7 @@ file.writeString("
 			for (i in 0 ... def.propertiesSorted.length)
 			{
 				var p = def.propertiesSorted[i];
-				a("\n    case "+ i); a(" => this."); a(quote(p.name));
+				a("\n    case "+ p.bitIndex()); a(" => this."); a(quote(p.name));
 			}
 			a("\n    case _ => super.field(index)");
 			a("\n  }");
@@ -395,7 +395,7 @@ file.writeString("
 			for (i in 0 ... def.propertiesSorted.length)
 			{
 				var p = def.propertiesSorted[i];
-				a('\n    case "'); if (p.hasOption(unique)) a('_id" | "');  a(p.name); a('" => '+i);
+				a('\n    case "'); if (p.hasOption(unique)) a('_id" | "');  a(p.name); a('" => '+ p.bitIndex());
 			}
 			a("\n    case _ => super.field(key)");
 			a("\n  }");
@@ -418,7 +418,7 @@ file.writeString("
 				a("(index match {\n");
 				for (i in 0 ... def.propertiesSorted.length) {
 					var p = def.propertiesSorted[i];
-					a('    case '+i); a(' => vo.'); a(propertyName(p)); a('\n');
+					a('    case ' + p.bitIndex()); a(' => vo.'); a(propertyName(p)); a('\n');
 				}
 				a("    case _ => null\n  }).asInstanceOf[AnyRef]\n\n");
 			}
@@ -433,7 +433,7 @@ file.writeString("
 				a("{ index match {\n");
 				for (i in 0 ... def.propertiesSorted.length) {
 					var p = def.propertiesSorted[i];
-					a('    case '+i); a(' => vo.'); a(p.name); a("_("); a("value );\n");
+					a('    case ' + p.bitIndex()); a(' => vo.'); a(p.name); a("_("); a("value );\n");
 				}
 				a("  }; vo; }\n");
 			}
@@ -931,9 +931,9 @@ file.writeString("
 					}
 				 	a(") ");
 				}
-				a("$fieldsSet |= 0x"); a(StringTools.hex(bit));
+				a("$fieldsSet |= 0x"); a(StringTools.hex(1 << p.bitIndex()));
 				if (nilChecked) {
-					a("; else $fieldsSet &= ~0x"); a(StringTools.hex(bit));
+					a("; else $fieldsSet &= ~0x"); a(StringTools.hex(1 << p.bitIndex()));
 				}
 				a("; ");
 		}
@@ -970,7 +970,7 @@ file.writeString("
 			switch (p.type) {
 				case Tdef(_), Tarray(_,_,_): // Don't set any bits
 				default:
-					a(" if (v == null) "); a("$fieldsSet &= ~0x" + StringTools.hex(bit)); //nilValue(p.type)); ac(")".code);
+					a(" if (v == null) "); a("$fieldsSet &= ~0x" + StringTools.hex(1 << p.bitIndex())); //nilValue(p.type)); ac(")".code);
 			}
 			a(" }\n");
 		}

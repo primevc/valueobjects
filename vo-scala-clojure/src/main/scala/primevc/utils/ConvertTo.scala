@@ -8,12 +8,12 @@ import javax.mail.internet.InternetAddress
 import com.mongodb.casbah.Imports._
 import org.joda.time.{DateMidnight, DateTime, Interval}
 import java.util.{Locale, Date}
-import java.text.{DecimalFormatSymbols, DecimalFormat}
 import org.bson.BSONObject
 import org.bson.types.{BasicBSONList, ObjectId}
 import collection.JavaConversions
 import java.net.{URISyntaxException, URL, URI}
 import org.msgpack.`object`.{NilType, ArrayType, IntegerType, RawType}
+import java.text.{ParseException, DecimalFormatSymbols, DecimalFormat}
 
 /**
  * Created by IntelliJ IDEA.
@@ -188,16 +188,34 @@ object ConvertTo
   protected def decimalFormatter(format:String) =
   {
     val pipe = format.indexOf('|')
-    if (pipe == 0) new DecimalFormat(format.substring(1))
+    val df  = if (pipe == 0)
+      new DecimalFormat(format.substring(1))
     else if (pipe >= 0 && pipe < 6)
-    {
-      val locale = format.substring(0, pipe)
-      val formatStr = format.substring(pipe+1)
-      new DecimalFormat(formatStr, new DecimalFormatSymbols(new Locale(locale)))
-    }
-    else new DecimalFormat(format)
+       decimalLocaleFormatter(format.substring(0, pipe), if (pipe == format.length - 1) null else format.substring(pipe+1))
+    else
+        new DecimalFormat(format)
+
+    df.setDecimalSeparatorAlwaysShown(false);
+    df
   }
-  def decimal       (value:String, format:String) : Double = decimalFormatter(format).parse(value).doubleValue
+
+  protected def decimalLocaleFormatter(locale:String, format:String = null) =
+  {
+    val df = if (format == null) new DecimalFormat() else new DecimalFormat(format);
+    df.setDecimalFormatSymbols(new DecimalFormatSymbols(new Locale(locale)))
+    df
+  }
+
+
+  def decimal       (value:String, format:String) : Double = try decimalFormatter(format).parse(value).doubleValue
+    catch {
+      case e : ParseException =>
+        val pipe = format.indexOf('|');
+        if (pipe >= 0 && pipe < 6)
+          decimalFormatter(format.substring(0,pipe+1)).parse(value).doubleValue
+        else
+          decimal(value)
+    }
 
   def date          (value:Any, formatter:DateTimeFormatter = ISODateTimeFormat.dateParser) : DateMidnight = unpack(value) match {
     case v:DateMidnight => v

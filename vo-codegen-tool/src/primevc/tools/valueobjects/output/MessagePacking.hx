@@ -105,7 +105,8 @@ class MessagePacking
 		
 		if (hasMixins)
 		{	
-			for (t in def.supertypes) mixinBits += t.propertiesSorted.length;
+		//	for (t in def.supertypes) mixinBits += t.propertiesSorted.length;
+			for (t in def.supertypes) if (t.propertiesSorted.length > 0) mixinBits += t.bitIndex(t.propertiesSorted[t.propertiesSorted.length - 1]) + 1;
 			
 			if (mixinBits > 1)
 			{

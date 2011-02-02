@@ -1945,7 +1945,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	{
 		if (propertiesDefined != null) return propertiesDefined;
 		
-		var n = maxPropertyIndex = 0;
+		var n = maxPropertyIndex = -1;
 		propertiesDefined = new IntHash();
 		for (p in this.property) if (p.definedIn == this) {
 			++n;
@@ -1953,7 +1953,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 			if (p.index > maxPropertyIndex) maxPropertyIndex = p.index;
 		}
 		Assert.that(n <= 31, "Max index used: "+ n + ", class: "+fullName);
-		numPropertiesDefined = n;
+		numPropertiesDefined = n + 1;
 		return propertiesDefined;
 	}
 	

@@ -264,20 +264,6 @@ file.writeString("
 		{
 			var andAnd;
 			
-			// empty_?
-			a("\n  override def empty_? = ");
-			if (def.superClass != null || nonEmptyChecks != 0) {
-				a("super.empty_?");
-				andAnd = true;
-			}
-			else andAnd = false;
-			
-			for (check in emptyChecks) {
-				if (andAnd) a(" && ");
-				andAnd = true;
-				a(check.expr);
-			}
-			
 			// updateFieldsSet_!
 			a("\n  override def updateFieldsSet_! = {");
 			if (def.superClass != null || nonEmptyChecks != 0) {
@@ -725,7 +711,7 @@ file.writeString("
 		a("\n  override def foreach[U](f: "); a(type.name); a(" => U) {");
 		for (i in 0 ... def.propertiesSorted.length) {
 			var p = def.propertiesSorted[i];
-			a("\n    if (__"); a(p.name); a(" != null && fieldIsSet_?("); a(i+")) f(__"); a(p.name); a(");");
+			a("\n    if (__"); a(p.name); a(" != null && fieldIsSet_?("); a(p.bitIndex() +")) f(__"); a(p.name); a(");");
 		}
 		if (def.keys.length > 0)
 			a("\n    super.foreach(f);");
@@ -751,7 +737,7 @@ file.writeString("
 		if (cl == null) throw def; // Not a set of VO's, so we're done.
 		
 		a("\n  final override def containsEntry(item:"); a(type.name); a(") = ");
-		genNamedSetKeyMatcher(def, "super.containsEntry", function(i,p) return "__"+ p.name +" != null && fieldIsSet_?("+i+");");
+		genNamedSetKeyMatcher(def, "super.containsEntry", function(i,p) return "__"+ p.name +" != null && fieldIsSet_?("+ p.bitIndex() +");");
 		a("  }\n");
 		
 		a("\n  final override def addEntry(item:"); a(type.name); a(") = {");
@@ -759,7 +745,7 @@ file.writeString("
 		a("  }; true; }\n");
 		
 		a("\n  final override def removeEntry(item:"); a(type.name); a(") = ");
-		genNamedSetKeyMatcher(def, "super.removeEntry", function(i,p) return "val old = __"+ p.name +"; if (old != null && fieldIsSet_?("+i+")) Some(old) else None;");
+		genNamedSetKeyMatcher(def, "super.removeEntry", function(i,p) return "val old = __"+ p.name +"; if (old != null && fieldIsSet_?("+ p.bitIndex() +")) Some(old) else None;");
 		a("  }\n");
 		
 		a("}\n");
@@ -1843,16 +1829,7 @@ class XMLProxyGenerator
 			
 			var objPathEnd = path.lastIndexOf('.');
 			
-			var fieldIndex = -1;
-			for (i in 0 ... prop.parent.propertiesSorted.length)
-			{
-				var p = prop.parent.propertiesSorted[i];
-				if (p.name != prop.name) continue;
-				fieldIndex = i;
-				break;
-			}
-			
-			if (fieldIndex == -1) throw "Property index not found for pathPrefix: "+pathPrefix+", path: "+path+", substr: "+path.substr(0, objPathEnd)+" prop named: "+prop.name+" in object: "+prop.parent.fullName;
+			var fieldIndex = prop.bitIndex();
 			
 			a("if ("); a(pathPrefix);
 			if (objPathEnd != -1) {

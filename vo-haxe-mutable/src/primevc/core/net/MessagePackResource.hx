@@ -131,7 +131,7 @@ class MessagePackResource <Data> implements IDisposable
 		Assert.notNull(uriPrefix);
 		var l   = loader,
 			e   = events.send,
-			uri = new URI(uriPrefix.string + uriSuffix);
+			uri = uriSuffix == null? uriPrefix : new URI(uriPrefix.string + uriSuffix);
 		
 		// Serialize
 		var out			= new haxe.io.BytesOutput();

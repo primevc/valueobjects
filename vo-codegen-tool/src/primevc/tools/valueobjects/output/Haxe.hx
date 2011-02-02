@@ -535,7 +535,7 @@ class Haxe implements CodeGenerator
 			else if (p.isBindable())			a("\n\t\t\tchangeSet.addBindableChange(");
 			else								a("\n\t\t\tchangeSet.addChange(");
 			
-			a(p.name.toUpperCase()); a(", _changedFlags & "); a(hexBitflag(i)); a(", "); 
+			a(p.name.toUpperCase()); a(", _changedFlags & "); a(hexBitflag(p.bitIndex())); a(", "); 
 			
 			if (!p.isArray() && p.isBindable()) {
 				a(p.name); a(".shadowValue, "); a(p.name); a(".value");
@@ -790,7 +790,7 @@ class Haxe implements CodeGenerator
 		a("\tprivate function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable())); a(")\n\t{\n");
 		
 		a("\t\treturn if (v == "); if (Util.isEnum(p.type) || Util.isPTypeBuiltin(p.type)) a("this."); else a("(untyped this)."); a(p.name); a(") v;\n");
-		a("\t\telse\n\t\t{\n\t\t\t_changedFlags |= "); a(hexBitflag(i)); a(";\n");
+		a("\t\telse\n\t\t{\n\t\t\t_changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
 		
 		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type))
 		{
@@ -815,12 +815,12 @@ class Haxe implements CodeGenerator
 			}
 		}
 		a("\t\t\t");
-		var ifExprAdded = addPropChangeFlagSetter(i, "v" + ((!p.isArray() && p.isBindable())? ".value" : ""), p.type, false);
+		var ifExprAdded = addPropChangeFlagSetter(p.bitIndex(), "v" + ((!p.isArray() && p.isBindable())? ".value" : ""), p.type, false);
 		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type)) {
 			a("\n\t\t\t}");
 			if (ifExprAdded) {
 				a("\n\t\t\t");
-				addPropChangeFlagUnsetter(i);
+				addPropChangeFlagUnsetter(p.bitIndex());
 			}
 		}
 		
@@ -836,32 +836,32 @@ class Haxe implements CodeGenerator
 			if (!listChangeHandler) {
 				a("value : "); a(typeName); a(", old : "); a(typeName);
 			}
-			a(") : Void {\n\t\t_changedFlags |= "); a(hexBitflag(i));
+			a(") : Void {\n\t\t_changedFlags |= "); a(hexBitflag(p.bitIndex()));
 			a(";\n\t\t");
 			
 			if (listChangeHandler)
 			{
-				a("if ("); a(p.name); a(".length.not0()) _propertiesSet |= "); a(hexBitflag(i)); a("; "); addPropChangeFlagUnsetter(i);
+				a("if ("); a(p.name); a(".length.not0()) _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a("; "); addPropChangeFlagUnsetter(p.bitIndex());
 			}
 			else
-				addPropChangeFlagSetter(i, "value", p.type, false);
+				addPropChangeFlagSetter(p.bitIndex(), "value", p.type, false);
 			a("\n\t}\n\n");
 		}
 	}
 	
-	private function addPropChangeFlagSetter(i, path, ptype, bindable)
+	private function addPropChangeFlagSetter(bit, path, ptype, bindable)
 	{
-		var ifAdded = !addIfVarIsSetExpr(path, ptype, bindable, "_propertiesSet |= " + hexBitflag(i));
+		var ifAdded = !addIfVarIsSetExpr(path, ptype, bindable, "_propertiesSet |= " + hexBitflag(bit));
 		
 		if (ifAdded) {
-			a(" "); addPropChangeFlagUnsetter(i);
+			a(" "); addPropChangeFlagUnsetter(bit);
 		}
 		
 		return ifAdded;
 	}
 	
-	private function addPropChangeFlagUnsetter(i) {
-		a("else _propertiesSet &= 0x" + StringTools.hex(0xFFFFFF ^ (1 << i)) + ";");
+	private function addPropChangeFlagUnsetter(bit) {
+		a("else _propertiesSet &= 0x" + StringTools.hex(0x7FFFFFFF ^ (1 << bit)) + ";");
 	}
 	
 	

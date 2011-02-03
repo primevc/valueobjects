@@ -60,7 +60,7 @@ class Reader implements IDisposable
 	}
 	
 	
-	public #if GenericArrays inline #end function readMsgPackArray<T>(pid : PropertyID, itemType : Dynamic) : FastArray<T>
+	public inline function readMsgPackArray<T>(pid : PropertyID, itemType : Dynamic) : FastArray<T>
 	{
 		return readArray(readArrayLength(), pid, itemType);
 	}
@@ -162,7 +162,7 @@ class Reader implements IDisposable
 	}
 	
 	
-	#if GenericArrays inline #end function readArray<T>(len:Int, pid : PropertyID, itemType : Dynamic) : FastArray<T>
+	inline function readArray<T>(len:Int, pid : PropertyID, itemType : Dynamic) : FastArray<T>
 	{
 		var arr = FastArrayUtil.create(len);
 		for (i in 0 ... len) //try {

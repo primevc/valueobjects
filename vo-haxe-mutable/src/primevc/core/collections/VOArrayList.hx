@@ -43,14 +43,14 @@ package primevc.core.collections;
  * @author Danny Wilson
  * @creation-date Dec 20, 2010
  */
-class VOArrayList<DataType : IValueObject> extends ArrayList<DataType> #if GenericArrays, implements haxe.rtti.Generic #end
+class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implements haxe.rtti.Generic
 {
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;
 	
-	public function new ( wrapAroundList:FastArray<#if GenericArrays DataType #else Dynamic #end> = null )
+	public function new ( wrapAroundList:FastArray<DataType> = null )
 	{
-		super(untyped wrapAroundList);
+		super(wrapAroundList);
 		itemChange = new Signal1();
 	}
 	
@@ -69,7 +69,7 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType> #if Gener
 	{
 		itemChange.dispose();
 		this.changeHandlerFn = changeHandler;
-		VOArrayListUtil.setChangeHandler(this, #if !GenericArrays untyped #end list, changeHandler);
+		VOArrayListUtil.setChangeHandler(this, list, changeHandler);
 	}
 	
 	
@@ -93,7 +93,7 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType> #if Gener
 	
 	override public function clone () : IReadOnlyList<DataType>
 	{
-		return untyped new VOArrayList<DataType>( #if !GenericArrays untyped #end list.clone() );
+		return new VOArrayList<DataType>( list.clone() );
 	}
 }
 

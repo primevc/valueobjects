@@ -173,10 +173,7 @@ class HaxeMessagePacking extends MessagePacking
 		{
 //			a("((untyped obj)."); a(p.name); a(" = ");
 //			a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
-			a( Util.isSingleValue(p.type)
-			 	? p.isBindable()? "new primevc.core.collections.RevertableArrayList(" : "new primevc.core.collections.ArrayList("
-				: 'new ' + HaxeUtil.haxeType(p.type, true, p.isBindable()) + '('
-			);
+			a('new ' + HaxeUtil.haxeType(p.type, true, p.isBindable()) + '(');
 		}
 /*		else {
 			a("((untyped obj)."); a(p.name);

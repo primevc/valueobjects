@@ -36,23 +36,34 @@ package primevc.core.collections;
   using primevc.utils.FastArray;
   using primevc.utils.IfUtil;
 
+
+ import primevc.core.RevertableBindableFlags;
+  using primevc.utils.BitUtil;
+  using primevc.utils.ChangesUtil;
+
+
 /**
  * A specialized RevertableArrayList for ValueObjects.
  * 
  * Used to support bubbling of ObjectChangeSets.
+ *  
+ *  Unfortunately it copies pretty much everything from RevertableArrayList, because the haXe compiler crashes if we extend it instead.
  * 
  * @author Danny Wilson
  * @creation-date Dec 20, 2010
  */
-class RevertableVOArrayList<DataType : IValueObject> extends RevertableArrayList<DataType> #if GenericArrays, implements haxe.rtti.Generic #end
+class RevertableVOArrayList<DataType : IValueObject>
+   extends ReadOnlyArrayList < DataType >, implements IRevertableList < DataType >, implements IReadOnlyList < DataType >, implements haxe.rtti.Generic
+// extends RevertableArrayList<DataType>, implements haxe.rtti.Generic, implements IRevertableList < DataType >
 {
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;
 	
-	public function new ( wrapAroundList:FastArray #if GenericArrays<DataType> #else <Dynamic> #end = null )
+	public function new( wrapAroundList:FastArray<DataType> = null )
 	{
-		super(untyped wrapAroundList);
+		super(wrapAroundList);
 		itemChange = new Signal1();
+		flags = RevertableArrayListFlags.REMEMBER_CHANGES;
 	}
 	
 	override public function dispose()
@@ -70,32 +81,198 @@ class RevertableVOArrayList<DataType : IValueObject> extends RevertableArrayList
 	{
 		itemChange.dispose();
 		this.changeHandlerFn = changeHandler;
-		VOArrayListUtil.setChangeHandler(this, #if !GenericArrays untyped #end list, changeHandler);
+		VOArrayListUtil.setChangeHandler(this, list, changeHandler);
+	}
+	
+	//
+	// Revertable stuff
+	//
+	
+	/**
+	 * Keeps track of settings.
+	 */
+	public var flags : Int;
+	
+	/**
+	 * List with all the changes that are made when the list is in editing mode.
+	 */
+	public var changes (default,null) : FastArray<ListChange<DataType>>;
+	
+	
+	
+	
+	
+	
+	public inline function rememberChanges (enabled:Bool = true)				{ flags = enabled ? flags.set(RevertableArrayListFlags.REMEMBER_CHANGES) : flags.unset(RevertableArrayListFlags.REMEMBER_CHANGES); }
+	public inline function dispatchChangesBeforeCommit (enabled:Bool = true)	{ flags = enabled ? flags.set(Flags.DISPATCH_CHANGES_BEFORE_COMMIT) : flags.unset(Flags.DISPATCH_CHANGES_BEFORE_COMMIT); }
+	
+	
+	//
+	// EDITABLE VALUE-OBJECT METHODS
+	//
+	
+	public inline function isEmpty()
+	{
+		return this.length == 0;
 	}
 	
 	
-	override public function add (item:DataType, pos:Int = -1) : DataType
+	public inline function beginEdit ()
 	{
-		super.add(item);
+		if (flags.hasNone( Flags.IN_EDITMODE ))
+		{
+			flags = flags.set( Flags.IN_EDITMODE );
+			
+			if (flags.has(RevertableArrayListFlags.REMEMBER_CHANGES))
+				changes = FastArrayUtil.create();
+		}
+	}
+	
+	
+	public  function commitEdit ()
+	{
+		// Check if REMEMBER_CHANGES is not set (value changed) and any dispatch flag is set.
+		if (changes != null && flags.has(RevertableArrayListFlags.REMEMBER_CHANGES) && flags.hasNone( Flags.DISPATCH_CHANGES_BEFORE_COMMIT ))
+			while (changes.length > 0) {
+				var listChange = changes.shift();
+				Assert.notNull( listChange );
+				change.send( listChange );
+			}
+		
+		stopEdit();
+	}
+	
+	
+	public inline function cancelEdit ()
+	{
+		if (changes != null && flags.hasAll( Flags.IN_EDITMODE | RevertableArrayListFlags.REMEMBER_CHANGES))
+		{
+			var f = flags;
+			flags = flags.unset( RevertableArrayListFlags.REMEMBER_CHANGES );
+			while (changes.length > 0)
+				this.undoListChange( changes.pop() );
+			
+			flags = f;
+		}
+		
+		stopEdit();
+	}
+	
+	
+	private inline function stopEdit ()
+	{
+		if (changes != null) {
+			changes.removeAll();
+			changes = null;
+		}
+		flags = flags.unset(Flags.IN_EDITMODE);
+	}
+	
+	
+	
+	//
+	// IBINDABLE LIST METHODS
+	//
+	
+	
+	private inline function addChange (listChange:ListChange<DataType>)
+	{
+		if (flags.has( RevertableArrayListFlags.REMEMBER_CHANGES ))
+			changes.push( listChange );
+
+		if (flags.has( Flags.DISPATCH_CHANGES_BEFORE_COMMIT ))
+			change.send( listChange );
+	}
+	
+	
+	public function removeAll ()
+	{
+		var f = flags;
+		Assert.that( f.has(Flags.IN_EDITMODE) );
+		
+		if (f.hasNone(Flags.IN_EDITMODE))
+			return;
+		
+		flags = f.unset( Flags.DISPATCH_CHANGES_BEFORE_COMMIT );
+		
+		while (length > 0)
+			remove ( list[ length - 1] );
+		
+		flags = f;
+		if (f.has( Flags.DISPATCH_CHANGES_BEFORE_COMMIT ))
+			change.send( ListChange.reset );
+	}
+	
+	
+	public function add (item:DataType, pos:Int = -1) : DataType
+	{
+		var f = flags;
+		Assert.that( f.has(Flags.IN_EDITMODE), this+" doesn't have EDITMODE. "); // Flags: "+Flags.readProperties(f) );
+		
+		if (f.hasNone(Flags.IN_EDITMODE))
+			return item;
+		
+		pos = list.insertAt(item, pos);
+		addChange( ListChange.added( item, pos ) );
+		
+	//	trace("this.add "+item +"; "+Flags.readProperties(flags)+"; "+length);
+		
 		cast(item, ValueObjectBase).change.bind(this, changeHandlerFn);
 		
 		return item;
 	}
 	
 	
-	override public function remove (item:DataType, oldPos:Int = -1) : DataType
+	public function remove (item:DataType, oldPos:Int = -1) : DataType
 	{
-		super.remove(item);
+		var f = flags;
+		Assert.that( f.has(Flags.IN_EDITMODE) );
+		
+		if (f.hasNone(Flags.IN_EDITMODE))
+			return item;
+		
+		if (oldPos == -1)
+			oldPos = list.indexOf(item);
+		
+		if (oldPos > -1 && list.removeItem(item, oldPos))
+			addChange( ListChange.removed( item, oldPos ) );
+		
 		cast(item, ValueObjectBase).change.unbind(this);
 		
 		return item;
 	}
 	
 	
-	override public function clone ()
+	public function move (item:DataType, newPos:Int, curPos:Int = -1) : DataType
+	{
+		var f = flags;
+		Assert.that( f.has(Flags.IN_EDITMODE) );
+		
+		if (f.hasNone(Flags.IN_EDITMODE))
+			return item;
+		
+		if		(curPos == -1)				curPos = list.indexOf(item);
+		if		(newPos > (length - 1))		newPos = length - 1;
+		else if (newPos < 0)				newPos = length - newPos;
+		
+		if (curPos != newPos && list.move(item, newPos, curPos))
+			addChange( ListChange.moved( item, newPos, curPos ) );
+		
+		return item;
+	}
+	
+	
+	//
+	// VO Stuff
+	//
+	
+	
+	
+	
+	override public function clone () : primevc.core.collections.IReadOnlyList<DataType>
 	{
 		var l = new RevertableVOArrayList<DataType>( list.clone() );
 		l.flags = flags;
-		return untyped l;
+		return l;
 	}
 }

@@ -2327,6 +2327,15 @@ class ClassDef extends BaseTypeDefinition
 		return false;
 	}
 	
+	public function implementsType (t:TypeDefinition) : Bool
+	{
+		for (type in this.supertypes)
+			if (type == t)
+				return true;
+		
+		return false;
+	}
+	
 	override public function toString():String {
 		return "<Class name='"+fullName+"'>";//"\n"+super.toString()+"\n\t</Class>";
 	}

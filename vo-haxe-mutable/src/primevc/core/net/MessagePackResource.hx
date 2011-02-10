@@ -117,6 +117,7 @@ class MessagePackResource <Data> implements IDisposable
 		onComplete.handler	= handleGET;
 		onError.handler		= cast (events.receive.error, Signal1<Dynamic>).send;
 		
+		trace("get "+uri);
 		l.load(uri);
 		e.started.send();
 	}

@@ -2014,15 +2014,8 @@ class ScalaMessagePacking extends MessagePacking
 				case Tenum(_):	a('o.pack('); a(path); a(".value)");
 			} 
 			
-			case Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tstring, Tdate, Tdatetime, Tinterval, Turi, TuniqueID, Temail, Tcolor, TfileRef:
+			case Tarray(_,_,_), Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tstring, Tdate, Tdatetime, Tinterval, Turi, TuniqueID, Temail, Tcolor, TfileRef:
 				a('o.pack('); a(path); ac(")".code);
-			
-			case Tarray(type, min, max):
-				a("{");
-				a("\n\t\t\t\tval arr = "); a(path); ac(";".code);
-				a("\n\t\t\t\to.packArray(arr.length);");
-				a("\n\t\t\t\tfor (item <- arr) "); addPropertyPackerCall("item", type, false); ac(";".code);
-				a("\n\t\t\t}");
 			
 			
 			case TenumConverter(_):	throw "Not implemented";

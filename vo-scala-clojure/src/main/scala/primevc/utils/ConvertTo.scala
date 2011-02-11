@@ -42,6 +42,7 @@ object ConvertTo
 
   def vo[T <: ValueObject](value:AnyRef) : T = unpack(value) match {
     case v:T => v
+    case v:MessagePackValueObject => v.vo.asInstanceOf[T]
   }
   def voRef[T <: ValueObjectWithID](value:AnyRef)(implicit idType:Manifest[T#IDType]) : Ref[T] = unpack(value) match {
     case v:Ref[T] => v

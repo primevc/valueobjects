@@ -6,7 +6,7 @@ import java.io.OutputStream
 import primevc.core.traits.{VOMessagePacker, VOCompanion, ValueObject}
 import org.bson.types.ObjectId
 import java.net.URI
-import primevc.types.{Ref, Enum, RGBA, FileRef}
+import primevc.types.{Ref, RefArray, Enum, RGBA, FileRef}
 
 /**
  * Created by IntelliJ IDEA.
@@ -37,7 +37,7 @@ class VOPacker (out:OutputStream) extends Packer(out)
   def pack(rgba     : RGBA)    : Unit = pack(rgba.argb)
 
   /** Packs a full ValueObject: Updates the VO fields-set bits, and uses those. */
-  def pack[V <: ValueObject](vo : V)
+  def pack(vo : ValueObject)
   {
     vo.updateFieldsSet_!;
     packValueObject(vo, vo.$fieldsSet)
@@ -50,7 +50,19 @@ class VOPacker (out:OutputStream) extends Packer(out)
     vo.Companion.asInstanceOf[VOMessagePacker[V]].msgpack_packVO(this, vo, fields);
   }
 
-  def pack(ref: Ref[_ <: ValueObject]) : Unit = pack(ref.vo_!)
+  def pack(ref: Ref[_ <: ValueObject]) {
+    if (ref.ref != null) require(ref.vo_! != null)
+    pack(ref.vo_!)
+  }
+
+  def pack(refArray: RefArray[_ <: ValueObject]) {
+    pack(refArray.voArray)
+  }
+
+  def pack[V <: ValueObject](voArray:Array[V]) {
+    packArray(voArray.length)
+    for (item <- voArray) pack(item);
+  }
 
   def packValueObjectHeader(voType : Int, mixins : Int, fieldFlagBytes : Int)
   {

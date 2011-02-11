@@ -355,13 +355,6 @@ class Haxe implements CodeGenerator
 		if (!def.isMixin)
 			genCloneFunction(def);
 		
-		for (p in def.property) if (p.hasOption(unique)) {
-			genToStringFunction(def, p);
-			break;
-		}
-	//	if (def.implementsType( UniqueIDTrait.type ))
-	//		genToStringFunction(def);
-		
 		// Close class }
 		code.add("}\n");
 		
@@ -520,8 +513,8 @@ class Haxe implements CodeGenerator
 	
 	private function genEditFunctions(def:ClassDef)
 	{
-		genEditableVOFunctionCalls(def, "beginEdit", false);
-		genEditableVOFunctionCalls(def, "commitBindables", false);
+		genEditableVOFunctionCalls(def, "beginEdit");
+		genEditableVOFunctionCalls(def, "commitBindables");
 		genEditableVOFunctionCalls(def, "cancelEdit");
 		
 		// addChanges()
@@ -610,21 +603,6 @@ class Haxe implements CodeGenerator
 	}
 	
 	
-	/**
-	 * Method will add an toString method that will return an unique-id for
-	 * the vo instance. Method only exists in debug mode
-	 */
-	private function genToStringFunction (def:ClassDef, idProp:Property)
-	{
-		var a = code.add;
-		a("\n\n#if debug");
-		openFunctionDeclaration( def, "toString", false, "String", false);
-		a("\t\treturn '[ "+def.name+"VO :: '+ " + idProp.name + " + ' ]';\n");
-		closeFunctionDeclaration( def, "toString");
-		a("#end\n");
-	}
-	
-	
 	private function openFunctionDeclaration (def:ClassDef, functionName, forceOverride = false, returnType:String = "Void", makeSuperCall = true, isPublic = true)
 	{
 		a("\n\t");
@@ -676,7 +654,7 @@ class Haxe implements CodeGenerator
 	}
 	
 	
-	private function genEditableVOFunctionCalls(def:ClassDef, functionName, superCallBefore:Bool = true)
+	private function genEditableVOFunctionCalls(def:ClassDef, functionName)
 	{
 		var functionCalls = new List<Property>();
 		
@@ -689,11 +667,10 @@ class Haxe implements CodeGenerator
 		
 		if (functionCalls.length > 0)
 		{
-			openFunctionDeclaration( def, functionName, true, "Void", false, !isCommitBindables );
+			openFunctionDeclaration( def, functionName, true, "Void", def.superClass != null, !isCommitBindables );
 			for (p in functionCalls)
 				generateFunctionCall( p, callFunctionName );
 			
-		//	if (def.superClass != null && !superCallBefore)
 			callSuperFunction(def, functionName);
 			
 			closeFunctionDeclaration( def, functionName);

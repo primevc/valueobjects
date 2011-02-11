@@ -1114,7 +1114,9 @@ private class HaxeUtil
 			case Tdef(_), Turi, TfileRef, Tinterval:
 				initializer; //"new " + HaxeUtil.haxeType(ptype) + "("+ initializer +")";
 			
-			case Tinteger(_,_,_), Tdecimal(_,_,_), TuniqueID, Temail, Tstring, Tbool(_), TenumConverter(_), Tdate, Tdatetime, Tcolor:
+			case TuniqueID:				initializer + ' == null? primevc.types.ObjectId.make() : ' + initializer;
+			
+			case Tinteger(_,_,_), Tdecimal(_,_,_), Temail, Tstring, Tbool(_), TenumConverter(_), Tdate, Tdatetime, Tcolor:
 				initializer;
 		}
 		

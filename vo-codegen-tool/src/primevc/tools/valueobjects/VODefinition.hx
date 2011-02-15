@@ -2138,7 +2138,8 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	
 	private function checkPropertyIsNumbered(p:Property)
 	{
-		Assert.that(p.index >= 0, "\n\tProperty has no Index: " + p);
+		if (!(p.index >= 0)) throw "\n\tProperty has no Index: " + p;
+		if (p.index >= 30 && !p.hasOption(transient)) throw "\n\tNon transient Property requires index under 30 (but is "+p.index+" instead): " + p;
 		
 		if (p.definedIn == this) {
 			if (this.propertyByNum.exists(p.index))
@@ -2554,7 +2555,7 @@ enum PropertyOption
 	bindable;
 	required;
 	unique;
-	mongo_transient;
+	transient;
 	mongo_reference;
 	mongo_typeCast;
 }

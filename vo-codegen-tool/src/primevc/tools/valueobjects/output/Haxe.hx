@@ -106,12 +106,11 @@ class HaxeMessagePacking extends MessagePacking
 	override private function definePackerFunction()
 	{
 		fieldIndexOffset = new IntHash();
-		
-		a("\n\t");  if (def.superClass != null) a("override ");  a("private function _fieldOffset(typeID:Int) return switch(typeID) {");
-		
-		genFieldOffsetCases(def);
-		
-		a("\n\t}");
+		if (!def.isMixin) {
+			a("\n\toverride private function _fieldOffset(typeID:Int) return switch(typeID) {");
+			genFieldOffsetCases(def);
+			a("\n\t}");
+		}
 		a("\n");
 		
 		a("\n\tstatic public function msgpack_packVO(o : haxe.io.BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBits : Int, prependMsgpackType : Bool = false) : Int\n\t{");
@@ -355,6 +354,13 @@ class Haxe implements CodeGenerator
 		if (!def.isMixin)
 			genCloneFunction(def);
 		
+		for (p in def.property) if (p.hasOption(unique)) {
+			genToStringFunction(def, p);
+			break;
+		}
+	//	if (def.implementsType( UniqueIDTrait.type ))
+	//		genToStringFunction(def);
+		
 		// Close class }
 		code.add("}\n");
 		
@@ -513,8 +519,8 @@ class Haxe implements CodeGenerator
 	
 	private function genEditFunctions(def:ClassDef)
 	{
-		genEditableVOFunctionCalls(def, "beginEdit");
-		genEditableVOFunctionCalls(def, "commitBindables");
+		genEditableVOFunctionCalls(def, "beginEdit", false);
+		genEditableVOFunctionCalls(def, "commitBindables", false);
 		genEditableVOFunctionCalls(def, "cancelEdit");
 		
 		// addChanges()
@@ -603,6 +609,21 @@ class Haxe implements CodeGenerator
 	}
 	
 	
+	/**
+	 * Method will add an toString method that will return an unique-id for
+	 * the vo instance. Method only exists in debug mode
+	 */
+	private function genToStringFunction (def:ClassDef, idProp:Property)
+	{
+		var a = code.add;
+		a("\n\n#if debug");
+		openFunctionDeclaration( def, "toString", false, "String", false);
+		a("\t\treturn '[ "+def.name+"VO :: '+ " + idProp.name + " + ' ]';\n");
+		closeFunctionDeclaration( def, "toString");
+		a("#end\n");
+	}
+	
+	
 	private function openFunctionDeclaration (def:ClassDef, functionName, forceOverride = false, returnType:String = "Void", makeSuperCall = true, isPublic = true)
 	{
 		a("\n\t");
@@ -654,7 +675,7 @@ class Haxe implements CodeGenerator
 	}
 	
 	
-	private function genEditableVOFunctionCalls(def:ClassDef, functionName)
+	private function genEditableVOFunctionCalls(def:ClassDef, functionName, superCallBefore:Bool = true)
 	{
 		var functionCalls = new List<Property>();
 		
@@ -667,10 +688,11 @@ class Haxe implements CodeGenerator
 		
 		if (functionCalls.length > 0)
 		{
-			openFunctionDeclaration( def, functionName, true, "Void", def.superClass != null, !isCommitBindables );
+			openFunctionDeclaration( def, functionName, true, "Void", false, !isCommitBindables );
 			for (p in functionCalls)
 				generateFunctionCall( p, callFunctionName );
 			
+		//	if (def.superClass != null && !superCallBefore)
 			callSuperFunction(def, functionName);
 			
 			closeFunctionDeclaration( def, functionName);

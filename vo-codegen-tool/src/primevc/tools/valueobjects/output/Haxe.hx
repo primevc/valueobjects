@@ -106,12 +106,11 @@ class HaxeMessagePacking extends MessagePacking
 	override private function definePackerFunction()
 	{
 		fieldIndexOffset = new IntHash();
-		
-		a("\n\t");  if (def.superClass != null) a("override ");  a("private function _fieldOffset(typeID:Int) return switch(typeID) {");
-		
-		genFieldOffsetCases(def);
-		
-		a("\n\t}");
+		if (!def.isMixin) {
+			a("\n\toverride private function _fieldOffset(typeID:Int) return switch(typeID) {");
+			genFieldOffsetCases(def);
+			a("\n\t}");
+		}
 		a("\n");
 		
 		a("\n\tstatic public function msgpack_packVO(o : haxe.io.BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBits : Int, prependMsgpackType : Bool = false) : Int\n\t{");

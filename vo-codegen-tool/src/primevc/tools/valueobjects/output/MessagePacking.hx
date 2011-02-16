@@ -90,7 +90,9 @@ class MessagePacking
 	{
 		// Count bits/properties for this 'def
 		totalPropsToPack = def.numPropertiesDefined;
-		for (p in def.propertiesDefined) if (lastProp == null || lastProp.index < p.index) lastProp = p;
+		for (p in def.propertiesDefined)
+		 	if (p.hasOption(transient)) --totalPropsToPack;
+		 	else if (lastProp == null || lastProp.index < p.index) lastProp = p;
 		
 		genDeSerialization(lastProp);
 		
@@ -165,7 +167,7 @@ class MessagePacking
 				var p = def.propertiesDefined.get(i);
 				++bit;
 				
-				if (p == null)
+				if (p == null || p.hasOption(transient))
 				{
 					if (def.propertiesDefined.exists(i+1))
 					{
@@ -303,7 +305,7 @@ class MessagePacking
 			}
 			
 			var p = def.propertiesDefined.get(i);
-			if (p == null) {
+			if (p == null || p.hasOption(transient)) {
 				++bit;
 				continue;
 			}

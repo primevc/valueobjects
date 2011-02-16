@@ -309,7 +309,8 @@ class Haxe implements CodeGenerator
 				genGetter(p, true);
 			} else {
 				genGetter(p, false);
-				genSetter(i, p, def.fullName);
+				if (!p.hasOption(transient))
+					genSetter(i, p, def.fullName);
 			}
 		}
 		
@@ -385,7 +386,7 @@ class Haxe implements CodeGenerator
 	{
 		a("\n\tstatic inline public var TYPE_ID = ");
 		a(def.index + ";\n\t");
-		for (p in def.propertiesSorted) {
+		for (p in def.propertiesSorted) if (!p.hasOption(transient)) {
 		 	a("\n\tstatic inline public var "); a(p.name.toUpperCase()); a(" = "); a("0x" + StringTools.hex(p.definedIn.index << 8 | p.index, 4)); a("; // "); a(p.definedIn.name);
 		}
 		a("\n\t");
@@ -532,7 +533,7 @@ class Haxe implements CodeGenerator
 		for (i in 0 ... def.propertiesSorted.length)
 		{
 			var p = def.propertiesSorted[i];
-			if (Util.isDefinedInSuperClassOf(def, p)) continue;
+			if (p.hasOption(transient) || Util.isDefinedInSuperClassOf(def, p)) continue;
 			
 			if (p.isArray() && p.isBindable())	a("\n\t\t\tchangeSet.addListChanges(");
 			else if (p.isBindable())			a("\n\t\t\tchangeSet.addBindableChange(");
@@ -777,7 +778,10 @@ class Haxe implements CodeGenerator
 		
 		if (immutable) {
 			a(",null");
-		} else {
+		}
+		else if (p.hasOption(transient))
+			a("\t,default");
+		else {
 			a(",set"); code.addCapitalized(p.name);
 		}
 		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable())); a(";\n");

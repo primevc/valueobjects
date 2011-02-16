@@ -3,7 +3,7 @@ package primevc.types;
  import java.lang.Long.parseLong
  import util.matching.Regex
 
-class RGBA private[types](val argb:Int)
+class RGBA private[types](val rgba:Int)
 {
   private[types] def this(s:String) = this(s.trim match
   {
@@ -25,26 +25,29 @@ class RGBA private[types](val argb:Int)
       parseLong(s).toInt
   })
 
-  def alpha = (argb & 0xFF000000) >>> 24
-  def red   = (argb &   0xFF0000) >>> 16
-  def green = (argb &     0xFF00) >>>  8
-  def blue  = (argb &       0xFF)
+  def alphaPercent: Float = alpha / 255
+  def rgb   = (rgba >>> 8)
+  def red   = (rgba & 0xFF000000) >>> 24
+  def green = (rgba &   0xFF0000) >>> 16
+  def blue  = (rgba &     0xFF00) >>>  8
+  def alpha = (rgba &       0xFF)
 
-  lazy val toRGBString = "#%06X".format(argb)
-  override lazy val toString = "0x" + argb.toHexString.toUpperCase
-  final def toInt = argb
+  lazy val toRGBString = "#%06X".format(rgba >>> 8)
+  lazy val toRGBAString = "#%08X".format(rgba)
+  override lazy val toString = "0x" + rgba.toHexString.toUpperCase
+  final def toInt = rgba
 
   override def equals(other:Any) = other match {
-    case color:Int => color == this.argb
-    case color:RGBA => color.argb == this.argb
+    case color:Int => color == this.rgba
+    case color:RGBA => color.rgba == this.rgba
     case _ => super.equals(other)
   }
 }
 
 object RGBA
 {
-  val black = new RGBA(0)        { override lazy val toString = "0x000000" }
-  val white = new RGBA(0xFFFFFF) { override lazy val toString = "0xFFFFFF" }
+  val black = new RGBA(0)          { override lazy val toString = "0x00000000" }
+  val white = new RGBA(0xFFFFFFFF) { override lazy val toString = "0xFFFFFFFF" }
 
   private val all_0 = new Regex("(?i)([0x#]*)")
   private val all_F = new Regex("(?i)([Fx#]*)")
@@ -56,7 +59,9 @@ object RGBA
   }
   def apply(i:Int): RGBA = i match {
     case 0 => black
-    case 0xFFFFFF => white
+    case 0xFFFFFFFF => white
     case _ => new RGBA(i)
   }
+  def apply(rgb:Int, a:Int): RGBA = apply((rgb << 8) | a)
+  def apply(rgb:Int, alphaPercentage:Float): RGBA = apply(rgb, (255 * alphaPercentage).toInt)
 }

@@ -34,7 +34,7 @@ class VOPacker (out:OutputStream) extends Packer(out)
 
   def pack(fileRef  : FileRef) : Unit = pack(fileRef.toString);
   def pack(uri      : URI)     : Unit = pack(uri.toString)
-  def pack(rgba     : RGBA)    : Unit = pack(rgba.argb)
+  def pack(rgba     : RGBA)    : Unit = pack(rgba.rgba)
 
   /** Packs a full ValueObject: Updates the VO fields-set bits, and uses those. */
   def pack(vo : ValueObject)

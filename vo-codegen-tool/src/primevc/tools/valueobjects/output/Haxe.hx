@@ -769,11 +769,12 @@ class Haxe implements CodeGenerator
 	function genGetter(p:Property, immutable:Bool)
 	{
 		a("\tpublic var "); a(p.name);
-		
-		if (Util.isPTypeBuiltin(p.type) || Util.isEnum(p.type))
+		var genGetterFn = false;
+		if (p.hasOption(transient) || Util.isPTypeBuiltin(p.type) || Util.isEnum(p.type))
 			a("\t(default");
 		else {
 			a("\t(get"); code.addCapitalized(p.name);
+			genGetterFn = true;
 		}
 		
 		if (immutable) {
@@ -786,7 +787,7 @@ class Haxe implements CodeGenerator
 		}
 		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable())); a(";\n");
 		
-		if (!immutable && !Util.isPTypeBuiltin(p.type) && !Util.isEnum(p.type)) {
+		if (genGetterFn) {
 			a("\tprivate function get"); code.addCapitalized(p.name); a("() { return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = ");
 			a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type)));
 			a(" }\n");

@@ -787,7 +787,7 @@ class Haxe implements CodeGenerator
 		}
 		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable())); a(";\n");
 		
-		if (genGetterFn) {
+		if (!immutable && genGetterFn) {
 			a("\tprivate function get"); code.addCapitalized(p.name); a("() { return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = ");
 			a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type)));
 			a(" }\n");

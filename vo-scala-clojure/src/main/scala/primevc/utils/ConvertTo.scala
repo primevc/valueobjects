@@ -109,6 +109,8 @@ object ConvertTo
     case v:RGBA => v
     case s:String => RGBA(s)
     case i:Int => RGBA(i)
+    case i:Long => RGBA(i)
+    case i:IntegerType => RGBA(i.asLong)
   }
 
   def uri           (value:Any) : URI = unpack(value) match {

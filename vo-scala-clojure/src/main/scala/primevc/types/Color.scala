@@ -62,6 +62,7 @@ object RGBA
     case 0xFFFFFFFF => white
     case _ => new RGBA(i)
   }
+  def apply(i:Long): RGBA = apply((i & 0xFFFFFFFF).toInt);
   def apply(rgb:Int, a:Int): RGBA = apply((rgb << 8) | a)
   def apply(rgb:Int, alphaPercentage:Float): RGBA = apply(rgb, (255 * alphaPercentage).toInt)
 }

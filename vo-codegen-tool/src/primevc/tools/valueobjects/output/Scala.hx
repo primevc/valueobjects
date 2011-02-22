@@ -760,7 +760,7 @@ file.writeString("
 		a("\n    vo");
 		a("\n  }");
 		
-		a("\n  def toXML(vo:"); a(def.name); a("VO): NodeSeq = if (vo.empty_?) NodeSeq.Empty else vo map(toXML(_)) reduceLeft { (a:NodeSeq, b:NodeSeq) => a union b };\n");
+		a("\n  def toXML(vo:"); a(def.name); a("VO): NodeSeq = if (vo.empty_?) NodeSeq.Empty else vo.toSeq.flatMap(toXML(_));\n");
 		
 /*		a("\n  override def get(key: String): Option["); a(type.name); a("] = {");
 		for (i in 0 ... def.propertiesSorted)

@@ -582,6 +582,10 @@ class Haxe implements CodeGenerator
 			if (p.isArray()) {
 				a("null"); // handle array cloning seperately
 			} else {
+				if (HaxeUtil.isNullableOnEveryPlatform(p.type, p.isBindable()) && p.hasOption(transient)) {
+					a("this."); a(p.name); a(".isNull()? null : ");
+				}
+				
 				a("this."); a(p.name);
 				if (p.isBindable())			a(".value");
 				
@@ -1177,7 +1181,15 @@ private class HaxeUtil
 			"new " + tdef.fullName + "VO()";
 		  else null;
 	}
-
+	
+	public static function isNullableOnEveryPlatform(ptype:PType, bindable:Bool) return switch (ptype)
+	{
+		case Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tcolor:
+			bindable;
+		case Tstring,Tdate,Tdatetime,Tinterval,Turi,TuniqueID,Temail,TfileRef, Tdef(_), TenumConverter(_), Tarray(_,_,_):
+			true;
+	}
+	
 /*	- Useless effort?
 	
 	public static function getDynamicConversionCall(ptype:PType, bindable:Bool) return switch (ptype)

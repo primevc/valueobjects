@@ -95,6 +95,12 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implemen
 	{
 		return new VOArrayList<DataType>( list.clone() );
 	}
+	
+	
+	override public function duplicate () : IReadOnlyList<DataType>
+	{
+		return new VOArrayList<DataType>( list.duplicate() );
+	}
 }
 
 class VOArrayListUtil

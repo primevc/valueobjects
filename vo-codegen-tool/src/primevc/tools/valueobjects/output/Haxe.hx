@@ -172,7 +172,7 @@ class HaxeMessagePacking extends MessagePacking
 		{
 //			a("((untyped obj)."); a(p.name); a(" = ");
 //			a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
-			a('new ' + HaxeUtil.haxeType(p.type, true, p.isBindable()) + '(');
+			a('new ' + HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient)) + '(');
 		}
 /*		else {
 			a("((untyped obj)."); a(p.name);
@@ -287,7 +287,10 @@ class Haxe implements CodeGenerator
 			
 			a(" implements "); a(def.module.fullName); a(".I"); a(def.name); a("VO,");
 			a(" implements primevc.core.traits.IEditableValueObject");
-			if (!def.isMixin && def.superClass == null) a(", implements primevc.core.traits.IClonable < I" + def.name + "VO >");
+			if (!def.isMixin && def.superClass == null) {
+				a(", implements primevc.core.traits.IClonable < I" + def.name + "VO >");
+				a(", implements primevc.core.traits.IDuplicatable < I" + def.name + "VO >");
+			}
 		}
 		else
 		{	
@@ -352,8 +355,10 @@ class Haxe implements CodeGenerator
 		genSerialization(def);
 //		genFieldSetter(def);
 		
-		if (!def.isMixin)
+		if (!def.isMixin) {
 			genCloneFunction(def);
+			genDuplicateFunction(def);
+		}
 		
 		for (p in def.property) if (p.hasOption(unique)) {
 			genToStringFunction(def, p);
@@ -582,7 +587,7 @@ class Haxe implements CodeGenerator
 			if (p.isArray()) {
 				a("null"); // handle array cloning seperately
 			} else {
-				if (HaxeUtil.isNullableOnEveryPlatform(p.type, p.isBindable()) && p.hasOption(transient)) {
+				if (HaxeUtil.isNullableOnEveryPlatform(p.type, p.isBindable()) && !p.hasOption(transient)) {
 					a("this."); a(p.name); a(".isNull()? null : ");
 				}
 				
@@ -600,6 +605,62 @@ class Haxe implements CodeGenerator
 		for (p in def.propertiesSorted) if (p.isArray())
 		{
 			a("\n\t\tinst."); a(p.name); a(" = cast this."); a(p.name); a(".clone();");
+			first = false;
+		}
+		if (!first)
+			a("\n\t\tinst._changedFlags = 0;\n");
+		
+		if (def.superClass == null)
+			a("\t\treturn inst;\n");
+		else
+			a("\t\treturn cast inst;\n");
+		
+		closeFunctionDeclaration( def, "clone");
+	}
+	
+	
+	private function genDuplicateFunction(def:ClassDef)
+	{
+		var a = code.add;
+		
+		var returnType	= def.superClass == null ? def.name : def.getRootSuperClass().name;
+		returnType		= "I" + returnType + "VO";
+		
+		openFunctionDeclaration( def, "duplicate", false, returnType, false);
+		a("\t\tvar inst = new "+def.name + "VO(\n");
+		
+		var first = true;
+		for (p in def.propertiesSorted)
+		{
+			if (first) {
+				first = false;
+				a("\t\t\t");
+			}
+			else a(",\n\t\t\t");
+			
+			if (p.isArray()) {
+				a("null"); // handle array cloning seperately
+			} else if (p.type == TuniqueID) {
+				a("null"); // never duplicate id's
+			} else {
+				if (HaxeUtil.isNullableOnEveryPlatform(p.type, p.isBindable()) && !p.hasOption(transient)) {
+					a("this."); a(p.name); a(".isNull()? null : ");
+				}
+				
+				a("this."); a(p.name);
+				if (p.isBindable())			a(".value");
+				
+				addAsClass(p.type);
+				if (p.hasClonableType())	a(".duplicate()");
+				addAsClass(p.type);
+			}
+		}
+		a("\n\t\t);\n");
+		
+		var first = true;
+		for (p in def.propertiesSorted) if (p.isArray())
+		{
+			a("\n\t\tinst."); a(p.name); a(" = cast this."); a(p.name); a(".duplicate();");
 			first = false;
 		}
 		if (!first)
@@ -685,7 +746,7 @@ class Haxe implements CodeGenerator
 		var functionCalls = new List<Property>();
 		
 		for (p in def.property)
-			if (!Util.isDefinedInSuperClassOf(def, p) && p.isBindable())
+			if (!Util.isDefinedInSuperClassOf(def, p) && p.isBindable() && !p.hasOption(transient))
 				functionCalls.add(p);
 		
 		var callFunctionName = functionName == "commitBindables"? "commitEdit" : functionName;
@@ -710,7 +771,7 @@ class Haxe implements CodeGenerator
 		for (i in 0 ... def.propertiesSorted.length)
 		{
 			var p = def.propertiesSorted[i];
-			a("\n\t\t\t"); a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true));
+			a("\n\t\t\t"); a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true, p.hasOption(transient)));
 			var init = HaxeUtil.getConstructorInitializer(p.type, true);
 			if (init != null) {
 			 	a(" = "); a(init);
@@ -748,7 +809,7 @@ class Haxe implements CodeGenerator
 					a("\t\tif ("); a(p.name); a("_.notNull()) this."); a(p.name); a(" = "); a(p.name); a("_;");
 				
 				default:
-					var c = HaxeUtil.getConstructorCall(p.type, p.isBindable(), p.name + "_");
+					var c = HaxeUtil.getConstructorCall(p.type, p.isBindable(), p.name + "_", p.hasOption(transient));
 					if (c != null) {
 						a("\t\tthis."); a(p.name); a(" = ");
 						a(c);
@@ -789,11 +850,11 @@ class Haxe implements CodeGenerator
 		else {
 			a(",set"); code.addCapitalized(p.name);
 		}
-		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable())); a(";\n");
+		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient))); a(";\n");
 		
 		if (!immutable && genGetterFn) {
 			a("\tprivate function get"); code.addCapitalized(p.name); a("() { return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = ");
-			a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type)));
+			a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type), p.hasOption(transient)));
 			a(" }\n");
 		}
 	}
@@ -807,15 +868,15 @@ class Haxe implements CodeGenerator
 			typeName = switch (p.type) {
 				case Tarray(innerType, _, _):
 					listChangeHandler = true;
-					"primevc.core.collections.ListChange<" + HaxeUtil.haxeType(innerType, true, false) + ">";
+					"primevc.core.collections.ListChange<" + HaxeUtil.haxeType(innerType, true, false, false, p.hasOption(transient)) + ">";
 				
 				default:
-					HaxeUtil.haxeType(p.type, false, false);
+					HaxeUtil.haxeType(p.type, false, false, false, p.hasOption(transient));
 			}
 		}
 		
 		
-		a("\tprivate function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable())); a(")\n\t{\n");
+		a("\tprivate function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient))); a(")\n\t{\n");
 		
 		a("\t\treturn if (v == "); if (Util.isEnum(p.type) || Util.isPTypeBuiltin(p.type)) a("this."); else a("(untyped this)."); a(p.name); a(") v;\n");
 		a("\t\telse\n\t\t{\n\t\t\t_changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
@@ -1135,12 +1196,12 @@ private class NamedSetDefGenerator extends MagicClassGenerator
 
 private class HaxeUtil
 {
-	public static function getConstructorCall(ptype:PType, bindable:Bool, initializer:String)
+	public static function getConstructorCall(ptype:PType, bindable:Bool, initializer:String, transient:Bool = false)
 	{
 		var code = switch (ptype)
 		{
 			case Tarray(type, _,_):
-				return "new " + HaxeUtil.haxeType( ptype, true, bindable ) + "("+ initializer +");";
+				return "new " + HaxeUtil.haxeType( ptype, true, bindable, false, transient ) + "("+ initializer +");";
 			
 			case Tdef(_), Turi, TfileRef, Tinterval:
 				initializer; //"new " + HaxeUtil.haxeType(ptype) + "("+ initializer +")";
@@ -1151,7 +1212,10 @@ private class HaxeUtil
 				initializer;
 		}
 		
-		return bindable? "new primevc.core.RevertableBindable<"+ HaxeUtil.haxeType(ptype) +">("+ code +");" : if (code == null) null else code + ";";
+		return	 if (bindable && transient)		"new primevc.core.Bindable<"+ HaxeUtil.haxeType(ptype) +">("+ code +");";
+			else if (bindable)					"new primevc.core.RevertableBindable<"+ HaxeUtil.haxeType(ptype) +">("+ code +");";
+			else if (code == null)				null;
+			else								code + ";";
 	}
 	
 	public static function getConstructorInitializer(ptype:PType, constOnly = false) return switch (ptype)
@@ -1220,7 +1284,7 @@ private class HaxeUtil
 			 	'ConvertTo.fastArray('+ haxeType(type, true, false) +', ';
 	}
 */	
-	public static function haxeType(ptype:PType, ?immutableInterface:Bool = false, ?bindable:Bool = false, ?constructorArg = false)
+	public static function haxeType(ptype:PType, ?immutableInterface:Bool = false, ?bindable:Bool = false, ?constructorArg = false, ?transient = false)
 	{
 		var type = switch (ptype)
 		{
@@ -1259,7 +1323,7 @@ private class HaxeUtil
 		if (bindable)
 		{
 			// Check for Bindable
-			type = "primevc.core.RevertableBindable<"+type+">";
+			type = transient ? "primevc.core.Bindable<"+type+">" : "primevc.core.RevertableBindable<"+type+">";
 		}
 		
 		return type;

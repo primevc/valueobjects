@@ -587,16 +587,19 @@ class Haxe implements CodeGenerator
 			if (p.isArray()) {
 				a("null"); // handle array cloning seperately
 			} else {
-				if (HaxeUtil.isNullableOnEveryPlatform(p.type, p.isBindable()) && !p.hasOption(transient)) {
+				if (HaxeUtil.isNullableOnEveryPlatform(p.type, p.isBindable())) { // && !p.hasOption(transient)) {
 					a("this."); a(p.name); a(".isNull()? null : ");
 				}
 				
 				a("this."); a(p.name);
 				if (p.isBindable())			a(".value");
+				addAsClass(p.type);
 				
-				addAsClass(p.type);
-				if (p.hasClonableType())	a(".clone()");
-				addAsClass(p.type);
+				if (p.hasClonableType() && !p.hasOption(transient))
+				{
+					a(".clone()");
+					addAsClass(p.type);
+				}
 			}
 		}
 		a("\n\t\t);\n");
@@ -643,16 +646,19 @@ class Haxe implements CodeGenerator
 			} else if (p.type == TuniqueID) {
 				a("null"); // never duplicate id's
 			} else {
-				if (HaxeUtil.isNullableOnEveryPlatform(p.type, p.isBindable()) && !p.hasOption(transient)) {
+				if (HaxeUtil.isNullableOnEveryPlatform(p.type, p.isBindable())) { // && !p.hasOption(transient)) {
 					a("this."); a(p.name); a(".isNull()? null : ");
 				}
 				
 				a("this."); a(p.name);
 				if (p.isBindable())			a(".value");
+				addAsClass(p.type);
 				
-				addAsClass(p.type);
-				if (p.hasClonableType())	a(".duplicate()");
-				addAsClass(p.type);
+				if (p.hasClonableType() && !p.hasOption(transient))
+				{
+					a(".duplicate()");
+					addAsClass(p.type);
+				}
 			}
 		}
 		a("\n\t\t);\n");

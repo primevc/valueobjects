@@ -893,6 +893,11 @@ file.writeString("
 			
 			case TenumConverter(_):		throw p;
 		}
+		
+		// optional hasProperty()
+		if (p.hasOption(optional)) {
+			a("\n  final def has"); a(p.name.substr(0,1).toUpperCase()); a(p.name.substr(1)); a("_? = fieldIsSet_?("); a(p.bitIndex() + ")");
+		}
 	}
 	
 	function writeSetter(i:Int, p:Property)

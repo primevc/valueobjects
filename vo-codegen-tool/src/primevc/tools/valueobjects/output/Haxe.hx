@@ -863,6 +863,11 @@ class Haxe implements CodeGenerator
 			a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type), p.hasOption(transient)));
 			a(" }\n");
 		}
+		
+		// optional hasProperty()
+		if (p.hasOption(optional)) {
+			a("\tpublic inline function has"); code.addCapitalized(p.name); a("(): Bool { return has("); a(p.name.toUpperCase()); a("); }\n");
+		}
 	}
 	
 	function genSetter(i:Int, p:Property, fullName:String)

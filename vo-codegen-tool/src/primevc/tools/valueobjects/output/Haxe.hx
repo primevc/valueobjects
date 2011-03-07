@@ -885,7 +885,7 @@ class Haxe implements CodeGenerator
 		a("\tprivate function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient))); a(")\n\t{\n");
 		
 		a("\t\treturn if (v == "); if (Util.isEnum(p.type) || Util.isPTypeBuiltin(p.type)) a("this."); else a("(untyped this)."); a(p.name); a(") v;\n");
-		a("\t\telse\n\t\t{\n\t\t\t_changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
+		a("\t\telse\n\t\t{\n\t\t\tif (isEditable()) _changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
 		
 		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type))
 		{

@@ -117,16 +117,17 @@ object ConvertTo
     case v:URI => v
     case v:URL => v.toURI
     case v:String => uri(v)
+    case v:RawType => uri(v.asString)
     case None => null
-    case _ => new URI(value.toString)
   }
-  def uri (v:String) = if (v == null || v.isEmpty) null else try { new URI(v) } catch { case e:URISyntaxException => null }
+  def uri (v:String) = if (v == null || v.isEmpty) null else try { new URI(v.replace(" ", "%20")) } catch { case e:URISyntaxException => null }
 
   def email         (value:Any) : InternetAddress = unpack(value) match {
     case v:InternetAddress => v
     case v:URI if ("mailto" == v.getScheme)   => new InternetAddress(v.getRawSchemeSpecificPart)
     case v:URL if ("mailto" == v.getProtocol) => new InternetAddress(v.getFile)
     case v:String => new InternetAddress(v)
+    case v:RawType => new InternetAddress(v.asString)
     case None => null
   }
 
@@ -162,7 +163,7 @@ object ConvertTo
     case v:Number => integer(v)
     case v:IntegerType => integer(v)
     case v:String => integer(v)
-    case _ => 0
+//    case _ => 0
   }
   def integer       (value:String) : Int = {
     val v = value.trim
@@ -227,7 +228,7 @@ object ConvertTo
     case v:Number => new DateMidnight(v.longValue)
     case v:String => formatter.parseDateTime(v).toDateMidnight
     case None => null
-    case _ => new DateMidnight(value)
+//    case _ => new DateMidnight(value)
   }
 
   def datetime      (value:Any, formatter:DateTimeFormatter = ISODateTimeFormat.dateTime) : DateTime = unpack(value) match {
@@ -237,7 +238,7 @@ object ConvertTo
     case v:Number => new DateTime(v.longValue)
     case v:String => if (v.isEmpty) null else formatter.parseDateTime(v)
     case None => null
-    case _ => new DateTime(value)
+//    case _ => new DateTime(value)
   }
 
   def boolean       (value:Any) : Boolean = unpack(value) match {
@@ -246,6 +247,6 @@ object ConvertTo
     case v:Number => v.intValue > 0
 //    case None => false
 //    case _ => value != null
-    case _ => false
+//    case _ => false
   }
 }

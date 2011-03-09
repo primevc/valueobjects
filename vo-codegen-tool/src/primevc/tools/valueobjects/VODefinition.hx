@@ -2558,6 +2558,7 @@ enum PropertyOption
 	transient;
 	mongo_reference;
 	mongo_typeCast;
+	optional;
 }
 
 enum ClassOption

@@ -859,14 +859,15 @@ class Haxe implements CodeGenerator
 		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient))); a(";\n");
 		
 		if (!immutable && genGetterFn) {
-			a("\tprivate function get"); code.addCapitalized(p.name); a("() { return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = ");
+			a("\tprivate function get"); code.addCapitalized(p.name); a(" () { return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = ");
 			a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type), p.hasOption(transient)));
 			a(" }\n");
 		}
 		
 		// optional hasProperty()
 		if (p.hasOption(optional)) {
-			a("\tpublic inline function has"); code.addCapitalized(p.name); a("(): Bool { return has("); a(p.name.toUpperCase()); a("); }\n");
+			if (immutable)		{ a("\tpublic function has"); code.addCapitalized(p.name); a(" (): Bool;\n"); }
+			else				{ a("\tpublic inline function has"); code.addCapitalized(p.name); a(" (): Bool { return has("); a(p.name.toUpperCase()); a("); }\n"); }
 		}
 	}
 	

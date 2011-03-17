@@ -245,6 +245,7 @@ object ConvertTo
     case v:Boolean => v
     case v:String => v.trim.toUpperCase match { case "TRUE" | "1" | "YES" => true; case _ => false }
     case v:Number => v.intValue > 0
+    case v:org.msgpack.`object`.BooleanType => v.asBoolean
 //    case None => false
 //    case _ => value != null
 //    case _ => false

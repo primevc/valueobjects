@@ -77,6 +77,7 @@ class MessagePackResource <Data> implements IDisposable
 		var load	= loader.events.load;
 		onComplete	= load.completed.bind( this, doNothing );
 		onError		= load.error.observe( this, doNothing );
+		handleStatus.on( loader.events.httpStatus, this );
 		events		= new DataServiceEvents(load.progress);
 	}
 
@@ -153,6 +154,8 @@ class MessagePackResource <Data> implements IDisposable
 
 	private function handleGET ()
 	{
+		trace(loader.bytesLoaded+" / "+loader.bytesTotal);
+		
 		var bytes	= haxe.io.Bytes.ofData(loader.data);
 		var input	= reader.input = new haxe.io.BytesInput(bytes);
 		input.bigEndian = true;
@@ -163,9 +166,16 @@ class MessagePackResource <Data> implements IDisposable
 	
 
 	private function handlePOST()
-	{   
+	{
+		trace(loader.bytesLoaded+" / "+loader.bytesTotal);
 		bytesSending = 0;
 		events.send.completed.send();
+	}
+
+
+	private function handleStatus(status:Int)
+	{
+		trace(status+" => "+loader.bytesLoaded+" / "+loader.bytesTotal);
 	}
 }
 

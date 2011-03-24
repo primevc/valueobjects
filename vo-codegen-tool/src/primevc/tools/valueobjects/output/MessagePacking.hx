@@ -108,7 +108,9 @@ class MessagePacking
 		if (hasMixins)
 		{	
 		//	for (t in def.supertypes) mixinBits += t.propertiesSorted.length;
-			for (t in def.supertypes) if (t.propertiesSorted.length > 0) mixinBits += t.bitIndex(t.propertiesSorted[t.propertiesSorted.length - 1]) + 1;
+			for (t in def.supertypes) if (t.propertiesSorted.length > 0) mixinBits += t.maxPropertyIndex + 1;
+			
+			for (p in def.propertiesDefined) if (p.definedIn == def) { mixinBits = def.bitIndex(p) + 1; break; }
 			
 			if (mixinBits > 1)
 			{
@@ -127,14 +129,14 @@ class MessagePacking
 			}
 			else {
 				// single mixin with 1 field optimization (like ObjectId)
-				a("\n\t\tvar mixin = propertyBits & 1; // Single field mixin: "); a(def.supertypes.first().fullName);
+				a("\n\t\tvar mixBits = propertyBits & 1; // Single field mixin: "); a(def.supertypes.first().fullName);
 			}
 			
 			a("\n\t\tpropertyBits >>>= "); a(mixinBits + ";");
 		}
 		
 		a_packVOHeaderCallStart();
-		if (hasMixins) a("mixin");
+		if (hasMixins) a(mixinBits > 1? "mixin" : "mixBits");
 		else if (!hasSuper) a("0");
 		
 		if (lastProp != null)
@@ -248,8 +250,8 @@ class MessagePacking
 		if (hasMixins)
 		{
 			a("\n\t\t");
-			if (lastProp != null) {	a("if ("); a_not0("mixin"); a(")"); }
-			else				  {	a_assertNot0("mixin"); }
+			if (lastProp != null) {	a("if ("); a_not0(mixinBits > 1? "mixin" : "mixBits"); a(")"); }
+			else				  {	a_assertNot0(mixinBits > 1? "mixin" : "mixBits"); }
 			
 			a("\n\t\t{");
 			

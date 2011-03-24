@@ -142,7 +142,7 @@ class HaxeMessagePacking extends MessagePacking
 			
 			a("\n\t\tcase "); a(Std.string(t.index)); a(": ");
 		
-			var offset = 0; for (p in def.propertiesSorted) if (p.definedIn != t) ++offset; else break;
+			var offset = 0; for (p in def.propertiesSorted) if (p.definedIn == t) { offset = p.bitIndex(); break; }
 			a(offset + ";"); a(" // "); a(t.fullName);
 		}
 	}

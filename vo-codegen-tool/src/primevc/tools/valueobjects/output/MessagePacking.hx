@@ -68,7 +68,7 @@ class MessagePacking
 	private function addIfMixinBitsSet(t:BaseTypeDefinition, offset:Int, expr:String)
 	{
 		a("\n			if (");
-		a_not0( "(propertyBits & " + (t.propertiesSorted.length == 1? "1" : interfacePropertiesBitmask(t, offset)) + " /* " + t.name + " */)");
+		a_not0( "(propertyBits & " + interfacePropertiesBitmask(t, offset) + " /* " + t.name + " */)");
 		a(") "); a(expr);
 	}
 	
@@ -333,6 +333,6 @@ class MessagePacking
 	
 	static function interfacePropertiesBitmask(t:BaseTypeDefinition, offset:Int)
 	{
-		return bitmask(t.propertiesSorted.length, offset);
+		return bitmask(t.maxPropertyIndex + 1, offset);
 	}
 }

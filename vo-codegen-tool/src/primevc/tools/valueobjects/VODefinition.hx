@@ -1909,7 +1909,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 			
 			var startIndex = lastPropertyBitIndex;
 			for (j in i ... propertiesSorted.length) { var p = propertiesSorted[j]; if (p.definedIn != t) break; else {
-				if (p.index > maxPropIndex) maxPropIndex = p.index;
+				if (!p.hasOption(transient) && p.index > maxPropIndex) maxPropIndex = p.index;
 				propertyBitIndex.set(p.name, startIndex + p.index);
 			}}
 			
@@ -1950,7 +1950,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		for (p in this.property) if (p.definedIn == this) {
 			++n;
 			propertiesDefined.set(p.index, p);
-			if (p.index > maxPropertyIndex) maxPropertyIndex = p.index;
+			if (!p.hasOption(transient) && p.index > maxPropertyIndex) maxPropertyIndex = p.index;
 		}
 		Assert.that(n <= 31, "Max index used: "+ n + ", class: "+fullName);
 		numPropertiesDefined = n + 1;

@@ -2005,6 +2005,9 @@ class ScalaMessagePacking extends MessagePacking
 	override private function endPackerFunction() {
 		a("\n\t}\n");
 	}
+	override private function addFieldIndexOffsetCase(t : TypeDefinition, offset : Int) {
+		a("\n    case "); a(Std.string(t.index)); a(" => "); a(offset + ";"); a(" // "); a(t.fullName);
+	}
 	
 	override private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)
 	{
@@ -2035,8 +2038,6 @@ class ScalaMessagePacking extends MessagePacking
 		a("\n		var propertyBits = flagsToPack;");
 	}
 	
-	var fieldIndexOffset : IntHash<Bool>;
-	
 	override private function genDeSerialization(lastProp)
 	{
 		fieldIndexOffset = new IntHash();
@@ -2045,21 +2046,6 @@ class ScalaMessagePacking extends MessagePacking
 		a("\n  def fieldIndexOffset(typeID: Int) = typeID match {");
 		genFieldOffsetCases(def);
 		a("\n  }\n");
-	}
-	
-	private function genFieldOffsetCases(t:TypeDefinition)
-	{
-		if (t.is(ClassDef)) {
-			for (s in t.as(ClassDef).supertypes) genFieldOffsetCases(s);
-		}
-		
-		if (!fieldIndexOffset.exists(t.index)) {
-			fieldIndexOffset.set(t.index, true);
-			a("\n    case "); a(Std.string(t.index)); a(" => ");
-		
-			var offset = 0; for (p in def.propertiesSorted) if (p.definedIn == t) { offset = p.bitIndex(); break; }
-			a(offset + ";"); a(" // "); a(t.fullName);
-		}
 	}
 	
 	override private function a_unpackProperty(p:Property)

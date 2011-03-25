@@ -129,24 +129,6 @@ class HaxeMessagePacking extends MessagePacking
 		a("\n\t\t");
 	}
 	
-	var fieldIndexOffset : IntHash<Bool>;
-	
-	private function genFieldOffsetCases(t:TypeDefinition)
-	{
-		if (t.is(ClassDef)) {
-			for (s in t.as(ClassDef).supertypes) genFieldOffsetCases(s);
-		}
-		
-		if (!fieldIndexOffset.exists(t.index)) {
-			fieldIndexOffset.set(t.index, true);
-			
-			a("\n\t\tcase "); a(Std.string(t.index)); a(": ");
-		
-			var offset = 0; for (p in def.propertiesSorted) if (p.definedIn == t) { offset = p.bitIndex(); break; }
-			a(offset + ";"); a(" // "); a(t.fullName);
-		}
-	}
-	
 	
 	override private function defineUnPackerFunction()
 	{

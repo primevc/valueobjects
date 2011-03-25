@@ -29,4 +29,22 @@
 package primevc.types;
 
 
-class FileRef extends URI { }
+/**
+ * FileRef class is meant for files that are hosted by online-touch. Use URI-class
+ * for uri's that are hosted externally.
+ */
+class FileRef extends URI
+{
+	/**
+	 * prefix that will be added before every URI.toString
+	 * By not adding the prefix to the URI itself we can make sure the data
+	 * isn't saved with a prefix
+	 */
+	public static var prefix : String = null;
+	
+	
+	override public function toString ()
+	{
+		return prefix + super.toString();
+	}
+}

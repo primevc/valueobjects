@@ -70,9 +70,9 @@ class MessagePackResource <Data> implements IDisposable
 		
 		reader = new primevc.utils.msgpack.Reader(typeMap);
 		loader = new URLLoader();
-#if flash9
-		loader.dataFormat = flash.net.URLLoaderDataFormat.BINARY;
-#end
+//#if flash9
+//		loader.dataFormat = flash.net.URLLoaderDataFormat.BINARY;
+//#end
 		
 		var load	= loader.events.load;
 		onComplete	= load.completed.bind( this, doNothing );

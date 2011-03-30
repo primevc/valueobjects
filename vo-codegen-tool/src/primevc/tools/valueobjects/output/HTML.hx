@@ -69,6 +69,7 @@ class HTML implements CodeGenerator
 			case Tarray(etype, min, max):	'<b>array of </b>'+typeHTML(pname, etype)+' '+ minmax(min,max);
 			
 			case Tdef(ptypedef):			typeLink(Util.unpackPTypedef(ptypedef));
+			case TclassRef(className):		'<b>'+className+'</b>';
 			
 			case Turi,
 				TuniqueID,

@@ -98,7 +98,8 @@ class HaxeMessagePacking extends MessagePacking
 				a("\n\t\t\t\tfor (i in 0 ... a.length) "); addPropertyPackerCall("a.getItemAt(i)", type, false); ac(";".code);
 				a("\n\t\t\t}");
 				
-			case TenumConverter(_):	throw "Not implemented";
+			case TenumConverter(_):	throw "Not implemented";	
+			case TclassRef(_):		throw "Not implemented";
 			
 		}
 	}
@@ -465,7 +466,7 @@ class Haxe implements CodeGenerator
 			if (Util.isEnum(ptype)) null
 			else "!" + path + ".isEmpty()";
 		
-		case Tbool(_), TuniqueID, Tinterval, TenumConverter(_), Tdate, Tdatetime, Tcolor:
+		case Tbool(_), TuniqueID, Tinterval, TenumConverter(_), Tdate, Tdatetime, Tcolor, TclassRef(_):
 			null;
 	}
 	
@@ -1204,6 +1205,9 @@ private class HaxeUtil
 			
 			case Tinteger(_,_,_), Tdecimal(_,_,_), Temail, Tstring, Tbool(_), TenumConverter(_), Tdate, Tdatetime, Tcolor:
 				initializer;
+			
+			case TclassRef(_):
+				null;
 		}
 		
 		return	 if (bindable && transient)		"new primevc.core.Bindable<"+ HaxeUtil.haxeType(ptype) +">("+ code +");";
@@ -1228,7 +1232,7 @@ private class HaxeUtil
 //		case Tdecimal(_,_,_):		'primevc.types.Number.FLOAT_NOT_SET';
 		case Temail:				"''";
 		
-		case Turi, TfileRef, Tinterval, Tdecimal(_,_,_), TuniqueID, TenumConverter(_), Tdate, Tdatetime, Tcolor:
+		case Turi, TfileRef, Tinterval, Tdecimal(_,_,_), TuniqueID, TenumConverter(_), Tdate, Tdatetime, Tcolor, TclassRef(_):
 			null;
 	}
 		
@@ -1244,7 +1248,7 @@ private class HaxeUtil
 	{
 		case Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tcolor:
 			bindable;
-		case Tstring,Tdate,Tdatetime,Tinterval,Turi,TuniqueID,Temail,TfileRef, Tdef(_), TenumConverter(_), Tarray(_,_,_):
+		case Tstring,Tdate,Tdatetime,Tinterval,Turi,TuniqueID,Temail,TfileRef, Tdef(_), TenumConverter(_), Tarray(_,_,_), TclassRef(_):
 			true;
 	}
 	
@@ -1294,6 +1298,7 @@ private class HaxeUtil
 			case Temail:					'primevc.types.EMail';
 			case Tcolor:					'primevc.types.RGBA';
 			case TfileRef:					'primevc.types.FileRef';
+			case TclassRef(classPath):		classPath;
 			
 			case Tdef(ptypedef):			switch (ptypedef) {
 				case Tclass		(def): (immutableInterface? def.module.fullName + ".I" + def.name : def.fullName) + "VO";
@@ -1337,6 +1342,7 @@ private class HaxeUtil
 		case Temail:					'TClass(primevc.types.EMail)';
 		case Tcolor:					'TClass(primevc.types.RGBA)';
 		case TfileRef:					'TClass(primevc.types.FileRef)';
+		case TclassRef(className):		'TClass('+className+')';
 		
 		case Tdef(ptypedef):			switch (ptypedef) {
 			case Tclass		(def): "TClass("+ def.module.fullName + "VO)";
@@ -1375,7 +1381,7 @@ private class HaxeUtil
 			//	'String';
 				throw "Unsupported value literal";
 			
-			case Tdef(_), Tinterval, Tarray(_,_,_):
+			case Tdef(_), Tinterval, Tarray(_,_,_), TclassRef(_):
 				throw "Unsupported value literal: "+type;
 		}
 		/*
@@ -1928,8 +1934,9 @@ private class HaxeXMLMap extends CodeBufferer
 			case Temail:					throw "impossible Temail";
 			case Tdef(ptypedef):			throw "impossible int conversion Tdef: "+ptypedef;
 			
-			case TenumConverter(enums):		throw "not implemented";
-			case Tarray(type, min, max):	throw "not implemented";
+			case TclassRef(className):		throw "not implemented "+ptype;
+			case TenumConverter(enums):		throw "not implemented "+ptype;
+			case Tarray(type, min, max):	throw "not implemented "+ptype;
 		}
 	}
 	
@@ -1954,6 +1961,7 @@ private class HaxeXMLMap extends CodeBufferer
 			
 			case TenumConverter(enums):		throw "not implemented";
 			case Tarray(type, min, max):	throw "not implemented";
+			case TclassRef(className):			throw "not implemented";
 		}
 	}
 	
@@ -2005,6 +2013,7 @@ private class HaxeXMLMap extends CodeBufferer
 				/*'return'*/ prop.definition.utilClassPath+"."+convFunction;
 			
 			case Tinterval:					throw "Interval not supported as XML value";
+			case TclassRef(_):				throw "Dynamic class-type not supported as XML value";
 			case Tarray(type, min, max):	"function(arr){Lambda.iter(arr, "+getXMLConversionFunction(type, "arr", prefix, property).fun+");}";
 		}
 		

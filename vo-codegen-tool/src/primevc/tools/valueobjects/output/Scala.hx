@@ -154,6 +154,7 @@ file.writeString("
 					++nonEmptyChecks;
 				
 				case TenumConverter(_):		throw p;
+				case TclassRef(_):			continue; //throw p;
 			}
 			else switch (p.type) {
 				case TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
@@ -209,7 +210,8 @@ file.writeString("
 		currentFieldBitNum = thisPropsStartIndex;
 		
 		for (p in def.propertiesDefined)
-			writeVarGetter(p);
+		//	if (!p.isTransient())
+				writeVarGetter(p);
 		a("\n}\n\n");
 		
 		if (def.isMixin) {
@@ -239,6 +241,8 @@ file.writeString("
 		
 		for (i in thisPropsStartIndex ... def.propertiesSorted.length) {
 			var p = def.propertiesSorted[i];
+		//	if (p.isTransient())
+		//		continue;
 			var r = p.hasOption(required);
 			if (r) requiredProps.add(i);
 			writeSetter(i, p);
@@ -553,6 +557,9 @@ file.writeString("
 			
 			for (i in thisPropsStartIndex ... def.propertiesSorted.length) {
 				var p = def.propertiesSorted[i];
+			//	if (p.isTransient())
+			//		continue;
+				
 				a("      "); writeMongoGetter(p, "vo." + propertyName(p));
 			}
 			if (def.superClass != null) {
@@ -639,7 +646,7 @@ file.writeString("
 		case TenumConverter(enums):
 			throw "Unsupported value literal";
 		
-		case Tdef(_), Tinterval, Tarray(_,_,_):
+		case Tdef(_), Tinterval, Tarray(_,_,_), TclassRef(_):
 			throw "Unsupported value literal: "+type;
 	}
 	
@@ -659,6 +666,7 @@ file.writeString("
 		case Tinterval:				throw t;
 		case Tarray(innerT,_,_):	throw t;
 		case TenumConverter(prop):	throw t;
+		case TclassRef(_):			throw t;
 	}
 	
 	function genNamedSetKeyMatcher(def: NamedSetDef, wildcardMethod:String, action:Int->Property->String)
@@ -891,6 +899,7 @@ file.writeString("
 			case Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, TuniqueID, TfileRef, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
 				a('__'); a(p.name);
 			
+			case TclassRef(className):	a(className); //throw p;
 			case TenumConverter(_):		throw p;
 		}
 		
@@ -1077,6 +1086,7 @@ file.writeString("
 		case Tbool(_):				"ConvertTo.boolean";
 		case Tcolor:				"ConvertTo.rgba";
 		case TenumConverter(prop):	prop.parent.fullName + ".from" + prop.name.substr(2); //"";
+		case TclassRef(className):	"ConvertTo."+className; //throw t;
 	}
 	
 	function mongoConversionHelper(t:PType, path:String, ?v:String = "v") return switch(t) {
@@ -1095,10 +1105,11 @@ file.writeString("
 		case Tdate:					"new org.joda.time.DateMidnight("+v+")";
 		case Tdatetime:				"new org.joda.time.DateTime("+v+")";
 		
-		case TuniqueID, Tstring, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
+		case TuniqueID, Tstring, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_), TclassRef(_):
 			v;
 		
 		case TenumConverter(_):		throw t; //"";
+	//	case TclassRef(_):			throw t;
 	}
 	
 	function needsMongoHelperClass(t:PType) return switch(t) {
@@ -1115,6 +1126,7 @@ file.writeString("
 		 	 Tdate,
 		 	 Tdatetime,
 			 Tcolor,
+			 TclassRef(_),
 		 	 Tbool(_):				false; //"Boolean";
 		
 		case TenumConverter(_):		throw t; //"";
@@ -1135,6 +1147,7 @@ file.writeString("
 		case Tbool(v):				true; //"Boolean";
 		case Tdate:					false; //"org.joda.time.DateTime";
 		case Tdatetime:				false; //"org.joda.time.DateTime";
+		case TclassRef(_):			throw t;
 		case TenumConverter(_):		throw t; //"";
 	}
 	
@@ -1165,6 +1178,7 @@ file.writeString("
 			"String";
 		
 		case TenumConverter(_):		throw t; //"";
+		case TclassRef(className):	className; //throw t;
 	}
 	
 	function arrayInnerType(p:Property) return switch(p.type) {
@@ -1199,6 +1213,7 @@ file.writeString("
 		case Tdecimal(_,_,_):		"Double.NaN";
 		case Tbool(v):				Std.string(v);
 		
+		case TclassRef(_):			"null";
 		case TenumConverter(_):		throw t; //"";
 	}
 	
@@ -1221,6 +1236,7 @@ file.writeString("
 			case Tdatetime:				"org.joda.time.DateTime";
 			case Tinterval:				"org.joda.time.Interval";
 			case Tcolor:				"primevc.types.RGBA";
+			case TclassRef(className):	className;
 		
 			case Tdef(ptypedef): switch (ptypedef) {
 				case Tclass		(def):	def.fullName + "VO";
@@ -2026,7 +2042,8 @@ class ScalaMessagePacking extends MessagePacking
 				a('o.pack('); a(path); ac(")".code);
 			
 			
-			case TenumConverter(_):	throw "Not implemented";
+			case TenumConverter(_), TclassRef(_):
+				throw "Not implemented";
 		}
 	}
 	

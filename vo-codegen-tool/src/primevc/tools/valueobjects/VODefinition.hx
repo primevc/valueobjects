@@ -446,6 +446,7 @@ class Util
 			case Tdate:					false;
 			case Tdatetime:				false;
 			case Tinterval:				false;
+			case TclassRef(_):			false;
 		}
 	}
 	
@@ -469,6 +470,7 @@ class Util
 			case Tdate:					true;
 			case Tdatetime:				true;
 			case Tinterval:				true;
+			case TclassRef(_):			true;
 		}
 	}
 	
@@ -496,6 +498,7 @@ class Util
 			case Tdate:					true;
 			case Tdatetime:				true;
 			case Tinterval:				true;
+			case TclassRef(_):			true;
 		}
 	}
 	
@@ -703,6 +706,7 @@ class PropertyTypeResolver
 			case EMail:			Temail;
 			case UniqueID:		TuniqueID;
 			case FileRef:		TfileRef;
+			case ClassRef(r):	TclassRef(r);
 			
 			case subclass(_,_,_),
 				namedSetOf(_,_,_,_),
@@ -725,7 +729,7 @@ class PropertyTypeResolver
 	{
 		type = switch(value)
 		{
-			case integer, decimal, color, date, datetime, interval, string, URI, EMail, UniqueID, FileRef:
+			case integer, decimal, color, date, datetime, interval, string, URI, EMail, UniqueID, FileRef, ClassRef(_):
 				builtinAbstractPType(value);
 			
 			case is(typeName):
@@ -766,7 +770,7 @@ class PropertyTypeResolver
 							case MUndefined(n,m):	throw Err_UndefinedType(path);
 						}
 					
-					case integer, decimal, color, date, datetime, interval, string, URI, EMail, UniqueID, FileRef:
+					case integer, decimal, color, date, datetime, interval, string, URI, EMail, UniqueID, FileRef, ClassRef(_):
 						builtinAbstractPType(atype);
 					
 					case namedSetOf	(_,_,_,_):	throw "namedSetOf(namedSetOf(...)) unsupported";
@@ -898,6 +902,11 @@ class Property
 		return hasOption(PropertyOption.bindable);
 	}
 	
+	public function isTransient()
+	{
+		return hasOption(transient);
+	}
+	
 	public function isArray ()
 	{
 		return switch (this.type) {
@@ -956,6 +965,7 @@ class Property
 			case Tcolor:			assert(hasType(Int));
 			case Tbool(v):			assert(hasType(Int) || hasType(Bool));
 			case TfileRef:			assert(hasType(String));
+			case TclassRef(_):		throw "not implemented";
 			
 			case TenumConverter(e):	throw "not implemented";
 			case Tdate:				throw "not implemented";
@@ -2274,6 +2284,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 			case Tinteger(a,b,c):	throw Err_PropertyHasNoMembers;
 			case TuniqueID:			throw Err_PropertyHasNoMembers;
 			case TfileRef:			throw Err_PropertyHasNoMembers;
+			case TclassRef(a):		throw Err_PropertyHasNoMembers;
 		}
 		
 		return def.doFindProperty(node.slice(1));
@@ -2522,6 +2533,7 @@ enum PType
 	Tstring;
 	Turi;
 	Temail;
+	TclassRef		(ref:String);
 	
 	TuniqueID;
 	TfileRef;
@@ -2551,6 +2563,7 @@ enum AbstractPType
 	string;
 	URI;
 	EMail;
+	ClassRef(ref:String);		//ref contains full classpath to the requested class
 	
 	// special data
 	date;

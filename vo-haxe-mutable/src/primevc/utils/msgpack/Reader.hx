@@ -79,7 +79,7 @@ class Reader implements IDisposable
 			case 0xdc:	i.readUInt16();
 			case 0xdd:	i.readUInt30();
 			default:
-				return if (b & 0xF0 == 0x90) b & 15;
+				if (b & 0xF0 == 0x90) b & 15;
 				else 1;
 		}
 	}

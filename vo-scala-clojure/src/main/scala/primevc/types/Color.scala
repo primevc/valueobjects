@@ -25,7 +25,7 @@ class RGBA private[types](val rgba:Int)
       parseLong(s).toInt
   })
 
-  def alphaPercent: Float = alpha / 255
+  def alphaPercent: Float = alpha.toFloat / 255
   def rgb   = (rgba >>> 8)
   def red   = (rgba & 0xFF000000) >>> 24
   def green = (rgba &   0xFF0000) >>> 16
@@ -62,6 +62,7 @@ object RGBA
     case 0xFFFFFFFF => white
     case _ => new RGBA(i)
   }
+  def apply(i:Long): RGBA = apply((i & 0xFFFFFFFF).toInt);
   def apply(rgb:Int, a:Int): RGBA = apply((rgb << 8) | a)
   def apply(rgb:Int, alphaPercentage:Float): RGBA = apply(rgb, (255 * alphaPercentage).toInt)
 }

@@ -275,4 +275,12 @@ class RevertableVOArrayList<DataType : IValueObject>
 		l.flags = flags;
 		return l;
 	}
+	
+	
+	override public function duplicate () : primevc.core.collections.IReadOnlyList<DataType>
+	{
+		var l = new RevertableVOArrayList<DataType>( list.duplicate() );
+		l.flags = flags;
+		return l;
+	}
 }

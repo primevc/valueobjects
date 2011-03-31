@@ -194,7 +194,7 @@ class ClassGenSpecBase extends CodegenSpecs
 		"XMLString.fromURI",
 		"XMLString.fromEMail",
 		"XMLString.fromColor",
-		"XMLString.fromBitmap",
+		"XMLString.fromAsset",
 		"NOT A CONVERSION",
 		
 		"XMLString.fromInt",

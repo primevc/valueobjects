@@ -10,7 +10,11 @@ trait ValueObject
   protected[primevc] def Companion : VOCompanion[_] with VOMessagePacker[_]
   protected[primevc] var $fieldsSet : Int = 0
 
-  def fieldIsSet_?(field:Field): Boolean = fieldIsSet_?(Companion.field(field.name.name))
+  def fieldIsSet_?(field:Field): Boolean = {
+    updateFieldsSet_!
+    fieldIsSet_?(Companion.field(field.name.name))
+  }
+  def fieldIsSet_?(name:Symbol): Boolean = fieldIsSet_?(Companion.field(name))
   
   /** Which field (as defined by the companion object fields Vector indices) is set? */
   def fieldIsSet_?(index:Int): Boolean = ($fieldsSet & (1 << index)) != 0

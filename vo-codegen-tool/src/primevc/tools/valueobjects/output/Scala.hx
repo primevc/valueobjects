@@ -760,7 +760,7 @@ file.writeString("
 		a("\n    vo");
 		a("\n  }");
 		
-		a("\n  def toXML(vo:"); a(def.name); a("VO): NodeSeq = if (vo.empty_?) NodeSeq.Empty else vo map(toXML(_)) reduceLeft { (a:NodeSeq, b:NodeSeq) => a union b };\n");
+		a("\n  def toXML(vo:"); a(def.name); a("VO): NodeSeq = if (vo.empty_?) NodeSeq.Empty else vo.toSeq.flatMap(toXML(_));\n");
 		
 /*		a("\n  override def get(key: String): Option["); a(type.name); a("] = {");
 		for (i in 0 ... def.propertiesSorted)
@@ -892,6 +892,11 @@ file.writeString("
 				a('__'); a(p.name);
 			
 			case TenumConverter(_):		throw p;
+		}
+		
+		// optional hasProperty()
+		if (p.hasOption(optional)) {
+			a("\n  final def has"); a(p.name.substr(0,1).toUpperCase()); a(p.name.substr(1)); a("_? = fieldIsSet_?("); a(p.bitIndex() + ")");
 		}
 	}
 	
@@ -2000,6 +2005,9 @@ class ScalaMessagePacking extends MessagePacking
 	override private function endPackerFunction() {
 		a("\n\t}\n");
 	}
+	override private function addFieldIndexOffsetCase(t : TypeDefinition, offset : Int) {
+		a("\n    case "); a(Std.string(t.index)); a(" => "); a(offset + ";"); a(" // "); a(t.fullName);
+	}
 	
 	override private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)
 	{
@@ -2030,8 +2038,6 @@ class ScalaMessagePacking extends MessagePacking
 		a("\n		var propertyBits = flagsToPack;");
 	}
 	
-	var fieldIndexOffset : IntHash<Bool>;
-	
 	override private function genDeSerialization(lastProp)
 	{
 		fieldIndexOffset = new IntHash();
@@ -2040,21 +2046,6 @@ class ScalaMessagePacking extends MessagePacking
 		a("\n  def fieldIndexOffset(typeID: Int) = typeID match {");
 		genFieldOffsetCases(def);
 		a("\n  }\n");
-	}
-	
-	private function genFieldOffsetCases(t:TypeDefinition)
-	{
-		if (t.is(ClassDef)) {
-			for (s in t.as(ClassDef).supertypes) genFieldOffsetCases(s);
-		}
-		
-		if (!fieldIndexOffset.exists(t.index)) {
-			fieldIndexOffset.set(t.index, true);
-			a("\n    case "); a(Std.string(t.index)); a(" => ");
-		
-			var offset = 0; for (p in def.propertiesSorted) if (p.definedIn != t) ++offset; else break;
-			a(offset + ";"); a(" // "); a(t.fullName);
-		}
 	}
 	
 	override private function a_unpackProperty(p:Property)

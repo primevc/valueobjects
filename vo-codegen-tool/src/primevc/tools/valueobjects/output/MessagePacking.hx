@@ -1,5 +1,6 @@
 package primevc.tools.valueobjects.output;
  import primevc.tools.valueobjects.VODefinition;
+  using primevc.utils.TypeUtil;
 
 /**
  * Helper functions to generate VO message packing functions
@@ -68,7 +69,7 @@ class MessagePacking
 	private function addIfMixinBitsSet(t:BaseTypeDefinition, offset:Int, expr:String)
 	{
 		a("\n			if (");
-		a_not0( "(propertyBits & " + (t.propertiesSorted.length == 1? "1" : interfacePropertiesBitmask(t, offset)) + " /* " + t.name + " */)");
+		a_not0( "(propertyBits & " + interfacePropertiesBitmask(t, offset) + " /* " + t.name + " */)");
 		a(") "); a(expr);
 	}
 	
@@ -106,9 +107,14 @@ class MessagePacking
 		var hasMixins = def.supertypes.length > 0;
 		
 		if (hasMixins)
-		{	
-		//	for (t in def.supertypes) mixinBits += t.propertiesSorted.length;
-			for (t in def.supertypes) if (t.propertiesSorted.length > 0) mixinBits += t.bitIndex(t.propertiesSorted[t.propertiesSorted.length - 1]) + 1;
+		{
+			for (t in def.supertypes) mixinBits += t.maxPropertyIndexNonTransient + 1;
+//			for (p in def.propertiesSorted) if (p.definedIn == def) mixinBits = p.bitIndex();
+//			for (t in def.supertypes) if (t.propertiesSorted.length > 0) mixinBits += t.maxPropertyIndex + 1;
+//			for (t in def.supertypes) if (t.propertiesSorted.length > 0) mixinBits += t.bitIndex(t.propertiesSorted[t.propertiesSorted.length - 1]) + 1;
+			
+//			for (p in def.propertiesDefined) if (p.definedIn == def) { mixinBits = def.bitIndex(p); break; }
+//			mixinBits = def.numPropertiesNonTransient;
 			
 			if (mixinBits > 1)
 			{
@@ -121,20 +127,20 @@ class MessagePacking
 				}
 				else for (t in def.supertypes) {
 					addIfMixinBitsSet(t, offset, expr_incrementMixinCount() + ";");
-					offset += t.propertiesSorted.length;
+					offset += t.maxPropertyIndexNonTransient + 1;
 				}
 				a("\n");
 			}
 			else {
 				// single mixin with 1 field optimization (like ObjectId)
-				a("\n\t\tvar mixin = propertyBits & 1; // Single field mixin: "); a(def.supertypes.first().fullName);
+				a("\n\t\tvar mixBits = propertyBits & 1; // Single field mixin: "); a(def.supertypes.first().fullName);
 			}
 			
 			a("\n\t\tpropertyBits >>>= "); a(mixinBits + ";");
 		}
 		
 		a_packVOHeaderCallStart();
-		if (hasMixins) a("mixin");
+		if (hasMixins) a(mixinBits > 1? "mixin" : "mixBits");
 		else if (!hasSuper) a("0");
 		
 		if (lastProp != null)
@@ -248,8 +254,8 @@ class MessagePacking
 		if (hasMixins)
 		{
 			a("\n\t\t");
-			if (lastProp != null) {	a("if ("); a_not0("mixin"); a(")"); }
-			else				  {	a_assertNot0("mixin"); }
+			if (lastProp != null) {	a("if ("); a_not0(mixinBits > 1? "mixin" : "mixBits"); a(")"); }
+			else				  {	a_assertNot0(mixinBits > 1? "mixin" : "mixBits"); }
 			
 			a("\n\t\t{");
 			
@@ -275,7 +281,7 @@ class MessagePacking
 				a("mixin);");
 				
 				if (t != def.supertypes.last()) {
-					a("\n\t\t\tmixBits >>>= "); a(t.propertiesSorted.length+";");
+					a("\n\t\t\tmixBits >>>= "); a((t.maxPropertyIndexNonTransient + 1) + ";");
 					a("\n\t\t\t");
 				}
 			}
@@ -285,6 +291,30 @@ class MessagePacking
 		}
 		
 		endPackerFunction();
+	}
+	
+	
+	var fieldIndexOffset : IntHash<Bool>;
+	
+	private function genFieldOffsetCases(t:TypeDefinition)
+	{
+		if (t.is(ClassDef)) {
+			for (s in t.as(ClassDef).supertypes) genFieldOffsetCases(s);
+		}
+		
+		if (!fieldIndexOffset.exists(t.index)) {
+			fieldIndexOffset.set(t.index, true);
+			
+			var lastProp = null;
+			var offset = 0; for (p in def.propertiesSorted) if (p.definedIn == t) { if (lastProp != null) offset = lastProp.bitIndex() + 1; break; } else if (!p.hasOption(transient)) lastProp = p;
+			
+			addFieldIndexOffsetCase(t, offset);
+		}
+	}
+	
+	private function addFieldIndexOffsetCase(t : TypeDefinition, offset : Int)
+	{
+		a("\n    case "); a(Std.string(t.index)); a(": "); a(offset + ";"); a(" // "); a(t.fullName);
 	}
 	
 	private function genDeSerialization(lastProp:Property)
@@ -333,6 +363,6 @@ class MessagePacking
 	
 	static function interfacePropertiesBitmask(t:BaseTypeDefinition, offset:Int)
 	{
-		return bitmask(t.propertiesSorted.length, offset);
+		return bitmask(t.maxPropertyIndexNonTransient + 1, offset);
 	}
 }

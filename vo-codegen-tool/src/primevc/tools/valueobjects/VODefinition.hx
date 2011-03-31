@@ -1881,7 +1881,8 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	
 	public var propertiesDefined(getPropertiesDefined, null) : IntHash<Property>; // key is property.index
 	public var numPropertiesDefined(getNumPropertiesDefined, null) : Int; // Count(propertiesDefined)
-	public var maxPropertyIndex(getMaxPropertyIndex, null) : Int; // max(propertiesDefined.index)
+	public var maxPropertyIndexNonTransient(getMaxPropertyIndexNonTransient, null) : Int; // Count(propertiesDefined)
+	public var maxDefinedPropertyIndex(getMaxDefinedPropertyIndex, null) : Int; // max(propertiesDefined.index) non-transient
 	public var propertiesSorted	(getPropertiesSorted,  null) : Array<Property>;
 	
 	public var settings		(default, null)		: {
@@ -1909,7 +1910,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 			
 			var startIndex = lastPropertyBitIndex;
 			for (j in i ... propertiesSorted.length) { var p = propertiesSorted[j]; if (p.definedIn != t) break; else {
-				if (p.index > maxPropIndex) maxPropIndex = p.index;
+				if (!p.hasOption(transient) && p.index > maxPropIndex) maxPropIndex = p.index;
 				propertyBitIndex.set(p.name, startIndex + p.index);
 			}}
 			
@@ -1920,6 +1921,8 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	
 	public function bitIndex(prop:Property)
 	{
+		if (prop.hasOption(transient)) return this.lastPropertyBitIndex + prop.index;
+		
 		if (propertyBitIndex == null) {
 			lastPropertyBitIndex = 0;
 			propertyBitIndex = new Hash();
@@ -1929,28 +1932,39 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		return propertyBitIndex.get(prop.name);
 	}
 	
+	private function getMaxPropertyIndexNonTransient()
+	{
+		getPropertiesDefined();
+		return maxPropertyIndexNonTransient;
+	}
+	
 	private function getNumPropertiesDefined()
 	{
 		getPropertiesDefined();
 		return numPropertiesDefined;
 	}
 	
-	private function getMaxPropertyIndex()
+	private function getMaxDefinedPropertyIndex()
 	{
 		getPropertiesDefined();
-		return maxPropertyIndex;
+		return maxDefinedPropertyIndex;
 	}
 	
 	private function getPropertiesDefined()
 	{
 		if (propertiesDefined != null) return propertiesDefined;
 		
-		var n = maxPropertyIndex = -1;
+		var n = maxDefinedPropertyIndex = -1;
 		propertiesDefined = new IntHash();
-		for (p in this.property) if (p.definedIn == this) {
-			++n;
-			propertiesDefined.set(p.index, p);
-			if (p.index > maxPropertyIndex) maxPropertyIndex = p.index;
+		for (p in this.property)
+		{
+			if (!p.hasOption(transient) && bitIndex(p) > maxPropertyIndexNonTransient) maxPropertyIndexNonTransient = bitIndex(p);
+			
+			if (p.definedIn == this) {
+				++n;
+				propertiesDefined.set(p.index, p);
+				if (!p.hasOption(transient) && p.index > maxDefinedPropertyIndex) maxDefinedPropertyIndex = p.index;
+			}
 		}
 		Assert.that(n <= 31, "Max index used: "+ n + ", class: "+fullName);
 		numPropertiesDefined = n + 1;
@@ -1996,6 +2010,8 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		this.description = "";
 		this.module = module;
 		this.name = name;
+		this.numPropertiesDefined = 0;
+		this.maxPropertyIndexNonTransient = 0;
 		this.property = new Hash();
 		this.propertyByNum = new IntHash();
 		this.implementedBy = new Hash();
@@ -2558,6 +2574,7 @@ enum PropertyOption
 	transient;
 	mongo_reference;
 	mongo_typeCast;
+	optional;
 }
 
 enum ClassOption

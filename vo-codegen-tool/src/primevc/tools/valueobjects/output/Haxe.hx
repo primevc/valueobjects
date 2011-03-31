@@ -1203,11 +1203,8 @@ private class HaxeUtil
 			
 			case TuniqueID:				initializer + ' == null? primevc.types.ObjectId.make() : ' + initializer;
 			
-			case Tinteger(_,_,_), Tdecimal(_,_,_), Temail, Tstring, Tbool(_), TenumConverter(_), Tdate, Tdatetime, Tcolor:
+			case Tinteger(_,_,_), Tdecimal(_,_,_), Temail, Tstring, Tbool(_), TenumConverter(_), Tdate, Tdatetime, Tcolor, TclassRef(_):
 				initializer;
-			
-			case TclassRef(_):
-				null;
 		}
 		
 		return	 if (bindable && transient)		"new primevc.core.Bindable<"+ HaxeUtil.haxeType(ptype) +">("+ code +");";

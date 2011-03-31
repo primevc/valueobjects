@@ -135,13 +135,9 @@ class MessagePackResource <Data> implements IDisposable
 			e   = events.send,
 			uri = uriSuffix == null? uriPrefix : new URI(uriPrefix.string + uriSuffix);
 		
-		// Serialize
-		var out			= new haxe.io.BytesOutput();
-		out.bigEndian	= true;
-		bytesSending	= obj.messagePack(out);
 		
-		var bytes = out.getBytes();
-		Assert.that(bytes.length == bytesSending);
+		var bytes		= serialize(obj);
+		bytesSending	= bytes.length;
 		
 		// Send
 		onComplete.handler	= handlePOST;
@@ -176,6 +172,18 @@ class MessagePackResource <Data> implements IDisposable
 	private function handleStatus(status:Int)
 	{
 		trace(status+" => "+loader.bytesLoaded+" / "+loader.bytesTotal);
+	}
+	
+	
+	public static inline function serialize (obj:IMessagePackable) : haxe.io.Bytes
+	{
+		// Serialize
+		var out			= new haxe.io.BytesOutput();
+		out.bigEndian	= true;
+		var origLen		= obj.messagePack(out);
+		var b			= out.getBytes();
+		Assert.equal(b.length, origLen);
+		return b;
 	}
 }
 

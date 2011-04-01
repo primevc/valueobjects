@@ -37,6 +37,7 @@ package primevc.core.net;
  import primevc.core.net.URLLoader;
  import primevc.types.URI;
   using primevc.utils.Bind;
+  using primevc.core.net.HttpStatusCodes;
 
 
 
@@ -54,8 +55,9 @@ class MessagePackResource <Data> implements IDisposable
 	public var data			(default, null) : Data;
 	public var uriPrefix	: URI;
 	
+	public var loader		(default, null) : URLLoader;
+	
 	private var reader		: primevc.utils.msgpack.Reader;
-	private var loader		: URLLoader;
 	private var bytes		: haxe.io.Bytes;
 	private var typeMap		: IntHash<Class<Dynamic>>;
 	private var onComplete  : Wire<Void   -> Void>;
@@ -77,7 +79,9 @@ class MessagePackResource <Data> implements IDisposable
 		var load	= loader.events.load;
 		onComplete	= load.completed.bind( this, doNothing );
 		onError		= load.error.observe( this, doNothing );
+#if debug
 		handleStatus.on( loader.events.httpStatus, this );
+#end
 		events		= new DataServiceEvents(load.progress);
 	}
 
@@ -136,21 +140,21 @@ class MessagePackResource <Data> implements IDisposable
 			uri = uriSuffix == null? uriPrefix : new URI(uriPrefix.string + uriSuffix);
 		
 		
-		var bytes		= serialize(obj);
-		bytesSending	= bytes.length;
+		l.bytes			= serialize(obj).getData();
+		bytesSending	= l.bytesTotal;
 		
 		// Send
 		onComplete.handler	= handlePOST;
 		onError.handler		= cast(events.send.error, Signal1<Dynamic>).send;
 		
-		l.binaryPOST(uri, bytes);
+		l.binaryPOST(uri);
 		e.started.send();
 	}
 	
 
 	private function handleGET ()
 	{
-		trace(loader.bytesLoaded+" / "+loader.bytesTotal);
+		trace(loader.bytesProgress+" / "+loader.bytesTotal);
 		
 		var bytes	= haxe.io.Bytes.ofData(loader.data);
 		var input	= reader.input = new haxe.io.BytesInput(bytes);
@@ -163,16 +167,18 @@ class MessagePackResource <Data> implements IDisposable
 
 	private function handlePOST()
 	{
-		trace(loader.bytesLoaded+" / "+loader.bytesTotal);
+		trace(loader.bytesProgress+" / "+loader.bytesTotal);
 		bytesSending = 0;
 		events.send.completed.send();
 	}
 
 
+#if debug
 	private function handleStatus(status:Int)
 	{
-		trace(status+" => "+loader.bytesLoaded+" / "+loader.bytesTotal);
+		trace(status.read()+" => "+loader.bytesProgress+" / "+loader.bytesTotal);
 	}
+#end
 	
 	
 	public static inline function serialize (obj:IMessagePackable) : haxe.io.Bytes

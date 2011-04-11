@@ -27,6 +27,7 @@
  *  Danny Wilson	<danny @ prime.vc>
  */
 package primevc.core.net;
+ import haxe.io.Bytes;
  import primevc.core.events.CommunicationEvents;
  import primevc.core.dispatcher.Signals;
  import primevc.core.dispatcher.Signal0;
@@ -151,12 +152,23 @@ class MessagePackResource <Data> implements IDisposable
 		e.started.send();
 	}
 	
-
+	
 	private function handleGET ()
 	{
 		trace(loader.bytesLoaded+" / "+loader.bytesTotal);
 		
+	#if js
+		var copy = Bytes.alloc(loader.bytesTotal);
+		var data = loader.data;
+		for (i in 0 ... data.length) {
+			copy.set(i, data.charCodeAt(i) & 0xFF);
+		}
+		var bytes = Bytes.ofData(copy.getData());
+		untyped console.log(bytes);
+	#else
 		var bytes	= haxe.io.Bytes.ofData(loader.data);
+	#end
+		
 		var input	= reader.input = new haxe.io.BytesInput(bytes);
 		input.bigEndian = true;
 		

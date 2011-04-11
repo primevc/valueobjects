@@ -45,6 +45,6 @@ class FileRef extends URI
 	
 	override public function toString ()
 	{
-		return prefix + super.toString();
+		return (prefix != null) ? prefix + super.toString() : super.toString();
 	}
 }

@@ -25,7 +25,7 @@ class MessagePackTest extends TestCase
 	{
 		var b = out.getBytes();
 		inp	= new BytesInput(b);
-		r	= new Reader(inp, new IntHash());
+		r	= new Reader(new IntHash(), inp);
 	
 		return b;
 	}

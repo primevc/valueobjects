@@ -27,6 +27,11 @@
  *  Danny Wilson	<danny @ prime.vc>
  */
 package primevc.core.net;
+ import haxe.io.Bytes;
+ import haxe.io.BytesData;
+ import haxe.io.BytesInput;
+ import haxe.io.BytesOutput;
+
  import primevc.core.events.CommunicationEvents;
  import primevc.core.dispatcher.Signals;
  import primevc.core.dispatcher.Signal0;
@@ -36,6 +41,7 @@ package primevc.core.net;
  import primevc.core.traits.IMessagePackable;
  import primevc.core.net.URLLoader;
  import primevc.types.URI;
+ import primevc.utils.msgpack.Reader;
   using primevc.utils.Bind;
   using primevc.core.net.HttpStatusCodes;
 
@@ -57,8 +63,8 @@ class MessagePackResource <Data> implements IDisposable
 	
 	public var loader		(default, null) : URLLoader;
 	
-	private var reader		: primevc.utils.msgpack.Reader;
-	private var bytes		: haxe.io.Bytes;
+	private var reader		: Reader;
+	private var bytes		: Bytes;
 	private var typeMap		: IntHash<Class<Dynamic>>;
 	private var onComplete  : Wire<Void   -> Void>;
 	private var onError		: Wire<String -> Void>;
@@ -81,6 +87,7 @@ class MessagePackResource <Data> implements IDisposable
 		onError		= load.error.observe( this, doNothing );
 #if debug
 		handleStatus.on( loader.events.httpStatus, this );
+		handleError.on( loader.events.load.error, this );
 #end
 		events		= new DataServiceEvents(load.progress);
 	}
@@ -154,43 +161,109 @@ class MessagePackResource <Data> implements IDisposable
 
 	private function handleGET ()
 	{
-		trace(loader.bytesProgress+" / "+loader.bytesTotal);
+		trace(loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
 		
-		var bytes	= haxe.io.Bytes.ofData(loader.data);
-		var input	= reader.input = new haxe.io.BytesInput(bytes);
-		input.bigEndian = true;
-		
-		data = reader.readMsgPackValue();
+		data = deserialize( loader.data, reader );
 		events.receive.completed.send();
+		
+		onComplete.handler	= doNothing;
+		onError.handler		= cast doNothing;
 	}
 	
 
 	private function handlePOST()
 	{
-		trace(loader.bytesProgress+" / "+loader.bytesTotal);
+		trace(loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
 		bytesSending = 0;
 		events.send.completed.send();
+		
+		onComplete.handler	= doNothing;
+		onError.handler		= cast doNothing;
 	}
 
 
 #if debug
-	private function handleStatus(status:Int)
-	{
-		trace(status.read()+" => "+loader.bytesProgress+" / "+loader.bytesTotal);
-	}
+	private function handleStatus(status:Int)	{ trace(status.read()+" => "+loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]"); }
+	private function handleError(e:String)		{ trace(e+"; [ "+uriPrefix+" ]"); }
 #end
 	
 	
-	public static inline function serialize (obj:IMessagePackable) : haxe.io.Bytes
+	public static inline function serialize (obj:IMessagePackable) : Bytes
 	{
 		// Serialize
-		var out			= new haxe.io.BytesOutput();
+#if debug
+		var start = haxe.Timer.stamp();
+#end
+		var out			= new BytesOutput();
 		out.bigEndian	= true;
 		var origLen		= obj.messagePack(out);
 		var b			= out.getBytes();
+
+#if debug
 		Assert.equal(b.length, origLen);
+		trace((haxe.Timer.stamp() - start)+" sec");
+#end
 		return b;
 	}
+	
+	
+	
+	public static inline function deserialize<Data> (data:BytesData, reader:Reader) : Data
+	{	
+#if debug
+		var start = haxe.Timer.stamp();
+#end
+		var bytes	= Bytes.ofData(data);
+		var input	= reader.input = new BytesInput(bytes);
+		input.bigEndian = true;
+#if debug
+		var o = reader.readMsgPackValue();
+		trace((haxe.Timer.stamp() - start)+" sec");
+		return o;
+#else
+		return reader.readMsgPackValue();
+#end
+	}
+	
+	
+/*	public static inline function serializeToString (obj:IMessagePackable) : String
+	{
+		var b = serialize(obj);
+		var d = b.getData();
+		var o = new StringBuf();
+		d.position = 0;
+		
+		for (i in 0...b.length)
+			o.addChar(d.readByte() & 0xFF);
+		
+	/*	// Test to make sure the serialized string contains the same bytes after deserializing again as the original data
+		var d2 = stringToBytes( o.toString() );
+		Assert.equal(d.length, d2.length);
+		
+		trace(o.toString());
+		d.position = 0;
+		d2.position = 0;
+		for (i in 0...b.length) {
+			var j1 = d.readByte();
+			var j2 = d2.readByte();
+			trace(StringTools.hex(j1, 2)+" / "+StringTools.hex(j1, 2));
+			Assert.equal( j1, j2 );
+		} //*/
+		
+/*		return o.toString();
+	}*/
+	
+	
+/*	public static inline function toBytes (input:String) : BytesData
+	{
+		var d = new BytesData();
+	//	var s2 = haxe.Timer.stamp();
+		d.writeUTFBytes(input);
+		
+	//	trace(primevc.utils.BytesUtil.toHex(d));
+	//	s2 = haxe.Timer.stamp() - s2;
+		return d;
+	}*/
 }
 
 

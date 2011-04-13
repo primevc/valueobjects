@@ -341,6 +341,7 @@ class Haxe implements CodeGenerator
 		if (!def.isMixin) {
 			genCloneFunction(def);
 			genDuplicateFunction(def);
+			genInjectValuesFunction(def);
 		}
 		
 		for (p in def.property) if (p.hasOption(unique)) {
@@ -662,6 +663,53 @@ class Haxe implements CodeGenerator
 		
 		closeFunctionDeclaration( def, "clone");
 	}
+	
+	
+	private function genInjectValuesFunction(def:ClassDef)
+	{
+		var a = code.add;
+		
+		var realType		= "I" + def.name + "VO";
+		var paramType		= "I" + (def.superClass == null ? def.name : def.getRootSuperClass().name) + "VO";
+		var functionName	= "injectValues";
+		
+		//open function declaration
+		a("\n\t");
+		if (def.superClass != null)
+			a("override ");
+		
+		a("public function "); a(functionName); a(" (data:"); a(paramType); a(") : Void");
+		a("\n\t{");
+		
+		//call super method
+		if (def.superClass != null) {
+			a("\n\t\tsuper."); a(functionName); a("(data);\n");
+		}
+		
+		a("\n\t\tvar vo = data.as("); a(realType); a(");");
+		
+		//inject properties
+		for (p in def.propertiesSorted)
+		{
+			if (p.hasOption(transient) || Util.isDefinedInSuperClassOf(def, p))
+				continue;
+			
+			a("\n\t\t");
+			if (p.isArray())
+			{
+				a("this."); a(p.name); a(".inject( "); a("vo."); a(p.name); a(" );");
+			}
+			else
+			{
+				var name = p.isBindable() ? p.name + ".value" : p.name;
+				a("this."); a(name); a(" = "); a("vo."); a(name); a(";");
+			}
+		}
+		a("\n");
+		closeFunctionDeclaration( def, "injectValues");
+	}
+	
+	
 	
 	
 	/**

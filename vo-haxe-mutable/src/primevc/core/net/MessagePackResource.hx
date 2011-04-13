@@ -157,7 +157,7 @@ class MessagePackResource <Data> implements IDisposable
 	{
 		trace(loader.bytesLoaded+" / "+loader.bytesTotal);
 		
-	#if js
+/*	#if js
 		var copy = Bytes.alloc(loader.bytesTotal);
 		var data = loader.data;
 		for (i in 0 ... data.length) {
@@ -166,8 +166,8 @@ class MessagePackResource <Data> implements IDisposable
 		var bytes = Bytes.ofData(copy.getData());
 		untyped console.log(bytes);
 	#else
-		var bytes	= haxe.io.Bytes.ofData(loader.data);
-	#end
+*/		var bytes	= haxe.io.Bytes.ofData(loader.data);
+//	#end
 		
 		var input	= reader.input = new haxe.io.BytesInput(bytes);
 		input.bigEndian = true;

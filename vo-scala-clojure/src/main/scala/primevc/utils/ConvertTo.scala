@@ -14,6 +14,7 @@ import collection.JavaConversions
 import java.net.{URISyntaxException, URL, URI}
 import org.msgpack.`object`.{NilType, ArrayType, IntegerType, RawType}
 import java.text.{ParseException, DecimalFormatSymbols, DecimalFormat}
+import org.msgpack.MessagePackObject
 
 /**
  * Created by IntelliJ IDEA.
@@ -167,7 +168,7 @@ object ConvertTo
   }
   def integer       (value:String) : Int = {
     val v = value.trim
-    if (v.isEmpty) 0 else v.toInt
+    if (v.isEmpty || v == "NaN") 0 else v.toInt
   }
   def integer       (value:java.lang.Number) : Int = if (value == null) 0 else value.intValue
   def integer       (value:IntegerType) : Int = value.asInt
@@ -227,6 +228,8 @@ object ConvertTo
     case v:Long => new DateMidnight(v)
     case v:Number => new DateMidnight(v.longValue)
     case v:String => formatter.parseDateTime(v).toDateMidnight
+    case v:org.msgpack.`object`.IntegerType => new DateMidnight( v.longValue )
+    case v:org.msgpack.`object`.FloatType => new DateMidnight( v.longValue )
     case None => null
 //    case _ => new DateMidnight(value)
   }
@@ -235,8 +238,11 @@ object ConvertTo
     case v:DateTime => v
     case v:Date => new DateTime(v)
     case v:Long => new DateTime(v)
+    case v:Double => new DateTime(v.toLong)
     case v:Number => new DateTime(v.longValue)
     case v:String => if (v.isEmpty) null else formatter.parseDateTime(v)
+    case v:org.msgpack.`object`.IntegerType => new DateTime( v.asLong )
+    case v:org.msgpack.`object`.FloatType => new DateTime( v.asLong )
     case None => null
 //    case _ => new DateTime(value)
   }
@@ -246,6 +252,7 @@ object ConvertTo
     case v:String => v.trim.toUpperCase match { case "TRUE" | "1" | "YES" => true; case _ => false }
     case v:Number => v.intValue > 0
     case v:org.msgpack.`object`.BooleanType => v.asBoolean
+    case v:MessagePackValueObject => throw new Exception("Expected bool: " + v.vo)
 //    case None => false
 //    case _ => value != null
 //    case _ => false

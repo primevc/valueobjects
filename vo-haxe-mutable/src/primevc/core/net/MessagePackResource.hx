@@ -71,9 +71,6 @@ class MessagePackResource <Data> implements IDisposable
 		
 		reader = new primevc.utils.msgpack.Reader(typeMap);
 		loader = new URLLoader();
-#if flash9
-		loader.dataFormat = flash.net.URLLoaderDataFormat.BINARY;
-#end
 		
 		var load	= loader.events.load;
 		onComplete	= load.completed.bind( this, doNothing );
@@ -120,7 +117,7 @@ class MessagePackResource <Data> implements IDisposable
 		onError.handler		= cast (events.receive.error, Signal1<Dynamic>).send;
 		
 		trace("get "+uri);
-		l.load(uri);
+		l.binaryGET(uri);
 		e.started.send();
 	}
 	
@@ -156,23 +153,21 @@ class MessagePackResource <Data> implements IDisposable
 	private function handleGET ()
 	{
 		trace(loader.bytesLoaded+" / "+loader.bytesTotal);
+		var start = haxe.Timer.stamp();
 		
-/*	#if js
-		var copy = Bytes.alloc(loader.bytesTotal);
-		var data = loader.data;
-		for (i in 0 ... data.length) {
-			copy.set(i, data.charCodeAt(i) & 0xFF);
-		}
-		var bytes = Bytes.ofData(copy.getData());
-		untyped console.log(bytes);
+	#if js
+		var input	= reader.input = new ByteStringInput(loader.data);
 	#else
-*/		var bytes	= haxe.io.Bytes.ofData(loader.data);
-//	#end
+		var bytes	= haxe.io.Bytes.ofData(loader.data);
 		
+		trace(StringTools.hex(bytes.get(0)));
 		var input	= reader.input = new haxe.io.BytesInput(bytes);
-		input.bigEndian = true;
+	#end
 		
-		data = reader.readMsgPackValue();
+		input.bigEndian = true;	
+		this.data = reader.readMsgPackValue();
+		
+		trace("Message un-packing took: " + (haxe.Timer.stamp() - start));
 		events.receive.completed.send();
 	}
 	
@@ -191,7 +186,26 @@ class MessagePackResource <Data> implements IDisposable
 	}
 }
 
-
+class ByteStringInput extends haxe.io.Input
+{
+	var b : String;
+	var pos : Int;
+	
+	public function new(charString : String) {
+		this.pos = 0;
+		this.b = charString;
+	}
+	
+	override public function readByte() : Int {
+		return StringTools.fastCodeAt(b, pos++) & 0xFF;
+	}
+	
+	override public function readString( len : Int ) : String {
+		var str = b.substr(pos, len);
+		pos += len;
+		return str;
+	}
+}
 
 
 /**

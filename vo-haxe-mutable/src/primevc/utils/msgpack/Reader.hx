@@ -47,14 +47,14 @@ class Reader implements IDisposable
 	{
 		Assert.notNull(this.input);
 		
-		var value;
+		var value = null;
 		try {
 			value = readValue(input.readByte(), pid, itemType);
 			if (IfUtil.notNull(itemType) && !Std.is(value, itemType))
 				value = converter(value, pid, itemType);
 		}
-		catch (e:Eof)
-		 	value = null;
+		catch (e:Eof) {}
+		// 	value = null;
 		
 		return value;
 	}

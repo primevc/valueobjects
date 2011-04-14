@@ -46,6 +46,13 @@ class VOPacker (out:OutputStream) extends Packer(out)
     }
   }
 
+  def pack(date : org.joda.time.DateTime): Unit = pack( date.toInstant )
+  def pack(date : org.joda.time.DateMidnight): Unit = pack( date.toInstant )
+
+  def pack(date : org.joda.time.Instant) {
+    pack( date.getMillis / 1000 )
+  }
+
   /** Packs specific valueobject fields as set in the fields bitmask.  */
   def packValueObject[V <: ValueObject](vo : V, fields : Int)
   {

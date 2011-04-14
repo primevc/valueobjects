@@ -86,7 +86,7 @@ class MessagePackResource <Data> implements IDisposable
 		onComplete	= load.completed.bind( this, doNothing );
 		onError		= load.error.observe( this, doNothing );
 #if debug
-		handleStatus.on( loader.events.httpStatus, this );
+	//	handleStatus.on( loader.events.httpStatus, this );
 		handleError.on( loader.events.load.error, this );
 #end
 		events		= new DataServiceEvents(load.progress);
@@ -183,7 +183,7 @@ class MessagePackResource <Data> implements IDisposable
 
 
 #if debug
-	private function handleStatus(status:Int)	{ trace(status.read()+" => "+loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]"); }
+//	private function handleStatus(status:Int)	{ trace(status.read()+" => "+loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]"); }
 	private function handleError(e:String)		{ trace(e+"; [ "+uriPrefix+" ]"); }
 #end
 	

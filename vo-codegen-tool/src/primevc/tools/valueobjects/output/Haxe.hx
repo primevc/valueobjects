@@ -295,7 +295,7 @@ class Haxe implements CodeGenerator
 				genGetter(p, true);
 			} else {
 				genGetter(p, false);
-				if (!p.hasOption(transient))
+				if (p.shouldHaveSetter())
 					genSetter(i, p, def.fullName);
 			}
 		}
@@ -768,11 +768,16 @@ class Haxe implements CodeGenerator
 	
 	private function genDispose(def:ClassDef)
 	{	
-		openFunctionDeclaration( def, "dispose", true );
+		openFunctionDeclaration( def, "dispose", true, "Void", false );
 		
 		for (p in def.property) if (!Util.isDefinedInSuperClassOf(def, p) && p.isDisposable()) {
-			a("\t\tif (this."); a(p.name); a(".notNull())\t\t{ "); a(p.name); a(".dispose(); "); a(p.name); a(" = null; }\n");
+			var name = p.shouldHaveSetter() ? "(untyped this)." + p.name : p.name;
+			a("\t\tif (this."); a(p.name); a(".notNull())\t\t{ "); a(p.name); a(".dispose(); "); a(name); a(" = null; }\n");
 		}
+		
+		//do supercall after the local properties are disposed
+	//	if (def.superClass != null)
+		callSuperFunction(def, "dispose");
 		
 		closeFunctionDeclaration( def, "dispose");
 	}
@@ -871,22 +876,14 @@ class Haxe implements CodeGenerator
 	function genGetter(p:Property, immutable:Bool)
 	{
 		a("\tpublic var "); a(p.name);
-		var genGetterFn = false;
-		if (p.hasOption(transient) || Util.isPTypeBuiltin(p.type) || Util.isEnum(p.type))
-			a("\t(default");
-		else {
-			a("\t(get"); code.addCapitalized(p.name);
-			genGetterFn = true;
-		}
+		var genGetterFn = p.shouldHaveGetter();
+		if (!genGetterFn)		{ a("\t(default"); }
+		else					{ a("\t(get"); code.addCapitalized(p.name); }
 		
-		if (immutable) {
-			a(",null");
-		}
-		else if (p.hasOption(transient))
-			a("\t,default");
-		else {
-			a(",set"); code.addCapitalized(p.name);
-		}
+		if (immutable)						{ a(",null"); }
+		else if (p.hasOption(transient))	{ a("\t,default"); }
+		else								{ a(",set"); code.addCapitalized(p.name); }
+		
 		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient))); a(";\n");
 		
 		if (!immutable && genGetterFn) {
@@ -904,8 +901,11 @@ class Haxe implements CodeGenerator
 	
 	function genSetter(i:Int, p:Property, fullName:String)
 	{
-		var typeName = null;
-		var listChangeHandler = false;
+		var typeName			= null;
+		var listChangeHandler	= false;
+		var hasGetter			= p.shouldHaveGetter();
+		var name				= hasGetter ? "(untyped this)." + p.name : p.name;
+		
 		if (p.isBindable() || p.isArray())
 		{
 			typeName = switch (p.type) {
@@ -921,17 +921,24 @@ class Haxe implements CodeGenerator
 		
 		a("\tprivate function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient))); a(")\n\t{\n");
 		
-		a("\t\treturn if (v == "); if (Util.isEnum(p.type) || Util.isPTypeBuiltin(p.type)) a("this."); else a("(untyped this)."); a(p.name); a(") v;\n");
-		a("\t\telse\n\t\t{\n\t\t\tif (isEditable()) _changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
+	//	a("\t\treturn if (v == "); a(name); a(") v;\n");
+	//	a("\t\telse\n\t\t{\n\t\t\tif (isEditable()) _changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
+		
+		a("\t\tif (v != "); a(name); a(")\n");
+		a("\t\t{\n");
 		
 		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type))
 		{
-			a("\t\t\tif (IfUtil.notNull((untyped this)."); a(p.name); a(")) ");
-				if (!p.isArray()) a("(untyped ");
-			a("this."); a(p.name);
-				if(!p.isArray()) a(")");
-			a(".change.unbind(this);\n");
+			a("\t\t\tif (IfUtil.notNull("); a(name); a("))\n");
 			
+	/*		if (!p.isArray())
+				a("(untyped ");
+			
+			a("this."); a(p.name);
+			if(!p.isArray())
+				a(")");*/
+			
+			a("\t\t\t\t"); a(name); a(".change.unbind(this);\n");
 			a("\t\t\tif (v.notNull()) {\n\t\t\t\tv.");
 			
 			if (p.isArray() || p.isBindable())
@@ -959,6 +966,7 @@ class Haxe implements CodeGenerator
 		a("\n\t\t\t");
 		a("\n\t\t\tthis."); a(p.name); a(" = v;\n");
 		a("\t\t}\n");
+		a("\t\treturn v;\n");
 		a("\t}\n");
 		
 		if (p.isBindable() || p.isArray())

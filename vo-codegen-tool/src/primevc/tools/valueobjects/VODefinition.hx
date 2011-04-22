@@ -1015,6 +1015,14 @@ class Property
 	public function copyOptions(prop:Property) {
 		trace("copyOptions not implemented ("+ this.definedIn.fullName +"."+ prop.name +")");
 	}
+	
+	public function shouldHaveGetter () : Bool {
+		return !hasOption(transient) && !Util.isPTypeBuiltin(type) && !Util.isEnum(type);
+	}
+	
+	public function shouldHaveSetter () : Bool {
+		return !hasOption(transient);
+	}
 }
 
 interface TypeDefinition

@@ -56,18 +56,23 @@ package primevc.core.net;
  */  
 class MessagePackResource <Data> implements IDisposable
 {
-	public var events		(default, null) : DataServiceEvents <Data>;
-	public var bytesSending (default, null) : Int;
-	public var data			(default, null) : Data;
-	public var uriPrefix	: URI;
+	public var events			(default, null) : DataServiceEvents <Data>;
+	public var bytesSending 	(default, null) : Int;
+	public var data				(default, null) : Data;
+	public var uriPrefix		: URI;
 	
-	public var loader		(default, null) : URLLoader;
+	public var loader			(default, null) : URLLoader;
 	
-	private var reader		: Reader;
-	private var bytes		: Bytes;
-	private var typeMap		: IntHash<Class<Dynamic>>;
-	private var onComplete  : Wire<Void   -> Void>;
-	private var onError		: Wire<String -> Void>;
+	/**
+	 * Cached value of the last returned http-status-code
+	 */
+	public var lastHttpStatus	(default, null)	: Int;
+	
+	private var reader			: Reader;
+	private var bytes			: Bytes;
+	private var typeMap			: IntHash<Class<Dynamic>>;
+	private var onComplete  	: Wire<Void   -> Void>;
+	private var onError			: Wire<String -> Void>;
 		
 
 	public function new(uriPrefix : URI, typeMap : IntHash<Class<Dynamic>>)
@@ -85,8 +90,9 @@ class MessagePackResource <Data> implements IDisposable
 		var load	= loader.events.load;
 		onComplete	= load.completed.bind( this, doNothing );
 		onError		= load.error.observe( this, doNothing );
+		
+		cacheStatus.on( loader.events.httpStatus, this );
 #if debug
-		handleStatus.on( loader.events.httpStatus, this );
 		handleError.on( loader.events.load.error, this );
 #end
 		events		= new DataServiceEvents(load.progress);
@@ -181,9 +187,15 @@ class MessagePackResource <Data> implements IDisposable
 		onError.handler		= cast doNothing;
 	}
 
-
+	
+	private function cacheStatus(status:Int)
+	{
+		lastHttpStatus = status;
+		trace(status.read()+" => "+loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
+	}
+	
+	
 #if debug
-	private function handleStatus(status:Int)	{ trace(status.read()+" => "+loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]"); }
 	private function handleError(e:String)		{ trace(e+"; [ "+uriPrefix+" ]"); }
 #end
 	

@@ -1001,7 +1001,7 @@ class Haxe implements CodeGenerator
 	}
 	
 	private function addPropChangeFlagUnsetter(bit) {
-		a("else _propertiesSet &= 0x" + StringTools.hex(0x7FFFFFFF ^ (1 << bit)) + ";");
+		a("else _propertiesSet &= 0x" + StringTools.hex(-1 ^ (1 << bit)) + ";");
 	}
 	
 	

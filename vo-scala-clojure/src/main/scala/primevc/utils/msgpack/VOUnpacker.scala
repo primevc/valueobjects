@@ -37,6 +37,7 @@ class VOUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends UnpackerImpl.V
 
   def prepareValueObject(typeID: Int) {
     if (vo == null) {
+      require(voCompanionMap.contains(typeID), "Type with id: "+typeID+", not found in voCompanionMap")
       voc = voCompanionMap(typeID).asInstanceOf[VOCompanion[ValueObject]]
       vo  = voc.empty
     }
@@ -48,8 +49,7 @@ class VOUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends UnpackerImpl.V
     do if ((fields & (1 << i)) == 0) i += 1;
     else {
       val field = currentIndex + i
-      if (field < vo.Companion.numFields)
-        vo.Companion.putValue(vo, field, value)
+      vo.Companion.putValue(vo, field, value)
 
       fields >>>= (i + 1);
       currentIndex += (if (fields != 0) i + 1 else 8 - i); // index fixup for last bit

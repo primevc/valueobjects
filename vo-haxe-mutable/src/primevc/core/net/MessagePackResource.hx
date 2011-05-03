@@ -238,6 +238,18 @@ class MessagePackResource <Data> implements IDisposable
 	}
 	
 	
+	/**
+	 * Method will the error send by the server
+	 */
+	public function getErrorResponse ()
+	{
+		var error		= Std.string( loader.getRawData() );
+		var beginBody	= error.indexOf( "<body>" ) + 6;			//add 6 for the 6 characters of <body>
+		var endBody		= error.indexOf( "</body>", beginBody );
+		return error.substr( beginBody, endBody - beginBody );
+	}
+	
+	
 /*	public static inline function serializeToString (obj:IMessagePackable) : String
 	{
 		var b = serialize(obj);

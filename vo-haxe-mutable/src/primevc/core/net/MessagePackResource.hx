@@ -116,7 +116,7 @@ class MessagePackResource <Data> implements IDisposable
 		onComplete.handler	= handleGET;
 		onError.handler		= cast (events.receive.error, Signal1<Dynamic>).send;
 		
-		trace("get "+uri);
+		//trace("get "+uri);
 		l.binaryGET(uri);
 		e.started.send();
 	}
@@ -152,7 +152,7 @@ class MessagePackResource <Data> implements IDisposable
 	
 	private function handleGET ()
 	{
-		trace(loader.bytesLoaded+" / "+loader.bytesTotal);
+		//trace(loader.bytesLoaded+" / "+loader.bytesTotal);
 		var start = haxe.Timer.stamp();
 		
 	#if js
@@ -167,14 +167,14 @@ class MessagePackResource <Data> implements IDisposable
 		input.bigEndian = true;	
 		this.data = reader.readMsgPackValue();
 		
-		trace("Message un-packing took: " + (haxe.Timer.stamp() - start));
+		//trace("Message un-packing took: " + (haxe.Timer.stamp() - start));
 		events.receive.completed.send();
 	}
 	
 
 	private function handlePOST()
 	{
-		trace(loader.bytesLoaded+" / "+loader.bytesTotal);
+		//trace(loader.bytesLoaded+" / "+loader.bytesTotal);
 		bytesSending = 0;
 		events.send.completed.send();
 	}
@@ -182,7 +182,7 @@ class MessagePackResource <Data> implements IDisposable
 
 	private function handleStatus(status:Int)
 	{
-		trace(status+" => "+loader.bytesLoaded+" / "+loader.bytesTotal);
+		//trace(status+" => "+loader.bytesLoaded+" / "+loader.bytesTotal);
 	}
 }
 

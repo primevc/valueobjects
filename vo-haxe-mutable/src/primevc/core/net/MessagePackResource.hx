@@ -135,7 +135,7 @@ class MessagePackResource <Data> implements IDisposable
 		onComplete.handler	= handleGET;
 		onError.handler		= cast (events.receive.error, Signal1<Dynamic>).send;
 		
-		trace("get "+uri);
+	//	trace("get "+uri);
 		l.load(uri);
 		e.started.send();
 	}
@@ -167,7 +167,7 @@ class MessagePackResource <Data> implements IDisposable
 
 	private function handleGET ()
 	{
-		trace(loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
+	//	trace(loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
 		
 		data = deserialize( loader.data, reader );
 		events.receive.completed.send();
@@ -179,7 +179,7 @@ class MessagePackResource <Data> implements IDisposable
 
 	private function handlePOST()
 	{
-		trace(loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
+	//	trace(loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
 		bytesSending = 0;
 		events.send.completed.send();
 		
@@ -191,7 +191,8 @@ class MessagePackResource <Data> implements IDisposable
 	private function cacheStatus(status:Int)
 	{
 		lastHttpStatus = status;
-		trace(status.read()+" => "+loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
+		if (status != 200)
+			trace(status.read()+" => "+loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
 	}
 	
 	
@@ -213,7 +214,8 @@ class MessagePackResource <Data> implements IDisposable
 
 #if debug
 		Assert.equal(b.length, origLen);
-		trace((haxe.Timer.stamp() - start)+" sec");
+		if ((haxe.Timer.stamp() - start) > 0.1)
+			trace((haxe.Timer.stamp() - start)+" sec");
 #end
 		return b;
 	}
@@ -230,7 +232,8 @@ class MessagePackResource <Data> implements IDisposable
 		input.bigEndian = true;
 #if debug
 		var o = reader.readMsgPackValue();
-		trace((haxe.Timer.stamp() - start)+" sec");
+		if ((haxe.Timer.stamp() - start) > 0.1)
+			trace((haxe.Timer.stamp() - start)+" sec");
 		return o;
 #else
 		return reader.readMsgPackValue();

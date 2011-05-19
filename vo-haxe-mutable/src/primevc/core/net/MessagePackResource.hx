@@ -304,10 +304,11 @@ class MessagePackResourceSignals extends CommunicationSignals
 {
 	public function new (progessSignal)
 	{
-		this.progress	= progessSignal;
-		this.started	= new Signal0();
-		this.completed	= new Signal0();
-		this.error		= new Signal1<String>();
+		super();
+		progress	= progessSignal;
+		started	= new Signal0();
+		completed	= new Signal0();
+		error		= new Signal1<String>();
 	}
 }
 
@@ -326,6 +327,7 @@ class DataServiceEvents <Data> extends Signals
 
 	public function new (progessSignal)
 	{
+		super();
 		receive = new MessagePackResourceSignals(progessSignal);
 		send	= new MessagePackResourceSignals(progessSignal);
 	}

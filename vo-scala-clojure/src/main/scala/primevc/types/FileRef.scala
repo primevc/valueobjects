@@ -18,6 +18,7 @@ trait FileRepository {
   def toURI(instance : FileRef): URI
   def create (): FileRefOutputStream
   def absorb (file : File): FileRef
+  def stream (ref : FileRef): InputStream
 
   def store[T](writer: FileRefOutputStream => T): FileRef = {
     val bldr = create
@@ -29,6 +30,7 @@ trait FileRepository {
 trait LocalFileRepository extends FileRepository {
   def getFile(instance : FileRef): File
   def apply  (instance : FileRef): File = this getFile instance
+  def stream (instance : FileRef): InputStream = new FileInputStream(this(instance))
 }
 
 class BasicLocalFileRepository(val root:File) extends LocalFileRepository {

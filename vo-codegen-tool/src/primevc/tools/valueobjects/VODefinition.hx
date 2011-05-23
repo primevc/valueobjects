@@ -1250,7 +1250,7 @@ class EnumDef implements TypeDefinitionWithProperties
 		}
 	}
 	
-	public function tryTasks();
+	public function tryTasks() {}
 	
 	public function finalize():Void
 	{

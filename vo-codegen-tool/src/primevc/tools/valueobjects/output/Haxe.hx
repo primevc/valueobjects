@@ -29,7 +29,7 @@ class HaxeTypeMap implements CodeGenerator
 class VO
 {
 	static public var typeMap : IntHash<Class<Dynamic>>;
-	static function __init__ ()
+	@:keep static function __init__ ()
 	{
 		var map : IntHash<Class<Dynamic>> = typeMap = new IntHash();
 ");
@@ -49,7 +49,7 @@ file.writeString("
 		file.close();
 	}
 	
-	public function genEnum(def:EnumDef);
+	public function genEnum(def:EnumDef) {}
 	
 	public function newModule(module:Module) {
 		module.generateWith(this);
@@ -675,6 +675,7 @@ class Haxe implements CodeGenerator
 		
 		//open function declaration
 		a("\n\t");
+		a("@:keep ");
 		if (def.superClass != null)
 			a("override ");
 		
@@ -730,6 +731,7 @@ class Haxe implements CodeGenerator
 	private function openFunctionDeclaration (def:ClassDef, functionName, forceOverride = false, returnType:String = "Void", makeSuperCall = true, isPublic = true)
 	{
 		a("\n\t");
+		a("@:keep ");
 		if (forceOverride || def.superClass != null) a("override ");
 
 		a(isPublic? "public " : "private "); a("function "); a(functionName); a("()");
@@ -1140,11 +1142,11 @@ private class CodeBufferer
 
 private class MagicClassGenerator extends CodeBufferer
 {
-	public function new();
+	public function new() {}
 	
-	public function fromXML(code:StringBuf);
-	public function inject(code:StringBuf);
-	public function constructor(code:StringBuf);
+	public function fromXML(code:StringBuf) {}
+	public function inject(code:StringBuf) {}
+	public function constructor(code:StringBuf) {}
 }
 
 private class NamedSetDefGenerator extends MagicClassGenerator
@@ -1485,6 +1487,7 @@ private class HaxeXMLMap extends CodeBufferer
 		a("\t}\n");
 		
 		a("\n\t");
+		a('@:keep ');
 		var has_super = add_override();
 		a("public function setFromXML(node:Xml) : Void\n\t{\n");
 		

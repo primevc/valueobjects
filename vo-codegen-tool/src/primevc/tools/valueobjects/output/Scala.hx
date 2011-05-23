@@ -15,7 +15,7 @@ class ScalaTypeMap implements CodeGenerator
 			map.set(def.index, if (def.isMixin) def.fullName; else def.fullName + "VO");
 	}
 
-	public function genEnum(def:EnumDef);
+	public function genEnum(def:EnumDef) {}
 
 	public function newModule(module:Module) {
 		module.generateWith(this);

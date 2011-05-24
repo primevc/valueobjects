@@ -9,7 +9,7 @@ package primevc.utils.msgpack;
  * @author Danny Wilson
  * @creation-date nov 22, 2010
  */
-@:keep class Format
+class Format
 {
 	/**
 	 * Writes 'value' in the most compact MsgPack form possible, to output 'o'.

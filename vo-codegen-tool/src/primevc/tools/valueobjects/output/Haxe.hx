@@ -29,7 +29,7 @@ class HaxeTypeMap implements CodeGenerator
 class VO
 {
 	static public var typeMap : IntHash<Class<Dynamic>>;
-	@:keep static function __init__ ()
+	static function __init__ ()
 	{
 		var map : IntHash<Class<Dynamic>> = typeMap = new IntHash();
 ");
@@ -675,7 +675,7 @@ class Haxe implements CodeGenerator
 		
 		//open function declaration
 		a("\n\t");
-		a("@:keep ");
+	//	a("@:keep ");
 		if (def.superClass != null)
 			a("override ");
 		
@@ -731,7 +731,7 @@ class Haxe implements CodeGenerator
 	private function openFunctionDeclaration (def:ClassDef, functionName, forceOverride = false, returnType:String = "Void", makeSuperCall = true, isPublic = true)
 	{
 		a("\n\t");
-		a("@:keep ");
+	//	a("@:keep ");
 		if (forceOverride || def.superClass != null) a("override ");
 
 		a(isPublic? "public " : "private "); a("function "); a(functionName); a("()");
@@ -1487,7 +1487,7 @@ private class HaxeXMLMap extends CodeBufferer
 		a("\t}\n");
 		
 		a("\n\t");
-		a('@:keep ');
+	//	a('@:keep ');
 		var has_super = add_override();
 		a("public function setFromXML(node:Xml) : Void\n\t{\n");
 		

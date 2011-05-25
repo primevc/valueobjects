@@ -162,7 +162,7 @@ class Reader implements IDisposable
 	}
 	
 	
-	function readArray<T>(len:Int, pid : PropertyID, itemType : Dynamic) : FastArray<T>
+	inline function readArray<T>(len:Int, pid : PropertyID, itemType : Dynamic) : FastArray<T>
 	{
 		var arr = FastArrayUtil.create(len);
 		for (i in 0 ... len) //try {

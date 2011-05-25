@@ -1,13 +1,15 @@
 package primevc.types;
  import java.lang.Integer.parseInt
  import java.lang.Long.parseLong
- import util.matching.Regex
+ import scala.util.matching.Regex
 
 class RGBA private[types](val rgba:Int)
 {
   private[types] def this(s:String) = this(s.trim match
   {
-	case "" => 0
+  	case "" => 0
+      // Could add color names here...
+      
     case s:String if (s.indexOf('#') == 0) =>
       if (s.length <= 8)
         parseInt(s.substring(1), 16)
@@ -21,7 +23,6 @@ class RGBA private[types](val rgba:Int)
         parseLong(s.substring(2), 16).toInt
     
     case s:String =>
-      // Could add color names here...
       parseLong(s).toInt
   })
 
@@ -34,7 +35,7 @@ class RGBA private[types](val rgba:Int)
 
   lazy val toRGBString = "#%06X".format(rgba >>> 8)
   lazy val toRGBAString = "#%08X".format(rgba)
-  override lazy val toString = "0x" + rgba.toHexString.toUpperCase
+  override lazy val toString = toRGBString // "0x" + rgba.toHexString.toUpperCase
   final def toInt = rgba
 
   override def equals(other:Any) = other match {

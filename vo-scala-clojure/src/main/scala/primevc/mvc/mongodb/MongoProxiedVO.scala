@@ -3,8 +3,7 @@ package primevc.mvc.mongodb
  import primevc.types._
  import org.bson.BSONObject
  import org.joda.time.Interval
- import scala.collection.JavaConversions
- import scala.collection.JavaConversions._
+ import scala.collection.JavaConverters._
  import scala.collection.mutable.ListBuffer
  import com.mongodb.casbah.Imports._
 import primevc.utils.ConvertTo
@@ -86,8 +85,7 @@ abstract class DBObjectVO[V <: ValueObject] (val vo:V) //(implicit val converter
 
   def keySet(fields : IndexedSeq[Field], field : Int => Field): java.util.Set[String] = {
     val fieldNames : Iterator[String] = fields.indices.iterator.filter(vo.fieldIsSet_?(_)).map(field(_).name.name)
-    val set = JavaConversions.asJavaSet((if (typeCast) Iterator("cast") ++ fieldNames else fieldNames) toSet);
-    set
+    (if (typeCast) Iterator("cast") ++ fieldNames else fieldNames).toSet.asJava
   }
 
   /** Checks if this object contains a field with the given name.
@@ -110,7 +108,7 @@ abstract class DBObjectVO[V <: ValueObject] (val vo:V) //(implicit val converter
    */
   def toMap() = {
     val map = new java.util.TreeMap[String, AnyRef]
-    for (key <- keySet) map.put(key, this.get(key))
+    for (key <- keySet.asScala) map.put(key, this.get(key))
     map
   } //throw new Exception("Moet dat echt?");
 
@@ -118,7 +116,7 @@ abstract class DBObjectVO[V <: ValueObject] (val vo:V) //(implicit val converter
 
   def putAll(map: java.util.Map[_,_]) {
     val m = map.asInstanceOf[java.util.Map[String,AnyRef]]
-    for (k <- m.keys) {
+    for (k <- m.keySet().iterator().asScala) {
       try {
         put(k, m.get(k))
       } catch {
@@ -128,7 +126,7 @@ abstract class DBObjectVO[V <: ValueObject] (val vo:V) //(implicit val converter
   }
 
   def putAll(obj: BSONObject) {
-    for (k <- obj.keySet) {
+    for (k <- obj.keySet.asScala) {
       try {
         put(k, obj.get(k))
       } catch {

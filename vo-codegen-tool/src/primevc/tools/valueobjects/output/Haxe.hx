@@ -114,7 +114,7 @@ class HaxeMessagePacking extends MessagePacking
 		}
 		a("\n");
 		
-		a("\n\tstatic public function msgpack_packVO(o : haxe.io.BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBits : Int, prependMsgpackType : Bool = false) : Int\n\t{");
+		a("\n\t@:keep static public function msgpack_packVO(o : haxe.io.BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBits : Int, prependMsgpackType : Bool = false) : Int\n\t{");
 		
 		a("\n		Assert.that(o != null && obj != null);");
 		a("\n		");
@@ -133,7 +133,7 @@ class HaxeMessagePacking extends MessagePacking
 	
 	override private function defineUnPackerFunction()
 	{
-		a("\n\tstatic public function msgpack_unpackVO(reader : Reader, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBytes : Int, converter : ValueConverter) : Void\n\t{");
+		a("\n\t@:keep static public function msgpack_unpackVO(reader : Reader, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBytes : Int, converter : ValueConverter) : Void\n\t{");
 		a("\n		Assert.that(reader != null && obj != null);");
 		a("\n		var input = reader.input, bits:Int, fieldOffset:Int = (untyped obj)._fieldOffset(TYPE_ID);");
 	}
@@ -1056,7 +1056,7 @@ class Haxe implements CodeGenerator
 		}
 		a("\n\t\t}\n\t}\n");
 		// fromValue
-		a("\tstatic public function fromValue(i:Int) : "); a(def.fullName); a("\n\t{\n\t\t");
+		a("\t@:keep static public function fromValue(i:Int) : "); a(def.fullName); a("\n\t{\n\t\t");
 		a("return switch (i) {");
 		for (e in def.enumerations)
 		{

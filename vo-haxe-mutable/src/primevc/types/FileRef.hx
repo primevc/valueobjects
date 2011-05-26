@@ -40,11 +40,17 @@ class FileRef extends URI
 	 * By not adding the prefix to the URI itself we can make sure the data
 	 * isn't saved with a prefix
 	 */
-	public static var prefix : String = null;
+	public static var prefix (default, setPrefix) : String;
 	
 	
 	override public function toString ()
 	{
 		return scheme == null ? prefix + super.toString() : super.toString();
+	}
+	
+	
+	private static inline function setPrefix (v:String)
+	{
+		return prefix = v != null ? v + "/" : v;
 	}
 }

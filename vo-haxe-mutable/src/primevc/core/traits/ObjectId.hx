@@ -9,7 +9,7 @@ class ObjectId
 {
 	static inline public var TYPE_ID = 0x01D;
 	
-	static public function msgpack_packVO(o : BytesOutput, obj : IObjectId, propertyBits : Int, prependMsgpackType : Bool = false) : Int
+	@:keep static public function msgpack_packVO(o : BytesOutput, obj : IObjectId, propertyBits : Int, prependMsgpackType : Bool = false) : Int
 	{
 		Assert.notNull(o);
 		Assert.notNull(obj);
@@ -31,7 +31,7 @@ class ObjectId
 		return b;
 	}
 	
-	static public function msgpack_unpackVO(reader : Reader, obj : IObjectId, propertyBytes : Int, converter : ValueConverter) : Void
+	@:keep static public function msgpack_unpackVO(reader : Reader, obj : IObjectId, propertyBytes : Int, converter : ValueConverter) : Void
 	{
 		Assert.that(reader != null && obj != null);
 		var input = reader.input, bits:Int;

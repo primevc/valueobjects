@@ -51,6 +51,6 @@ class FileRef extends URI
 	
 	private static inline function setPrefix (v:String)
 	{
-		return prefix = v != null ? v + "/" : v;
+		return prefix = (v != null && v != "") ? v + "/" : v;
 	}
 }

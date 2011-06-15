@@ -20,16 +20,9 @@ class VOPacker (out:OutputStream) extends Packer(out)
 {
   def pack(id : ObjectId)
   {
-    val time    = id._time
-    val machine = id._machine
-    val inc     = id._inc
-
-    val bytes = Array(0xD7 toByte, 0x1D toByte,
-      time    & 0xFF toByte, (time    >>> 8) & 0xFF toByte, (time    >>> 16) & 0xFF toByte, (time    >>> 24) & 0xFF toByte,
-      machine & 0xFF toByte, (machine >>> 8) & 0xFF toByte, (machine >>> 16) & 0xFF toByte, (machine >>> 24) & 0xFF toByte,
-      inc     & 0xFF toByte, (inc     >>> 8) & 0xFF toByte, (inc     >>> 16) & 0xFF toByte, (inc     >>> 24) & 0xFF toByte
-    );
-    out.write(bytes);
+    out.write(0xD7)
+    out.write(0x1D)
+    out.write(id.toByteArray);
   }
 
   def pack(fileRef  : FileRef) : Unit = pack(fileRef.toString);

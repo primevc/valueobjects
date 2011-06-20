@@ -11,7 +11,9 @@ import java.util.{Locale, Date}
 import org.bson.BSONObject
 import org.bson.types.{BasicBSONList, ObjectId}
 import collection.JavaConversions
-import java.net.{URISyntaxException, URL, URI}
+
+//import java.net.{URISyntaxException, URL, URI}
+import org.apache.commons.httpclient.URI
 import org.msgpack.`object`.{NilType, ArrayType, IntegerType, RawType}
 import java.text.{ParseException, DecimalFormatSymbols, DecimalFormat}
 import org.msgpack.MessagePackObject
@@ -116,17 +118,19 @@ object ConvertTo
 
   def uri           (value:Any) : URI = unpack(value) match {
     case v:URI => v
-    case v:URL => v.toURI
+    case v:java.net.URI => uri(v.toString)
+    case v:java.net.URL => uri(v.toString)
     case v:String => uri(v)
     case v:RawType => uri(v.asString)
     case None => null
   }
-  def uri (v:String) = if (v == null || v.isEmpty) null else try { new URI(v.replace(" ", "%20")) } catch { case e:URISyntaxException => null }
+  def uri (v:String) = if (v == null || v.isEmpty) null else new URI(v, true)
 
   def email         (value:Any) : InternetAddress = unpack(value) match {
     case v:InternetAddress => v
-    case v:URI if ("mailto" == v.getScheme)   => new InternetAddress(v.getRawSchemeSpecificPart)
-    case v:URL if ("mailto" == v.getProtocol) => new InternetAddress(v.getFile)
+    case v:URI if ("mailto" == v.getScheme)            => new InternetAddress(v.getPath)
+    case v:java.net.URI if ("mailto" == v.getScheme)   => new InternetAddress(v.getPath)
+    case v:java.net.URL if ("mailto" == v.getProtocol) => new InternetAddress(v.getFile)
     case v:String => new InternetAddress(v)
     case v:RawType => new InternetAddress(v.asString)
     case None => null

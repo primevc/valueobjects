@@ -12,6 +12,6 @@ package primevc.mvc.controller
 abstract class SubRouter(val parent:RequestRouter)
   extends RequestRouter
 {
-  override val prefix = parent.prefix + "/" + this.getClass.getSimpleName.toLowerCase
+  prefix = parent.prefix + "/" + this.getClass.getSimpleName.toLowerCase
   get("") = redirect(prefix+"/")
 }

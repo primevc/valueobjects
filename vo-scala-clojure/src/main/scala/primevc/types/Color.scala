@@ -47,8 +47,8 @@ class RGBA private[types](val rgba:Int)
 
 object RGBA
 {
-  val black = new RGBA(0)          { override lazy val toString = "0x00000000" }
-  val white = new RGBA(0xFFFFFFFF) { override lazy val toString = "0xFFFFFFFF" }
+  val black = new RGBA(0)
+  val white = new RGBA(0xFFFFFFFF)
 
   private val all_0 = new Regex("(?i)([0x#]*)")
   private val all_F = new Regex("(?i)([Fx#]*)")

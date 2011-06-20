@@ -1223,15 +1223,15 @@ file.writeString("
 		res.name = (surroundWithType != null? surroundWithType + "[" : "") +
 		  (switch(t) {
 			case Tarray(innerT,_,_):	"Array["+ getType(innerT).name +"]";
-			case Turi:					"java.net.URI";
-			case TuniqueID:				"org.bson.types.ObjectId";
+			case Turi:					"primevc.types.URI";
+			case TuniqueID:				"primevc.types.ObjectId";
 			case TfileRef:				"primevc.types.FileRef";
 			case Tstring:				"String";
 			case Tinteger(_,_,_):		res.mongoOptionGetter = ".map(ConvertTo.integer(_))";    "Int";
 			case Tdecimal(_,_,_):		res.mongoOptionGetter = ".map(ConvertTo.decimal(_))"; "Double";
 			case Tbool(v):				res.defaultValue = v; res.mongoOptionGetter = ".map(_.booleanValue)"; "Boolean";
 			case TenumConverter(_):		throw t; //"";
-			case Temail:				"javax.mail.internet.InternetAddress";
+			case Temail:				"primevc.types.InternetAddress";
 			case Tdate:					"org.joda.time.DateMidnight";
 			case Tdatetime:				"org.joda.time.DateTime";
 			case Tinterval:				"org.joda.time.Interval";

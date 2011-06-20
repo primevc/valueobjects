@@ -5,8 +5,7 @@ import java.lang.Math
 import java.io.OutputStream
 import primevc.core.traits.{VOMessagePacker, VOCompanion, ValueObject}
 import org.bson.types.ObjectId
-import java.net.URI
-import primevc.types.{Ref, RefArray, Enum, RGBA, FileRef}
+import primevc.types.{Ref, RefArray, Enum, RGBA, FileRef, URI}
 
 /**
  * Created by IntelliJ IDEA.

@@ -29,10 +29,26 @@ class Reader implements IDisposable
 #end
 
 #if flash10
+    public var bytes(default,setBytes) : flash.utils.ByteArray;
+        private function setBytes(b : flash.utils.ByteArray) {
+            this.bigEndian = (b.endian == flash.utils.Endian.BIG_ENDIAN);
+//            b.position = 0;
+//    		if (b.length < 1024)
+//    			b.length = 1024;
+//    		flash.Memory.select(b);
+    		this.bytes = b;
+    		
+    		this.input = new haxe.io.BytesInput(haxe.io.Bytes.ofData(b));
+    		this.input.bigEndian = this.bigEndian;
+    		
+    		return b;
+        }
+    var bigEndian : Bool;
+    var addr : Int;
 
-#else    
-	public var input	: Input;
 #end
+
+	private var input	: Input;
 	private var context	: IntHash<Class<Dynamic>>;
 	
 	public function new(context_ : IntHash<Class<Dynamic>>, ?input_ : Input)
@@ -40,11 +56,8 @@ class Reader implements IDisposable
 		Assert.notNull(context_);
 		this.context = context_;
 	#if flash10
-	    this.bytes = untyped input_.b;
-		bytes.position = 0;
-		if (bytes.length < 1024)
-			bytes.length = 1024;
-		select(bytes);
+	    if (input_ != null)
+    	    this.bytes = untyped input_.b;
 	#else
 	    this.input = input_;
 	#end
@@ -264,9 +277,11 @@ class Reader implements IDisposable
 		{
 			case ObjectId.TYPE_ID:
 			#if flash10
-			    var oid = ObjectId.fromMemory(addr);
-			    addr += 12;
-			    return oid;
+			    return if (input == null) {
+			        var oid = ObjectId.fromMemory(addr);
+			        addr += 12;
+			        oid;
+		        } else ObjectId.fromInput(input);
 			#else
 			    return ObjectId.fromInput(input);
 			#end
@@ -283,56 +298,53 @@ class Reader implements IDisposable
 	}
 	
 	
-	private function deserializeVO(voHeader : Int, target : ValueObjectBase = null)
+	private function deserializeVO(voHeader : Int)
 	{
-		var superTypeCount = (voHeader & 0x38 /* 0b_0011_1000 */) >>> 3;
-		var fieldsSetBytes =  voHeader & 0x07 /* 0b_0000_0111 */;
+		var target : Dynamic = null;
+		var superTypeCount = 0;
+		do {
+			superTypeCount += (voHeader & 0x38 /* 0b_0011_1000 */) >>> 3;
+			var fieldsSetBytes =  voHeader & 0x07 /* 0b_0000_0111 */;
 		
-		var typeID = if ((voHeader & 0x40 /* 0b_0100_0000 */).not0())
-			readUInt16(); // 2 typeID bytes
-		else
-			readByte();   // 1 typeID byte
+			var typeID = if ((voHeader & 0x40 /* 0b_0100_0000 */).not0())
+				readUInt16(); // 2 typeID bytes
+			else
+				readByte();   // 1 typeID byte
 		
-		#if MessagePackDebug_Read if (verbose)
-			trace("deserializeVO { typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes + ", target: "+target);
-		#end
+#if MessagePackDebug_Read if (verbose)
+				trace("deserializeVO { typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes + ", target: "+target);
+#end
+		    var clazz = this.context.get(typeID);
+			Assert.notNull(clazz, "voHeader: " + StringTools.hex(typeID, 2) + ", type: " + typeID + " not found...");
 		
-		var clazz = this.context.get(typeID);
-		Assert.notNull(clazz, "voHeader: " + StringTools.hex(typeID, 2) + ", type: " + typeID + " not found...");
+			if (target == null) {
+#if MessagePackDebug_Read
+					trace("                create Instance: "+ clazz);
+#end
+				target = Type.createInstance(clazz, []);
+				Assert.notNull(target);
+				target.beginEdit();
+			}
 		
-		var targetWasNull = target == null;
-		if (targetWasNull) {
-			#if MessagePackDebug_Read if (verbose)
-				trace("                create Instance: "+ clazz);
-			#end
-			target = Type.createInstance(clazz, []);
-			Assert.notNull(target);
-			target.beginEdit();
+#if debug
+			var clazzName = Type.getClassName(clazz);
+			var lastDot = clazzName.lastIndexOf('.');
+		
+			var interfaze = Type.resolveClass(
+				clazzName.substr(0, lastDot) + ".I" + clazzName.substr(lastDot+1)
+			);
+			Assert.that(Std.is(target, interfaze), target +" is not a "+ interfaze + " ; voHeader: 0x"+StringTools.hex(voHeader) + ", typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes);
+#end
+			if (fieldsSetBytes != 0)
+				(untyped clazz).msgpack_unpackVO(this, target, fieldsSetBytes);
+			
+			if (superTypeCount > 0)
+				voHeader = readByte();
 		}
-		
-	#if debug
-		var clazzName = Type.getClassName(clazz);
-		var lastDot = clazzName.lastIndexOf('.');
-		
-		var interfaze = Type.resolveClass(
-			clazzName.substr(0, lastDot) + ".I" + clazzName.substr(lastDot+1)
-		);
-		Assert.that(Std.is(target, interfaze), target +" is not a "+ interfaze + " ; voHeader: 0x"+StringTools.hex(voHeader) + ", typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes);
-	#end
-		
-		if (fieldsSetBytes != 0)// try {
-			(untyped clazz).msgpack_unpackVO(this, target, fieldsSetBytes, this.converter);
-//		} catch (e:Dynamic) {
-//			throw "Could not unpack VO data with typeID: "+typeID+", using: "+clazz;
-//		}
-		
-		while (superTypeCount-->0)
-			deserializeVO(readByte(), target);
-		
-		if (targetWasNull) {
-			untyped target._changedFlags = 0;
-			target.commitEdit();
-		}
+		while (superTypeCount-->0);
+	
+		untyped target._changedFlags = 0;
+		target.commitEdit();
 		
 		return target; // done
 	}
@@ -352,105 +364,98 @@ class Reader implements IDisposable
 	}
 	
 	
-	
+/*  
 #if flash10
 
-	var bytes : flash.utils.ByteArray;
-	var addr : Int;
-	
-	private inline function select( b : flash.utils.ByteArray ) : Void {
-		flash.system.ApplicationDomain.currentDomain.domainMemory = b;
-	}
-#end
+    public inline function readByte()       : Int {
+        var v:Int = untyped __vmem_get__(0,addr++);
+    #if debug
+        bytes.position = addr - 1;
+        var b:Int = bytes.readUnsignedByte();
+        Assert.equal(b, v, "addr="+addr);
+    #end
+        return v;
+    }
 
-#if flash10
-
-	public inline function readByte()		: Int {
-	#if debug
-		bytes.position = addr;
-		Assert.equal(bytes.readUnsignedByte(), untyped __vmem_get__(0,addr));
-	#end
-		var v = untyped __vmem_get__(0,addr++);
-		return v;
-	}
-
-	private inline function readUInt16()	: Int {
-	#if debug
-		bytes.position = addr;
-		Assert.equal(bytes.readUnsignedShort(), untyped __vmem_get__(1,addr));
-	#end
-		var v = untyped __vmem_get__(1,addr);
-		addr += 2;
-		return v;
-	}
-
-	private inline function readInt32()		: Int {
-	#if debug
-		bytes.position = addr;
-		Assert.equal(bytes.readInt(), untyped __vmem_get__(2,addr));
-	#end
-		var v = untyped __vmem_get__(2,addr);
-		addr += 4;
-		return v;
-	}
-
-	private inline function readFloat()		: Float {
-	#if debug
-		bytes.position = addr;
-		Assert.equal(bytes.readFloat(), untyped __vmem_get__(3,addr));
-	#end
-		var v = untyped __vmem_get__(3,addr);
-		addr += 4;
-		return v;
-	}
-
-	private inline function readDouble()	: Float {
-	#if debug
-		bytes.position = addr;
-		Assert.equal(bytes.readDouble(), untyped __vmem_get__(4,addr));
-	#end
-		var v = untyped __vmem_get__(4,addr);
-		addr += 8;
-		return v;
-	}
-	
-	private inline function readString(n)	: String {
-		bytes.position = addr;
-		addr += n;
-		return bytes.readUTFBytes(n);
-	}
-	private inline function read(n)			: Void {
-		addr += n;
-	}
-	private inline function readInt8()		: Int {
-	    var n = readByte();
-		if( n >= 128 ) n -= 256;
-
-    	#if debug
-    		bytes.position = addr - 1;
-    		Assert.equal(bytes.readByte(), n);
-    	#end
-		return n;
-	}
-	private inline function readInt16()		: Int {
-	    var n = flash.Memory.signExtend16( readUInt16() );
-
-    	#if debug
-    		bytes.position = addr - 2;
-    		Assert.equal(bytes.readShort(), n);
-    	#end
+    private inline function readUInt16()    : Int {
+        var v = if (bigEndian) untyped { __vmem_get__(0,addr+1) | (__vmem_get__(0,addr) << 8); } else untyped __vmem_get__(1,addr);
+    #if debug
+        bytes.position = addr;
+        Assert.equal(bytes.readUnsignedShort(), v, "addr="+addr);
+    #end
         
-		return n;
-	}
-	private inline function readUInt30()	: Int {
-	#if debug
-		bytes.position = addr;
-		Assert.equal(bytes.readUnsignedInt(), untyped __vmem_get__(2,addr));
-	#end
-		return readInt32() & 0x3FFFFFFF;
-	}
+        addr += 2;
+        return v;
+    }
 
-#else
+    private inline function readInt32()     : Int {
+    #if debug
+        bytes.position = addr;
+        Assert.equal(bytes.readInt(), untyped __vmem_get__(2,addr));
+    #end
+        var v = untyped __vmem_get__(2,addr);
+        addr += 4;
+        return v;
+    }
+
+    private inline function readFloat()     : Float {
+    #if debug
+        bytes.position = addr;
+        Assert.equal(bytes.readFloat(), untyped __vmem_get__(3,addr));
+    #end
+        var v = untyped __vmem_get__(3,addr);
+        addr += 4;
+        return v;
+    }
+
+    private inline function readDouble()    : Float {
+    #if debug
+        bytes.position = addr;
+        Assert.equal(bytes.readDouble(), untyped __vmem_get__(4,addr));
+    #end
+        var v = untyped __vmem_get__(4,addr);
+        addr += 8;
+        return v;
+    }
+    
+    private inline function readString(n)   : String {
+        bytes.position = addr;
+        addr += n;
+        return bytes.readUTFBytes(n);
+    }
+    private inline function read(n)         : Void {
+        addr += n;
+    }
+    private inline function readInt8()      : Int {
+        var n = readByte();
+        if( n >= 128 ) n -= 256;
+
+        #if debug
+            bytes.position = addr - 1;
+            Assert.equal(bytes.readByte(), n);
+        #end
+        return n;
+    }
+    private inline function readInt16()     : Int {
+        var n = flash.Memory.signExtend16( readUInt16() );
+
+        #if debug
+            bytes.position = addr - 2;
+            Assert.equal(bytes.readShort(), n);
+        #end
+        
+        return n;
+    }
+    private inline function readUInt30()    : Int {
+        var v = readInt32() & 0x3FFFFFFF;
+    #if debug
+        bytes.position = addr - 4;
+        Assert.equal(bytes.readUnsignedInt(), v);
+    #end
+        return v;
+    }
+*/
+//#else
 
 	public  inline function readByte()		: Int		return input.readByte()
 	private inline function readUInt16()	: Int		return input.readUInt16()
@@ -464,6 +469,6 @@ class Reader implements IDisposable
 	private inline function readInt16()		: Int		return input.readInt16()
 	private inline function readUInt30()	: Int		return input.readUInt30()
 	
-#end
+//#end
 }
 

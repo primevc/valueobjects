@@ -31,7 +31,7 @@ class ObjectId
 		return b;
 	}
 	
-	@:keep static public function msgpack_unpackVO(reader : Reader, obj : IObjectId, propertyBytes : Int, converter : ValueConverter) : Void
+	@:keep static public function msgpack_unpackVO(reader : Reader, obj : IObjectId, propertyBytes : Int) : Void
 	{
 		Assert.that(reader != null && obj != null);
 		var bits:Int;

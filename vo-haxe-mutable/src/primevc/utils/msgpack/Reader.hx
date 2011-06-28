@@ -32,14 +32,14 @@ class Reader implements IDisposable
     public var bytes(default,setBytes) : flash.utils.ByteArray;
         private function setBytes(b : flash.utils.ByteArray) {
             this.bigEndian = (b.endian == flash.utils.Endian.BIG_ENDIAN);
-//            b.position = 0;
-//    		if (b.length < 1024)
-//    			b.length = 1024;
-//    		flash.Memory.select(b);
+            b.position = 0;
+    		if (b.length < 1024)
+    			b.length = 1024;
+    		flash.Memory.select(b);
     		this.bytes = b;
     		
-    		this.input = new haxe.io.BytesInput(haxe.io.Bytes.ofData(b));
-    		this.input.bigEndian = this.bigEndian;
+//    		this.input = new haxe.io.BytesInput(haxe.io.Bytes.ofData(b));
+//    		this.input.bigEndian = this.bigEndian;
     		
     		return b;
         }
@@ -364,7 +364,7 @@ class Reader implements IDisposable
 	}
 	
 	
-/*  
+
 #if flash10
 
     public inline function readByte()       : Int {
@@ -389,11 +389,12 @@ class Reader implements IDisposable
     }
 
     private inline function readInt32()     : Int {
+        var v = if (bigEndian) untyped { (__vmem_get__(0,addr) << 24) | (__vmem_get__(0,addr+1) << 16) | (__vmem_get__(0,addr+2) << 8) | __vmem_get__(0,addr+3); } else untyped __vmem_get__(1,addr);
+        
     #if debug
         bytes.position = addr;
-        Assert.equal(bytes.readInt(), untyped __vmem_get__(2,addr));
+        Assert.equal(bytes.readInt(), v);
     #end
-        var v = untyped __vmem_get__(2,addr);
         addr += 4;
         return v;
     }
@@ -454,8 +455,8 @@ class Reader implements IDisposable
     #end
         return v;
     }
-*/
-//#else
+
+#else
 
 	public  inline function readByte()		: Int		return input.readByte()
 	private inline function readUInt16()	: Int		return input.readUInt16()
@@ -469,6 +470,6 @@ class Reader implements IDisposable
 	private inline function readInt16()		: Int		return input.readInt16()
 	private inline function readUInt30()	: Int		return input.readUInt30()
 	
-//#end
+#end
 }
 

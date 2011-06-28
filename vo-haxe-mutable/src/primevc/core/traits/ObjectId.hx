@@ -34,13 +34,13 @@ class ObjectId
 	@:keep static public function msgpack_unpackVO(reader : Reader, obj : IObjectId, propertyBytes : Int, converter : ValueConverter) : Void
 	{
 		Assert.that(reader != null && obj != null);
-		var input = reader.input, bits:Int;
+		var bits:Int;
 		
 		if (!(propertyBytes).not0()) return;
 
 		--propertyBytes;
 		
-		bits = input.readByte();
+		bits = reader.readByte();
 		if ((bits & 0x01).not0()) (untyped obj).setId(reader.readMsgPackValue(0, primevc.types.ObjectId));
 		
 		if ((propertyBytes).not0()) reader.discardRemainingVOProperties(propertyBytes);

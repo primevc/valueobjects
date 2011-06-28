@@ -329,7 +329,7 @@ class MessagePacking
 		{
 			if (bit == 8) {
 				a("\n\t\n\t\tif ("); a_is0("propertyBytes"); a(") return;");
-				a("\n\t\n\t\tbits = input.readByte();");
+				a("\n\t\n\t\tbits = reader.readByte();");
 				a("\n\t\n\t\t"); a(expr_decrementPropertyBytes());
 				bit = 0;
 			}

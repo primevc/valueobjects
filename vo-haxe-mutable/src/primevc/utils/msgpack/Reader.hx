@@ -24,32 +24,48 @@ typedef ValueConverter = Dynamic -> PropertyID -> Dynamic -> Dynamic
  */
 class Reader implements IDisposable
 {
+#if MessagePackDebug_Read
+    public var verbose : Bool;
+#end
+
+#if flash10
+
+#else    
 	public var input	: Input;
+#end
 	private var context	: IntHash<Class<Dynamic>>;
-	
 	
 	public function new(context_ : IntHash<Class<Dynamic>>, ?input_ : Input)
 	{
 		Assert.notNull(context_);
 		this.context = context_;
-		this.input = input_;
+	#if flash10
+	    this.bytes = untyped input_.b;
+		bytes.position = 0;
+		if (bytes.length < 1024)
+			bytes.length = 1024;
+		select(bytes);
+	#else
+	    this.input = input_;
+	#end
 	}
 	
 	
 	public function dispose ()
 	{
-		input	= null;
+		#if flash10 this.bytes #else this.input #end = null;
 		context	= null;
 	}
 	
 	
 	public function readMsgPackValue(?pid : PropertyID, ?itemType : Dynamic) : Dynamic
 	{
-		Assert.notNull(this.input);
+	    #if MessagePackDebug_Read if (verbose) trace("readMsgPackValue(pid: "+pid+", itemType: "+ itemType +")"); #end
+		Assert.notNull(#if flash10 this.bytes #else this.input #end);
 		
 		var value;
 		try {
-			value = readValue(input.readByte(), pid, itemType);
+			value = readValue(readByte(), pid, itemType);
 			if (IfUtil.notNull(itemType) && !Std.is(value, itemType))
 				value = converter(value, pid, itemType);
 		}
@@ -72,12 +88,12 @@ class Reader implements IDisposable
 	
 	private function readArrayLength() : Int
 	{
-		var i = input, b = input.readByte();
+		var b = readByte();
 		
 		return switch (b)
 		{
-			case 0xdc:	i.readUInt16();
-			case 0xdd:	i.readUInt30();
+			case 0xdc:	readUInt16();
+			case 0xdd:	readUInt30();
 			default:
 				return if (b & 0xF0 == 0x90) b & 15;
 				else 1;
@@ -99,17 +115,22 @@ class Reader implements IDisposable
 			case URI:		return new URI(Std.string(value));
 			case Date:		return Date.fromTime(value);
 			case RGBAType:	return value;
+//			case String:	return Std.string(value);
+//			case Bool:		return value > 0;
 //			case ObjectId:	
 		}
 		
-		if (Std.is(value, Int) && Type.getEnumName(typeClass) != null)
+		try if (Std.is(value, Int) && Type.getEnumName(typeClass) != null)
 		{
 			var utils:Dynamic = Type.resolveClass(Type.getEnumName(typeClass) + "_utils");
-			Assert.that(utils != null, "No converter available for: " + Type.getEnumName(typeClass));
+			Assert.that(utils != null, "No converter available for: " + Type.getEnumName(typeClass) + ", enum name: " + Type.getEnumName(typeClass) + ", value: " + value);
 			
 			var v = utils.fromValue(value);
 			Assert.that(v != null, "Converting to Enum instance by '"+ Type.getClassName(utils) +".fromValue("+value+")' failed");
 			return v;
+		}
+		catch (e:Dynamic) {
+			Assert.that(false, "Could not convert: " + value + ", to: " + typeClass);// + " - stack: " + haxe.Stack.callStack().join("\n"));
 		}
 		
 		return value;
@@ -118,45 +139,45 @@ class Reader implements IDisposable
 	
 	private function readValue(b : Int, pid : PropertyID, itemType : Dynamic) : Dynamic switch (b)
 	{
-		case /* uint8  */		0xcc:	#if MessagePackDebug_Read trace("readValue (uint8)"); #end	return input.readByte();
-		case /* uint16 */		0xcd:	#if MessagePackDebug_Read trace("readValue (uint16)"); #end	return input.readUInt16();
-		case /* uint32 */		0xce:	#if MessagePackDebug_Read trace("readValue (uint32)"); #end	#if neko return input.readUInt30(); #else var v:UInt = cast input.readInt32(); return v; #end
-		case /* uint64 */		0xcf:	#if MessagePackDebug_Read trace("readValue (uint64)"); #end	throw "uint64 not implemented: " + input.read(8);
+		case /* uint8  */		0xcc:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint8)"); #end	return readByte();
+		case /* uint16 */		0xcd:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint16)"); #end	return readUInt16();
+		case /* uint32 */		0xce:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint32)"); #end	#if neko return readUInt30(); #else var v:UInt = cast readInt32(); return v; #end
+		case /* uint64 */		0xcf:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint64)"); #end	throw "uint64 not implemented: " + read(8);
 		
-		case /*  int8  */		0xd0:	#if MessagePackDebug_Read trace("readValue (int8)"); #end	return input.readInt8();
-		case /*  int16  */		0xd1:	#if MessagePackDebug_Read trace("readValue (int16)"); #end	return input.readInt16();
-		case /*  int32  */		0xd2:	#if MessagePackDebug_Read trace("readValue (uint32)"); #end	return input.readInt32();
-		case /*  int64  */		0xd3:	throw "int64 not implemented: " + input.read(8);
+		case /*  int8  */		0xd0:	#if MessagePackDebug_Read if (verbose) trace("readValue (int8)"); #end	return readInt8();
+		case /*  int16  */		0xd1:	#if MessagePackDebug_Read if (verbose) trace("readValue (int16)"); #end	return readInt16();
+		case /*  int32  */		0xd2:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint32)"); #end	return readInt32();
+		case /*  int64  */		0xd3:	throw "int64 not implemented: " + read(8);
 		
-		case /* nil */			0xc0:	#if MessagePackDebug_Read trace("readValue (null)"); #end	return null;
-		case /* true */			0xc3:	#if MessagePackDebug_Read trace("readValue (true)"); #end	return true;
-		case /* false */		0xc2:	#if MessagePackDebug_Read trace("readValue (false)"); #end	return false;
+		case /* nil */			0xc0:	#if MessagePackDebug_Read if (verbose) trace("readValue (null)"); #end	return null;
+		case /* true */			0xc3:	#if MessagePackDebug_Read if (verbose) trace("readValue (true)"); #end	return true;
+		case /* false */		0xc2:	#if MessagePackDebug_Read if (verbose) trace("readValue (false)"); #end	return false;
 		
-		case /* float */		0xca:	return input.readFloat();
-		case /* double */		0xcb:	return input.readDouble();
+		case /* float */		0xca:	return readFloat();
+		case /* double */		0xcb:	return readDouble();
 		
-		case /* raw16 */		0xda:	var len = input.readUInt16(); return input.readString(len);
-		case /* raw32 */		0xdb:	var len = input.readUInt30(); return input.readString(len);
+		case /* raw16 */		0xda:	var len = readUInt16(); return readString(len);
+		case /* raw32 */		0xdb:	var len = readUInt30(); return readString(len);
 		
-		case /* array 16 */		0xdc:	return readArray(input.readUInt16(), pid, itemType);
-		case /* array 32 */		0xdd:	return readArray(input.readUInt30(), pid, itemType);
+		case /* array 16 */		0xdc:	return readArray(readUInt16(), pid, itemType);
+		case /* array 32 */		0xdd:	return readArray(readUInt30(), pid, itemType);
 		
-		case /* map 16 */		0xde:	return readMap(input.readUInt16(), pid, itemType);
-		case /* map 32 */		0xdf:	return readMap(input.readUInt30(), pid, itemType);
+		case /* map 16 */		0xde:	return readMap(readUInt16(), pid, itemType);
+		case /* map 32 */		0xdf:	return readMap(readUInt30(), pid, itemType);
 		
 		case /* ValueObject */	0xd7:
-			var header = input.readByte();
+			var header = readByte();
 			if ((header & 0x80).not0())
 				return deserializeVO(header);
 			else
 			 	return deserializeValue(header);
 		
 		default:
-			     if (b & 0x80 == 0x00){ #if MessagePackDebug_Read trace("readValue, pos-int: "+(b & 0x7F)); #end		return b & 0x7F;						 } // fixed positive int
-			else if (b & 0xE0 == 0xE0){ #if MessagePackDebug_Read trace("readValue, neg-int: "+(-1 - (b & 31))); #end	return -1 - (b & 31);					 } // fixed negative int
-			else if (b & 0xE0 == 0xA0){ #if MessagePackDebug_Read trace("readValue,  string: "+(b & 31)); #end			return input.readString(b & 31);		 } // fixed raw
-			else if (b & 0xF0 == 0x90){ #if MessagePackDebug_Read trace("readValue:   array: "+(b & 15)); #end			return readArray(b & 15, pid, itemType); } // fixed array
-			else if (b & 0xF0 == 0x80){ #if MessagePackDebug_Read trace("readValue:     map: "+(b & 15)); #end			return readMap  (b & 15, pid, itemType); } // fixed map
+			     if (b & 0x80 == 0x00){ #if MessagePackDebug_Read if (verbose) trace("readValue, b: "+b+", pos-int: "+(b & 0x7F)); #end		return b & 0x7F;						 } // fixed positive int
+			else if (b & 0xE0 == 0xE0){ #if MessagePackDebug_Read if (verbose) trace("readValue, b: "+b+", neg-int: "+(-1 - (b & 31))); #end	return -1 - (b & 31);					 } // fixed negative int
+			else if (b & 0xE0 == 0xA0){ #if MessagePackDebug_Read if (verbose) trace("readValue, b: "+b+",  string: "+(b & 31)); #end			return readString(b & 31);				 } // fixed raw
+			else if (b & 0xF0 == 0x90){ #if MessagePackDebug_Read if (verbose) trace("readValue, b: "+b+",   array: "+(b & 15)); #end			return readArray(b & 15, pid, itemType); } // fixed array
+			else if (b & 0xF0 == 0x80){ #if MessagePackDebug_Read if (verbose) trace("readValue, b: "+b+",     map: "+(b & 15)); #end			return readMap  (b & 15, pid, itemType); } // fixed map
 			else
 			 	throw "unknown type: " + StringTools.hex(b, 2);
 	}
@@ -236,18 +257,23 @@ class Reader implements IDisposable
 	
 	private function deserializeValue(type : Int) : Dynamic
 	{
-#if MessagePackDebug_Read
+#if MessagePackDebug_Read if (verbose)
 		trace("deserializeValue { typeID: "+ type);
 #end
 		switch (type)
 		{
 			case ObjectId.TYPE_ID:
-				return ObjectId.fromBytes(input);
+			#if flash10
+			    var oid = ObjectId.fromMemory(addr);
+			    addr += 12;
+			    return oid;
+			#else
+			    return ObjectId.fromInput(input);
+			#end
 				
 			case DateInterval.TYPE_ID:
-				var inp = this.input;
-				var start = Date.fromTime(inp.readDouble());
-				var end   = Date.fromTime(inp.readDouble());
+				var start = Date.fromTime(readDouble());
+				var end   = Date.fromTime(readDouble());
 				Assert.that(Std.is(start, Date));
 				Assert.that(Std.is(end,   Date));
 				return new DateInterval(start, end);
@@ -259,16 +285,15 @@ class Reader implements IDisposable
 	
 	private function deserializeVO(voHeader : Int, target : ValueObjectBase = null)
 	{
-		var inp = this.input;
 		var superTypeCount = (voHeader & 0x38 /* 0b_0011_1000 */) >>> 3;
 		var fieldsSetBytes =  voHeader & 0x07 /* 0b_0000_0111 */;
 		
 		var typeID = if ((voHeader & 0x40 /* 0b_0100_0000 */).not0())
-			inp.readUInt16(); // 2 typeID bytes
+			readUInt16(); // 2 typeID bytes
 		else
-			inp.readByte();   // 1 typeID byte
+			readByte();   // 1 typeID byte
 		
-		#if MessagePackDebug_Read
+		#if MessagePackDebug_Read if (verbose)
 			trace("deserializeVO { typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes + ", target: "+target);
 		#end
 		
@@ -277,7 +302,7 @@ class Reader implements IDisposable
 		
 		var targetWasNull = target == null;
 		if (targetWasNull) {
-			#if MessagePackDebug_Read
+			#if MessagePackDebug_Read if (verbose)
 				trace("                create Instance: "+ clazz);
 			#end
 			target = Type.createInstance(clazz, []);
@@ -302,7 +327,7 @@ class Reader implements IDisposable
 //		}
 		
 		while (superTypeCount-->0)
-			deserializeVO(inp.readByte(), target);
+			deserializeVO(readByte(), target);
 		
 		if (targetWasNull) {
 			untyped target._changedFlags = 0;
@@ -315,16 +340,130 @@ class Reader implements IDisposable
 	
 	public function discardRemainingVOProperties(propertyBytes : Int)
 	{
-		#if MessagePackDebug_Read
+//		#if MessagePackDebug_Read if (verbose)
 			trace("                discarding propertyBytes: "+ propertyBytes);
-		#end
+//		#end
 		
-		var inp = this.input;
 		while (propertyBytes-->0) {
-			var bits = inp.readByte();
+			var bits = readByte();
 			for (bit in 0 ... 8) if ((bits & (1 << bit)).not0())
 				readMsgPackValue();
 		}
 	}
+	
+	
+	
+#if flash10
+
+	var bytes : flash.utils.ByteArray;
+	var addr : Int;
+	
+	private inline function select( b : flash.utils.ByteArray ) : Void {
+		flash.system.ApplicationDomain.currentDomain.domainMemory = b;
+	}
+#end
+
+#if flash10
+
+	public inline function readByte()		: Int {
+	#if debug
+		bytes.position = addr;
+		Assert.equal(bytes.readUnsignedByte(), untyped __vmem_get__(0,addr));
+	#end
+		var v = untyped __vmem_get__(0,addr++);
+		return v;
+	}
+
+	private inline function readUInt16()	: Int {
+	#if debug
+		bytes.position = addr;
+		Assert.equal(bytes.readUnsignedShort(), untyped __vmem_get__(1,addr));
+	#end
+		var v = untyped __vmem_get__(1,addr);
+		addr += 2;
+		return v;
+	}
+
+	private inline function readInt32()		: Int {
+	#if debug
+		bytes.position = addr;
+		Assert.equal(bytes.readInt(), untyped __vmem_get__(2,addr));
+	#end
+		var v = untyped __vmem_get__(2,addr);
+		addr += 4;
+		return v;
+	}
+
+	private inline function readFloat()		: Float {
+	#if debug
+		bytes.position = addr;
+		Assert.equal(bytes.readFloat(), untyped __vmem_get__(3,addr));
+	#end
+		var v = untyped __vmem_get__(3,addr);
+		addr += 4;
+		return v;
+	}
+
+	private inline function readDouble()	: Float {
+	#if debug
+		bytes.position = addr;
+		Assert.equal(bytes.readDouble(), untyped __vmem_get__(4,addr));
+	#end
+		var v = untyped __vmem_get__(4,addr);
+		addr += 8;
+		return v;
+	}
+	
+	private inline function readString(n)	: String {
+		bytes.position = addr;
+		addr += n;
+		return bytes.readUTFBytes(n);
+	}
+	private inline function read(n)			: Void {
+		addr += n;
+	}
+	private inline function readInt8()		: Int {
+	    var n = readByte();
+		if( n >= 128 ) n -= 256;
+
+    	#if debug
+    		bytes.position = addr - 1;
+    		Assert.equal(bytes.readByte(), n);
+    	#end
+		return n;
+	}
+	private inline function readInt16()		: Int {
+	    var n = flash.Memory.signExtend16( readUInt16() );
+
+    	#if debug
+    		bytes.position = addr - 2;
+    		Assert.equal(bytes.readShort(), n);
+    	#end
+        
+		return n;
+	}
+	private inline function readUInt30()	: Int {
+	#if debug
+		bytes.position = addr;
+		Assert.equal(bytes.readUnsignedInt(), untyped __vmem_get__(2,addr));
+	#end
+		return readInt32() & 0x3FFFFFFF;
+	}
+
+#else
+
+	public  inline function readByte()		: Int		return input.readByte()
+	private inline function readUInt16()	: Int		return input.readUInt16()
+	private inline function readInt32()		: Int		return #if neko input.readInt31() #else cast input.readInt32() #end
+	private inline function readFloat()		: Float		return input.readFloat()
+	private inline function readDouble()	: Float		return input.readDouble()
+
+	private inline function readString(n)	: String	return input.readString(n)
+	private inline function read(n)						return input.read(n)
+	private inline function readInt8()		: Int		return input.readInt8()
+	private inline function readInt16()		: Int		return input.readInt16()
+	private inline function readUInt30()	: Int		return input.readUInt30()
+	
+#end
 }
 

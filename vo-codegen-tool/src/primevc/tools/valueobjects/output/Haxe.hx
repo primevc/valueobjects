@@ -135,7 +135,7 @@ class HaxeMessagePacking extends MessagePacking
 	{
 		a("\n\t@:keep static public function msgpack_unpackVO(reader : Reader, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBytes : Int, converter : ValueConverter) : Void\n\t{");
 		a("\n		Assert.that(reader != null && obj != null);");
-		a("\n		var input = reader.input, bits:Int, fieldOffset:Int = (untyped obj)._fieldOffset(TYPE_ID);");
+		a("\n		var bits:Int, fieldOffset:Int = (untyped obj)._fieldOffset(TYPE_ID);");
 	}
 	
 	override private function a_unpackProperty(p:Property)

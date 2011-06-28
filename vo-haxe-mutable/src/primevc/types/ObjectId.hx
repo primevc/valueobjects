@@ -30,25 +30,38 @@ class ObjectId
 	}
 	
 #if debug
-	static public function selftest() {
+	static public function __init__() { // Run selftest at startup
 		var str = "47cc67093475061e3d95369d";
 		var o = fromString(str);
-		Assert.that(str == o.toString().toLowerCase());
+		Assert.equal(str, o.toString().toLowerCase());
 #if !neko
-		Assert.that(o.timestamp	== 0x47cc6709);
+		Assert.equal(o.timestamp,	0x47cc6709);
 #end
-		Assert.that(o.machine	== 0x347506  );
-		Assert.that(o.pid		== 0x1e3d    );
-		Assert.that(o.increment	== 0x95369d  );
+		Assert.equal(o.machine,	    0x347506  );
+		Assert.equal(o.pid,		    0x1e3d    );
+		Assert.equal(o.increment,	0x95369d  );
 		
 		var bytes = new haxe.io.BytesOutput();
 		o.writeBytes(bytes);
-		var copy = fromBytes(new haxe.io.BytesInput(bytes.getBytes()));
+		var byteArr = bytes.getBytes();
+		var copy = fromInput(new haxe.io.BytesInput(byteArr));
 		
-		Assert.that(copy.timestamp	== o.timestamp);
-		Assert.that(copy.machine	== o.machine);
-		Assert.that(copy.pid		== o.pid);
-		Assert.that(copy.increment	== o.increment);
+		Assert.equal(copy.timestamp, o.timestamp);
+		Assert.equal(copy.machine,   o.machine);
+		Assert.equal(copy.pid,       o.pid);
+		Assert.equal(copy.increment, o.increment);
+		
+	#if flash10
+		var b:flash.utils.ByteArray = untyped byteArr.b;
+		b.length = 1024;
+		flash.Memory.select(b);
+		copy = fromMemory(0);
+		
+		Assert.equal(copy.timestamp, o.timestamp);
+		Assert.equal(copy.machine,   o.machine);
+		Assert.equal(copy.pid,       o.pid);
+		Assert.equal(copy.increment, o.increment);
+	#end
 	}
 #end
 	
@@ -65,7 +78,7 @@ class ObjectId
 		return oid;
 	}
 	
-	static public function fromBytes(input: haxe.io.Input)
+	static public function fromInput(input: haxe.io.Input)
 	{
 		var oid = new ObjectId();
 		
@@ -76,7 +89,23 @@ class ObjectId
 		
 		return oid;
 	}
+
+#if flash10
 	
+	static public inline function fromMemory(addr : Int)
+	{
+		var oid = new ObjectId();
+		
+		oid.timestamp	= flash.Memory.getI32(addr);
+		oid.machine		= flash.Memory.getByte(addr +  4) | (flash.Memory.getUI16(addr +  5) << 8); // input.readUInt24();
+		oid.pid			= flash.Memory.getUI16(addr +  7); // input.readUInt16();
+		oid.increment	= flash.Memory.getByte(addr +  9) | (flash.Memory.getUI16(addr + 10) << 8); // input.readUInt24();
+		
+		return oid;
+	}
+	
+#end
+    
 	public function writeBytes(out : haxe.io.Output)
 	{
 		out.writeInt32(haxe.Int32.ofInt( cast timestamp ));

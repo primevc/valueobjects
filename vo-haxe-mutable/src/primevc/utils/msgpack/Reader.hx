@@ -257,57 +257,53 @@ class Reader implements IDisposable
 	}
 	
 	
-	private function deserializeVO(voHeader : Int, target : ValueObjectBase = null)
+	private function deserializeVO(voHeader : Int)
 	{
-		var inp = this.input;
-		var superTypeCount = (voHeader & 0x38 /* 0b_0011_1000 */) >>> 3;
-		var fieldsSetBytes =  voHeader & 0x07 /* 0b_0000_0111 */;
+		var target = null;
+		var superTypeCount = 0;
+		do {
+			var inp = this.input;
+			superTypeCount += (voHeader & 0x38 /* 0b_0011_1000 */) >>> 3;
+			var fieldsSetBytes =  voHeader & 0x07 /* 0b_0000_0111 */;
 		
-		var typeID = if ((voHeader & 0x40 /* 0b_0100_0000 */).not0())
-			inp.readUInt16(); // 2 typeID bytes
-		else
-			inp.readByte();   // 1 typeID byte
+			var typeID = if ((voHeader & 0x40 /* 0b_0100_0000 */).not0())
+				inp.readUInt16(); // 2 typeID bytes
+			else
+				inp.readByte();   // 1 typeID byte
 		
-		#if MessagePackDebug_Read
-			trace("deserializeVO { typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes + ", target: "+target);
-		#end
+#if MessagePackDebug_Read
+				trace("deserializeVO { typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes + ", target: "+target);
+#end		var clazz = this.context.get(typeID);
+			Assert.notNull(clazz, "voHeader: " + StringTools.hex(typeID, 2) + ", type: " + typeID + " not found...");
 		
-		var clazz = this.context.get(typeID);
-		Assert.notNull(clazz, "voHeader: " + StringTools.hex(typeID, 2) + ", type: " + typeID + " not found...");
+			if (target == null) {
+#if MessagePackDebug_Read
+					trace("                create Instance: "+ clazz);
+#end
+				target = Type.createInstance(clazz, []);
+				Assert.notNull(target);
+				target.beginEdit();
+			}
 		
-		var targetWasNull = target == null;
-		if (targetWasNull) {
-			#if MessagePackDebug_Read
-				trace("                create Instance: "+ clazz);
-			#end
-			target = Type.createInstance(clazz, []);
-			Assert.notNull(target);
-			target.beginEdit();
+#if debug
+			var clazzName = Type.getClassName(clazz);
+			var lastDot = clazzName.lastIndexOf('.');
+		
+			var interfaze = Type.resolveClass(
+				clazzName.substr(0, lastDot) + ".I" + clazzName.substr(lastDot+1)
+			);
+			Assert.that(Std.is(target, interfaze), target +" is not a "+ interfaze + " ; voHeader: 0x"+StringTools.hex(voHeader) + ", typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes);
+#end
+		
+			if (fieldsSetBytes != 0)
+				(untyped clazz).msgpack_unpackVO(this, target, fieldsSetBytes);
+			
+			if (superTypeCount > 0)		voHeader = inp.readByte();
 		}
-		
-	#if debug
-		var clazzName = Type.getClassName(clazz);
-		var lastDot = clazzName.lastIndexOf('.');
-		
-		var interfaze = Type.resolveClass(
-			clazzName.substr(0, lastDot) + ".I" + clazzName.substr(lastDot+1)
-		);
-		Assert.that(Std.is(target, interfaze), target +" is not a "+ interfaze + " ; voHeader: 0x"+StringTools.hex(voHeader) + ", typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes);
-	#end
-		
-		if (fieldsSetBytes != 0)// try {
-			(untyped clazz).msgpack_unpackVO(this, target, fieldsSetBytes, this.converter);
-//		} catch (e:Dynamic) {
-//			throw "Could not unpack VO data with typeID: "+typeID+", using: "+clazz;
-//		}
-		
-		while (superTypeCount-->0)
-			deserializeVO(inp.readByte(), target);
-		
-		if (targetWasNull) {
-			untyped target._changedFlags = 0;
-			target.commitEdit();
-		}
+		while (superTypeCount-->0);
+	
+		untyped target._changedFlags = 0;
+		target.commitEdit();
 		
 		return target; // done
 	}

@@ -926,12 +926,13 @@ class Haxe implements CodeGenerator
 	//	a("\t\treturn if (v == "); a(name); a(") v;\n");
 	//	a("\t\telse\n\t\t{\n\t\t\tif (isEditable()) _changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
 		
-		a("\t\tif (v != "); a(name); a(")\n");
+		a("\t\tvar old "); a(hasGetter? ": " + HaxeUtil.haxeType(p.type, false, p.isBindable()) + " = cast " : "= "); a(name); a(";\n");
+		a("\t\tif (v != old)\n");
 		a("\t\t{\n");
 		
 		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type))
 		{
-			a("\t\t\tif (IfUtil.notNull("); a(name); a("))\n");
+			a("\t\t\tif (old.notNull())\n");
 			
 	/*		if (!p.isArray())
 				a("(untyped ");
@@ -940,28 +941,32 @@ class Haxe implements CodeGenerator
 			if(!p.isArray())
 				a(")");*/
 			
-			a("\t\t\t\t"); a(name); a(".change.unbind(this);\n");
-			a("\t\t\tif (v.notNull()) {\n\t\t\t\tv.");
+			a("\t\t\t\told.change.unbind(this);\n");
+			a("\t\t\tif (v.notNull()) {\n\t\t\t\t");
 			
 			if (p.isArray() || p.isBindable())
 			{
-				a("change.");
+				a("v.change.");
 				a(listChangeHandler? "observe(this, " : "bind(this, "); a(p.name); a("Changed);\n\t");
 				if (listChangeHandler && !Util.isSingleValue(p.type)) {
 					a("\t\t\tv.setChangeHandler(objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t");
 				}
 			}
 			else if (!Util.isSingleValue(p.type)) {
-				a("as(ValueObjectBase).change.bind(this, objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t");
+			    a("var newV = v.as(ValueObjectBase);\n\t\t\t\t");
+				a("newV.change.bind(this, objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t\t\t\t");
+				a("if (newV.isEmpty()) "); addPropChangeFlagUnsetter(p.bitIndex()); a(" else _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a(";\n\t");
 			}
 		}
 		a("\t\t\t");
-		var ifExprAdded = addPropChangeFlagSetter(p.bitIndex(), "v" + ((!p.isArray() && p.isBindable())? ".value" : ""), p.type, false);
+		var ifExprAdded =
+		    if(!p.isArray() && !Util.isSingleValue(p.type)) false; // Flags are already handled just above this line.
+		    else addPropChangeFlagSetter(p.bitIndex(), "v" + ((!p.isArray() && p.isBindable())? ".value" : ""), p.type, false);
+		
 		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type)) {
 			a("\n\t\t\t}");
 			if (ifExprAdded) {
-				a("\n\t\t\t");
-				addPropChangeFlagUnsetter(p.bitIndex());
+				a("\n\t\t\telse "); addPropChangeFlagUnsetter(p.bitIndex());
 			}
 		}
 		
@@ -983,7 +988,7 @@ class Haxe implements CodeGenerator
 			
 			if (listChangeHandler)
 			{
-				a("if ("); a(p.name); a(".length.not0()) _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a("; "); addPropChangeFlagUnsetter(p.bitIndex());
+				a("if ("); a(p.name); a(".length.not0()) _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a("; else "); addPropChangeFlagUnsetter(p.bitIndex());
 			}
 			else
 				addPropChangeFlagSetter(p.bitIndex(), "value", p.type, false);
@@ -996,14 +1001,14 @@ class Haxe implements CodeGenerator
 		var ifAdded = !addIfVarIsSetExpr(path, ptype, bindable, "_propertiesSet |= " + hexBitflag(bit));
 		
 		if (ifAdded) {
-			a(" "); addPropChangeFlagUnsetter(bit);
+			a(" else "); addPropChangeFlagUnsetter(bit);
 		}
 		
 		return ifAdded;
 	}
 	
 	private function addPropChangeFlagUnsetter(bit) {
-		a("else _propertiesSet &= 0x" + StringTools.hex(-1 ^ (1 << bit)) + ";");
+		a("_propertiesSet &= 0x" + StringTools.hex(-1 ^ (1 << bit)) + ";");
 	}
 	
 	

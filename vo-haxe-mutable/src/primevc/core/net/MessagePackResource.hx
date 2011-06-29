@@ -223,7 +223,7 @@ class MessagePackResource <Data> implements IDisposable
 	
 	
 	public static inline function deserialize<Data> (data:BytesData, reader:Reader) : Data
-	{	
+	{
 //#if debug
 		var start = haxe.Timer.stamp();
 //#end

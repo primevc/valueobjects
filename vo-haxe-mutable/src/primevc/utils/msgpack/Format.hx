@@ -15,10 +15,11 @@ class Format
 	 * Writes 'value' in the most compact MsgPack form possible, to output 'o'.
 	 * Returns: bytes written.
 	 */
-	static inline public function packInt(o : Output, value : Int) : Int
+	static public function packInt(o : Output, value : Int) : Int
 	{
-		#if MessagePackDebug_Pack trace("packInt: "+value); #end
-		
+	    #if MessagePackDebug_Pack trace("packInt: "+value); #end
+        Assert.that(o.bigEndian, "MessagePack integers must be written big-endian.");
+	    
 		if (value >= 0 && value < 0x10000)
 		{
 			if (value <= 127) {
@@ -68,7 +69,8 @@ class Format
 	static public function packUInt(o : Output, value : UInt) : Int
 	{
 		#if MessagePackDebug_Pack trace("packUInt: "+value); #end
-		
+		Assert.that(o.bigEndian, "MessagePack integers must be written big-endian.");
+        
 		if (value <= 127) {
 		 	o.writeByte(value);
 			return 1;

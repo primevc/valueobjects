@@ -14,6 +14,7 @@ package primevc.utils.msgpack;
  import primevc.types.ObjectId;
  import primevc.utils.IfUtil;
   using primevc.utils.IfUtil;
+  using Std;
 
 typedef ValueConverter = Dynamic -> PropertyID -> Dynamic -> Dynamic
 
@@ -30,25 +31,25 @@ class Reader implements IDisposable
 
 #if flash10
     public var bytes(default,setBytes) : flash.utils.ByteArray;
-        private function setBytes(b : flash.utils.ByteArray) {
-            this.bigEndian = (b.endian == flash.utils.Endian.BIG_ENDIAN);
-            b.position = 0;
-    		if (b.length < 1024)
-    			b.length = 1024;
-    		flash.Memory.select(b);
-    		this.bytes = b;
-    		
-//    		this.input = new haxe.io.BytesInput(haxe.io.Bytes.ofData(b));
-//    		this.input.bigEndian = this.bigEndian;
-    		
-    		return b;
-        }
-    var bigEndian : Bool;
-    var addr : Int;
 
+    private function setBytes(b : flash.utils.ByteArray)
+    {
+        Assert.equal(b.endian, flash.utils.Endian.BIG_ENDIAN, "MessagePack integers must be read big-endian.");
+        
+        b.position = 0;
+		if (b.length < 1024)
+			b.length = 1024;
+		flash.Memory.select(b);
+		
+		return this.bytes = b;
+    }
+
+    private var addr : Int;
+
+#else
+	private var input : Input;
 #end
 
-	private var input	: Input;
 	private var context	: IntHash<Class<Dynamic>>;
 	
 	public function new(context_ : IntHash<Class<Dynamic>>, ?input_ : Input)
@@ -57,7 +58,7 @@ class Reader implements IDisposable
 		this.context = context_;
 	#if flash10
 	    if (input_ != null)
-    	    this.bytes = untyped input_.b;
+	        this.bytes = input_.is(haxe.io.BytesInput)? untyped input_.b : input_.readAll().getData();
 	#else
 	    this.input = input_;
 	#end
@@ -111,13 +112,6 @@ class Reader implements IDisposable
 				return if (b & 0xF0 == 0x90) b & 15;
 				else 1;
 		}
-	}
-	
-	
-	private function readConvert(packedType : Int, propertyID : PropertyID, typeClass : Dynamic) : Dynamic
-	{
-		var value = readValue(packedType, propertyID, typeClass);
-		return Std.is(value, typeClass)? value : converter(value, propertyID, typeClass);
 	}
 	
 	
@@ -186,7 +180,7 @@ class Reader implements IDisposable
 			 	return deserializeValue(header);
 		
 		default:
-			     if (b & 0x80 == 0x00){ #if MessagePackDebug_Read if (verbose) trace("readValue, b: "+b+", pos-int: "+(b & 0x7F)); #end		return b & 0x7F;						 } // fixed positive int
+			     if (b & 0x80 == 0x00){ #if MessagePackDebug_Read if (verbose) trace("readValue, b: "+b+", pos-int: "+(b & 0x7F)); #end	    	return b & 0x7F;						 } // fixed positive int
 			else if (b & 0xE0 == 0xE0){ #if MessagePackDebug_Read if (verbose) trace("readValue, b: "+b+", neg-int: "+(-1 - (b & 31))); #end	return -1 - (b & 31);					 } // fixed negative int
 			else if (b & 0xE0 == 0xA0){ #if MessagePackDebug_Read if (verbose) trace("readValue, b: "+b+",  string: "+(b & 31)); #end			return readString(b & 31);				 } // fixed raw
 			else if (b & 0xF0 == 0x90){ #if MessagePackDebug_Read if (verbose) trace("readValue, b: "+b+",   array: "+(b & 15)); #end			return readArray(b & 15, pid, itemType); } // fixed array
@@ -196,33 +190,7 @@ class Reader implements IDisposable
 	}
 	
 	
-	inline function readArray<T>(len:Int, pid : PropertyID, itemType : Dynamic) : FastArray<T>
-	{
-		var arr = FastArrayUtil.create(len);
-		for (i in 0 ... len) //try {
-		 	arr[i] = readMsgPackValue(pid, itemType);
-//		} catch (e:Dynamic) {
-//			throw "Could not unpack array data with property ID: 0x"+StringTools.hex(pid)+", and itemType: "+itemType;
-//		}
-		
-		return arr;
-	}/*		
-	#if flash10
-		var isVO = false, sc = itemType;
-		while ((sc = Type.getSuperClass(sc)) != null)
-			if (sc == ValueObjectBase) {
-				isVO = true;
-				break;
-			}
-		
-		if (isVO) return readVOArray(len, pid, itemType);
-		else return readObjectArray(len, pid, itemType);
-	#else
-		return readObjectArray(len, pid, itemType);
-	#end
-	}
-	
-	function readObjectArray(len:Int, pid : PropertyID, itemType : Dynamic) : FastArray<Dynamic>
+	private inline function readArray<T>(len:Int, pid : PropertyID, itemType : Dynamic) : FastArray<T>
 	{
 		var arr = FastArrayUtil.create(len);
 		for (i in 0 ... len)
@@ -230,18 +198,7 @@ class Reader implements IDisposable
 		
 		return arr;
 	}
-	
-	#if flash10
-	function readVOArray(len:Int, pid : PropertyID, itemType : Dynamic) : FastArray<IValueObject>
-	{
-		var arr : FastArray<IValueObject> = FastArrayUtil.create(len);
-		for (i in 0 ... len)
-		 	arr[i] = readMsgPackValue(pid, itemType);
-		
-		return arr;
-	}
-	#end
-*/
+
 	
 	private function readMap(elem:Int, pid : PropertyID, itemType : Dynamic)
 	{
@@ -258,15 +215,6 @@ class Reader implements IDisposable
 		return map;
 	}
 	
-/*	function readUInt(i : Input, bytes : Int) return switch (bytes)
-	{
-		case 1: input.readByte();
-		case 2: input.readUInt16();
-		case 3: input.readUInt24();
-		case 4: #if neko input.readUInt30(); #else cast input.readInt32(); #end
-		default: 0;
-	}
-*/
 	
 	private function deserializeValue(type : Int) : Dynamic
 	{
@@ -277,11 +225,9 @@ class Reader implements IDisposable
 		{
 			case ObjectId.TYPE_ID:
 			#if flash10
-			    return if (input == null) {
-			        var oid = ObjectId.fromMemory(addr);
-			        addr += 12;
-			        oid;
-		        } else ObjectId.fromInput(input);
+			    var a = addr;
+			    addr += 12;
+			    return ObjectId.fromMemory(a);
 			#else
 			    return ObjectId.fromInput(input);
 			#end
@@ -367,56 +313,98 @@ class Reader implements IDisposable
 
 #if flash10
 
-    public inline function readByte()       : Int {
-        var v:Int = untyped __vmem_get__(0,addr++);
-    #if debug
-        bytes.position = addr - 1;
-        var b:Int = bytes.readUnsignedByte();
-        Assert.equal(b, v, "addr="+addr);
-    #end
-        return v;
+    public inline function readByte()       : Int
+    {
+        #if MessagePackDebug_Read
+            var v:Int = flash.Memory.getByte( addr++ );
+        
+            bytes.position = addr - 1;
+            var b:Int = bytes.readUnsignedByte();
+            Assert.equal(b, v, "addr="+addr);
+        
+            return v;
+        #else
+            return flash.Memory.getByte( addr++ );
+        #end
     }
 
-    private inline function readUInt16()    : Int {
-        var v = if (bigEndian) untyped { __vmem_get__(0,addr+1) | (__vmem_get__(0,addr) << 8); } else untyped __vmem_get__(1,addr);
-    #if debug
-        bytes.position = addr;
-        Assert.equal(bytes.readUnsignedShort(), v, "addr="+addr);
-    #end
-        
+/*
+    // Byte swapping in AS3 seems to be slower then just OR-ing bytes read with alchemy opcodes
+
+    private inline function byteSwapInt (inValue:Int)
+    {
+    	return  ((inValue & 0xff000000) >> 24) |
+				((inValue & 0x00ff0000) >>  8) |
+				((inValue & 0x0000ff00) <<  8) |
+				((inValue & 0x000000ff) << 24) ;
+    }
+    
+    private inline function byteSwapShort (inValue:Int)
+    {
+    	return  (((inValue >> 8)) | ((inValue & 0xFF) << 8));
+    }
+*/
+
+    private inline function readUInt16()    : Int
+    {
+        var a = addr;
         addr += 2;
-        return v;
-    }
-
-    private inline function readInt32()     : Int {
-        var v = if (bigEndian) untyped { (__vmem_get__(0,addr) << 24) | (__vmem_get__(0,addr+1) << 16) | (__vmem_get__(0,addr+2) << 8) | __vmem_get__(0,addr+3); } else untyped __vmem_get__(1,addr);
         
-    #if debug
-        bytes.position = addr;
-        Assert.equal(bytes.readInt(), v);
-    #end
-        addr += 4;
-        return v;
+        #if MessagePackDebug_Read       var v =
+        #else return                            #end
+            flash.Memory.getByte(a)   << 8 |
+            flash.Memory.getByte(a+1)      ;
+        
+        #if MessagePackDebug_Read
+            bytes.position = a;
+            Assert.equal(bytes.readUnsignedShort(), v, "addr="+a);
+            return v;
+        #end
     }
 
-    private inline function readFloat()     : Float {
-    #if debug
-        bytes.position = addr;
-        Assert.equal(bytes.readFloat(), untyped __vmem_get__(3,addr));
-    #end
-        var v = untyped __vmem_get__(3,addr);
+    private inline function readInt32()     : Int
+    {
+        var a = addr;
         addr += 4;
-        return v;
+        
+        #if MessagePackDebug_Read       var v =
+        #else return                            #end
+            flash.Memory.getByte(a)   << 24 |
+            flash.Memory.getByte(a+1) << 16 |
+            flash.Memory.getByte(a+2) <<  8 |
+            flash.Memory.getByte(a+3)       ;
+        
+        #if MessagePackDebug_Read
+            bytes.position = a;
+            Assert.equal(bytes.readInt(), v);
+            return v;
+        #end
     }
 
-    private inline function readDouble()    : Float {
-    #if debug
-        bytes.position = addr;
-        Assert.equal(bytes.readDouble(), untyped __vmem_get__(4,addr));
-    #end
-        var v = untyped __vmem_get__(4,addr);
+    private inline function readFloat()     : Float
+    {    
+        var a = addr;
+        addr += 4;
+        
+        #if MessagePackDebug_Read
+            bytes.position = a;
+            Assert.equal(bytes.readFloat(), flash.Memory.getFloat(a));
+        #end
+        
+        return flash.Memory.getFloat(a);
+    }
+
+    private inline function readDouble()    : Float
+    {    
+        var a = addr;
         addr += 8;
-        return v;
+        
+        #if MessagePackDebug_Read
+            bytes.position = a;
+            Assert.equal(bytes.readDouble(), flash.Memory.getDouble(a));
+        #end
+        
+        return flash.Memory.getDouble(a);
     }
     
     private inline function readString(n)   : String {
@@ -424,36 +412,45 @@ class Reader implements IDisposable
         addr += n;
         return bytes.readUTFBytes(n);
     }
+    
     private inline function read(n)         : Void {
         addr += n;
     }
-    private inline function readInt8()      : Int {
+    
+    private inline function readInt8()      : Int
+    {
         var n = readByte();
         if( n >= 128 ) n -= 256;
 
-        #if debug
+        #if MessagePackDebug_Read
             bytes.position = addr - 1;
             Assert.equal(bytes.readByte(), n);
         #end
         return n;
     }
-    private inline function readInt16()     : Int {
-        var n = flash.Memory.signExtend16( readUInt16() );
-
-        #if debug
+    
+    private inline function readInt16()     : Int
+    {
+        #if MessagePackDebug_Read
+            var n = flash.Memory.signExtend16( readUInt16() );
             bytes.position = addr - 2;
             Assert.equal(bytes.readShort(), n);
+            return n;
+        #else
+            return flash.Memory.signExtend16( readUInt16() );
         #end
-        
-        return n;
     }
-    private inline function readUInt30()    : Int {
-        var v = readInt32() & 0x3FFFFFFF;
-    #if debug
-        bytes.position = addr - 4;
-        Assert.equal(bytes.readUnsignedInt(), v);
-    #end
-        return v;
+    
+    private inline function readUInt30()    : Int
+    {
+        #if MessagePackDebug_Read
+            var v = readInt32() & 0x3FFFFFFF;
+            bytes.position = addr - 4;
+            Assert.equal(bytes.readUnsignedInt(), v);
+            return v;
+        #else
+            return readInt32() & 0x3FFFFFFF;
+        #end
     }
 
 #else

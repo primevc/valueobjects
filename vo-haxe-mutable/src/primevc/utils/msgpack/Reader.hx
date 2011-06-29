@@ -79,7 +79,7 @@ class Reader implements IDisposable
 		var value;
 		try {
 			value = readValue(readByte(), pid, itemType);
-			if (IfUtil.notNull(itemType) && !Std.is(value, itemType))
+			if (IfUtil.notNull(itemType) && !(#if flash9 untyped __is__(value, itemType) || #end Std.is(value, itemType)))
 				value = converter(value, pid, itemType);
 		}
 		catch (e:Eof)

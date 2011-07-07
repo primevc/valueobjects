@@ -664,6 +664,7 @@ class PropertyTypeResolver
 				if 		(Type.getEnumName(e) == Type.getEnumName(AbstractPType))	handleAbstractPType(def);
 				else if	(Type.getEnumName(e) == Type.getEnumName(PType))			handlePType(def);
 				else if	(Type.getEnumName(e) == Type.getEnumName(PropertyOption))	handlePropertyOption(def);
+				else if	(Type.getEnumName(e) == Type.getEnumName(Platform))			handlePlatform(def);
 				else throw Err_UnknownType(this, runtimeType);
 			
 			case TObject:
@@ -724,6 +725,16 @@ class PropertyTypeResolver
 		else if (!Lambda.has(prop.opts, value))
 			prop.opts.push(value);
 	}
+
+
+	private function handlePlatform (value:Platform)
+	{
+		if (prop.platforms == null)
+			prop.platforms = [value];
+		else
+			prop.platforms.push(value);
+	}
+
 	
 	private function handleAbstractPType(value:AbstractPType)
 	{
@@ -863,6 +874,7 @@ class Property
 	public var opts							: Array<PropertyOption>;
 	public var description					: String;
 	public var defaultValue	(default,null)	: Dynamic;
+	public var platforms					: Array<Platform>;
 	
 	
 	public function new(name:String, parent:TypeDefinitionWithProperties) {
@@ -936,6 +948,10 @@ class Property
 	public function hasOption(option:PropertyOption) {
 		if (opts != null) for (opt in opts) if (opt == option) return true;
 		return false;
+	}
+
+	public inline function isPlatformSpecific () : Bool {
+		return platforms != null && platforms.length > 0;
 	}
 	
 	public function checkDefaultValue(defaultval:Dynamic)
@@ -2596,6 +2612,14 @@ enum PropertyOption
 	mongo_reference;
 	mongo_typeCast;
 	optional;
+}
+
+enum Platform
+{
+	js;
+	flash9;
+	flash;
+	scala;
 }
 
 enum ClassOption

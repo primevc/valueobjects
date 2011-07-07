@@ -290,7 +290,8 @@ class Haxe implements CodeGenerator
 		{
 			var p = def.propertiesSorted[i];
 			if (Util.isDefinedInSuperClassOf(def, p)) continue;
-			
+
+			openPlatformCode(p);
 			if (immutable) {
 				genGetter(p, true);
 			} else {
@@ -298,6 +299,7 @@ class Haxe implements CodeGenerator
 				if (p.shouldHaveSetter())
 					genSetter(i, p, def.fullName);
 			}
+			closePlatformCode(p);
 		}
 		
 		if (immutable) {
@@ -815,12 +817,21 @@ class Haxe implements CodeGenerator
 		for (i in 0 ... def.propertiesSorted.length)
 		{
 			var p = def.propertiesSorted[i];
-			a("\n\t\t\t"); a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true, p.hasOption(transient)));
+			if (p.isPlatformSpecific()) {
+				a("\n"); openPlatformCode(p, false); a("\t");
+			} else
+				a("\n\t\t\t\t");
+			
+			a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true, p.hasOption(transient)));
 			var init = HaxeUtil.getConstructorInitializer(p.type, true);
 			if (init != null) {
 			 	a(" = "); a(init);
 			}
 			if (i + 1 != def.propertiesSorted.length) a(", ");
+
+			if (p.isPlatformSpecific())
+				closePlatformCode(p, false);
+			
 			a("\t\t\t\t//"+i);
 		}
 		a("\n\t\t)\n\t{\n");
@@ -833,8 +844,10 @@ class Haxe implements CodeGenerator
 			{
 				var p = def.propertiesSorted[i];
 				if (Util.isDefinedInSuperClassOf(def, p)) {
+					openPlatformCode(p, false);
 					if (first) first = false; else a(", ");
 					a(p.name); a("_");
+					closePlatformCode(p, false);
 				}
 			}
 			a(");\n");
@@ -844,6 +857,7 @@ class Haxe implements CodeGenerator
 		
 		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p))
 		{
+			openPlatformCode(p);
 			if (!Util.isPTypeBuiltin(p.type) && !Util.isEnum(p.type)) {
 				if (p.isBindable())		{ a("\t\tthis."); a(p.name); a(".value"); a(" = "); a(p.name); a("_;"); }
 				else					{ a("\t\tthis."); a(p.name); a(" = "); a(p.name); a("_;"); }
@@ -860,6 +874,7 @@ class Haxe implements CodeGenerator
 					}
 			}
 		 	a("\n");
+			closePlatformCode(p);
 		}
 		
 		magic.constructor(code);
@@ -1133,6 +1148,27 @@ class Haxe implements CodeGenerator
 		code.add("\n#end\n#if (VO_Read || !VO_Write)\n");
 		mapToHaxe.genFromXML();
 		this.code.add("\n#end\n");
+	}
+
+
+
+	private inline function openPlatformCode(p:Property, useNewLine:Bool = true)
+	{
+		if (p.isPlatformSpecific()) {
+			a("#if ("+p.platforms.join(" || ")+")");
+			if (useNewLine)
+				a("\n");
+		}
+	}
+
+
+	private inline function closePlatformCode (p:Property, useNewLine:Bool = true)
+	{
+		if (p.isPlatformSpecific()) {
+			a("#end");
+			if (useNewLine)
+				a("\n");
+		}
 	}
 }
 

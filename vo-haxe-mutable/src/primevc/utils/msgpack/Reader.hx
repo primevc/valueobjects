@@ -146,19 +146,19 @@ class Reader implements IDisposable
 	
 	private function readValue(b : Int, pid : PropertyID, itemType : Dynamic) : Dynamic switch (b)
 	{
-		case /* uint8  */		0xcc:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint8)"); #end	return readByte();
-		case /* uint16 */		0xcd:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint16)"); #end	return readUInt16();
-		case /* uint32 */		0xce:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint32)"); #end	#if neko return readUInt30(); #else var v:UInt = cast readInt32(); return v; #end
-		case /* uint64 */		0xcf:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint64)"); #end	throw "uint64 not implemented: " + read(8);
+		case /* uint8  */		0xcc:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint8)"); #end      return readByte();
+		case /* uint16 */		0xcd:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint16)"); #end     return readUInt16();
+		case /* uint32 */		0xce:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint32)"); #end     #if neko return readUInt30(); #else var v:UInt = cast readInt32(); return v; #end
+		case /* uint64 */		0xcf:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint64)"); #end     throw "uint64 not implemented: " + read(8);
 		
-		case /*  int8  */		0xd0:	#if MessagePackDebug_Read if (verbose) trace("readValue (int8)"); #end	return readInt8();
-		case /*  int16  */		0xd1:	#if MessagePackDebug_Read if (verbose) trace("readValue (int16)"); #end	return readInt16();
-		case /*  int32  */		0xd2:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint32)"); #end	return readInt32();
+		case /*  int8  */		0xd0:	#if MessagePackDebug_Read if (verbose) trace("readValue (int8)"); #end       return readInt8();
+		case /*  int16  */		0xd1:	#if MessagePackDebug_Read if (verbose) trace("readValue (int16)"); #end      return readInt16();
+		case /*  int32  */		0xd2:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint32)"); #end	 return readInt32();
 		case /*  int64  */		0xd3:	throw "int64 not implemented: " + read(8);
 		
-		case /* nil */			0xc0:	#if MessagePackDebug_Read if (verbose) trace("readValue (null)"); #end	return null;
-		case /* true */			0xc3:	#if MessagePackDebug_Read if (verbose) trace("readValue (true)"); #end	return true;
-		case /* false */		0xc2:	#if MessagePackDebug_Read if (verbose) trace("readValue (false)"); #end	return false;
+		case /* nil */			0xc0:	#if MessagePackDebug_Read if (verbose) trace("readValue (null)"); #end       return null;
+		case /* true */			0xc3:	#if MessagePackDebug_Read if (verbose) trace("readValue (true)"); #end       return true;
+		case /* false */		0xc2:	#if MessagePackDebug_Read if (verbose) trace("readValue (false)"); #end      return false;
 		
 		case /* float */		0xca:	return readFloat();
 		case /* double */		0xcb:	return readDouble();

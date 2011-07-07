@@ -122,6 +122,11 @@ class MessagePackResource <Data> implements IDisposable
 	private function doNothing () throw "impossible"
 	
 
+#if debug
+	private var getStarted : Int;
+#end
+
+
 	/**
 	 * GET a single object by proving a uriSuffix.
 	 */
@@ -135,7 +140,10 @@ class MessagePackResource <Data> implements IDisposable
 		onComplete.handler	= handleGET;
 		onError.handler		= cast (events.receive.error, Signal1<Dynamic>).send;
 		
-	//	trace("get "+uri);
+#if debug
+		getStarted = primevc.utils.TimerUtil.stamp();
+		trace("get "+uri);
+#end
 		l.load(uri);
 		e.started.send();
 	}
@@ -168,7 +176,9 @@ class MessagePackResource <Data> implements IDisposable
 	private function handleGET ()
 	{
 	//	trace(loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
-		
+#if debug
+		trace("received data in "+(primevc.utils.TimerUtil.stamp() - getStarted) + " ms");
+#end
 		data = deserialize( loader.data, reader );
 		events.receive.completed.send();
 		
@@ -205,7 +215,7 @@ class MessagePackResource <Data> implements IDisposable
 	{
 		// Serialize
 #if debug
-		var start = haxe.Timer.stamp();
+		var start = primevc.utils.TimerUtil.stamp();
 #end
 		var out			= new BytesOutput();
 		out.bigEndian	= true;
@@ -214,8 +224,7 @@ class MessagePackResource <Data> implements IDisposable
 
 #if debug
 		Assert.equal(b.length, origLen);
-		if ((haxe.Timer.stamp() - start) > 0.1)
-			trace((haxe.Timer.stamp() - start)+" sec");
+		trace("serialized data in "+(primevc.utils.TimerUtil.stamp() - start)+" ms");
 #end
 		return b;
 	}
@@ -225,18 +234,17 @@ class MessagePackResource <Data> implements IDisposable
 	public static inline function deserialize<Data> (data:BytesData, reader:Reader) : Data
 	{
 #if debug
-		var start = haxe.Timer.stamp();
+		var start = primevc.utils.TimerUtil.stamp();
 #end
 //		var bytes	= Bytes.ofData(data);
 		
-		data.endian = flash.utils.Endian.BIG_ENDIAN;
+		data.endian	 = flash.utils.Endian.BIG_ENDIAN;
 		reader.bytes = data;
 		//var input	= reader.input = new BytesInput(bytes);
 		//input.bigEndian = true;
 #if debug
 		var o = reader.readMsgPackValue();
-		if ((haxe.Timer.stamp() - start) > 0.1)
-			trace((haxe.Timer.stamp() - start)+" sec");
+		trace("deserialized data in "+(primevc.utils.TimerUtil.stamp() - start)+" ms");
 		return o;
 #else
 		return reader.readMsgPackValue();

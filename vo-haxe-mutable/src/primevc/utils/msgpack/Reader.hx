@@ -58,7 +58,7 @@ class Reader implements IDisposable
 		this.context = context_;
 	#if flash10
 	    if (input_ != null)
-	        this.bytes = input_.is(haxe.io.BytesInput)? untyped input_.b : input_.readAll().getData();
+	        this.bytes = input_.is(haxe.io.BytesInput) ? (untyped input_).b : input_.readAll().getData();
 	#else
 	    this.input = input_;
 	#end

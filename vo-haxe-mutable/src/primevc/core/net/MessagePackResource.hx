@@ -238,8 +238,12 @@ class MessagePackResource <Data> implements IDisposable
 #end
 //		var bytes	= Bytes.ofData(data);
 		
+#if flash10
 		data.endian	 = flash.utils.Endian.BIG_ENDIAN;
 		reader.bytes = data;
+#else
+		reader.input = new BytesInput(Bytes.ofData(data));
+#end
 		//var input	= reader.input = new BytesInput(bytes);
 		//input.bigEndian = true;
 #if debug

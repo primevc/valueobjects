@@ -47,7 +47,7 @@ class Reader implements IDisposable
     private var addr : Int;
 
 #else
-	private var input : Input;
+	public var input : Input;
 #end
 
 	private var context	: IntHash<Class<Dynamic>>;

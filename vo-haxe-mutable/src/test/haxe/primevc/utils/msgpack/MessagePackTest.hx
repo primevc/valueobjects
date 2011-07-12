@@ -25,6 +25,7 @@ class MessagePackTest extends TestCase
 	{
 		var b = out.getBytes();
 		inp	= new BytesInput(b);
+		inp.bigEndian = true;
 		r	= new Reader(new IntHash(), inp);
 	
 		return b;
@@ -32,6 +33,7 @@ class MessagePackTest extends TestCase
 	
 	override function setup() {
 		out	= new BytesOutput();
+		out.bigEndian = true;
 	}
 	
 	override function tearDown() {

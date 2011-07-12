@@ -386,12 +386,8 @@ class Reader implements IDisposable
         var a = addr;
         addr += 4;
         
-        #if MessagePackDebug_Read
-            bytes.position = a;
-            Assert.equal(bytes.readFloat(), flash.Memory.getFloat(a));
-        #end
-        
-        return flash.Memory.getFloat(a);
+        bytes.position = a;
+    	return bytes.readFloat();
     }
 
     private inline function readDouble()    : Float
@@ -399,12 +395,8 @@ class Reader implements IDisposable
         var a = addr;
         addr += 8;
         
-        #if MessagePackDebug_Read
-            bytes.position = a;
-            Assert.equal(bytes.readDouble(), flash.Memory.getDouble(a));
-        #end
-        
-        return flash.Memory.getDouble(a);
+        bytes.position = a;
+        return bytes.readDouble();
     }
     
     private inline function readString(n)   : String {

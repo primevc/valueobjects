@@ -42,11 +42,12 @@ class ObjectId
 		Assert.equal(o.increment,	0x95369d  );
 		
 		var bytes = new haxe.io.BytesOutput();
-		bytes.b.length = 1024;
-		trace(bytes.b.position+" / "+bytes.b.length);
+		bytes.bigEndian = true;
 		o.writeBytes(bytes);
 		var byteArr = bytes.getBytes();
-		var copy1 = fromInput(new haxe.io.BytesInput(byteArr));
+		var input = new haxe.io.BytesInput(byteArr);
+		input.bigEndian = true;
+		var copy1 = fromInput(input);
 		
 		Assert.equal(copy1.timestamp, o.timestamp);
 		Assert.equal(copy1.machine,   o.machine);
@@ -55,6 +56,8 @@ class ObjectId
 		
 	#if flash10
 		var b:flash.utils.ByteArray = (untyped byteArr).b;
+		b.length = 1024;
+		b.position = 0;
 		flash.Memory.select(b);
 		var copy2 = fromMemory(0);
 		
@@ -93,14 +96,29 @@ class ObjectId
 
 #if flash10
 	
-	static public inline function fromMemory(addr : Int)
+	static public inline function fromMemory(addr : Int, bigEndian:Bool = true)
 	{
 		var oid = new ObjectId();
 		
-		oid.timestamp	= flash.Memory.getI32(addr);
-		oid.machine		= flash.Memory.getByte(addr +  4) | (flash.Memory.getUI16(addr +  5) << 8);
-		oid.pid			= flash.Memory.getUI16(addr +  7);
-		oid.increment	= flash.Memory.getByte(addr +  9) | (flash.Memory.getUI16(addr + 10) << 8);
+		if (bigEndian)
+		{
+			oid.timestamp =
+				flash.Memory.getByte(addr)   << 24 |
+    	        flash.Memory.getByte(addr+1) << 16 |
+        	    flash.Memory.getByte(addr+2) <<  8 |
+            	flash.Memory.getByte(addr+3)       ;
+            
+			oid.machine	  = flash.Memory.getByte(addr +  4) << 16 | (flash.Memory.getByte(addr +  5) << 8) | flash.Memory.getByte(addr +  6);
+			oid.pid       = flash.Memory.getByte(addr +  7) <<  8 |  flash.Memory.getByte(addr +  8);
+			oid.increment = flash.Memory.getByte(addr +  9) << 16 | (flash.Memory.getByte(addr + 10) << 8) | flash.Memory.getByte(addr +  11);
+		}
+		else
+		{
+			oid.timestamp	= flash.Memory.getI32(addr);
+			oid.machine		= flash.Memory.getByte(addr +  4) | (flash.Memory.getUI16(addr +  5) << 8);
+			oid.pid			= flash.Memory.getUI16(addr +  7);
+			oid.increment	= flash.Memory.getByte(addr +  9) | (flash.Memory.getUI16(addr + 10) << 8);
+		}
 		
 		return oid;
 	}

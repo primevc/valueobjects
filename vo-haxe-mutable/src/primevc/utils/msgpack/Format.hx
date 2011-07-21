@@ -17,8 +17,9 @@ class Format
 	 */
 	static public function packInt(o : Output, value : Int) : Int
 	{
-		#if MessagePackDebug_Pack trace("packInt: "+value); #end
-		
+	    #if MessagePackDebug_Pack trace("packInt: "+value); #end
+        Assert.that(o.bigEndian, "MessagePack integers must be written big-endian.");
+	    
 		if (value >= 0 && value < 0x10000)
 		{
 			if (value <= 127) {
@@ -68,7 +69,8 @@ class Format
 	static public function packUInt(o : Output, value : UInt) : Int
 	{
 		#if MessagePackDebug_Pack trace("packUInt: "+value); #end
-		
+		Assert.that(o.bigEndian, "MessagePack integers must be written big-endian.");
+        
 		if (value <= 127) {
 		 	o.writeByte(value);
 			return 1;
@@ -267,7 +269,7 @@ import primevc.types.ObjectId;
  * @author Danny Wilson
  * @creation-date Dec 14, 2010
  */
-class VOFormat
+extern class VOFormat
 {
 	/**
 	 *  Custom VO Type:
@@ -275,7 +277,7 @@ class VOFormat
 	 *  | 0xD7 | VO Header |
 	 *  +------+-----------+
 	 */
-	static inline public function packValueObject(o : Output)
+	static inline public function packValueObject(o : Output) : Int
 	{
 		#if MessagePackDebug_Pack trace("packValueObject"); #end
 		
@@ -306,7 +308,7 @@ class VOFormat
 	 *  - first value is for field index: $groupnumber + 2
 	 *  - second value for field index:   $groupnumber + 7
 	 */
-	static inline public function packValueObjectHeader(o : Output, voType : Int, superTypes : Int, fieldFlags : Int)
+	static inline public function packValueObjectHeader(o : Output, voType : Int, superTypes : Int, fieldFlags : Int) : Int
 	{
 		Assert.that(superTypes >= 0 && superTypes <= 7);
 		
@@ -330,7 +332,7 @@ class VOFormat
 		}
 	}
 	
-	static inline function bytesUsedInInt(n:Int)
+	static inline function bytesUsedInInt(n:Int) : Int
 	{
 		return if (n == 0x000000)	0;
 		  else if (n <= 0x0000FF)	1;
@@ -348,7 +350,7 @@ class VOFormat
 	 *  x: TypeID of value
 	 *  
 	 */
-	static inline public function packVOValueTypeHeader(o : Output, valueType : Int)
+	static inline public function packVOValueTypeHeader(o : Output, valueType : Int) : Int
 	{
 		#if MessagePackDebug_Pack trace("packVOValueTypeHeader: "+valueType);
 		switch (valueType)
@@ -367,7 +369,7 @@ class VOFormat
 		return 2;
 	}
 	
-	static inline public function packRGBA(o : Output, value : RGBA)
+	static inline public function packRGBA(o : Output, value : RGBA) : Int
 	{
 		#if MessagePackDebug_Pack trace("packRGBA: "+value); #end
 		
@@ -382,42 +384,42 @@ class VOFormat
 		return 5;
 	}
 	
-	static inline public function packEMail(o : BytesOutput, value : EMail)
+	static inline public function packEMail(o : BytesOutput, value : EMail) : Int
 	{
 		#if MessagePackDebug_Pack trace("packEMail: "+value); #end
 		
 		return Format.packString(o, value.toString());
 	}
 	
-	static inline public function packURI(o : BytesOutput, value : URI)
+	static inline public function packURI(o : BytesOutput, value : URI) : Int
 	{
 		#if MessagePackDebug_Pack trace("packURI: "+value); #end
 		
 		return Format.packString(o, value.string);
 	}
 	
-	static inline public function packFileRef(o : BytesOutput, value : FileRef)
+	static inline public function packFileRef(o : BytesOutput, value : FileRef) : Int
 	{
 		#if MessagePackDebug_Pack trace("packFileRef: "+value); #end
 		
 		return Format.packString(o, value.string);
 	}
 	
-	static inline public function packDateTime(o : Output, value : Date)
+	static inline public function packDateTime(o : Output, value : Date) : Int
 	{
 		#if MessagePackDebug_Pack trace("packDateTime: "+value + ", float = "+ value.getTime() +", uint = " + Std.int(value.getTime() / 1000)); #end
 		
 		return Format.packDouble(o, value.getTime());
 	}
 	
-	static inline public function packDate(o : Output, value : Date)
+	static inline public function packDate(o : Output, value : Date) : Int
 	{
 		#if MessagePackDebug_Pack trace("packDate: "+value); #end
 		
 		return packDateTime(o, value);
 	}
 	
-	static inline public function packDateInterval(o : Output, value : DateInterval)
+	static inline public function packDateInterval(o : Output, value : DateInterval) : Int
 	{
 		#if MessagePackDebug_Pack trace("packDateInterval: "+value); #end
 		
@@ -428,7 +430,7 @@ class VOFormat
 	}
 	
 	
-	static inline public function packObjectId(o : Output, value : ObjectId)
+	static inline public function packObjectId(o : Output, value : ObjectId) : Int
 	{
 		#if MessagePackDebug_Pack trace("packObjectId: "+value); #end
 		

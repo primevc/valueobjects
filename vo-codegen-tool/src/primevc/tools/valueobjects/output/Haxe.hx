@@ -49,7 +49,7 @@ file.writeString("
 		file.close();
 	}
 	
-	public function genEnum(def:EnumDef);
+	public function genEnum(def:EnumDef) {}
 	
 	public function newModule(module:Module) {
 		module.generateWith(this);
@@ -114,7 +114,7 @@ class HaxeMessagePacking extends MessagePacking
 		}
 		a("\n");
 		
-		a("\n\tstatic public function msgpack_packVO(o : haxe.io.BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBits : Int, prependMsgpackType : Bool = false) : Int\n\t{");
+		a("\n\t@:keep static public function msgpack_packVO(o : haxe.io.BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBits : Int, prependMsgpackType : Bool = false) : Int\n\t{");
 		
 		a("\n		Assert.that(o != null && obj != null);");
 		a("\n		");
@@ -133,9 +133,9 @@ class HaxeMessagePacking extends MessagePacking
 	
 	override private function defineUnPackerFunction()
 	{
-		a("\n\tstatic public function msgpack_unpackVO(reader : Reader, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBytes : Int, converter : ValueConverter) : Void\n\t{");
+		a("\n\t@:keep static public function msgpack_unpackVO(reader : Reader, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBytes : Int) : Void\n\t{");
 		a("\n		Assert.that(reader != null && obj != null);");
-		a("\n		var input = reader.input, bits:Int, fieldOffset:Int = (untyped obj)._fieldOffset(TYPE_ID);");
+		a("\n		var bits:Int, fieldOffset:Int = (untyped obj)._fieldOffset(TYPE_ID);");
 	}
 	
 	override private function a_unpackProperty(p:Property)
@@ -290,7 +290,8 @@ class Haxe implements CodeGenerator
 		{
 			var p = def.propertiesSorted[i];
 			if (Util.isDefinedInSuperClassOf(def, p)) continue;
-			
+
+			openPlatformCode(p);
 			if (immutable) {
 				genGetter(p, true);
 			} else {
@@ -298,6 +299,7 @@ class Haxe implements CodeGenerator
 				if (p.shouldHaveSetter())
 					genSetter(i, p, def.fullName);
 			}
+			closePlatformCode(p);
 		}
 		
 		if (immutable) {
@@ -675,6 +677,7 @@ class Haxe implements CodeGenerator
 		
 		//open function declaration
 		a("\n\t");
+	//	a("@:keep ");
 		if (def.superClass != null)
 			a("override ");
 		
@@ -730,6 +733,7 @@ class Haxe implements CodeGenerator
 	private function openFunctionDeclaration (def:ClassDef, functionName, forceOverride = false, returnType:String = "Void", makeSuperCall = true, isPublic = true)
 	{
 		a("\n\t");
+	//	a("@:keep ");
 		if (forceOverride || def.superClass != null) a("override ");
 
 		a(isPublic? "public " : "private "); a("function "); a(functionName); a("()");
@@ -813,12 +817,21 @@ class Haxe implements CodeGenerator
 		for (i in 0 ... def.propertiesSorted.length)
 		{
 			var p = def.propertiesSorted[i];
-			a("\n\t\t\t"); a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true, p.hasOption(transient)));
+			if (p.isPlatformSpecific()) {
+				a("\n"); openPlatformCode(p, false); a("\t");
+			} else
+				a("\n\t\t\t\t");
+			
+			a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true, p.hasOption(transient)));
 			var init = HaxeUtil.getConstructorInitializer(p.type, true);
 			if (init != null) {
 			 	a(" = "); a(init);
 			}
 			if (i + 1 != def.propertiesSorted.length) a(", ");
+
+			if (p.isPlatformSpecific())
+				closePlatformCode(p, false);
+			
 			a("\t\t\t\t//"+i);
 		}
 		a("\n\t\t)\n\t{\n");
@@ -831,8 +844,10 @@ class Haxe implements CodeGenerator
 			{
 				var p = def.propertiesSorted[i];
 				if (Util.isDefinedInSuperClassOf(def, p)) {
+					openPlatformCode(p, false);
 					if (first) first = false; else a(", ");
 					a(p.name); a("_");
+					closePlatformCode(p, false);
 				}
 			}
 			a(");\n");
@@ -842,6 +857,7 @@ class Haxe implements CodeGenerator
 		
 		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p))
 		{
+			openPlatformCode(p);
 			if (!Util.isPTypeBuiltin(p.type) && !Util.isEnum(p.type)) {
 				if (p.isBindable())		{ a("\t\tthis."); a(p.name); a(".value"); a(" = "); a(p.name); a("_;"); }
 				else					{ a("\t\tthis."); a(p.name); a(" = "); a(p.name); a("_;"); }
@@ -858,6 +874,7 @@ class Haxe implements CodeGenerator
 					}
 			}
 		 	a("\n");
+			closePlatformCode(p);
 		}
 		
 		magic.constructor(code);
@@ -924,12 +941,13 @@ class Haxe implements CodeGenerator
 	//	a("\t\treturn if (v == "); a(name); a(") v;\n");
 	//	a("\t\telse\n\t\t{\n\t\t\tif (isEditable()) _changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
 		
-		a("\t\tif (v != "); a(name); a(")\n");
+		a("\t\tvar old "); a(hasGetter? ": " + HaxeUtil.haxeType(p.type, false, p.isBindable()) + " = cast " : "= "); a(name); a(";\n");
+		a("\t\tif (v != old)\n");
 		a("\t\t{\n");
 		
 		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type))
 		{
-			a("\t\t\tif (IfUtil.notNull("); a(name); a("))\n");
+			a("\t\t\tif (old.notNull())\n");
 			
 	/*		if (!p.isArray())
 				a("(untyped ");
@@ -938,28 +956,32 @@ class Haxe implements CodeGenerator
 			if(!p.isArray())
 				a(")");*/
 			
-			a("\t\t\t\t"); a(name); a(".change.unbind(this);\n");
-			a("\t\t\tif (v.notNull()) {\n\t\t\t\tv.");
+			a("\t\t\t\told.change.unbind(this);\n");
+			a("\t\t\tif (v.notNull()) {\n\t\t\t\t");
 			
 			if (p.isArray() || p.isBindable())
 			{
-				a("change.");
+				a("v.change.");
 				a(listChangeHandler? "observe(this, " : "bind(this, "); a(p.name); a("Changed);\n\t");
 				if (listChangeHandler && !Util.isSingleValue(p.type)) {
 					a("\t\t\tv.setChangeHandler(objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t");
 				}
 			}
 			else if (!Util.isSingleValue(p.type)) {
-				a("as(ValueObjectBase).change.bind(this, objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t");
+			    a("var newV = v.as(ValueObjectBase);\n\t\t\t\t");
+				a("newV.change.bind(this, objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t\t\t\t");
+				a("if (newV.isEmpty()) "); addPropChangeFlagUnsetter(p.bitIndex()); a(" else _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a(";\n\t");
 			}
 		}
 		a("\t\t\t");
-		var ifExprAdded = addPropChangeFlagSetter(p.bitIndex(), "v" + ((!p.isArray() && p.isBindable())? ".value" : ""), p.type, false);
+		var ifExprAdded =
+		    if(!p.isArray() && !Util.isSingleValue(p.type)) false; // Flags are already handled just above this line.
+		    else addPropChangeFlagSetter(p.bitIndex(), "v" + ((!p.isArray() && p.isBindable())? ".value" : ""), p.type, false);
+		
 		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type)) {
 			a("\n\t\t\t}");
 			if (ifExprAdded) {
-				a("\n\t\t\t");
-				addPropChangeFlagUnsetter(p.bitIndex());
+				a("\n\t\t\telse "); addPropChangeFlagUnsetter(p.bitIndex());
 			}
 		}
 		
@@ -981,7 +1003,7 @@ class Haxe implements CodeGenerator
 			
 			if (listChangeHandler)
 			{
-				a("if ("); a(p.name); a(".length.not0()) _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a("; "); addPropChangeFlagUnsetter(p.bitIndex());
+				a("if ("); a(p.name); a(".length.not0()) _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a("; else "); addPropChangeFlagUnsetter(p.bitIndex());
 			}
 			else
 				addPropChangeFlagSetter(p.bitIndex(), "value", p.type, false);
@@ -994,14 +1016,14 @@ class Haxe implements CodeGenerator
 		var ifAdded = !addIfVarIsSetExpr(path, ptype, bindable, "_propertiesSet |= " + hexBitflag(bit));
 		
 		if (ifAdded) {
-			a(" "); addPropChangeFlagUnsetter(bit);
+			a(" else "); addPropChangeFlagUnsetter(bit);
 		}
 		
 		return ifAdded;
 	}
 	
 	private function addPropChangeFlagUnsetter(bit) {
-		a("else _propertiesSet &= 0x" + StringTools.hex(-1 ^ (1 << bit)) + ";");
+		a("_propertiesSet &= 0x" + StringTools.hex(-1 ^ (1 << bit)) + ";");
 	}
 	
 	
@@ -1054,7 +1076,7 @@ class Haxe implements CodeGenerator
 		}
 		a("\n\t\t}\n\t}\n");
 		// fromValue
-		a("\tstatic public function fromValue(i:Int) : "); a(def.fullName); a("\n\t{\n\t\t");
+		a("\t@:keep static public function fromValue(i:Int) : "); a(def.fullName); a("\n\t{\n\t\t");
 		a("return switch (i) {");
 		for (e in def.enumerations)
 		{
@@ -1127,6 +1149,27 @@ class Haxe implements CodeGenerator
 		mapToHaxe.genFromXML();
 		this.code.add("\n#end\n");
 	}
+
+
+
+	private inline function openPlatformCode(p:Property, useNewLine:Bool = true)
+	{
+		if (p.isPlatformSpecific()) {
+			a("#if ("+p.platforms.join(" || ")+")");
+			if (useNewLine)
+				a("\n");
+		}
+	}
+
+
+	private inline function closePlatformCode (p:Property, useNewLine:Bool = true)
+	{
+		if (p.isPlatformSpecific()) {
+			a("#end");
+			if (useNewLine)
+				a("\n");
+		}
+	}
 }
 
 private class CodeBufferer
@@ -1140,11 +1183,11 @@ private class CodeBufferer
 
 private class MagicClassGenerator extends CodeBufferer
 {
-	public function new();
+	public function new() {}
 	
-	public function fromXML(code:StringBuf);
-	public function inject(code:StringBuf);
-	public function constructor(code:StringBuf);
+	public function fromXML(code:StringBuf) {}
+	public function inject(code:StringBuf) {}
+	public function constructor(code:StringBuf) {}
 }
 
 private class NamedSetDefGenerator extends MagicClassGenerator
@@ -1485,6 +1528,7 @@ private class HaxeXMLMap extends CodeBufferer
 		a("\t}\n");
 		
 		a("\n\t");
+	//	a('@:keep ');
 		var has_super = add_override();
 		a("public function setFromXML(node:Xml) : Void\n\t{\n");
 		

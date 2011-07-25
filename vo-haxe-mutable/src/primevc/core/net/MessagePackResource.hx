@@ -119,7 +119,7 @@ class MessagePackResource <Data> implements IDisposable
 	}
 	
 
-	private function doNothing () throw "impossible"
+	private function doNothing () { throw "impossible " + uriPrefix; }
 	
 
 #if debug

@@ -243,6 +243,7 @@ class Haxe implements CodeGenerator
 		if (immutable)
 			a("\ninterface I");
 		else {
+			a(" import primevc.tools.valueobjects.ObjectChangeSet;\n");
 			a(" import primevc.tools.valueobjects.ValueObjectBase;\n");
 			a(" import primevc.tools.valueobjects.xmlmap.XMLString;\n");
 			a(" import primevc.utils.msgpack.Reader;\n");

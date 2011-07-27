@@ -30,10 +30,13 @@ package primevc.core.collections;
  import primevc.core.collections.RevertableArrayList;
  import primevc.core.dispatcher.Signal1;
  import primevc.core.traits.IValueObject;
+ import primevc.tools.valueobjects.ObjectChangeSet;
  import primevc.tools.valueobjects.ValueObjectBase;
  import primevc.utils.FastArray;
   using primevc.utils.FastArray;
   using primevc.utils.IfUtil;
+  using primevc.utils.TypeUtil;
+ 
 
 /**
  * A specialized ArrayList for ValueObjects.
@@ -76,7 +79,7 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implemen
 	override public function add (item:DataType, pos:Int = -1) : DataType
 	{
 		super.add(item);
-		cast(item, ValueObjectBase).change.bind(this, changeHandlerFn);
+		item.as(ValueObjectBase).change.bind(this, changeHandlerFn);
 		
 		return item;
 	}
@@ -85,7 +88,7 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implemen
 	override public function remove (item:DataType, oldPos:Int = -1) : DataType
 	{
 		super.remove(item);
-		cast(item, ValueObjectBase).change.unbind(this);
+		item.as(ValueObjectBase).change.unbind(this);
 		
 		return item;
 	}

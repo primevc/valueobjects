@@ -4,7 +4,7 @@ package primevc.utils.msgpack;
  import primevc.core.traits.IDisposable;
  import primevc.core.traits.IValueObject;
  import primevc.utils.FastArray;
- import primevc.tools.valueobjects.ValueObjectBase;
+ import primevc.tools.valueobjects.PropertyID;
  import primevc.types.RGBA;
  import primevc.types.RGBAType;
  import primevc.types.EMail;

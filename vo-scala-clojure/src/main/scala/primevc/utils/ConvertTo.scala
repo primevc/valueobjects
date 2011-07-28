@@ -126,7 +126,12 @@ object ConvertTo
     case None => null
   }
   val log = new Logger("ConvertTo")
-  def uri (v:String) = if (v == null || v.isEmpty) null else try { new URI(v.replace(" ", "%20"), true) } catch { case e:URIException => log.warn("Invalid URI: "+v+"to URI", e); null }
+  def uri (v:String) = if (v == null || v.isEmpty) null
+    else try { new URI(v.replace(" ", "%20"), true) }
+       catch { case e:URIException =>
+         /*  try {*/ new URI(v, false) /*}*/
+         /*catch { case e:URIException => log.warn("Invalid URI: "+v+"to URI", e); null }*/
+       }
 
   def email         (value:Any) : InternetAddress = unpack(value) match {
     case v:InternetAddress => v

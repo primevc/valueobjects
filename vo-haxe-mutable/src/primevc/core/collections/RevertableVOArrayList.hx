@@ -171,6 +171,12 @@ class RevertableVOArrayList<DataType : IValueObject>
 		}
 		flags = flags.unset(BindFlags.IN_EDITMODE);
 	}
+
+
+	public inline function isEditable ()
+	{
+		return flags.has( BindFlags.IN_EDITMODE );
+	}
 	
 	
 	

@@ -381,7 +381,48 @@ class Haxe implements CodeGenerator
 		for (p in def.propertiesSorted) if (!p.hasOption(transient)) {
 		 	a("\n\tstatic inline public var "); a(p.name.toUpperCase()); a(" = "); a("0x" + StringTools.hex(p.definedIn.index << 8 | p.index, 4)); a("; // "); a(p.definedIn.name);
 		}
-		a("\n\t");
+		a("\n\t\n\t");
+
+		//generate static propertyIdToString method
+		a("\n\t@:keep static public function propertyIdToString (id:Int) : String");
+		a("\n\t{");
+		a("\n\t\treturn switch(id) {");
+		for (p in def.propertiesSorted) if (!p.hasOption(transient)) {
+			a("\n\t\t\tcase "); a(p.name.toUpperCase()); a(": '"); a(p.name); a("';");
+		}
+		a("\n\t\t}");
+		a("\n\t}");
+		a("\n\t\n\t");
+
+		if (!def.isMixin)
+		{
+			//generate getPropertyById method
+			a("\n\toverride public function getPropertyById (id:Int) : Dynamic");
+			a("\n\t{");
+			a("\n\t\treturn untyped switch(id) {");
+			for (p in def.propertiesSorted) if (!p.hasOption(transient)) {
+				a("\n\t\t\tcase "); a(p.name.toUpperCase()); a(": "); a("this."); a(p.name); a(";");
+			}
+			a("\n\t\t}");
+			a("\n\t}");
+			a("\n\t\n\t");
+
+			//generate setPropertyById method
+			a("\n\toverride public function setPropertyById (id:Int, v:Dynamic) : Void");
+			a("\n\t{");
+			a("\n\t\tswitch(id) {");
+			for (p in def.propertiesSorted) if (!p.hasOption(transient)) {
+				a("\n\t\t\tcase "); a(p.name.toUpperCase()); a(": "); 
+				if (p.isBindable() && !p.isArray()) {
+					a("this."); a(p.name); a(".value = v;");
+				} else {
+					a("this."); a(p.name); a(" = v;");
+				}
+			}
+			a("\n\t\t}");
+			a("\n\t}");
+			a("\n\t\n\t");
+		}
 	}
 	
 	private function addFullName(t:TypeDefinition, interfaceT = false)

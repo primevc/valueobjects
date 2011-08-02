@@ -16,7 +16,7 @@ class ObjectId
 	private var pid			: Int;
 	private var increment	: Int;
 	
-	private function new();
+	private function new(){}
 	
 	static public function make()
 	{

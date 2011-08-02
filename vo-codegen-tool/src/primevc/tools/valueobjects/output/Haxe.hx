@@ -49,7 +49,7 @@ file.writeString("
 		file.close();
 	}
 	
-	public function genEnum(def:EnumDef);
+	public function genEnum(def:EnumDef){}
 	
 	public function newModule(module:Module) {
 		module.generateWith(this);
@@ -1083,11 +1083,11 @@ private class CodeBufferer
 
 private class MagicClassGenerator extends CodeBufferer
 {
-	public function new();
+	public function new() {}
 	
-	public function fromXML(code:StringBuf);
-	public function inject(code:StringBuf);
-	public function constructor(code:StringBuf);
+	public function fromXML(code:StringBuf){}
+	public function inject(code:StringBuf){}
+	public function constructor(code:StringBuf){}
 }
 
 private class NamedSetDefGenerator extends MagicClassGenerator

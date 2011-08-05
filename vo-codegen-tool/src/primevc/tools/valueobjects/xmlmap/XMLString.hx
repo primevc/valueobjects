@@ -3,7 +3,7 @@ package primevc.tools.valueobjects.xmlmap;
  import primevc.types.EMail;
  import primevc.types.URI;
  import primevc.types.RGBA;
- import primevc.types.Asset;
+// import primevc.types.Asset;
 
 class XMLString
 {
@@ -17,7 +17,7 @@ class XMLString
 	static public inline function fromEMail		(v:EMail)	: String	{ return v; }
 	
 	static public inline function fromColor		(v:RGBA)	: String	{ return Std.string(v); }
-	static public inline function fromAsset		(v:Asset)	: String	{ return Std.string(v); }
+//	static public inline function fromAsset		(v:Asset)	: String	{ return Std.string(v); }
 	
 	static public inline function fromDate (v:Date, ?format:String) : String
 	{
@@ -38,7 +38,7 @@ class XMLString
 		var rgb = v == null? 0 : Std.parseInt(v.charCodeAt(0) == '#'.code? "0x"+v.substr(1) : v);
 		return #if neko { color: rgb, a:0xFF } #else rgb #end;
 	}
-	static public inline function toAsset		(v:String)	: Asset		{ return Asset.fromString(v); }
+//	static public inline function toAsset		(v:String)	: Asset		{ return Asset.fromString(v); }
 	
 	
 	static public function toString(v:String) {

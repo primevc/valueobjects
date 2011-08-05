@@ -224,20 +224,20 @@ class MessagePackResource <Data> implements IDisposable
 	
 	public static inline function deserialize<Data> (data:BytesData, reader:Reader) : Data
 	{	
-#if debug
+//#if debug
 		var start = haxe.Timer.stamp();
-#end
+//#end
 		var bytes	= Bytes.ofData(data);
 		var input	= reader.input = new BytesInput(bytes);
 		input.bigEndian = true;
-#if debug
+//#if debug
 		var o = reader.readMsgPackValue();
 		if ((haxe.Timer.stamp() - start) > 0.1)
 			trace((haxe.Timer.stamp() - start)+" sec");
 		return o;
-#else
-		return reader.readMsgPackValue();
-#end
+//#else
+//		return reader.readMsgPackValue();
+//#end
 	}
 	
 	

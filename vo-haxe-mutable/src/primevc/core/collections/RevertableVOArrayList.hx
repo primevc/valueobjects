@@ -233,7 +233,7 @@ class RevertableVOArrayList<DataType : IValueObject>
 	}
 	
 	
-	public function remove (item:DataType, oldPos:Int = -1) : DataType
+	public function remove (item:DataType, curPos:Int = -1) : DataType
 	{
 		var f = flags;
 		Assert.that( f.has(BindFlags.IN_EDITMODE) );
@@ -241,11 +241,11 @@ class RevertableVOArrayList<DataType : IValueObject>
 		if (f.hasNone(BindFlags.IN_EDITMODE))
 			return item;
 		
-		if (oldPos == -1)
-			oldPos = list.indexOf(item);
+		if (curPos == -1)
+			curPos = list.indexOf(item);
 		
-		if (oldPos > -1 && list.removeItem(item, oldPos))
-			addChange( ListChange.removed( item, oldPos ) );
+		if (list.removeAt(curPos))
+			addChange( ListChange.removed( item, curPos ) );
 		
 		cast(item, ValueObjectBase).change.unbind(this);
 		

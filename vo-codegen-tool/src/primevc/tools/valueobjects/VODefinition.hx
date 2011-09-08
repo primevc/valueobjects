@@ -434,6 +434,7 @@ class Util
 			
 			case Tdef(_):				false;
 			case Turi:					false;
+			case Turl:					false;
 			case TuniqueID:				false;
 			case TfileRef:				false;
 			case Tstring:				false;
@@ -458,6 +459,7 @@ class Util
 			
 			case Tarray(_,_,_):			true;
 			case Turi:					true;
+			case Turl:					true;
 			case TuniqueID:				true;
 			case TfileRef:				true;
 			case Tstring:				true;
@@ -486,6 +488,7 @@ class Util
 			
 			case Tarray(t,_,_):			isSingleValue(t);
 			case Turi:					true;
+			case Turl:					true;
 			case TuniqueID:				true;
 			case Tstring:				true;
 			case TfileRef:				true;
@@ -704,6 +707,7 @@ class PropertyTypeResolver
 			case interval:		Tinterval;
 			case string:		Tstring;
 			case URI:			Turi;
+			case URL:			Turl;
 			case EMail:			Temail;
 			case UniqueID:		TuniqueID;
 			case FileRef:		TfileRef;
@@ -740,7 +744,7 @@ class PropertyTypeResolver
 	{
 		type = switch(value)
 		{
-			case integer, decimal, color, date, datetime, interval, string, URI, EMail, UniqueID, FileRef, ClassRef(_):
+			case integer, decimal, color, date, datetime, interval, string, URI, URL, EMail, UniqueID, FileRef, ClassRef(_):
 				builtinAbstractPType(value);
 			
 			case is(typeName):
@@ -781,7 +785,7 @@ class PropertyTypeResolver
 							case MUndefined(n,m):	throw Err_UndefinedType(path);
 						}
 					
-					case integer, decimal, color, date, datetime, interval, string, URI, EMail, UniqueID, FileRef, ClassRef(_):
+					case integer, decimal, color, date, datetime, interval, string, URI, URL, EMail, UniqueID, FileRef, ClassRef(_):
 						builtinAbstractPType(atype);
 					
 					case namedSetOf	(_,_,_,_):	throw "namedSetOf(namedSetOf(...)) unsupported";
@@ -974,7 +978,8 @@ class Property
 				if (max != null)	assert(defaultval <= max);
 				if (stride != null)	assert(defaultval == (defaultval / stride) * stride);
 			
-			case Turi:				assert(hasType(String) || Util.toString(defaultval) != '');
+			case Turl,
+				 Turi:				assert(hasType(String) || Util.toString(defaultval) != '');
 			case TuniqueID:			assert(hasType(String) || hasType(Int));
 			case Tstring:			assert(hasType(String));
 			case Temail:			assert(hasType(String));
@@ -1113,6 +1118,7 @@ class Enumeration
 				case color:		this.type = PType.Tcolor;
 				case UniqueID:	this.type = PType.TuniqueID;
 				case URI:		this.type = PType.Turi;
+				case URL:		this.type = PType.Turl;
 				case EMail:		this.type = PType.Temail;
 				
 				default:
@@ -2294,6 +2300,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 			
 			case Tstring:			throw("TODO: implement binding to string properties");		throw Err_PropertyHasNoMembers;
 			case Turi:				throw("TODO: implement binding to URI    properties");		throw Err_PropertyHasNoMembers;
+			case Turl:				throw("TODO: implement binding to URL    properties");		throw Err_PropertyHasNoMembers;
 			case Temail:			throw("TODO: implement binding to e-mail properties");		throw Err_PropertyHasNoMembers;
 			case Tdate:				throw("TODO: implement binding to date properties");		throw Err_PropertyHasNoMembers;
 			case Tdatetime:			throw("TODO: implement binding to datetime properties");	throw Err_PropertyHasNoMembers;
@@ -2556,6 +2563,7 @@ enum PType
 	
 	Tstring;
 	Turi;
+	Turl;
 	Temail;
 	TclassRef		(ref:String);
 	
@@ -2586,6 +2594,7 @@ enum AbstractPType
 	// string
 	string;
 	URI;
+	URL;
 	EMail;
 	ClassRef(ref:String);		//ref contains full classpath to the requested class
 	

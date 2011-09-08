@@ -76,7 +76,7 @@ class HaxeMessagePacking extends MessagePacking
 			case Tdate:						a('b += o.packDate(');			a(path); ac(")".code);
 			case Tdatetime:					a('b += o.packDateTime(');		a(path); ac(")".code);
 			case Tinterval:					a('b += o.packDateInterval(');	a(path); ac(")".code);
-			case Turi:						a('b += o.packURI(');			a(path); ac(")".code);
+			case Turi, Turl:				a('b += o.packURI(');			a(path); ac(")".code);
 			case TuniqueID:					a('b += o.packObjectId(');		a(path); ac(")".code);
 			case Temail:					a('b += o.packEMail(');			a(path); ac(")".code);
 			case Tcolor:					a('b += o.packRGBA(');			a(path); ac(")".code);
@@ -465,7 +465,7 @@ class Haxe implements CodeGenerator
 		var nullCheck = path + ".notNull()";
 		
 		switch (ptype) {
-			case Tarray(_,_,_), Turi:
+			case Tarray(_,_,_), Turi, Turl:
 			
 			case Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
 				if (!bindable) nullCheck = null; // Simple types can't be null...
@@ -501,7 +501,7 @@ class Haxe implements CodeGenerator
 		case Tarray(_,_,_):
 			path + ".length.not0()";
 
-		case Turi, TfileRef:
+		case Turi, Turl, TfileRef:
 			path + ".isSet";
 		
 		case Tinteger(_,_,_), Tdecimal(_,_,_):
@@ -1339,7 +1339,7 @@ private class HaxeUtil
 			case Tarray(type, _,_):
 				return "new " + HaxeUtil.haxeType( ptype, true, bindable, false, transient ) + "("+ initializer +");";
 			
-			case Tdef(_), Turi, TfileRef, Tinterval:
+			case Tdef(_), Turi, Turl, TfileRef, Tinterval:
 				initializer; //"new " + HaxeUtil.haxeType(ptype) + "("+ initializer +")";
 			
 			case TuniqueID:				initializer + ' == null? primevc.types.ObjectId.make() : ' + initializer;
@@ -1370,7 +1370,7 @@ private class HaxeUtil
 //		case Tdecimal(_,_,_):		'primevc.types.Number.FLOAT_NOT_SET';
 		case Temail:				"''";
 		
-		case Turi, TfileRef, Tinterval, Tdecimal(_,_,_), TuniqueID, TenumConverter(_), Tdate, Tdatetime, Tcolor, TclassRef(_):
+		case Turi, Turl, TfileRef, Tinterval, Tdecimal(_,_,_), TuniqueID, TenumConverter(_), Tdate, Tdatetime, Tcolor, TclassRef(_):
 			null;
 	}
 		
@@ -1386,7 +1386,7 @@ private class HaxeUtil
 	{
 		case Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tcolor:
 			bindable;
-		case Tstring,Tdate,Tdatetime,Tinterval,Turi,TuniqueID,Temail,TfileRef, Tdef(_), TenumConverter(_), Tarray(_,_,_), TclassRef(_):
+		case Tstring,Tdate,Tdatetime,Tinterval,Turi,Turl,TuniqueID,Temail,TfileRef, Tdef(_), TenumConverter(_), Tarray(_,_,_), TclassRef(_):
 			true;
 	}
 	
@@ -1432,6 +1432,7 @@ private class HaxeUtil
 			case Tdatetime:					'Date';
 			case Tinterval:					'primevc.types.DateInterval';
 			case Turi:						'primevc.types.URI';
+			case Turl: 						'primevc.types.URL';
 			case TuniqueID:					'primevc.types.ObjectId';
 			case Temail:					'primevc.types.EMail';
 			case Tcolor:					'primevc.types.RGBA';
@@ -1476,6 +1477,7 @@ private class HaxeUtil
 		case Tdatetime:					'TClass(Date)';
 		case Tinterval:					'TClass(primevc.types.DateInterval)';
 		case Turi:						'TClass(primevc.types.URI)';
+		case Turl:						'TClass(primevc.types.URL)';
 		case TuniqueID:					'TClass(primevc.types.ObjectId)';
 		case Temail:					'TClass(primevc.types.EMail)';
 		case Tcolor:					'TClass(primevc.types.RGBA)';
@@ -1502,7 +1504,7 @@ private class HaxeUtil
 			case Tstring:
 				path +" == "+ '"'+ val +'"';
 			
-			case Turi, TfileRef:
+			case Turi, Turl, TfileRef:
 				path +'.string == "'+ Std.string(val) +'"';
 			
 			case Tdate, Tdatetime, TuniqueID, Temail:
@@ -2067,6 +2069,7 @@ private class HaxeXMLMap extends CodeBufferer
 			case Tdatetime:					path+".getTime()";
 			
 			case Turi:						throw "impossible Turi";
+			case Turl:						throw "impossible Turl";
 			case TfileRef:					throw "impossible TfileRef";
 			case Tinterval:					throw "impossible Tinterval";
 			case TuniqueID:					throw "impossible Tuniq";
@@ -2093,6 +2096,7 @@ private class HaxeXMLMap extends CodeBufferer
 			
 			case Tinterval:					throw "impossible";
 			case Turi:						throw "impossible";
+			case Turl:						throw "impossible";
 			case TfileRef:					throw "impossible";
 			case TuniqueID:					throw "impossible";
 			case Temail:					throw "impossible";
@@ -2122,6 +2126,7 @@ private class HaxeXMLMap extends CodeBufferer
 			case Tdecimal(min,max,stride):	xmlstring+prefix+'Float';
 			case Tstring, TfileRef:			if (prefix == "to") xmlstring+prefix+'String'; else null;
 			case Turi:						if (prefix == "to") { setProp = false; "this." + property + ".parse"; } else xmlstring+prefix+'URI';
+			case Turl:						if (prefix == "to") { setProp = false; "this." + property + ".parse"; } else xmlstring+prefix+'URL';
 			case TuniqueID:					xmlstring+prefix+'ObjectId';
 			case Temail:					xmlstring+prefix+'EMail';
 			case Tcolor:					xmlstring+prefix+'Color';

@@ -9,6 +9,7 @@ package primevc.utils.msgpack;
  import primevc.types.RGBAType;
  import primevc.types.EMail;
  import primevc.types.URI;
+ import primevc.types.URL;
  import primevc.types.FileRef;
  import primevc.types.DateInterval;
  import primevc.types.ObjectId;
@@ -119,6 +120,7 @@ class Reader implements IDisposable
 	{
 		switch (typeClass) {
 			case FileRef:	return new FileRef(Std.string(value));
+            case URL:       return new URL(Std.string(value));
 			case URI:		return new URI(Std.string(value));
 			case Date:		return Date.fromTime(value);
 			case RGBAType:	return value;

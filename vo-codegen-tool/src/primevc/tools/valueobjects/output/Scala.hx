@@ -150,14 +150,14 @@ file.writeString("
 				case Tarray(_,_,_):
 					emptyChecks.add({expr: "(__"+ p.name +" == null || __"+ p.name +".length == 0)", id: i});
 				
-				case Tstring, TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
+				case Tstring, TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, Turl, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
 					++nonEmptyChecks;
 				
 				case TenumConverter(_):		throw p;
 				case TclassRef(_):			continue; //throw p;
 			}
 			else switch (p.type) {
-				case TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
+				case TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, Turl, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
 					superClassHasBitflags = true;
 				default:
 			}
@@ -523,10 +523,10 @@ file.writeString("
 							a('.filter(_ != null).map(ConvertTo.string(_));\n');
 						}
 				
-					case Tcolor:					a("  "); addVOGetterCase(p); a('.toInt.asInstanceOf[AnyRef];\n');
-					case Turi, Temail, TfileRef:	a("  "); addVOGetterCase(p); a('.toString;\n');
-					case Tdate,Tdatetime:			a("  "); addVOGetterCase(p); a('.toDate;\n');
-					case Tinterval:					a("  "); addPropnameCase(p); a("new IntervalDBObject(vo."); a(quote(p.name)); a(");\n");
+					case Tcolor:						a("  "); addVOGetterCase(p); a('.toInt.asInstanceOf[AnyRef];\n');
+					case Turi, Turl, Temail, TfileRef:	a("  "); addVOGetterCase(p); a('.toString;\n');
+					case Tdate,Tdatetime:				a("  "); addVOGetterCase(p); a('.toDate;\n');
+					case Tinterval:						a("  "); addPropnameCase(p); a("new IntervalDBObject(vo."); a(quote(p.name)); a(");\n");
 					
 					default:
 				}
@@ -630,7 +630,7 @@ file.writeString("
 		case Tstring:
 			ac('"'.code); a(Std.string(val)); ac('"'.code);
 		
-		case Turi:
+		case Turi, Turl:
 			ac('"'.code); a(Std.string(val)); ac('"'.code);
 		
 		case Tdate, Tdatetime, TuniqueID, Temail:
@@ -655,7 +655,7 @@ file.writeString("
 			case Tenum(def):		path;
 			default:				path;
 		}
-		case Turi, Temail, TuniqueID, TfileRef, Tdate, Tdatetime:
+		case Turi, Turl, Temail, TuniqueID, TfileRef, Tdate, Tdatetime:
 			'"" + ' + path; //+".toString";
 		case Tstring:				path;
 		case Tinteger(_,_,_):		path;
@@ -896,7 +896,7 @@ file.writeString("
 			case Tstring:
 				add_ifVarNotNull(p.name, '""');
 			
-			case Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, TuniqueID, TfileRef, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
+			case Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, Turl, TuniqueID, TfileRef, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
 				a('__'); a(p.name);
 			
 			case TclassRef(className):	a(className); //throw p;
@@ -1073,7 +1073,7 @@ file.writeString("
 			case Tdef(_):			"ConvertTo.voArray["+getType(innerT).name+"]";
 			default:				"ConvertTo.array["+getType(innerT).name+"]";
 		}
-		case Turi:					"ConvertTo.uri";
+		case Turi, Turl:			"ConvertTo.uri";
 		case Temail:				"ConvertTo.email";
 		case Tinterval:				"ConvertTo.interval";
 		case TuniqueID:				"ConvertTo.uniqueID";
@@ -1091,7 +1091,7 @@ file.writeString("
 	
 	function mongoConversionHelper(t:PType, path:String, ?v:String = "v") return switch(t) {
 		case Tarray(innerT,_,_):	"JavaConversions.asScalaIterator("+v+".iterator).map(e => "+mongoConversionHelper(innerT, null, "e.asInstanceOf["+ mongoType(innerT,false) +"]") + ").toArray";
-		case Turi:					"ConvertTo.uri("+v+")";
+		case Turi, Turl:			"ConvertTo.uri("+v+")";
 		case Temail:				"ConvertTo.email("+v+")";
 		case Tinterval:				"ConvertTo.interval("+v+")";
 		case Tcolor:				"ConvertTo.rgba("+v+")";
@@ -1116,6 +1116,7 @@ file.writeString("
 		case Tarray(innerT,_,_):	needsMongoHelperClass(innerT);
 		case Tdef(t):				switch(t) { case Tenum(_): false; default: true; }
 		case Turi,
+			 Turl,
 		 	 Temail,
 		 	 Tinterval,
 			 TfileRef,
@@ -1135,7 +1136,7 @@ file.writeString("
 	function isBasicMongoType(t:PType) return switch(t) {
 		case Tarray(innerT,_,_):	isBasicMongoType(innerT);
 		case Tdef(_):				false;
-		case Turi:					false;
+		case Turi, Turl:			false;
 		case Temail:				false; //"EMail";
 		case Tcolor:				false;
 		case Tinterval:				false; //"org.joda.time.Interval";
@@ -1174,7 +1175,7 @@ file.writeString("
 		case Tdate:					"java.util.Date";
 		case Tdatetime:				"java.util.Date";
 		
-		case Turi, Temail, TfileRef:
+		case Turi, Turl, Temail, TfileRef:
 			"String";
 		
 		case TenumConverter(_):		throw t; //"";
@@ -1206,7 +1207,7 @@ file.writeString("
 	}
 	
 	function nilValue(t:PType) return switch(t) {
-		case Tstring, Turi, TuniqueID, Tinterval, Tdate, Tdatetime, Temail, Tdef(_), Tarray(_,_,_), Tcolor, TfileRef:
+		case Tstring, Turi, Turl, TuniqueID, Tinterval, Tdate, Tdatetime, Temail, Tdef(_), Tarray(_,_,_), Tcolor, TfileRef:
 			"null";
 		
 		case Tinteger(_,_,_):		"0";
@@ -1223,7 +1224,7 @@ file.writeString("
 		res.name = (surroundWithType != null? surroundWithType + "[" : "") +
 		  (switch(t) {
 			case Tarray(innerT,_,_):	"Array["+ getType(innerT).name +"]";
-			case Turi:					"java.net.URI";
+			case Turi, Turl:			"java.net.URI";
 			case TuniqueID:				"org.bson.types.ObjectId";
 			case TfileRef:				"primevc.types.FileRef";
 			case Tstring:				"String";
@@ -2038,7 +2039,7 @@ class ScalaMessagePacking extends MessagePacking
 				case Tenum(_):	a('o.pack('); a(path); a(".value)");
 			} 
 			
-			case Tarray(_,_,_), Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tstring, Tdate, Tdatetime, Tinterval, Turi, TuniqueID, Temail, Tcolor, TfileRef:
+			case Tarray(_,_,_), Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tstring, Tdate, Tdatetime, Tinterval, Turi, Turl, TuniqueID, Temail, Tcolor, TfileRef:
 				a('o.pack('); a(path); ac(")".code);
 			
 			

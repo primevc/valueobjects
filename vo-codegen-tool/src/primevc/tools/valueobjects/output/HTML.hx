@@ -71,13 +71,14 @@ class HTML implements CodeGenerator
 			case Tdef(ptypedef):			typeLink(Util.unpackPTypedef(ptypedef));
 			case TclassRef(className):		'<b>'+className+'</b>';
 			
-			case Turi,
-				TuniqueID,
-				TfileRef,
-				Tstring,
-				Temail,
-				Tcolor:
-				return '<b>'+ Std.string(ptype).substr(1) +'</b>';
+			case Turi, 
+				 Turl,
+				 TuniqueID,
+				 TfileRef,
+				 Tstring,
+				 Temail,
+				 Tcolor:
+				 	return '<b>'+ Std.string(ptype).substr(1) +'</b>';
 		}
 	}
 	

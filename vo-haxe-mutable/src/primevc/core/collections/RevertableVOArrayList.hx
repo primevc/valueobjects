@@ -217,11 +217,9 @@ class RevertableVOArrayList<DataType : IValueObject>
 	public function add (item:DataType, pos:Int = -1) : DataType
 	{
 		var f = flags;
-		Assert.that( f.has(BindFlags.IN_EDITMODE), this+" doesn't have EDITMODE. "); // Flags: "+BindFlags.readProperties(f) );
-		
-		if (f.hasNone(BindFlags.IN_EDITMODE))
-			return item;
-		
+#if debug	Assert.that( f.has(BindFlags.IN_EDITMODE), 	this+" doesn't have EDITMODE. "); // Flags: "+BindFlags.readProperties(f) );
+			if (f.hasNone(BindFlags.IN_EDITMODE)) 		return item; #end
+
 		pos = list.insertAt(item, pos);
 		addChange( ListChange.added( item, pos ) );
 		
@@ -236,10 +234,8 @@ class RevertableVOArrayList<DataType : IValueObject>
 	public function remove (item:DataType, curPos:Int = -1) : DataType
 	{
 		var f = flags;
-		Assert.that( f.has(BindFlags.IN_EDITMODE) );
-		
-		if (f.hasNone(BindFlags.IN_EDITMODE))
-			return item;
+#if debug	Assert.that( f.has(BindFlags.IN_EDITMODE), 	this+" doesn't have EDITMODE. "); // Flags: "+BindFlags.readProperties(f) );
+			if (f.hasNone(BindFlags.IN_EDITMODE)) 		return item; #end
 		
 		if (curPos == -1)
 			curPos = list.indexOf(item);
@@ -256,10 +252,8 @@ class RevertableVOArrayList<DataType : IValueObject>
 	public function move (item:DataType, newPos:Int, curPos:Int = -1) : DataType
 	{
 		var f = flags;
-		Assert.that( f.has(BindFlags.IN_EDITMODE) );
-		
-		if (f.hasNone(BindFlags.IN_EDITMODE))
-			return item;
+#if debug	Assert.that( f.has(BindFlags.IN_EDITMODE), 	this+" doesn't have EDITMODE. "); // Flags: "+BindFlags.readProperties(f) );
+			if (f.hasNone(BindFlags.IN_EDITMODE)) 		return item; #end
 		
 		if		(curPos == -1)				curPos = list.indexOf(item);
 		if		(newPos > (length - 1))		newPos = length - 1;

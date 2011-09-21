@@ -4,6 +4,7 @@ package primevc.utils.msgpack;
  import haxe.io.Output;
  import haxe.io.BytesInput;
  import haxe.io.BytesOutput;
+ import primevc.types.Number;
  import primevc.utils.FastArray;
  import primevc.utils.msgpack.Reader;
   using primevc.utils.msgpack.Format;
@@ -59,6 +60,18 @@ class MessagePackTest extends TestCase
 	function test__int32()			checkInt(5, 0xd2, -65000)
 	function test2_int32()			checkInt(5, 0xd2, -1073741823)
 	
+	function test_int_is_nil()
+	{
+		assertEquals(1, out.packInt(Number.INT_NOT_SET));
+		assertEquals(0xc0, unpack(1, null).get(0));
+	}
+	
+	function test_double_is_nil()
+	{
+		assertEquals(1, out.packDouble(Number.FLOAT_NOT_SET));
+		assertEquals(0xc0, unpack(1, null).get(0));
+	}
+
 	function test_nil()
 	{
 		assertEquals(1, out.packNil());

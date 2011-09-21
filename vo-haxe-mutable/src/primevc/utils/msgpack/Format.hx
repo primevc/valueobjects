@@ -3,6 +3,7 @@ package primevc.utils.msgpack;
  import haxe.io.BytesOutput;
  import haxe.Int32;
  import primevc.utils.FastArray;
+  using primevc.utils.NumberUtil;
 
 /**
  * MessagePack values to bytes formatter
@@ -19,45 +20,48 @@ class Format
 	{
 	    #if MessagePackDebug_Pack trace("packInt: "+value); #end
         Assert.that(o.bigEndian, "MessagePack integers must be written big-endian.");
-	    
-		if (value >= 0 && value < 0x10000)
+
+        return if (value.notSet()) {
+        	packNil(o);
+        }
+        else if (value >= 0 && value < 0x10000)
 		{
 			if (value <= 127) {
 			 	o.writeByte(value);
-				return 1;
+				/*return*/ 1;
 			}
 			else if (value <= 255) {
 				o.writeByte(0xcc);
 				o.writeByte(value);
-				return 2;
+				/*return*/ 2;
 			}
 			else {
 				o.writeByte(0xcd);
 				o.writeUInt16(value);
-				return 3;
+				/*return*/ 3;
 			}
 		}
 		else if (value < 0 && value >= -0x8000)
 		{
 			if (value >= -32) {
 				o.writeByte(0xE0 | (-1 - value));
-				return 1;
+				/*return*/ 1;
 			}
 			else if (value >= -0x80) {
 				o.writeByte(0xd0);
 				o.writeInt8(value);
-				return 2;
+				/*return*/ 2;
 			}
 			else {
 				o.writeByte(0xd1);
 				o.writeInt16(value);
-				return 3;
+				/*return*/ 3;
 			}
 		}
 		else { // Int32
 			o.writeByte(0xd2);
 			o.writeInt32(haxe.Int32.ofInt(value));
-			return 5;
+			/*return*/ 5;
 		}
 	}
 
@@ -141,9 +145,13 @@ class Format
 	{
 		#if MessagePackDebug_Pack trace("packDouble: "+value); #end
 		
-		o.writeByte(0xcb);
-		o.writeDouble(value);
-		return 9;
+		return if (value.notSet())
+        	packNil(o);
+	    else {
+			o.writeByte(0xcb);
+			o.writeDouble(value);
+			/*return*/ 9;
+		}
 	}
 	
 	/**

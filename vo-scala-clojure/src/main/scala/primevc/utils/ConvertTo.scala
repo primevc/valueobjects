@@ -127,7 +127,7 @@ object ConvertTo
   }
   val log = new Logger("ConvertTo")
   def uri (v:String) = if (v == null || v.isEmpty) null
-    else try { new URI(v.replace(" ", "%20"), true) }
+    else try { new URI(v, true) }
        catch { case e:URIException =>
          /*  try {*/ new URI(v, false) /*}*/
          /*catch { case e:URIException => log.warn("Invalid URI: "+v+"to URI", e); null }*/
@@ -162,10 +162,12 @@ object ConvertTo
   def string        (value:Any) : String = unpack(value) match {
     case v:String => string(v)
     case v:RawType => string(v)
+    case v:URI => string(v)
     case v:Array[String] => v.mkString(", ")
     case None => null
     case _ => value.toString
   }
+  def string        (value:URI) : String = value.getEscapedURIReference
   def string        (value:String) : String = if (value == null || value.isEmpty) null else value
   def string        (value:Double, format:String) = decimalFormatter(format).format(value)
   def string        (value:RawType) : String = value.asString

@@ -12,7 +12,6 @@ import org.bson.BSONObject
 import org.bson.types.{BasicBSONList, ObjectId}
 import collection.JavaConversions
 import org.apache.commons.httpclient.{URIException, URI}
-import ru.circumflex.core.Logger
 
 //import java.net.{URISyntaxException, URL, URI}
 import org.msgpack.`object`.{NilType, ArrayType, IntegerType, RawType}
@@ -125,13 +124,10 @@ object ConvertTo
     case v:RawType => uri(v.asString)
     case None => null
   }
-  val log = new Logger("ConvertTo")
+
   def uri (v:String) = if (v == null || v.isEmpty) null
     else try { new URI(v, true) }
-       catch { case e:URIException =>
-         /*  try {*/ new URI(v, false) /*}*/
-         /*catch { case e:URIException => log.warn("Invalid URI: "+v+"to URI", e); null }*/
-       }
+       catch { case e:URIException => new URI(v, false) }
 
   def email         (value:Any) : InternetAddress = unpack(value) match {
     case v:InternetAddress => v

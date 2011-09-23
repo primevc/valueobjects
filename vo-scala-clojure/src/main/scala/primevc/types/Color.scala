@@ -11,14 +11,14 @@ class RGBA private[types](val rgba:Int)
       // Could add color names here...
       
     case s:String if (s.indexOf('#') == 0) =>
-      if (s.length <= 8)
-        parseInt(s.substring(1), 16)
+      if (s.length <= 7)
+        parseInt(s.substring(1), 16) << 8
       else
         parseLong(s.substring(1), 16).toInt
 
     case s:String if (s.startsWith("0x")) =>
-      if (s.length <= 9)
-        parseInt(s.substring(2), 16)
+      if (s.length <= 8)
+        parseInt(s.substring(2), 16) << 8
       else
         parseLong(s.substring(2), 16).toInt
     
@@ -26,14 +26,14 @@ class RGBA private[types](val rgba:Int)
       parseLong(s).toInt
   })
 
-  def alphaPercent: Float = alpha.toFloat / 255
-  def rgb   = (rgba >>> 8)
-  def red   = (rgba & 0xFF000000) >>> 24
-  def green = (rgba &   0xFF0000) >>> 16
-  def blue  = (rgba &     0xFF00) >>>  8
-  def alpha = (rgba &       0xFF)
+  final def alphaPercent: Float = alpha.toFloat / 255
+  final def rgb   = (rgba >>> 8)
+  final def red   = (rgba & 0xFF000000) >>> 24
+  final def green = (rgba &   0xFF0000) >>> 16
+  final def blue  = (rgba &     0xFF00) >>>  8
+  final def alpha = (rgba &       0xFF)
 
-  lazy val toRGBString = "#%06X".format(rgba >>> 8)
+  lazy val toRGBString = "#%06X".format(rgb)
   lazy val toRGBAString = "#%08X".format(rgba)
   override lazy val toString = toRGBString // "0x" + rgba.toHexString.toUpperCase
   final def toInt = rgba
@@ -47,8 +47,8 @@ class RGBA private[types](val rgba:Int)
 
 object RGBA
 {
-  val black = new RGBA(0)          { override lazy val toString = "0x00000000" }
-  val white = new RGBA(0xFFFFFFFF) { override lazy val toString = "0xFFFFFFFF" }
+  val black = new RGBA(0)
+  val white = new RGBA(0xFFFFFFFF)
 
   private val all_0 = new Regex("(?i)([0x#]*)")
   private val all_F = new Regex("(?i)([Fx#]*)")

@@ -11,7 +11,7 @@ import java.util.{Locale, Date}
 import org.bson.BSONObject
 import org.bson.types.{BasicBSONList, ObjectId}
 import collection.JavaConversions
-import org.apache.commons.httpclient.{URIException, URI}
+import org.apache.commons.httpclient.{URIException}
 
 //import java.net.{URISyntaxException, URL, URI}
 import org.msgpack.`object`.{NilType, ArrayType, IntegerType, RawType}
@@ -125,8 +125,8 @@ object ConvertTo
     case None => null
   }
 
-  def uri (v:String) = if (v == null || v.isEmpty) null
-    else try { new URI(v, true) }
+  def uri (v:String) : URI = if (v == null || v.isEmpty) null
+    else try { new primevc.types.URI(v, true) }
        catch { case e:URIException => new URI(v, false) }
 
   def email         (value:Any) : InternetAddress = unpack(value) match {

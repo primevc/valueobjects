@@ -56,7 +56,7 @@ package primevc.core.net;
  */  
 class MessagePackResource <Data> implements IDisposable
 {
-	public var events			(default, null) : DataServiceEvents <Data>;
+	public var events			(default, null) : DataServiceEvents;
 	public var bytesSending 	(default, null) : Int;
 	public var data				(default, null) : Data;
 	public var uriPrefix		: URI;
@@ -334,7 +334,7 @@ class MessagePackResourceSignals extends CommunicationSignals
  * @author	Danny Wilson
  * @since	Jan 20, 2011
  */
-class DataServiceEvents <Data> extends Signals
+class DataServiceEvents extends Signals
 {
 	var receive	(default, null) : CommunicationSignals;
 	var send	(default, null) : CommunicationSignals;

@@ -67,6 +67,17 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implemen
 			itemChange = null;
 		}
 	}
+
+	/**
+	 * Method will dispose the VO-list and all the VO's inside of the list
+	 */
+	public function disposeAll ()
+	{
+		for (item in list)
+			item.dispose();
+		
+		dispose();
+	}
 	
 	
 	public function setChangeHandler(changeHandler : ObjectChangeSet -> Void)

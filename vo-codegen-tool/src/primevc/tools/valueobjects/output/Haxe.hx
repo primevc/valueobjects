@@ -978,7 +978,7 @@ class Haxe implements CodeGenerator
 		}
 		
 		
-		a("\tprivate function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient))); a(")\n\t{\n");
+		a("\tpublic function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient))); a(")\n\t{\n");
 		
 	//	a("\t\treturn if (v == "); a(name); a(") v;\n");
 	//	a("\t\telse\n\t\t{\n\t\t\tif (isEditable()) _changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
@@ -1028,6 +1028,7 @@ class Haxe implements CodeGenerator
 		}
 		
 		a("\n\t\t\t");
+		a("\n\t\t\t_changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";");
 		a("\n\t\t\tthis."); a(p.name); a(" = v;\n");
 		a("\t\t}\n");
 		a("\t\treturn v;\n");

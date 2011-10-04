@@ -41,15 +41,20 @@ object ConvertTo
          if (classOf[String]  == manifest[T].erasure) string (value).asInstanceOf[T]
     else if (classOf[Integer] == manifest[T].erasure) integer(value).asInstanceOf[T]
     else if (classOf[URI]     == manifest[T].erasure) uri    (value).asInstanceOf[T]
-    else throw new MatchError("ConvertTo[" + manifest[T].erasure.getName + "] not implemented")
+    else throw new MatchError("ConvertTo[" + manifest[T].erasure.getName + "] not implemented; value = " + value)
 
   def vo[T <: ValueObject](value:AnyRef) : T = unpack(value) match {
     case v:T => v
     case v:MessagePackValueObject => v.vo.asInstanceOf[T]
   }
-  def voRef[T <: ValueObjectWithID](value:AnyRef)(implicit idType:Manifest[T#IDType]) : Ref[T] = unpack(value) match {
+  def voRef[T <: ValueObjectWithID](value:AnyRef)(implicit voType:Manifest[T], idType:Manifest[T#IDType]) : Ref[T] = unpack(value) match {
     case v:Ref[T] => v
+    case v:T => new Ref[T](v.Companion.asInstanceOf[IDAccessor[T]].idValue(v), v)
+    case v:MessagePackValueObject if (voType.erasure.isAssignableFrom(v.vo.getClass)) => voRef[T](v.vo.asInstanceOf[T])
     case v:String if (classOf[String] == idType.erasure) => new Ref[T](string(v).asInstanceOf[T#IDType]) 
+//    case v:AnyRef if (voType.erasure.isAssignableFrom(v.getClass)) =>
+//      val vo = v.asInstanceOf[T]
+//      new Ref[T](vo.Companion.asInstanceOf[IDAccessor[T]].idValue(vo), vo)
     case v:AnyRef if (idType.erasure.isAssignableFrom(v.getClass)) => new Ref[T](v.asInstanceOf[T#IDType])
     case v:AnyRef => new Ref[T](ConvertTo[T#IDType](v))
 //    case _ => null.asInstanceOf[T]

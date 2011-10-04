@@ -11,7 +11,9 @@ import java.util.{Locale, Date}
 import org.bson.BSONObject
 import org.bson.types.{BasicBSONList, ObjectId}
 import collection.JavaConversions
-import java.net.{URISyntaxException, URL, URI}
+import org.apache.commons.httpclient.{URIException}
+
+//import java.net.{URISyntaxException, URL, URI}
 import org.msgpack.`object`.{NilType, ArrayType, IntegerType, RawType}
 import java.text.{ParseException, DecimalFormatSymbols, DecimalFormat}
 import org.msgpack.MessagePackObject
@@ -39,15 +41,20 @@ object ConvertTo
          if (classOf[String]  == manifest[T].erasure) string (value).asInstanceOf[T]
     else if (classOf[Integer] == manifest[T].erasure) integer(value).asInstanceOf[T]
     else if (classOf[URI]     == manifest[T].erasure) uri    (value).asInstanceOf[T]
-    else throw new MatchError("ConvertTo[" + manifest[T].erasure.getName + "] not implemented")
+    else throw new MatchError("ConvertTo[" + manifest[T].erasure.getName + "] not implemented; value = " + value)
 
   def vo[T <: ValueObject](value:AnyRef) : T = unpack(value) match {
     case v:T => v
     case v:MessagePackValueObject => v.vo.asInstanceOf[T]
   }
-  def voRef[T <: ValueObjectWithID](value:AnyRef)(implicit idType:Manifest[T#IDType]) : Ref[T] = unpack(value) match {
+  def voRef[T <: ValueObjectWithID](value:AnyRef)(implicit voType:Manifest[T], idType:Manifest[T#IDType]) : Ref[T] = unpack(value) match {
     case v:Ref[T] => v
+    case v:T => new Ref[T](v.Companion.asInstanceOf[IDAccessor[T]].idValue(v), v)
+    case v:MessagePackValueObject if (voType.erasure.isAssignableFrom(v.vo.getClass)) => voRef[T](v.vo.asInstanceOf[T])
     case v:String if (classOf[String] == idType.erasure) => new Ref[T](string(v).asInstanceOf[T#IDType]) 
+//    case v:AnyRef if (voType.erasure.isAssignableFrom(v.getClass)) =>
+//      val vo = v.asInstanceOf[T]
+//      new Ref[T](vo.Companion.asInstanceOf[IDAccessor[T]].idValue(vo), vo)
     case v:AnyRef if (idType.erasure.isAssignableFrom(v.getClass)) => new Ref[T](v.asInstanceOf[T#IDType])
     case v:AnyRef => new Ref[T](ConvertTo[T#IDType](v))
 //    case _ => null.asInstanceOf[T]
@@ -116,17 +123,22 @@ object ConvertTo
 
   def uri           (value:Any) : URI = unpack(value) match {
     case v:URI => v
-    case v:URL => v.toURI
+    case v:java.net.URI => uri(v.toString)
+    case v:java.net.URL => uri(v.toString)
     case v:String => uri(v)
     case v:RawType => uri(v.asString)
     case None => null
   }
-  def uri (v:String) = if (v == null || v.isEmpty) null else try { new URI(v.replace(" ", "%20")) } catch { case e:URISyntaxException => null }
+
+  def uri (v:String) : URI = if (v == null || v.isEmpty) null
+    else try { new primevc.types.URI(v, true) }
+       catch { case e:URIException => new URI(v, false) }
 
   def email         (value:Any) : InternetAddress = unpack(value) match {
     case v:InternetAddress => v
-    case v:URI if ("mailto" == v.getScheme)   => new InternetAddress(v.getRawSchemeSpecificPart)
-    case v:URL if ("mailto" == v.getProtocol) => new InternetAddress(v.getFile)
+    case v:URI if ("mailto" == v.getScheme)            => new InternetAddress(v.getPath)
+    case v:java.net.URI if ("mailto" == v.getScheme)   => new InternetAddress(v.getPath)
+    case v:java.net.URL if ("mailto" == v.getProtocol) => new InternetAddress(v.getFile)
     case v:String => new InternetAddress(v)
     case v:RawType => new InternetAddress(v.asString)
     case None => null
@@ -151,10 +163,12 @@ object ConvertTo
   def string        (value:Any) : String = unpack(value) match {
     case v:String => string(v)
     case v:RawType => string(v)
+    case v:URI => string(v)
     case v:Array[String] => v.mkString(", ")
     case None => null
     case _ => value.toString
   }
+  def string        (value:URI) : String = value.getEscapedURIReference
   def string        (value:String) : String = if (value == null || value.isEmpty) null else value
   def string        (value:Double, format:String) = decimalFormatter(format).format(value)
   def string        (value:RawType) : String = value.asString

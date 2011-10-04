@@ -2,9 +2,7 @@ package primevc.types;
  import org.apache.commons.codec.binary.Base64
  import org.bouncycastle.crypto.digests.SHA256Digest
  import org.bouncycastle.crypto.io.DigestOutputStream
- import org.bson.types.ObjectId
 import primevc.utils.ConvertTo
-import java.net.URI
 import org.bouncycastle.crypto.Digest
 import org.apache.commons.codec.digest.DigestUtils
 import java.io._

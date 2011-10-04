@@ -258,11 +258,11 @@ file.writeString("
 		// Companion getter
 		a("\n  override def Companion : VOCompanion[_] with VOMessagePacker[_] = "); a(def.name); a("VO");
 		
-		// partial_?
+/*		// partial_?
 		if (def.propertiesSorted.length != 0) {
 			a("\n  override def partial_? = numFieldsSet_? != "); a(Std.string(def.propertiesSorted.length));
 		}
-		
+*/		
 		// Non-bitflag empty checks overrides
 		if (emptyChecks.length > 0)
 		{
@@ -369,7 +369,15 @@ file.writeString("
 				}
 			}
 			
-			a("\n\n  override val numFields = "+def.propertiesSorted.length);
+			// fields : Array
+			a("\n\n  override val fields = Array[Field](");
+			for (i in 0 ... def.propertiesSorted.length)
+			{
+				var p = def.propertiesSorted[i];
+				if (i != 0) a(", "); a(quote(p.name));
+			}
+			a(");");
+			
 			// field(Int)
 			a("\n\n  override def field(index: Int) = index match {");
 			for (i in 0 ... def.propertiesSorted.length)
@@ -455,7 +463,7 @@ file.writeString("
 			a("}\n");
 			// VOFieldInfo
 			a("trait "); a(def.name); a("FieldInfo extends VOFieldInfo {\n");
-				a('  override val numFields = '); a(def.name); a('VO.numFields;\n');
+//				a('  override val numFields = '); a(def.name); a('VO.numFields;\n');
 				a("  override def field(index: Int): Field = "); a(def.name); a('VO.field(index);\n');
 				a("  override def field(key: String): Int = " ); a(def.name); a('VO.field(key);\n');
 			a("}\n");
@@ -1224,15 +1232,15 @@ file.writeString("
 		res.name = (surroundWithType != null? surroundWithType + "[" : "") +
 		  (switch(t) {
 			case Tarray(innerT,_,_):	"Array["+ getType(innerT).name +"]";
-			case Turi, Turl:			"java.net.URI";
-			case TuniqueID:				"org.bson.types.ObjectId";
+			case Turi, Turl:			"primevc.types.URI";
+			case TuniqueID:				"primevc.types.ObjectId";
 			case TfileRef:				"primevc.types.FileRef";
 			case Tstring:				"String";
 			case Tinteger(_,_,_):		res.mongoOptionGetter = ".map(ConvertTo.integer(_))";    "Int";
 			case Tdecimal(_,_,_):		res.mongoOptionGetter = ".map(ConvertTo.decimal(_))"; "Double";
 			case Tbool(v):				res.defaultValue = v; res.mongoOptionGetter = ".map(_.booleanValue)"; "Boolean";
 			case TenumConverter(_):		throw t; //"";
-			case Temail:				"javax.mail.internet.InternetAddress";
+			case Temail:				"primevc.types.InternetAddress";
 			case Tdate:					"org.joda.time.DateMidnight";
 			case Tdatetime:				"org.joda.time.DateTime";
 			case Tinterval:				"org.joda.time.Interval";

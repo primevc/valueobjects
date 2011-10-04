@@ -20,7 +20,7 @@ trait ValueObject
   def fieldIsSet_?(index:Int): Boolean = ($fieldsSet & (1 << index)) != 0
   def empty_? = { updateFieldsSet_! ; $fieldsSet == 0 }
 
-  def partial_? : Boolean = true
+  def partial_? : Boolean = numFieldsSet_? != Companion.numFields
   def validationErrors_? : List[(Symbol, String)] = Nil
 
   // Courtesy of: http://graphics.stanford.edu/%7Eseander/bithacks.html#CountBitsSetParallel
@@ -67,14 +67,13 @@ trait VOAccessor[V <: ValueObject]
 
 trait VOFieldInfo
 {
-  val numFields: Int = 0
+  val fields: Array[Field] = Array()
+  def numFields: Int = fields.length
   def field(index: Int): Field = throw new MatchError("Field with index "+index+" not found in this VO");
   def field(key:String): Int = -1
 
   @inline final def field(key: Symbol): Field = fieldNamed(key.name)
   @inline final def fieldNamed(key:String): Field = field(field(key))
-  
-  @inline def fields: IndexedSeq[Field] = (0 until numFields) map(field(_))
 }
 
 trait VOMessagePacker[V <: ValueObject] {

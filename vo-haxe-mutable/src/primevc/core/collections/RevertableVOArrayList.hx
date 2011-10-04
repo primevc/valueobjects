@@ -244,7 +244,7 @@ class RevertableVOArrayList<DataType : IValueObject>
 		if (oldPos == -1)
 			oldPos = list.indexOf(item);
 		
-		if (oldPos > -1 && list.removeItem(item, oldPos))
+		if (oldPos > -1 && list.removeAt(oldPos))
 			addChange( ListChange.removed( item, oldPos ) );
 		
 		cast(item, ValueObjectBase).change.unbind(this);

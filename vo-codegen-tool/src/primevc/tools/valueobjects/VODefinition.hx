@@ -1921,7 +1921,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	
 	public var settings		(default, null)		: {
 		var mongo_proxied: MongoProxyType;
-	}
+	};
 	
 	public function hasOption(opt:Dynamic) {
 		for (o in options) if (o == opt) return true;

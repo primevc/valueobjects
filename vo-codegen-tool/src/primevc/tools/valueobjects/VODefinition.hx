@@ -1919,9 +1919,9 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	public var maxDefinedPropertyIndex(getMaxDefinedPropertyIndex, null) : Int; // max(propertiesDefined.index) non-transient
 	public var propertiesSorted	(getPropertiesSorted,  null) : Array<Property>;
 	
-	public var settings		(default, null)		: {
+	public var settings		(default, null)	: {
 		var mongo_proxied: MongoProxyType;
-	}
+	};
 	
 	public function hasOption(opt:Dynamic) {
 		for (o in options) if (o == opt) return true;

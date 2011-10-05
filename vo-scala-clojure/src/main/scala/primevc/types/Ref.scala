@@ -3,6 +3,8 @@ package primevc.types
 
 class Ref[V <: ValueObjectWithID](val ref:V#IDType, var vo_! : V = null.asInstanceOf[V])
 {
+  if (vo_! != null) require(ref != null, "No ref value for Ref[_].vo_! = "+ vo_!);
+  
   def empty_? = ref == null
   def vo(implicit proxy:VOProxy[V]) = if (ref == null) None else if (vo_! != null) Some(vo_!)
     else {

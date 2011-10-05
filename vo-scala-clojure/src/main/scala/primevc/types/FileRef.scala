@@ -13,6 +13,7 @@ trait FileRefOutputStream extends OutputStream {
 }
 
 trait FileRepository {
+  def exists (ref : FileRef): Boolean
   def toURI(instance : FileRef): URI
   def create (): FileRefOutputStream
   def absorb (file : File): FileRef
@@ -36,6 +37,7 @@ class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
 
   def toURI   (f : FileRef) = ConvertTo.uri(f.toString)
   def getFile (f : FileRef) = new File(root.getAbsolutePath + "/" + f.toString)
+  def exists  (f : FileRef) = getFile(f).exists
 
 //  def save (stream : OutputStream) = FileRef(new StreamWrapper(stream)).get
 

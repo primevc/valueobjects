@@ -53,8 +53,9 @@ class VOPacker (out:OutputStream) extends Packer(out)
   }
 
   def pack(ref: Ref[_ <: ValueObject]) {
-    if (ref.ref != null) require(ref.vo_! != null)
-    pack(ref.vo_!)
+    if (ref.vo_! != null) pack(ref.vo_!)
+  //untested:
+  //else                  pack(ref.ref)
   }
 
   def pack(refArray: RefArray[_ <: ValueObject]) {

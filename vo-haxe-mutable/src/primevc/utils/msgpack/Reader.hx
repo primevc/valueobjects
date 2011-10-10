@@ -283,8 +283,10 @@ class Reader implements IDisposable
 			);
 			Assert.that(Std.is(target, interfaze), target +" is not a "+ interfaze + " ; voHeader: 0x"+StringTools.hex(voHeader) + ", typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes);
 #end
+#if debug   try { #end
 			if (fieldsSetBytes != 0)
 				(untyped clazz).msgpack_unpackVO(this, target, fieldsSetBytes);
+#if debug   } catch (e:Dynamic) { throw clazz+" unpack error: "+e; } #end
 			
 			if (superTypeCount > 0)
 				voHeader = readByte();

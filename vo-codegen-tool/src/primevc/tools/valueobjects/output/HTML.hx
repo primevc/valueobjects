@@ -1,6 +1,7 @@
 package primevc.tools.valueobjects.output;
  import primevc.tools.valueobjects.VODefinition;
   using primevc.utils.ArrayUtils;
+  using StringTools;
 
 class HTML implements CodeGenerator
 {
@@ -65,7 +66,7 @@ class HTML implements CodeGenerator
 			case Tinteger(min,max,stride):	'<b>integer</b>'+ minmax(min,max);
 			case Tdecimal(min,max,stride):	'<b>decimal</b>'+ minmax(min,max);
 			case Tbool(bool):				'<b>boolean</b><span title="default value">'+bool+'</span>';
-			case TenumConverter(prop):		'<b>conversion </b>' + Lambda.map(prop.enums, function(e:Enumeration){ return "<span>"+e.name +" &harr; "+ e.conversions.get(prop.name)  +"</span>"; }).join(" ");
+			case TenumConverter(prop):		'<b>conversion </b>' + Lambda.map(prop.enums, function(e:Enumeration){ return "<span>"+ e.name +" &harr; '"+ e.conversions.get(prop.name) +"'</span><br/>"; }).join(" ");
 			case Tarray(etype, min, max):	'<b>array of </b>'+typeHTML(pname, etype)+' '+ minmax(min,max);
 			
 			case Tdef(ptypedef):			typeLink(Util.unpackPTypedef(ptypedef));
@@ -82,19 +83,33 @@ class HTML implements CodeGenerator
 		}
 	}
 	
-	private static function propertiesHTML(properties:Hash<Property>)
+	private static function enumHTML(enumvo : EnumDef)
 	{
-		var keys = properties.keys;
-		var propKeys = Lambda.array({iterator: keys});
-		
-		propKeys.sortAlphabetically();
-		
+		var enums = Lambda.array(enumvo.enumerations);
+		enums.sort(function(a,b) return a.intValue - b.intValue);
+
 		var props = [];
-		for (k in propKeys) {
-			var p = properties.get(k);
+		for (p in enums) {
+			props.push({
+				type: p.intValue + " ; 0x" + StringTools.hex(p.intValue, 6),
+				name: p.name,
+				desc: p.description != null? p.description.split("\n").join("<br>") : ""
+			});
+		}
+
+		return t_properties.execute({
+			property: props,
+		});
+	}
+
+	private static function propertiesHTML(properties:Array<Property>)
+	{
+		var props = [];
+		for (p in properties) {
 			props.push({
 				type: typeHTML(p.name, p.type),
-				name: p.name
+				name: p.name,
+				desc: p.description != null? p.description.trim().split("\n").join("<br>") : ""
 			});
 		}
 		
@@ -224,7 +239,7 @@ class HTML implements CodeGenerator
 			fullName		: def.fullName,
 			implemented		: linkTypes('Implemented by: ', cast def.implementedBy),
 			supers 			: linkTypes('Supertypes ', cast def.supertypes),
-			properties		: def.property == null? "" : propertiesHTML(def.property) + opt.toString()
+			properties		: def.property == null? "" : propertiesHTML(def.propertiesSorted) + opt.toString()
 		}));
 	}
 	
@@ -251,7 +266,7 @@ class HTML implements CodeGenerator
 			fullName		: def.fullName,
 			implemented		: "", //linkTypes('Implemented by: ', cast def.implementedBy),
 			supers 			: "", //linkTypes('Supertypes ', cast def.supertypes),
-			properties		: propertiesHTML(def.property) + opt.toString()
+			properties		: enumHTML(def) + "<br/>" + propertiesHTML(def.propertiesSorted) + opt.toString()
 		}));
 	}
 	
@@ -298,7 +313,7 @@ class HTML implements CodeGenerator
 		padding: 0.2em 0.3em;
 		border-right: 2px solid #000;
 		border-bottom: 1px solid #606060;
-		width: 15em;
+		min-width: 15em;
 		font-size: 9pt;
 		background: #1A1D1D;
 		text-align: right;
@@ -371,7 +386,7 @@ class HTML implements CodeGenerator
 	static var t_properties = new haxe.Template('
 		<table cellspacing="0" cellpadding="0">
 		::foreach property::
-			<tr><td>::type::</td><td>::name::</td></tr>
+			<tr><td>::type::</td><td>::name::</td><td>::desc::</td></tr>
 		::end::
 		</table>
 	');

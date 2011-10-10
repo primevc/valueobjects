@@ -679,7 +679,8 @@ class PropertyTypeResolver
 				}}
 			
 			case TClass(cl):
-				throw Err_UnknownType(this, runtimeType);
+				if (cl == String) prop.description = def;
+				else throw Err_UnknownType(this, runtimeType);
 			
 			case
 			  TInt:
@@ -1156,7 +1157,11 @@ class Enumeration
 						this.conversions.set(field, Std.string(val));
 				}
 			
-			case TBool, TUnknown, TNull, TFunction, TClass(_), TEnum(_):
+			case TClass(cl):
+				if (cl == String) this.description = opt;
+				else throw "Don't know what to do with "+Std.string(opt) + ", for: "+ this;
+			
+			case TBool, TUnknown, TNull, TFunction, TEnum(_):
 				throw "Currently unsupported enum option: "+Std.string(opt) + ", for: "+ this;
 		}
 		

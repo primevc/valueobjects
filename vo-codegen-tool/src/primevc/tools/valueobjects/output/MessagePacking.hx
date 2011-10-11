@@ -314,39 +314,39 @@ class MessagePacking
 	
 	private function addFieldIndexOffsetCase(t : TypeDefinition, offset : Int)
 	{
-		a("\n    case "); a(Std.string(t.index)); a(": "); a(offset + ";"); a(" // "); a(t.fullName);
+		a("\n		case "); a(Std.string(t.index)); a(": "); a(offset + ";"); a(" // "); a(t.fullName);
 	}
 	
 	private function genDeSerialization(lastProp:Property)
 	{
-		if (lastProp == null) return;
-		
 		defineUnPackerFunction();
 		
-		var bit = 8;
-		
-		for (i in 0 ... lastProp.index + 1)
+		if (lastProp != null)
 		{
-			if (bit == 8) {
-				a("\n\t\n\t\tif ("); a_is0("propertyBytes"); a(") return;");
-				a("\n\t\n\t\tbits = reader.readByte();");
-				a("\n\t\n\t\t"); a(expr_decrementPropertyBytes());
-				bit = 0;
-			}
+			var bit = 8;
 			
-			var p = def.propertiesDefined.get(i);
-			if (p == null || p.hasOption(transient)) {
+			for (i in 0 ... lastProp.index + 1)
+			{
+				if (bit == 8) {
+					a("\n\t\n\t\tif ("); a_is0("propertyBytes"); a(") return;");
+					a("\n\t\n\t\tbits = reader.readByte();");
+					a("\n\t\n\t\t"); a(expr_decrementPropertyBytes());
+					bit = 0;
+				}
+				
+				var p = def.propertiesDefined.get(i);
+				if (p == null || p.hasOption(transient)) {
+					++bit;
+					continue;
+				}
+				
+				a("\n\t\tif ("); a_not0("bits & 0x" + StringTools.hex(1 << bit, 2)); a(") ");
+				
+				a_unpackProperty(p);
+				
 				++bit;
-				continue;
 			}
-			
-			a("\n\t\tif ("); a_not0("bits & 0x" + StringTools.hex(1 << bit, 2)); a(") ");
-			
-			a_unpackProperty(p);
-			
-			++bit;
 		}
-		
 		a("\n\t\t\n\t\tif ("); a_not0("propertyBytes"); a(") reader.discardRemainingVOProperties(propertyBytes);");
 		
 		a("\n\t}");

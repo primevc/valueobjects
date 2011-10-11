@@ -314,7 +314,7 @@ class MessagePacking
 	
 	private function addFieldIndexOffsetCase(t : TypeDefinition, offset : Int)
 	{
-		a("\n		case "); a(Std.string(t.index)); a(": "); a(offset + ";"); a(" // "); a(t.fullName);
+		a("\n\t\tcase "); a(Std.string(t.index)); a(": "); a(offset + ";"); a(" // "); a(t.fullName);
 	}
 	
 	private function genDeSerialization(lastProp:Property)

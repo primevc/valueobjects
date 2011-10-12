@@ -816,7 +816,7 @@ class Haxe implements CodeGenerator
 	{	
 		openFunctionDeclaration( def, "dispose", true, "Void", false );
 		
-		for (p in def.property) if (!Util.isDefinedInSuperClassOf(def, p) && p.isDisposable()) {
+		for (p in def.property) if (!Util.isDefinedInSuperClassOf(def, p) && p.isDisposable() && !p.hasOption(mongo_reference)) {
 			var name = p.shouldHaveSetter() ? "(untyped this)." + p.name : p.name;
 			a("\t\tif (this."); a(p.name); a(".notNull())\t\t{ "); a(p.name); a(".dispose(); "); a(name); a(" = null; }\n");
 		}

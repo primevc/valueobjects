@@ -1016,13 +1016,13 @@ class Haxe implements CodeGenerator
 			}
 		}
 		a("\t\t\t");
-		var ifExprAdded =
+		var ifExprAdded =			// FIXME (danny@Oct 12, 2011): remove ifExprAdded?
 		    if(!p.isArray() && !Util.isSingleValue(p.type)) false; // Flags are already handled just above this line.
 		    else addPropChangeFlagSetter(p.bitIndex(), "v" + ((!p.isArray() && p.isBindable())? ".value" : ""), p.type, false);
 		
 		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type)) {
 			a("\n\t\t\t}");
-			if (ifExprAdded) {
+			if (ifExprAdded || !Util.isSingleValue(p.type)) {
 				a("\n\t\t\telse "); addPropChangeFlagUnsetter(p.bitIndex());
 			}
 		}

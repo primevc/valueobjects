@@ -983,13 +983,14 @@ class Haxe implements CodeGenerator
 	//	a("\t\treturn if (v == "); a(name); a(") v;\n");
 	//	a("\t\telse\n\t\t{\n\t\t\tif (isEditable()) _changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
 		
-		a("\t\tvar old "); a(hasGetter? ": " + HaxeUtil.haxeType(p.type, false, p.isBindable()) + " = cast " : "= "); a(name); a(";\n");
-		a("\t\tif (v != old)\n");
+		a("\t\tvar oldV "); a(hasGetter? ": " + HaxeUtil.haxeType(p.type, false, p.isBindable()) + " = cast " : "= "); a(name); a(";\n");
+		a("\t\tvar newV "); a(hasGetter? ": " + HaxeUtil.haxeType(p.type, false, p.isBindable()) + " = cast " : "= "); a("v"); a(";\n");
+		a("\t\tif (newV != oldV)\n");
 		a("\t\t{\n");
 		
 		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type))
 		{
-			a("\t\t\tif (old.notNull())\n");
+			a("\t\t\tif (oldV.notNull())\n");
 			
 	/*		if (!p.isArray())
 				a("(untyped ");
@@ -998,19 +999,18 @@ class Haxe implements CodeGenerator
 			if(!p.isArray())
 				a(")");*/
 			
-			a("\t\t\t\told.change.unbind(this);\n");
-			a("\t\t\tif (v.notNull()) {\n\t\t\t\t");
+			a("\t\t\t\toldV.change.unbind(this);\n");
+			a("\t\t\tif (newV.notNull()) {\n\t\t\t\t");
 			
 			if (p.isArray() || p.isBindable())
 			{
-				a("v.change.");
+				a("newV.change.");
 				a(listChangeHandler? "observe(this, " : "bind(this, "); a(p.name); a("Changed);\n\t");
 				if (listChangeHandler && !Util.isSingleValue(p.type)) {
-					a("\t\t\tv.setChangeHandler(objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t");
+					a("\t\t\tnewV.setChangeHandler(objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t");
 				}
 			}
 			else if (!Util.isSingleValue(p.type)) {
-			    a("var newV = v.as(ValueObjectBase);\n\t\t\t\t");
 				a("newV.change.bind(this, objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t\t\t\t");
 				a("if (newV.isEmpty()) "); addPropChangeFlagUnsetter(p.bitIndex()); a(" else _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a(";\n\t");
 			}
@@ -1349,8 +1349,8 @@ private class HaxeUtil
 				initializer;
 		}
 		
-		return	 if (bindable && transient)		"new primevc.core.Bindable<"+ HaxeUtil.haxeType(ptype) +">("+ code +");";
-			else if (bindable)					"new primevc.core.RevertableBindable<"+ HaxeUtil.haxeType(ptype) +">("+ code +");";
+		return	 if (bindable && transient)		"new "+ HaxeUtil.haxeType(ptype, true, bindable) +"("+ code +");";
+			else if (bindable)					"new "+ HaxeUtil.haxeType(ptype, true, bindable) +"("+ code +");";
 			else if (code == null)				null;
 			else								code + ";";
 	}

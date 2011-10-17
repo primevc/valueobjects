@@ -286,7 +286,7 @@ class Reader implements IDisposable
 #if debug   try { #end
 			if (fieldsSetBytes != 0)
 				(untyped clazz).msgpack_unpackVO(this, target, fieldsSetBytes);
-#if debug   } catch (e:Dynamic) { throw clazz+" unpack error: "+e; } #end
+#if debug   } catch (e:Dynamic) { trace(clazz+"; "+e); throw clazz+" unpack error: "+e; } #end
 			
 			if (superTypeCount > 0)
 				voHeader = readByte();

@@ -116,8 +116,8 @@ class HaxeMessagePacking extends MessagePacking
 		
 		a("\n\t@:keep static public function msgpack_packVO(o : haxe.io.BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBits : Int, prependMsgpackType : Bool = false) : Int\n\t{");
 		
-		a("\n		Assert.that(o != null && obj != null);");
-		a("\n		");
+		a("\n\t\tAssert.that(o != null && obj != null);");
+		a("\n\t\t");
 		
 		a("\n\t\tvar b /* bytes written */ : Int;");
 		a("\n\t\tif (prependMsgpackType) {");
@@ -134,8 +134,8 @@ class HaxeMessagePacking extends MessagePacking
 	override private function defineUnPackerFunction()
 	{
 		a("\n\t@:keep static public function msgpack_unpackVO(reader : Reader, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBytes : Int) : Void\n\t{");
-		a("\n		Assert.that(reader != null && obj != null);");
-		a("\n		var bits:Int, fieldOffset:Int = (untyped obj)._fieldOffset(TYPE_ID);");
+		a("\n\t\tAssert.that(reader != null && obj != null);");
+		a("\n\t\tvar bits:Int, fieldOffset:Int = (untyped obj)._fieldOffset(TYPE_ID);");
 	}
 	
 	override private function a_unpackProperty(p:Property)
@@ -143,7 +143,7 @@ class HaxeMessagePacking extends MessagePacking
 		var setFn = false;
 		
 		if (!p.isArray() && p.isBindable()) {
-			a("(cast(obj."); a(p.name); a(", primevc.core.Bindable<"); a(HaxeUtil.haxeType(p.type)); a(">).value = ");
+			a("(cast(obj."); a(p.name); a(", primevc.core.Bindable<"); a(HaxeUtil.haxeType(p.type, true)); a(">).value = ");
 		}
 		else
 		{
@@ -901,7 +901,12 @@ class Haxe implements CodeGenerator
 		{
 			openPlatformCode(p);
 			if (!Util.isPTypeBuiltin(p.type) && !Util.isEnum(p.type)) {
-				if (p.isBindable())		{ a("\t\tthis."); a(p.name); a(".value"); a(" = "); a(p.name); a("_;"); }
+				if (p.isBindable()) {
+					if (HaxeUtil.isNullableOnEveryPlatform(p.type, true)) {
+						a("\t\tif ("); a(p.name); a("_.notNull())");
+					}
+					a("\t\tthis."); a(p.name); a(".value"); a(" = "); a(p.name); a("_;");
+				}
 				else					{ a("\t\tthis."); a(p.name); a(" = "); a(p.name); a("_;"); }
 			}
 			else switch (p.type) {
@@ -964,6 +969,7 @@ class Haxe implements CodeGenerator
 		var listChangeHandler	= false;
 		var hasGetter			= p.shouldHaveGetter();
 		var name				= hasGetter ? "(untyped this)." + p.name : p.name;
+		var isSingleValue 		= Util.isSingleValue(p.type);
 		
 		if (p.isBindable() || p.isArray())
 		{
@@ -973,24 +979,23 @@ class Haxe implements CodeGenerator
 					"primevc.core.collections.ListChange<" + HaxeUtil.haxeType(innerType, true, false, false, p.hasOption(transient)) + ">";
 				
 				default:
-					HaxeUtil.haxeType(p.type, false, false, false, p.hasOption(transient));
+					HaxeUtil.haxeType(p.type, true, false, false, p.hasOption(transient));
 			}
 		}
 		
 		
-		a("\tpublic function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient))); a(")\n\t{\n");
+		a("\tpublic function set"); code.addCapitalized(p.name); a("(newV:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient))); a(")\n\t{\n");
 		
 	//	a("\t\treturn if (v == "); a(name); a(") v;\n");
 	//	a("\t\telse\n\t\t{\n\t\t\tif (isEditable()) _changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
 		
-		a("\t\tvar oldV "); a(hasGetter? ": " + HaxeUtil.haxeType(p.type, false, p.isBindable()) + " = cast " : "= "); a(name); a(";\n");
-		a("\t\tvar newV "); a(hasGetter? ": " + HaxeUtil.haxeType(p.type, false, p.isBindable()) + " = cast " : "= "); a("v"); a(";\n");
+		a("\t\tvar oldV = "); a(name); a(";\n");
 		a("\t\tif (newV != oldV)\n");
 		a("\t\t{\n");
 		
-		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type))
+		if (listChangeHandler || p.isBindable() || !isSingleValue)
 		{
-			a("\t\t\tif (oldV.notNull())\n");
+			a("\t\t\tif (oldV.notNull()) {\n");
 			
 	/*		if (!p.isArray())
 				a("(untyped ");
@@ -999,39 +1004,52 @@ class Haxe implements CodeGenerator
 			if(!p.isArray())
 				a(")");*/
 			
-			a("\t\t\t\toldV.change.unbind(this);\n");
-			a("\t\t\tif (newV.notNull()) {\n\t\t\t\t");
+			if (p.isArray() || p.isBindable()) {
+				a("\t\t\t\toldV.change.unbind(this);\n");
+				if (!isSingleValue && !p.isArray())
+					a("\t\t\t\tValueObjectBase.removeChangeListener( oldV.value, this );\n");
+			}
+			else if (!isSingleValue)
+				a("\t\t\t\tValueObjectBase.removeChangeListener( oldV, this );\n");
+			
+			a("\t\t\t}\n");
+
+			a("\t\t\tif (newV.notNull()) {\n");
 			
 			if (p.isArray() || p.isBindable())
 			{
-				a("newV.change.");
-				a(listChangeHandler? "observe(this, " : "bind(this, "); a(p.name); a("Changed);\n\t");
-				if (listChangeHandler && !Util.isSingleValue(p.type)) {
-					a("\t\t\tnewV.setChangeHandler(objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t");
+				a("\t\t\t\tnewV.change.");
+				a(listChangeHandler? "observe(this, " : "bind(this, "); a(p.name); a("Changed);\n");
+				if (listChangeHandler && !isSingleValue) {
+					a("\t\t\t\tnewV.setChangeHandler(objectChangedHandler("); a(p.name.toUpperCase()); a("));\n");
+				}
+				else if (!isSingleValue) {
+					a("\t\t\t\tValueObjectBase.addChangeListener( newV.value, this, objectChangedHandler("); a(p.name.toUpperCase()); a("));\n");
+					a("\t\t\t\tif (newV.value.isEmpty()) "); addPropChangeFlagUnsetter(p.bitIndex()); a(" else _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a(";\n");
 				}
 			}
-			else if (!Util.isSingleValue(p.type)) {
-				a("newV.change.bind(this, objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t\t\t\t");
-				a("if (newV.isEmpty()) "); addPropChangeFlagUnsetter(p.bitIndex()); a(" else _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a(";\n\t");
+			else if (!isSingleValue) {
+				a("\t\t\t\tValueObjectBase.addChangeListener( newV, this, objectChangedHandler("); a(p.name.toUpperCase()); a("));\n");
+				a("\t\t\t\tif (newV.isEmpty()) "); addPropChangeFlagUnsetter(p.bitIndex()); a(" else _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a(";\n");
 			}
 		}
 		a("\t\t\t");
 		var ifExprAdded =			// FIXME (danny@Oct 12, 2011): remove ifExprAdded?
-		    if(!p.isArray() && !Util.isSingleValue(p.type)) false; // Flags are already handled just above this line.
-		    else addPropChangeFlagSetter(p.bitIndex(), "v" + ((!p.isArray() && p.isBindable())? ".value" : ""), p.type, false);
+		    if(!p.isArray() && !isSingleValue) false; // Flags are already handled just above this line.
+		    else addPropChangeFlagSetter(p.bitIndex(), "newV" + ((!p.isArray() && p.isBindable())? ".value" : ""), p.type, false);
 		
-		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type)) {
+		if (listChangeHandler || p.isBindable() || !isSingleValue) {
 			a("\n\t\t\t}");
-			if (ifExprAdded || !Util.isSingleValue(p.type)) {
+			if (ifExprAdded || !isSingleValue) {
 				a("\n\t\t\telse "); addPropChangeFlagUnsetter(p.bitIndex());
 			}
 		}
 		
 		a("\n\t\t\t");
 		a("\n\t\t\t_changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";");
-		a("\n\t\t\tthis."); a(p.name); a(" = v;\n");
+		a("\n\t\t\tthis."); a(p.name); a(" = newV;\n");
 		a("\t\t}\n");
-		a("\t\treturn v;\n");
+		a("\t\treturn newV;\n");
 		a("\t}\n");
 		
 		if (p.isBindable() || p.isArray())
@@ -1039,17 +1057,22 @@ class Haxe implements CodeGenerator
 			a("\tprivate function "); a(p.name); a("Changed(");
 			
 			if (!listChangeHandler) {
-				a("value : "); a(typeName); a(", old : "); a(typeName);
+				a("newV : "); a(typeName); a(", oldV : "); a(typeName);
 			}
-			a(") : Void {\n\t\t_changedFlags |= "); a(hexBitflag(p.bitIndex()));
-			a(";\n\t\t");
+			a(") : Void {\n\t\t");
+			a("_changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n\t\t");
 			
+			if (p.isBindable() && !p.isArray() && !isSingleValue) {
+				a("if (oldV.notNull())		ValueObjectBase.removeChangeListener( oldV, this );\n\t\t");
+				a("if (newV.notNull())		ValueObjectBase.addChangeListener( newV, this, objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t\t");
+			}
+
 			if (listChangeHandler)
 			{
 				a("if ("); a(p.name); a(".length.not0()) _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a("; else "); addPropChangeFlagUnsetter(p.bitIndex());
 			}
 			else
-				addPropChangeFlagSetter(p.bitIndex(), "value", p.type, false);
+				addPropChangeFlagSetter(p.bitIndex(), "newV", p.type, false);
 			a("\n\t}\n\n");
 		}
 	}
@@ -1335,24 +1358,14 @@ private class HaxeUtil
 {
 	public static function getConstructorCall(ptype:PType, bindable:Bool, initializer:String, transient:Bool = false)
 	{
-		var code = switch (ptype)
-		{
-			case Tarray(type, _,_):
-				return "new " + HaxeUtil.haxeType( ptype, true, bindable, false, transient ) + "("+ initializer +");";
-			
-			case Tdef(_), Turi, Turl, TfileRef, Tinterval:
-				initializer; //"new " + HaxeUtil.haxeType(ptype) + "("+ initializer +")";
-			
-			case TuniqueID:				initializer + ' == null? primevc.types.ObjectId.make() : ' + initializer;
-			
-			case Tinteger(_,_,_), Tdecimal(_,_,_), Temail, Tstring, Tbool(_), TenumConverter(_), Tdate, Tdatetime, Tcolor, TclassRef(_):
-				initializer;
+		switch (ptype) {
+			case Tarray(type, _,_):		return "new " + HaxeUtil.haxeType( ptype, true, bindable, false, transient ) + "("+ initializer +");";
+			case TuniqueID:				initializer = initializer + ' == null? primevc.types.ObjectId.make() : ' + initializer;
+			default:
 		}
 		
-		return	 if (bindable && transient)		"new "+ HaxeUtil.haxeType(ptype, true, bindable) +"("+ code +");";
-			else if (bindable)					"new "+ HaxeUtil.haxeType(ptype, true, bindable) +"("+ code +");";
-			else if (code == null)				null;
-			else								code + ";";
+		return 	if (bindable)			"new "+ HaxeUtil.haxeType(ptype, true, bindable, false, transient) +"("+ initializer +");";
+				else					initializer + ";";
 	}
 	
 	public static function getConstructorInitializer(ptype:PType, constOnly = false) return switch (ptype)

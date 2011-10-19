@@ -72,18 +72,19 @@ class RevertableVOArrayList<DataType : IValueObject>
 	
 	override public function dispose()
 	{
-		super.dispose();
+		Assert.notNull(itemChange);
+
+		if (changeHandlerFn != null)
+			setChangeHandler(null);
 		
-		if (itemChange.notNull()) {
-			itemChange.dispose();
-			itemChange = null;
-		}
+		itemChange.dispose();
+		itemChange = null;
+		super.dispose();
 	}
 	
 	
 	public function setChangeHandler(changeHandler : ObjectChangeSet -> Void)
 	{
-		itemChange.dispose();
 		this.changeHandlerFn = changeHandler;
 		VOArrayListUtil.setChangeHandler(this, list, changeHandler);
 	}
@@ -286,5 +287,13 @@ class RevertableVOArrayList<DataType : IValueObject>
 		var l = new RevertableVOArrayList<DataType>( list.duplicate() );
 		l.flags = flags;
 		return l;
+	}
+
+	
+	override public function inject (otherList:FastArray<DataType>)
+	{
+		VOArrayListUtil.setChangeHandler(this, list, null);
+		super.inject(otherList);
+		VOArrayListUtil.setChangeHandler(this, otherList, this.changeHandlerFn);
 	}
 }

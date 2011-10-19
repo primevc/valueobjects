@@ -60,12 +60,14 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implemen
 	
 	override public function dispose()
 	{
-		super.dispose();
+		Assert.notNull(itemChange);
+
+		if (changeHandlerFn != null)
+			setChangeHandler(null);
 		
-		if (itemChange.notNull()) {
-			itemChange.dispose();
-			itemChange = null;
-		}
+		itemChange.dispose();
+		itemChange = null;
+		super.dispose();
 	}
 
 	/**
@@ -82,7 +84,6 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implemen
 	
 	public function setChangeHandler(changeHandler : ObjectChangeSet -> Void)
 	{
-		itemChange.dispose();
 		this.changeHandlerFn = changeHandler;
 		VOArrayListUtil.setChangeHandler(this, list, changeHandler);
 	}
@@ -115,6 +116,14 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implemen
 	override public function duplicate () : IReadOnlyList<DataType>
 	{
 		return new VOArrayList<DataType>( list.duplicate() );
+	}
+
+
+	override public function inject (otherList:FastArray<DataType>)
+	{
+		VOArrayListUtil.setChangeHandler(this, list, null);
+		super.inject(otherList);
+		VOArrayListUtil.setChangeHandler(this, otherList, this.changeHandlerFn);
 	}
 }
 

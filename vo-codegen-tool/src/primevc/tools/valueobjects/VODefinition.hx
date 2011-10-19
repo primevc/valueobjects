@@ -904,50 +904,45 @@ class Property
 		return p;
 	}
 	
-	public function bitIndex()
-	{
-		return if (Std.is(parent, BaseTypeDefinition)) cast(parent,BaseTypeDefinition).bitIndex(this); else this.index;
+	public 		  function bitIndex()						return if (Std.is(parent, BaseTypeDefinition)) cast(parent,BaseTypeDefinition).bitIndex(this) else this.index
+	public inline function propertyID()						return definedIn.index << 8 | this.index
+
+	public inline function isBindable() 					return hasOption(PropertyOption.bindable)
+	public inline function isTransient()					return hasOption(PropertyOption.transient)
+	public inline function isOptional ()					return hasOption(PropertyOption.optional)
+	public inline function isMappedTo(t:MappingType) 		return Lambda.has(mappings, t)
+	public inline function isMixin ()						return Std.is(definedIn, ClassDef) && cast(definedIn, ClassDef).isMixin
+
+	public inline function setDefaultValue(val:Dynamic) 	{ checkDefaultValue(val); this.defaultValue = val; }
+	public 		  function toString():String 				return "\n\t\t<Property idx='"+index+"' name='"+name+"' defined-in='"+ this.definedIn.fullName +"' parent='"+parent.fullName+"'>"+Std.string(type)+"</Property>"
+	public 		  function copyOptions(prop:Property) 		trace("copyOptions not implemented ("+ this.definedIn.fullName +"."+ prop.name +")")
+
+	public inline function shouldHaveGetter ()		 		return !isTransient() && !Util.isPTypeBuiltin(type) && !Util.isEnum(type) && !isBindable()
+	public inline function shouldHaveSetter ()		 		return !isTransient() && !isBindable() && !isArray()
+
+	public inline function isType (type:PType)				return this.type == type
+	
+		
+	public function isArray ()			return switch (this.type) {
+		case Tarray(_,_,_):				true;
+		default:						false;
+	}
+
+	public function isDecimal ()		return switch (this.type) {
+		case Tdecimal(_,_,_):			true;
+		default:						false;
 	}
 	
-	public function propertyID()
-	{
-		return definedIn.index << 8 | this.index;
+	public function isDisposable () 	return isBindable() || switch (this.type) {
+		case Tdef(type):				!Util.isEnum(this.type);
+		case Tarray(_,_,_):				true;
+		default:						false;
 	}
 	
-	public function isBindable()
-	{
-		return hasOption(PropertyOption.bindable);
-	}
-	
-	public function isTransient()
-	{
-		return hasOption(transient);
-	}
-	
-	public function isArray ()
-	{
-		return switch (this.type) {
-			case Tarray(type,min,max):	true;
-			default:					false;
-		}
-	}
-	
-	public function isDisposable ()
-	{
-		return isBindable() || switch (this.type) {
-			case Tdef(type):				!Util.isEnum(this.type);
-			case Tarray(type,min,max):		true;
-			default:						false;
-		}
-	}
-	
-	public function hasClonableType ()
-	{
-		return switch (this.type) {
-			case Tdef(_):					!Util.isEnum(this.type);
-			case Tarray(_,min,max):			true;
-			default:						false;
-		}
+	public function hasClonableType ()	return switch (this.type) {
+		case Tdef(_):					!Util.isEnum(this.type);
+		case Tarray(_,_,_):				true;
+		default:						false;
 	}
 	
 	public function hasOption(option:PropertyOption) {
@@ -1019,31 +1014,6 @@ class Property
 				}
 				
 		}
-	}
-	
-	public function setDefaultValue(val:Dynamic) {
-		checkDefaultValue(val);
-		this.defaultValue = val;
-	}
-	
-	public function toString():String {
-		return "\n\t\t<Property idx='"+index+"' name='"+name+"' defined-in='"+ this.definedIn.fullName +"' parent='"+parent.fullName+"'>"+Std.string(type)+"</Property>";
-	}
-	
-	public function isMappedTo(t:MappingType):Bool {
-		return Lambda.has(mappings, t);
-	}
-	
-	public function copyOptions(prop:Property) {
-		trace("copyOptions not implemented ("+ this.definedIn.fullName +"."+ prop.name +")");
-	}
-	
-	public function shouldHaveGetter () : Bool {
-		return !hasOption(transient) && !Util.isPTypeBuiltin(type) && !Util.isEnum(type);
-	}
-	
-	public function shouldHaveSetter () : Bool {
-		return !hasOption(transient);
 	}
 }
 

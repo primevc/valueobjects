@@ -30,7 +30,7 @@ class MessagePacking
 	private function defineUnPackerFunction()	Assert.abstract()
 	
 	private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)	Assert.abstract()
-	private function a_unpackProperty(p:Property) Assert.abstract()
+	private function a_unpackProperty(p:Property, bit:Int) 							Assert.abstract()
 	
 	private function expr_incrementMixinCount()		return "++mixin"
 	private function expr_decrementPropertyBytes()	return 
@@ -328,28 +328,25 @@ class MessagePacking
 			for (i in 0 ... lastProp.index + 1)
 			{
 				if (bit == 8) {
-					a("\n\t\n\t\tif ("); a_is0("propertyBytes"); a(") return;");
-					a("\n\t\n\t\tbits = reader.readByte();");
-					a("\n\t\n\t\t"); a(expr_decrementPropertyBytes());
+					a("\n\t\tif ("); a_is0("propertyBytes"); a(") return;\n");
+					a("\t\tbits = reader.readByte();\n");
+					a("\t\t"); a(expr_decrementPropertyBytes()); a("\n\n");
 					bit = 0;
 				}
 				
 				var p = def.propertiesDefined.get(i);
-				if (p == null || p.hasOption(transient)) {
+				if (p == null || p.isTransient()) {
 					++bit;
 					continue;
 				}
 				
-				a("\n\t\tif ("); a_not0("bits & 0x" + StringTools.hex(1 << bit, 2)); a(") ");
-				
-				a_unpackProperty(p);
+				a_unpackProperty(p, bit);
 				
 				++bit;
 			}
 		}
-		a("\n\t\t\n\t\tif ("); a_not0("propertyBytes"); a(") reader.discardRemainingVOProperties(propertyBytes);");
-		
-		a("\n\t}");
+		a("\n\t\tif ("); a_not0("propertyBytes"); a(") reader.discardRemainingVOProperties(propertyBytes);\n");
+		a("\t}\n");
 	}
 	
 	static function bitmask(numBits:Int, offset:Int=0)

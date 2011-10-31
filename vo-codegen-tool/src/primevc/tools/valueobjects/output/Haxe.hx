@@ -251,7 +251,7 @@ class Haxe implements CodeGenerator
 		addPackage(def);
 		
 		if (immutable)
-			a("\ninterface I");
+			a("\n@:keep interface I");
 		else {
 			a(" import primevc.tools.valueobjects.ObjectChangeSet;\n");
 			a(" import primevc.tools.valueobjects.ValueObjectBase;\n");
@@ -772,7 +772,7 @@ class Haxe implements CodeGenerator
 		
 		//open function declaration
 		a("\n\t");
-	//	a("@:keep ");
+		a("@:keep ");
 		if (def.superClass != null)
 			a("override ");
 		

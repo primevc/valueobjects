@@ -1,8 +1,8 @@
 package primevc.types;
  import primevc.core.traits.IObjectId;
  import haxe.io.BytesOutput;
-  using primevc.utils.IfUtil;
   using primevc.utils.msgpack.Format;
+  using primevc.utils.IfUtil;
 
 class ObjectId
 {
@@ -155,10 +155,7 @@ class ObjectId
 	static var counter		= -1;
 	private function setTimeAndIncrement()
 	{
-		this.timestamp =
-		 	#if flash9	untyped    Date.now().getTime() * 0.001 ; #end
-			#if js		Math.floor(Date.now().getTime() * 0.001); #end
-		
+		this.timestamp = primevc.utils.TimerUtil.stamp();
 		if ((this.increment = ++ObjectId.counter) == 0xFFFFFF)
 		 	ObjectId.counter = -1;
 	}

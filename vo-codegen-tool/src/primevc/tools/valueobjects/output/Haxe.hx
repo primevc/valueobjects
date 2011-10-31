@@ -133,7 +133,8 @@ class HaxeMessagePacking extends MessagePacking
 	
 	override private function defineUnPackerFunction()
 	{
-		a("\n\t@:keep static public function msgpack_unpackVO(reader : Reader, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBytes : Int) : Void\n\t{");
+		var name = def.isMixin ? def.name : def.name + "VO";
+		a("\n\t@:keep static public function msgpack_unpackVO(reader : Reader, obj : "); a("I"); a(name); a(", propertyBytes : Int) : Void\n\t{");
 		a("\n\t\tAssert.that(reader != null && obj != null);");
 		a("\n\t\tvar bits:Int, fieldOffset:Int = (untyped obj)._fieldOffset(TYPE_ID);");
 	}
@@ -192,6 +193,7 @@ class HaxeMessagePacking extends MessagePacking
 		if (hasWrapper)
 			a(")");
 		a(");\n");
+
 	//	a("\t} catch (e:Dynamic) { trace(e); throw 'property: "); a(p.name); a(" in ' + obj + '; error: '+e; }\n");
 	}
 }

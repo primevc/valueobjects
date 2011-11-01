@@ -248,7 +248,7 @@ class MessagePackResource <Data> implements IDisposable
 		//input.bigEndian = true;
 #if debug
 		var o = reader.readMsgPackValue();
-		trace("deserialized data in "+(primevc.utils.TimerUtil.stamp() - start)+" ms";
+		trace("deserialized data in "+(primevc.utils.TimerUtil.stamp() - start)+" ms");
 		return o;
 #else
 		return reader.readMsgPackValue();

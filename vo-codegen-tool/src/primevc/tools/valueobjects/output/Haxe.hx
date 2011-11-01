@@ -821,12 +821,12 @@ class Haxe implements CodeGenerator
 	 */
 	private function genToStringFunction (def:ClassDef, idProp:Property)
 	{
-		var a = code.add;
+	/*	var a = code.add;
 		a("\n\n#if debug");
 		openFunctionDeclaration( def, "toString", true, "String", false);
 		a("\t\treturn '[ "+def.name+"VO :: '+ " + idProp.name + " + ' ]';\n");
 		closeFunctionDeclaration( def, "toString");
-		a("#end\n");
+		a("#end\n");*/
 	}
 	
 	
@@ -898,8 +898,7 @@ class Haxe implements CodeGenerator
 			var getName = hasGetter ? "(untyped this)." + p.name : p.name;
 
 			a("\t\t");
-			if (hasWrapper) { a("if ("); a(getName); a(".notNull())\t\t{ "); }
-
+			if (hasWrapper)	{ a("if (IfUtil.notNull("); a(getName); a("))\t\t{ "); }
 			a(p.name); a(".dispose(); "); a(setName); a(" = null;");
 			if (hasWrapper)
 				a(" }");
@@ -1041,31 +1040,45 @@ class Haxe implements CodeGenerator
 		a("\n\n\toverride private function init()\n\t{\n");
 		a("\t\tsuper.init();\n");
 
-		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p) && (p.isBindable() || p.isArray()))
+		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p) && (!Util.isSingleValue(p.type) || (p.isBindable() || p.isArray())))
 		{
 			var isArray 		= p.isArray();
 			var isSingleValue	= Util.isSingleValue(p.type);
 			var flagName 		= p.name.toUpperCase();
+			var hasGetter 		= p.shouldHaveGetter();
 			
-		//	if (p.isTransient() || p.isMixin())		//FIXME: Temporary.. isMixin won't detect classes that are used as mixins.. To solve this, move all the unpack code to Reader
-		//	{
-				a("\t\t"); a("if ("); a(p.name); a(".isNull())\t"); a(p.name); a(" = "); a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type, true), p.isTransient())); a(";\n");
-		//	}
+		//	if (p.isTransient() || p.isMixin()) {	//FIXME: Temporary.. isMixin won't detect classes that are used as mixins.. To solve this, move all the unpack code to Reader
+			if (!hasGetter || p.isBindable() || p.isArray()) {
+				a("\t\t"); a("if ("); a(p.name); a(".isNull())\t"); 
+				if (p.shouldHaveSetter())
+					a("(untyped this).");	
+				
+				a(p.name); a(" = "); a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type, true), p.isTransient())); a(";\n");
+			}
+
 			if (!p.isTransient())
 			{
-				Assert.that(!p.shouldHaveGetter(), def.name+" -> "+p.name+" has a getter");
-				
-				// listen to changes of the array or bindable
-				a("\t\t"); a(p.name); a(".change."); a(isArray ? "observe" : "bind"); a("(this, "); a(p.name); a("Changed);\n");
+				if (isArray || p.isBindable()) {
+					// listen to changes of the array or bindable
+					a("\t\t"); a(p.name); a(".change."); a(isArray ? "observe" : "bind"); a("(this, "); a(p.name); a("Changed);\n");
+				}
 
 				// listen to changes of value-objects within the array or bindable
 				if (!isSingleValue)
 				{
 					if (isArray) {
 						a("\t\t"); a(p.name); a(".setChangeHandler(objectChangedHandler("); a(flagName); a("));\n");
-					} else { // it's a bindable
-						var val = p.name + ".value";
-						a("\t\tif ("); a(val); a(".notNull())\tValueObjectBase.addChangeListener( "); a(val); a(", this, objectChangedHandler("); a(flagName); a("));\n");
+					}
+					else
+					{	// it's a bindable or vo
+						var val = p.isBindable() ? p.name + ".value" : p.name;
+						a("\t");
+						if (hasGetter) {
+							a("\tif (IfUtil.notNull((untyped this)."); a(val); a("))");
+						} else if (p.isBindable()) {
+							a("\tif ("); a(val); a(".notNull())");
+						}
+						a("\tValueObjectBase.addChangeListener( "); a(val); a(", this, objectChangedHandler("); a(flagName); a("));\n");
 					}
 				}
 			}

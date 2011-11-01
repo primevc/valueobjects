@@ -11,7 +11,7 @@ class ObjectId
 	static var sessionMID = Std.int(Math.random() * 0xFFFFFF);
 	static var sessionPID = Std.int(Math.random() * 0xFFFF);
 	
-	public  var timestamp (default,null) : #if flash9 UInt #else Float #end;
+	public  var timestamp (default,null) : #if flash9 Float #else Float #end;
 	private var machine		: Int;
 	private var pid			: Int;
 	private var increment	: Int;

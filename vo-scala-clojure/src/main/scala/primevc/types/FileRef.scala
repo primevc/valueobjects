@@ -65,7 +65,7 @@ class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
   }
 }
 
-class FileRef private[primevc]( val _ref:String, val _hash:Array[Byte] )
+class FileRef private[primevc]( val _ref:String, val _hash:Array[Byte], val originalName : String = null)
 {
   require(_ref != null || _hash != null, "either ref or hash should be set")
 
@@ -83,7 +83,7 @@ object FileRef
   def apply(o:ObjectId) : FileRef = new FileRef("^", o.toByteArray)
 
   def apply(file : File) : FileRef = apply(file, null)
-  def apply(file : File, prefix : String) : FileRef = new FileRef(prefix, DigestUtils.sha256(new FileInputStream(file)))
+  def apply(file : File, prefix : String) : FileRef = new FileRef(prefix, DigestUtils.sha256(new FileInputStream(file)), file.getName)
 
 
   def apply(out : OutputStream) : FileRef.Builder = new FileRef.Builder(out, null)

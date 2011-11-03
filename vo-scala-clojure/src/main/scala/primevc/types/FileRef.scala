@@ -44,7 +44,12 @@ class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
   def absorb (file : File) = {
     val ref = FileRef(file)
     val newFile = getFile(ref)
-    file renameTo newFile
+    if (newFile.exists) {
+      org.apache.commons.io.FileUtils.touch(newFile)
+      file.delete
+    }
+    else file renameTo newFile
+    
     ref
   }
 

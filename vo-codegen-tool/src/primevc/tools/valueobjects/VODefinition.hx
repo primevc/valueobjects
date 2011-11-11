@@ -127,6 +127,12 @@ class Module
 	//
 	// -- Public API
 	//
+	public function getPackageRoot(): Module {
+		var m = this;
+		while (m != null && !m.packageRoot) m = m.parent;
+		return m != null? m : root;
+	}
+
 	public function generateWith(code:CodeGenerator)
 	{
 		finalize();

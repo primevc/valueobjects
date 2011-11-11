@@ -33,15 +33,19 @@ object ConvertTo
 
   @inline final def unpack(value:Any) : Any = value match {
     case Some(v) => unpack(v)
-    case None | null => None
+    case None | null | _ : NilType => None
     case _ => value
   }
 
-  def apply[T <: Any : Manifest](value:Any) : T =
-         if (classOf[String]  == manifest[T].erasure) string (value).asInstanceOf[T]
-    else if (classOf[Integer] == manifest[T].erasure) integer(value).asInstanceOf[T]
-    else if (classOf[URI]     == manifest[T].erasure) uri    (value).asInstanceOf[T]
-    else throw new MatchError("ConvertTo[" + manifest[T].erasure.getName + "] not implemented; value = " + value)
+  def apply[T <: Any : Manifest](value:Any) : T = {
+    val      t  = manifest[T].erasure
+         if (t == classOf[String] ) string (value)
+    else if (t == classOf[Integer]) integer(value)
+    else if (t == classOf[URI]    ) uri    (value)
+    else if (t == classOf[FileRef]) fileRef(value)
+    else
+      throw new MatchError("ConvertTo[" + manifest[T].erasure.getName + "] not implemented; value = " + value)
+  }.asInstanceOf[T]
 
   def vo[T <: ValueObject](value:AnyRef) : T = unpack(value) match {
     case v:T => v
@@ -70,12 +74,11 @@ object ConvertTo
         v.asInstanceOf[Array[T]];
       else
         toArray[T](v);
+    
+    case v:ArrayType      => array[T](v.asArray)
+    case v:String         => toArray[T](v.split(splitStringOn))
+    case v:Traversable[_] => toArray[T](v)
 
-    case v:String =>
-      toArray[T](v.split(splitStringOn))
-
-    case v:Traversable[_] =>
-      toArray[T](v)
     case v:BasicDBList =>
       val s = JavaConversions.asScalaSet(v.keySet).iterator.map({ k =>
         val x = v.get(k.asInstanceOf[String]);
@@ -108,9 +111,11 @@ object ConvertTo
   }
 
   def fileRef			(value:Any) : FileRef = unpack(value) match {
-    case v:FileRef => v
-    case s:String => FileRef(s)
-    case v:RawType => FileRef(string(v))
+    case v:FileRef     => v
+    case s:String      => FileRef(s)
+    case b:Array[Byte] => FileRef(b)
+    case v:RawType     => FileRef(string(v))
+    case None          => null
   }
 
   def rgba			(value:Any) : RGBA = unpack(value) match {

@@ -38,8 +38,12 @@ class MessagePacking
 		"\n\t\tfieldOffset += 8;" +
 		"\n\t\t--propertyBytes;"
 	
-	private function a_writeByte(byte:String) {
-		a("{ #if MessagePackDebug_Pack trace('packVO byte: 0x' + StringTools.hex("); a(byte); a(")); #end o.writeByte("); a(byte); a("); ++b; }");
+	private function a_maskByte(mask:Int, byte:String) {
+		return if (mask > 0xFF) a(byte); else { a(byte); a(" & 0x"); a(StringTools.hex(mask, 2)); }
+	}
+
+	private function a_writeByte(byte:String, mask:Int = 0xFFFFFF) {
+		a("{ #if MessagePackDebug_Pack trace('packVO byte: 0x' + StringTools.hex("); a_maskByte(mask, byte); a(")); #end o.writeByte("); a(byte); a("); ++b; }");
 	}
 	
 	private function a_return() a("return b;")
@@ -195,12 +199,12 @@ class MessagePacking
 						if (bit <= 8 && p == lastProp)
 						{
 							a("\n\t\t");
-							var bitMask = (1 << (bit-1));
+							var bitMask = (1 << (bit-1)) << 8;
 							// Single last Property: optimize if + packing
-							a("\n\t\t"); a_assertNot0("propertyBits & " + bitMask);
-							a("\n\t\t"); a_writeByte(Std.string(bitMask));
+							a("\n\t\tif ("); a_not0("(propertyBits & 0x" + StringTools.hex(bitMask, 4) + ")"); a(") {");
+							a("\n\t\t"); a_writeByte("0x" + StringTools.hex(bitMask >>> 8, 2));
 							a("\n\t\t"); addPropertyPackerCall("obj." + p.name, p.type, p.isBindable()); ac(";".code);
-							
+							a("\n\t\t}");
 							break;
 						}
 						else throw "huh?";
@@ -222,7 +226,7 @@ class MessagePacking
 								a("\n\t\tif ("); a_not0("propertyBits"); a(") ");
 							}
 							
-							a_writeByte((def.numPropertiesDefined > 8 && def.numPropertiesDefined - i > 1)? "propertyBits & 0x" + StringTools.hex(mask, 2) : "propertyBits");
+							a_writeByte("propertyBits", (def.numPropertiesDefined > 8 && def.numPropertiesDefined - i > 1)? mask : null);
 							a("\n\t\t");
 							if (totalProps <= 8) {	a("\n\t\t"); a_assertNot0("propertyBits"); }
 							else				 {	a("\n\t\tif ("); a_not0("(propertyBits & 0xFF)"); a(") { // open group"); }
@@ -237,7 +241,7 @@ class MessagePacking
 							
 							if (totalProps > 8) {	a("\n\t\t} //end 8"); }
 							a("\n\t\t");
-							if (totalPropsToPack > 0) {
+							if (totalPropsToPack > 1) {
 								a("\n\t\tpropertyBits >>>= 8;");
 								a("\n\t\t");
 							}

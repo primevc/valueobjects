@@ -33,7 +33,7 @@ trait LocalFileRepository extends FileRepository {
 }
 
 class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
-  require(root.isDirectory)
+  require(root.isDirectory, root + " is not a directory.")
 
   def toURI   (f : FileRef) = ConvertTo.uri(f.toString)
   def getFile (f : FileRef) = new File(root.getAbsolutePath + "/" + f.toString)
@@ -49,7 +49,7 @@ class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
       file.delete
     }
     else file renameTo newFile
-    
+
     ref
   }
 
@@ -84,10 +84,11 @@ class FileRef private[primevc]( val _ref:String, val _hash:Array[Byte], val orig
 
 object FileRef
 {
-  def apply(s:String)   : FileRef = new FileRef(s, null)
-  def apply(o:ObjectId) : FileRef = new FileRef("^", o.toByteArray)
+  def apply(b:Array[Byte]) : FileRef = new FileRef(null, b)
+  def apply(s:String)      : FileRef = new FileRef(s, null)
+  def apply(o:ObjectId)    : FileRef = new FileRef("^", o.toByteArray)
 
-  def apply(file : File) : FileRef = apply(file, null)
+  def apply(file : File)   : FileRef = apply(file, null)
   def apply(file : File, prefix : String) : FileRef = new FileRef(prefix, DigestUtils.sha256(new FileInputStream(file)), file.getName)
 
 

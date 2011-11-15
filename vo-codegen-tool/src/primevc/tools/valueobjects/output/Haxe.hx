@@ -1047,7 +1047,7 @@ class Haxe implements CodeGenerator
 			var flagName 		= p.name.toUpperCase();
 			var hasGetter 		= p.shouldHaveGetter();
 			
-		//	if (p.isTransient() || p.isMixin()) {	//FIXME: Temporary.. isMixin won't detect classes that are used as mixins.. To solve this, move all the unpack code to Reader
+		//	if (p.isTransient() || p.isMixin()) {	//FIXME: Temporary.. isMixin won't detect classes that are used as mixins but are not defined as mixins.. To solve this, move all the unpack code to Reader
 			if (!hasGetter || p.isBindable() || p.isArray()) {
 				a("\t\t"); a("if ("); a(p.name); a(".isNull())\t"); 
 				if (p.shouldHaveSetter())

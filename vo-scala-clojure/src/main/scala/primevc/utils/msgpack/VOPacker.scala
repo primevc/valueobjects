@@ -55,7 +55,10 @@ class VOPacker (out:OutputStream) extends Packer(out)
 
   final def pack(ref: Ref[_ <: ValueObject]) {
     if (ref.vo_! != null) pack(ref.vo_!)
-    else                  pack(ref.ref)
+    else ref.ref match {
+      case id:ObjectId => pack(id)
+      case ref         => pack(ref)
+    }
   }
 
   final def pack(fileRefArray: Array[FileRef]) {

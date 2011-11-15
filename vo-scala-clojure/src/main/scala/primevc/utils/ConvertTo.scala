@@ -39,10 +39,11 @@ object ConvertTo
 
   def apply[T <: Any : Manifest](value:Any) : T = {
     val      t  = manifest[T].erasure
-         if (t == classOf[String] ) string (value)
-    else if (t == classOf[Integer]) integer(value)
-    else if (t == classOf[URI]    ) uri    (value)
-    else if (t == classOf[FileRef]) fileRef(value)
+         if (t == classOf[String] )  string (value)
+    else if (t == classOf[Integer])  integer(value)
+    else if (t == classOf[URI]    )  uri    (value)
+    else if (t == classOf[FileRef])  fileRef(value)
+    else if (t == classOf[ObjectId]) uniqueID(value)
     else
       throw new MatchError("ConvertTo[" + manifest[T].erasure.getName + "] not implemented; value = " + value)
   }.asInstanceOf[T]

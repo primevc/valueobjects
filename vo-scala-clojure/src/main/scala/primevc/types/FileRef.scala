@@ -70,7 +70,7 @@ class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
   }
 }
 
-class FileRef private[primevc]( val _ref:String, val _hash:Array[Byte], val originalName : String = null)
+case class FileRef private[primevc]( val _ref:String, val _hash:Array[Byte], val originalName : String = null)
 {
   require(_ref != null || _hash != null, "either ref or hash should be set")
 

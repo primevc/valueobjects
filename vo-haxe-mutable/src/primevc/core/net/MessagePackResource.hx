@@ -174,7 +174,7 @@ class MessagePackResource <Data> implements IDisposable
 	{
 	//	trace(loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
 #if debug
-		trace("received data in "+(primevc.utils.TimerUtil.stamp() - getStarted) + " ms");
+		trace("received data in "+(primevc.utils.TimerUtil.stamp() - getStarted) + " ms; bytes: "+loader.bytesTotal);
 #end
 		data = deserialize( loader.data, reader );
 		events.receive.completed.send();

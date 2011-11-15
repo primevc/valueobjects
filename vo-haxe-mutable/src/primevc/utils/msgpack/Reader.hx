@@ -263,15 +263,15 @@ class Reader implements IDisposable
 				trace("deserializeVO { typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes + ", target: "+target);
 #end
 		    var clazz = this.context.get(typeID);
-			Assert.notNull(clazz, "voHeader: " + StringTools.hex(typeID, 2) + ", type: " + typeID + " not found...");
+#if debug	Assert.notNull(clazz, "voHeader: " + StringTools.hex(typeID, 2) + ", type: " + typeID + " not found..."); #end
 		
 			if (target == null) {
 #if MessagePackDebug_Read
 					trace("                create Instance: "+ clazz);
 #end
-				target = Type.createInstance(clazz, []);
+				target = Type.createEmptyInstance(clazz);
 				Assert.notNull(target);
-				target.beginEdit();
+			//	target.beginEdit();
 			}
 		
 #if debug
@@ -286,15 +286,16 @@ class Reader implements IDisposable
 #if debug   try { #end
 			if (fieldsSetBytes != 0)
 				(untyped clazz).msgpack_unpackVO(this, target, fieldsSetBytes);
-#if debug   } catch (e:Dynamic) { throw clazz+" unpack error: "+e; } #end
+#if debug   } catch (e:Dynamic) { trace(clazz+"; bytes: "+fieldsSetBytes+"; "+e); trace("stack: "+haxe.Stack.toString(haxe.Stack.callStack())); throw clazz+" unpack error: "+e; } #end
 			
 			if (superTypeCount > 0)
 				voHeader = readByte();
 		}
 		while (superTypeCount-->0);
-	
-		untyped target._changedFlags = 0;
-		target.commitEdit();
+	   
+	//	untyped target._changedFlags = 0;
+	//	target.commitEdit();
+        target.init();
 		
 		return target; // done
 	}

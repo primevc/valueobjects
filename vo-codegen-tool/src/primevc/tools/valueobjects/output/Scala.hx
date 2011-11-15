@@ -2091,7 +2091,7 @@ class ScalaMessagePacking extends MessagePacking
 		a("\n  }\n");
 	}
 	
-	override private function a_unpackProperty(p:Property)
+	override private function a_unpackProperty(p:Property, bit:Int)
 	{
 		a(p.name); a(" = "); a("input.unpack();");
 	}

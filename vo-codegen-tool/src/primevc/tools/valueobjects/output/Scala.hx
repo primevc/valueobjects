@@ -167,6 +167,7 @@ file.writeString("
 				if (idProperty != null) throw "VO's may have only 1 ID property...\n  idProperty = "+idProperty+"\n"+def;
 				idProperty = p;
 				idType = getType(p.type).name;
+				Assert.notNull(idType);
 				
 				if (p.definedIn != def)
 					idFromSuperclassOrTrait = true;
@@ -192,6 +193,10 @@ file.writeString("
 		}
 		else if (def.superClass != null) {
 			a(def.superClass.fullName);
+			if (!def.superClass.hasUniqueID() && idType != null) {
+				// Superclass has no Unique ID. Add the required trait now.
+				a(" with ValueObjectWithID");
+			}
 		}
 		else {
 			a("ValueObject"); if (idType != null) a("WithID");
@@ -226,13 +231,13 @@ file.writeString("
 		a("\n\nsealed class "); a(def.name); a("VO");
 		
 		if (idType != null) {
-			a(def.superClass != null? " (_id:" : " (val _id:"); a(idType); a(")");
+			a(def.superClass != null && def.superClass.hasUniqueID()? " (_id:" : " (val _id:"); a(idType); a(")");
 		}
 		a(" extends ");
 		
 		if (def.superClass != null) {
 			a(def.superClass.fullName); a("VO");
-			if (idType != null) a("(_id)");
+			if (idType != null && def.superClass.hasUniqueID()) a("(_id)");
 			a(" with ");
 		}
 		else if (!def.isMixin && ns == null) {

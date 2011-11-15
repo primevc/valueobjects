@@ -31,15 +31,19 @@ package primevc.core.collections;
  import primevc.core.collections.VOArrayList;
  import primevc.core.dispatcher.Signal1;
  import primevc.core.traits.IValueObject;
+ import primevc.core.RevertableBindableFlags;
+
+ import primevc.tools.valueobjects.ObjectChangeSet;
  import primevc.tools.valueobjects.ValueObjectBase;
  import primevc.utils.FastArray;
+  using primevc.utils.BitUtil;
+  using primevc.tools.valueobjects.ChangesUtil;
   using primevc.utils.FastArray;
   using primevc.utils.IfUtil;
 
 
- import primevc.core.RevertableBindableFlags;
-  using primevc.utils.BitUtil;
-  using primevc.utils.ChangesUtil;
+private typedef ListFlags = RevertableArrayListFlags;
+private typedef BindFlags = RevertableBindableFlags;
 
 
 /**
@@ -63,7 +67,7 @@ class RevertableVOArrayList<DataType : IValueObject>
 	{
 		super(wrapAroundList);
 		itemChange = new Signal1();
-		flags = RevertableArrayListFlags.REMEMBER_CHANGES;
+		flags = ListFlags.REMEMBER_CHANGES;
 	}
 	
 	override public function dispose()
@@ -103,8 +107,8 @@ class RevertableVOArrayList<DataType : IValueObject>
 	
 	
 	
-	public inline function rememberChanges (enabled:Bool = true)				{ flags = enabled ? flags.set(RevertableArrayListFlags.REMEMBER_CHANGES) : flags.unset(RevertableArrayListFlags.REMEMBER_CHANGES); }
-	public inline function dispatchChangesBeforeCommit (enabled:Bool = true)	{ flags = enabled ? flags.set(Flags.DISPATCH_CHANGES_BEFORE_COMMIT) : flags.unset(Flags.DISPATCH_CHANGES_BEFORE_COMMIT); }
+	public inline function rememberChanges (enabled:Bool = true)				{ flags = enabled ? flags.set(ListFlags.REMEMBER_CHANGES) : flags.unset(ListFlags.REMEMBER_CHANGES); }
+	public inline function dispatchChangesBeforeCommit (enabled:Bool = true)	{ flags = enabled ? flags.set(BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT) : flags.unset(BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT); }
 	
 	
 	//
@@ -119,11 +123,11 @@ class RevertableVOArrayList<DataType : IValueObject>
 	
 	public inline function beginEdit ()
 	{
-		if (flags.hasNone( Flags.IN_EDITMODE ))
+		if (flags.hasNone( BindFlags.IN_EDITMODE ))
 		{
-			flags = flags.set( Flags.IN_EDITMODE );
+			flags = flags.set( BindFlags.IN_EDITMODE );
 			
-			if (flags.has(RevertableArrayListFlags.REMEMBER_CHANGES))
+			if (flags.has(ListFlags.REMEMBER_CHANGES))
 				changes = FastArrayUtil.create();
 		}
 	}
@@ -132,7 +136,7 @@ class RevertableVOArrayList<DataType : IValueObject>
 	public  function commitEdit ()
 	{
 		// Check if REMEMBER_CHANGES is not set (value changed) and any dispatch flag is set.
-		if (changes != null && flags.has(RevertableArrayListFlags.REMEMBER_CHANGES) && flags.hasNone( Flags.DISPATCH_CHANGES_BEFORE_COMMIT ))
+		if (changes != null && flags.has(ListFlags.REMEMBER_CHANGES) && flags.hasNone( BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT ))
 			while (changes.length > 0) {
 				var listChange = changes.shift();
 				Assert.notNull( listChange );
@@ -145,10 +149,10 @@ class RevertableVOArrayList<DataType : IValueObject>
 	
 	public inline function cancelEdit ()
 	{
-		if (changes != null && flags.hasAll( Flags.IN_EDITMODE | RevertableArrayListFlags.REMEMBER_CHANGES))
+		if (changes != null && flags.hasAll( BindFlags.IN_EDITMODE | ListFlags.REMEMBER_CHANGES))
 		{
 			var f = flags;
-			flags = flags.unset( RevertableArrayListFlags.REMEMBER_CHANGES );
+			flags = flags.unset( ListFlags.REMEMBER_CHANGES );
 			while (changes.length > 0)
 				this.undoListChange( changes.pop() );
 			
@@ -165,7 +169,13 @@ class RevertableVOArrayList<DataType : IValueObject>
 			changes.removeAll();
 			changes = null;
 		}
-		flags = flags.unset(Flags.IN_EDITMODE);
+		flags = flags.unset(BindFlags.IN_EDITMODE);
+	}
+
+
+	public inline function isEditable ()
+	{
+		return flags.has( BindFlags.IN_EDITMODE );
 	}
 	
 	
@@ -177,10 +187,10 @@ class RevertableVOArrayList<DataType : IValueObject>
 	
 	private inline function addChange (listChange:ListChange<DataType>)
 	{
-		if (flags.has( RevertableArrayListFlags.REMEMBER_CHANGES ))
+		if (flags.has( ListFlags.REMEMBER_CHANGES ))
 			changes.push( listChange );
 
-		if (flags.has( Flags.DISPATCH_CHANGES_BEFORE_COMMIT ))
+		if (flags.has( BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT ))
 			change.send( listChange );
 	}
 	
@@ -188,18 +198,18 @@ class RevertableVOArrayList<DataType : IValueObject>
 	public function removeAll ()
 	{
 		var f = flags;
-		Assert.that( f.has(Flags.IN_EDITMODE) );
+		Assert.that( f.has(BindFlags.IN_EDITMODE) );
 		
-		if (f.hasNone(Flags.IN_EDITMODE))
+		if (f.hasNone(BindFlags.IN_EDITMODE))
 			return;
 		
-		flags = f.unset( Flags.DISPATCH_CHANGES_BEFORE_COMMIT );
+		flags = f.unset( BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT );
 		
 		while (length > 0)
 			remove ( list[ length - 1] );
 		
 		flags = f;
-		if (f.has( Flags.DISPATCH_CHANGES_BEFORE_COMMIT ))
+		if (f.has( BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT ))
 			change.send( ListChange.reset );
 	}
 	
@@ -207,15 +217,13 @@ class RevertableVOArrayList<DataType : IValueObject>
 	public function add (item:DataType, pos:Int = -1) : DataType
 	{
 		var f = flags;
-		Assert.that( f.has(Flags.IN_EDITMODE), this+" doesn't have EDITMODE. "); // Flags: "+Flags.readProperties(f) );
-		
-		if (f.hasNone(Flags.IN_EDITMODE))
-			return item;
-		
+#if debug	Assert.that( f.has(BindFlags.IN_EDITMODE), 	this+" doesn't have EDITMODE. "); // Flags: "+BindFlags.readProperties(f) );
+			if (f.hasNone(BindFlags.IN_EDITMODE)) 		return item; #end
+
 		pos = list.insertAt(item, pos);
 		addChange( ListChange.added( item, pos ) );
 		
-	//	trace("this.add "+item +"; "+Flags.readProperties(flags)+"; "+length);
+	//	trace("this.add "+item +"; "+BindFlags.readProperties(flags)+"; "+length);
 		
 		cast(item, ValueObjectBase).change.bind(this, changeHandlerFn);
 		
@@ -223,19 +231,17 @@ class RevertableVOArrayList<DataType : IValueObject>
 	}
 	
 	
-	public function remove (item:DataType, oldPos:Int = -1) : DataType
+	public function remove (item:DataType, curPos:Int = -1) : DataType
 	{
 		var f = flags;
-		Assert.that( f.has(Flags.IN_EDITMODE) );
+#if debug	Assert.that( f.has(BindFlags.IN_EDITMODE), 	this+" doesn't have EDITMODE. "); // Flags: "+BindFlags.readProperties(f) );
+			if (f.hasNone(BindFlags.IN_EDITMODE)) 		return item; #end
 		
-		if (f.hasNone(Flags.IN_EDITMODE))
-			return item;
+		if (curPos == -1)
+			curPos = list.indexOf(item);
 		
-		if (oldPos == -1)
-			oldPos = list.indexOf(item);
-		
-		if (oldPos > -1 && list.removeItem(item, oldPos))
-			addChange( ListChange.removed( item, oldPos ) );
+		if (list.removeAt(curPos))
+			addChange( ListChange.removed( item, curPos ) );
 		
 		cast(item, ValueObjectBase).change.unbind(this);
 		
@@ -246,10 +252,8 @@ class RevertableVOArrayList<DataType : IValueObject>
 	public function move (item:DataType, newPos:Int, curPos:Int = -1) : DataType
 	{
 		var f = flags;
-		Assert.that( f.has(Flags.IN_EDITMODE) );
-		
-		if (f.hasNone(Flags.IN_EDITMODE))
-			return item;
+#if debug	Assert.that( f.has(BindFlags.IN_EDITMODE), 	this+" doesn't have EDITMODE. "); // Flags: "+BindFlags.readProperties(f) );
+			if (f.hasNone(BindFlags.IN_EDITMODE)) 		return item; #end
 		
 		if		(curPos == -1)				curPos = list.indexOf(item);
 		if		(newPos > (length - 1))		newPos = length - 1;

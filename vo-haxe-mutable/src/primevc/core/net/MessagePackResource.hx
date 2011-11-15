@@ -28,6 +28,10 @@
  */
 package primevc.core.net;
  import haxe.io.Bytes;
+ import haxe.io.BytesData;
+ import haxe.io.BytesInput;
+ import haxe.io.BytesOutput;
+
  import primevc.core.events.CommunicationEvents;
  import primevc.core.dispatcher.Signals;
  import primevc.core.dispatcher.Signal0;
@@ -37,7 +41,9 @@ package primevc.core.net;
  import primevc.core.traits.IMessagePackable;
  import primevc.core.net.URLLoader;
  import primevc.types.URI;
+ import primevc.utils.msgpack.Reader;
   using primevc.utils.Bind;
+  using primevc.core.net.HttpStatusCodes;
 
 
 
@@ -50,17 +56,23 @@ package primevc.core.net;
  */  
 class MessagePackResource <Data> implements IDisposable
 {
-	public var events		(default, null) : DataServiceEvents <Data>;
-	public var bytesSending (default, null) : Int;
-	public var data			(default, null) : Data;
-	public var uriPrefix	: URI;
+	public var events			(default, null) : DataServiceEvents;
+	public var bytesSending 	(default, null) : Int;
+	public var data				(default, null) : Data;
+	public var uriPrefix		: URI;
 	
-	private var reader		: primevc.utils.msgpack.Reader;
-	private var loader		: URLLoader;
-	private var bytes		: haxe.io.Bytes;
-	private var typeMap		: IntHash<Class<Dynamic>>;
-	private var onComplete  : Wire<Void   -> Void>;
-	private var onError		: Wire<String -> Void>;
+	public var loader			(default, null) : URLLoader;
+	
+	/**
+	 * Cached value of the last returned http-status-code
+	 */
+	public var lastHttpStatus	(default, null)	: Int;
+	
+	private var reader			: Reader;
+	private var bytes			: Bytes;
+	private var typeMap			: IntHash<Class<Dynamic>>;
+	private var onComplete  	: Wire<Void   -> Void>;
+	private var onError			: Wire<String -> Void>;
 		
 
 	public function new(uriPrefix : URI, typeMap : IntHash<Class<Dynamic>>)
@@ -71,11 +83,15 @@ class MessagePackResource <Data> implements IDisposable
 		
 		reader = new primevc.utils.msgpack.Reader(typeMap);
 		loader = new URLLoader();
-		
+
 		var load	= loader.events.load;
 		onComplete	= load.completed.bind( this, doNothing );
 		onError		= load.error.observe( this, doNothing );
-		handleStatus.on( loader.events.httpStatus, this );
+		
+		cacheStatus.on( loader.events.httpStatus, this );
+#if debug
+		handleError.on( loader.events.load.error, this );
+#end
 		events		= new DataServiceEvents(load.progress);
 	}
 
@@ -100,8 +116,13 @@ class MessagePackResource <Data> implements IDisposable
 	}
 	
 
-	private function doNothing () throw "impossible"
+	private function doNothing () { throw "impossible " + uriPrefix; }
 	
+
+#if debug
+	private var getStarted : Int;
+#end
+
 
 	/**
 	 * GET a single object by proving a uriSuffix.
@@ -116,7 +137,10 @@ class MessagePackResource <Data> implements IDisposable
 		onComplete.handler	= handleGET;
 		onError.handler		= cast (events.receive.error, Signal1<Dynamic>).send;
 		
-		//trace("get "+uri);
+#if debug
+		getStarted = primevc.utils.TimerUtil.stamp();
+		trace("get "+uri);
+#end
 		l.binaryGET(uri);
 		e.started.send();
 	}
@@ -133,24 +157,102 @@ class MessagePackResource <Data> implements IDisposable
 			e   = events.send,
 			uri = uriSuffix == null? uriPrefix : new URI(uriPrefix.string + uriSuffix);
 		
-		// Serialize
-		var out			= new haxe.io.BytesOutput();
-		out.bigEndian	= true;
-		bytesSending	= obj.messagePack(out);
 		
-		var bytes = out.getBytes();
-		Assert.that(bytes.length == bytesSending);
+		l.bytes			= serialize(obj).getData();
+		bytesSending	= l.bytesTotal;
 		
 		// Send
 		onComplete.handler	= handlePOST;
 		onError.handler		= cast(events.send.error, Signal1<Dynamic>).send;
 		
-		l.binaryPOST(uri, bytes);
+		l.binaryPOST(uri);
 		e.started.send();
 	}
 	
-	
+
 	private function handleGET ()
+	{
+	//	trace(loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
+#if debug
+		trace("received data in "+(primevc.utils.TimerUtil.stamp() - getStarted) + " ms");
+#end
+		data = deserialize( loader.data, reader );
+		events.receive.completed.send();
+		
+		onComplete.handler	= doNothing;
+		onError.handler		= cast doNothing;
+	}
+	
+
+	private function handlePOST()
+	{
+	//	trace(loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
+		bytesSending = 0;
+		events.send.completed.send();
+		
+		onComplete.handler	= doNothing;
+		onError.handler		= cast doNothing;
+	}
+
+	
+	private function cacheStatus(status:Int)
+	{
+		lastHttpStatus = status;
+		if (status != 200)
+			trace(status.read()+" => "+loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
+	}
+	
+	
+#if debug
+	private function handleError(e:String)		{ trace(e+"; [ "+uriPrefix+" ]"); }
+#end
+	
+	
+	public static inline function serialize (obj:IMessagePackable) : Bytes
+	{
+		// Serialize
+#if debug
+		var start = primevc.utils.TimerUtil.stamp();
+#end
+		var out			= new BytesOutput();
+		out.bigEndian	= true;
+		var origLen		= obj.messagePack(out);
+		var b			= out.getBytes();
+
+#if debug
+		Assert.equal(b.length, origLen);
+		trace("serialized data in "+(primevc.utils.TimerUtil.stamp() - start)+" ms");
+#end
+		return b;
+	}
+	
+	
+	
+	public static inline function deserialize<Data> (data:BytesData, reader:Reader) : Data
+	{
+#if debug
+		var start = primevc.utils.TimerUtil.stamp();
+#end
+//		var bytes	= Bytes.ofData(data);
+	
+#if flash10
+		data.endian	 = flash.utils.Endian.BIG_ENDIAN;
+		reader.bytes = data;
+#else
+		reader.input = #if js new ByteStringInput(loader.data); #else new BytesInput(Bytes.ofData(data)); #end
+		reader.input.bigEndian = true;
+#end
+		
+#if debug
+		var o = reader.readMsgPackValue();
+		trace("deserialized data in "+(primevc.utils.TimerUtil.stamp() - start)+" ms");
+		return o;
+#else
+		return reader.readMsgPackValue();
+#end
+	}
+
+		private function handleGET ()
 	{
 		//trace(loader.bytesLoaded+" / "+loader.bytesTotal);
 		var start = haxe.Timer.stamp();
@@ -170,22 +272,68 @@ class MessagePackResource <Data> implements IDisposable
 		//trace("Message un-packing took: " + (haxe.Timer.stamp() - start));
 		events.receive.completed.send();
 	}
+
 	
-
-	private function handlePOST()
+	/**
+	 * Method will the error send by the server
+	 */
+	public function getErrorResponse ()
 	{
-		//trace(loader.bytesLoaded+" / "+loader.bytesTotal);
-		bytesSending = 0;
-		events.send.completed.send();
+		var error		= Std.string( loader.getRawData() );
+		var beginBody	= error.indexOf( "<body>" ) + 6;			//add 6 for the 6 characters of <body>
+		var endBody		= error.indexOf( "</body>", beginBody );
+		return error.substr( beginBody, endBody - beginBody );
 	}
-
-
-	private function handleStatus(status:Int)
+	
+	
+/*	public static inline function serializeToString (obj:IMessagePackable) : String
 	{
-		//trace(status+" => "+loader.bytesLoaded+" / "+loader.bytesTotal);
-	}
+		var b = serialize(obj);
+		var d = b.getData();
+		var o = new StringBuf();
+		d.position = 0;
+		
+		for (i in 0...b.length)
+			o.addChar(d.readByte() & 0xFF);
+		
+	/*	// Test to make sure the serialized string contains the same bytes after deserializing again as the original data
+		var d2 = stringToBytes( o.toString() );
+		Assert.equal(d.length, d2.length);
+		
+		trace(o.toString());
+		d.position = 0;
+		d2.position = 0;
+		for (i in 0...b.length) {
+			var j1 = d.readByte();
+			var j2 = d2.readByte();
+			trace(StringTools.hex(j1, 2)+" / "+StringTools.hex(j1, 2));
+			Assert.equal( j1, j2 );
+		} //*/
+		
+/*		return o.toString();
+	}*/
+	
+	
+/*	public static inline function toBytes (input:String) : BytesData
+	{
+		var d = new BytesData();
+	//	var s2 = haxe.Timer.stamp();
+		d.writeUTFBytes(input);
+		
+	//	trace(primevc.utils.BytesUtil.toHex(d));
+	//	s2 = haxe.Timer.stamp() - s2;
+		return d;
+	}*/
 }
 
+
+
+#if js
+/**
+ * Optimized Input stream for use with XMLHttpRequest undecoded byte Strings
+ * @author	Danny Wilson
+ * @since	Apr 14, 2011
+ */
 class ByteStringInput extends haxe.io.Input
 {
 	var b : String;
@@ -206,6 +354,8 @@ class ByteStringInput extends haxe.io.Input
 		return str;
 	}
 }
+#end
+
 
 
 /**
@@ -216,10 +366,11 @@ class MessagePackResourceSignals extends CommunicationSignals
 {
 	public function new (progessSignal)
 	{
-		this.progress	= progessSignal;
-		this.started	= new Signal0();
-		this.completed	= new Signal0();
-		this.error		= new Signal1<String>();
+		super();
+		progress	= progessSignal;
+		started	= new Signal0();
+		completed	= new Signal0();
+		error		= new Signal1<String>();
 	}
 }
 
@@ -230,7 +381,7 @@ class MessagePackResourceSignals extends CommunicationSignals
  * @author	Danny Wilson
  * @since	Jan 20, 2011
  */
-class DataServiceEvents <Data> extends Signals
+class DataServiceEvents extends Signals
 {
 	var receive	(default, null) : CommunicationSignals;
 	var send	(default, null) : CommunicationSignals;
@@ -238,6 +389,7 @@ class DataServiceEvents <Data> extends Signals
 
 	public function new (progessSignal)
 	{
+		super();
 		receive = new MessagePackResourceSignals(progessSignal);
 		send	= new MessagePackResourceSignals(progessSignal);
 	}

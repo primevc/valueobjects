@@ -30,10 +30,13 @@ package primevc.core.collections;
  import primevc.core.collections.RevertableArrayList;
  import primevc.core.dispatcher.Signal1;
  import primevc.core.traits.IValueObject;
+ import primevc.tools.valueobjects.ObjectChangeSet;
  import primevc.tools.valueobjects.ValueObjectBase;
  import primevc.utils.FastArray;
   using primevc.utils.FastArray;
   using primevc.utils.IfUtil;
+  using primevc.utils.TypeUtil;
+ 
 
 /**
  * A specialized ArrayList for ValueObjects.
@@ -48,6 +51,7 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implemen
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;
 	
+
 	public function new ( wrapAroundList:FastArray<DataType> = null )
 	{
 		super(wrapAroundList);
@@ -63,6 +67,17 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implemen
 			itemChange = null;
 		}
 	}
+
+	/**
+	 * Method will dispose the VO-list and all the VO's inside of the list
+	 */
+	public function disposeAll ()
+	{
+		for (item in list)
+			item.dispose();
+		
+		dispose();
+	}
 	
 	
 	public function setChangeHandler(changeHandler : ObjectChangeSet -> Void)
@@ -75,17 +90,17 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implemen
 	
 	override public function add (item:DataType, pos:Int = -1) : DataType
 	{
-		super.add(item);
-		cast(item, ValueObjectBase).change.bind(this, changeHandlerFn);
+		super.add(item, pos);
+		item.as(ValueObjectBase).change.bind(this, changeHandlerFn);
 		
 		return item;
 	}
 	
 	
-	override public function remove (item:DataType, oldPos:Int = -1) : DataType
+	override public function remove (item:DataType, curPos:Int = -1) : DataType
 	{
-		super.remove(item);
-		cast(item, ValueObjectBase).change.unbind(this);
+		super.remove(item, curPos);
+		item.as(ValueObjectBase).change.unbind(this);
 		
 		return item;
 	}
@@ -103,16 +118,21 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implemen
 	}
 }
 
+
+/*
+ * @author Danny Wilson
+ * @creation-date Dec 20, 2010
+ */
 class VOArrayListUtil
 {
 	static inline public function setChangeHandler<T>(owner:Dynamic, list:FastArray<T>, changeHandler : ObjectChangeSet -> Void)
 	{
-		if (changeHandler.notNull()) {
+		if (changeHandler.notNull())
 			for (i in 0 ... list.length)
 			 	cast(list[i], ValueObjectBase).change.bind(owner, changeHandler);
-		} else {
+		
+		else
 			for (i in 0 ... list.length)
 			 	cast(list[i], ValueObjectBase).change.unbind(owner);
-		}
 	}
 }

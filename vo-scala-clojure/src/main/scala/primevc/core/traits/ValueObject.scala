@@ -1,9 +1,10 @@
 package primevc.core.traits
  import primevc.types._
  import scala.collection.JavaConversions
- import primevc.utils.msgpack.VOPacker
+ import org.msgpack.Unpacker
+ import primevc.utils.msgpack.{VOPacker, VOUnpacker, VOInstanceUnpacker}
 
-trait ValueObject
+trait ValueObject extends java.io.Externalizable
 {
   protected[primevc] def updateFieldsSet_!() { }
 
@@ -20,7 +21,7 @@ trait ValueObject
   def fieldIsSet_?(index:Int): Boolean = ($fieldsSet & (1 << index)) != 0
   def empty_? = { updateFieldsSet_! ; $fieldsSet == 0 }
 
-  def partial_? : Boolean = true
+  def partial_? : Boolean = numFieldsSet_? != Companion.numFields
   def validationErrors_? : List[(Symbol, String)] = Nil
 
   // Courtesy of: http://graphics.stanford.edu/%7Eseander/bithacks.html#CountBitsSetParallel
@@ -32,6 +33,31 @@ trait ValueObject
     v = ((v + (v >> 4) & 0xF0F0F0F) * 0x1010101) >> 24; // count
     v
   }
+
+  def readExternal(in : java.io.ObjectInput)
+  {
+    val obj = this;
+    val map = obj.Companion.defaultVOCompanionMap;
+    val helper = new VOUnpacker(map)
+    {
+      var first = true;
+      override def newObject = if (!first) super.newObject else {
+        first = false;
+        new VOInstanceUnpacker(map) {
+          vo  = obj
+          voc = obj.Companion.asInstanceOf[VOCompanion[ValueObject]]
+        }
+      }
+    }
+    val unpacker = new Unpacker(in.asInstanceOf[java.io.ObjectInputStream])
+    unpacker.setVOHelper(helper)
+    
+    unpacker.next
+  }
+
+  def writeExternal(out : java.io.ObjectOutput) {
+    new VOPacker(out.asInstanceOf[java.io.ObjectOutputStream]).pack(this)
+  }
 }
 
 trait ValueObjectWithID extends ValueObject
@@ -41,6 +67,9 @@ trait ValueObjectWithID extends ValueObject
   /** The original ID of this object */
   val _id: IDType;
 }
+
+abstract class AbstractValueObject() extends ValueObject {}
+
 
 trait VOAccessor[V <: ValueObject]
 {
@@ -67,14 +96,13 @@ trait VOAccessor[V <: ValueObject]
 
 trait VOFieldInfo
 {
-  val numFields: Int = 0
+  val fields: Array[Field] = Array()
+  def numFields: Int = fields.length
   def field(index: Int): Field = throw new MatchError("Field with index "+index+" not found in this VO");
   def field(key:String): Int = -1
 
   @inline final def field(key: Symbol): Field = fieldNamed(key.name)
   @inline final def fieldNamed(key:String): Field = field(field(key))
-  
-  @inline def fields: IndexedSeq[Field] = (0 until numFields) map(field(_))
 }
 
 trait VOMessagePacker[V <: ValueObject] {
@@ -107,6 +135,8 @@ trait VOCompanion[V <: ValueObject] extends VOAccessor[V] with VOFieldInfo {
   def putValue(vo:VOType, index:Int, value:AnyRef): VOType
   def empty: VOType
   def fieldIndexOffset(typeID : Int) : Int
+
+  val defaultVOCompanionMap : scala.collection.immutable.IntMap[primevc.core.traits.VOCompanion[_]]
 }
 
 trait IDAccessor[V <: ValueObjectWithID]

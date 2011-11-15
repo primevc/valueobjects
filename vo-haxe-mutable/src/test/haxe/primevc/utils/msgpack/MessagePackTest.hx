@@ -4,6 +4,7 @@ package primevc.utils.msgpack;
  import haxe.io.Output;
  import haxe.io.BytesInput;
  import haxe.io.BytesOutput;
+ import primevc.types.Number;
  import primevc.utils.FastArray;
  import primevc.utils.msgpack.Reader;
   using primevc.utils.msgpack.Format;
@@ -25,13 +26,15 @@ class MessagePackTest extends TestCase
 	{
 		var b = out.getBytes();
 		inp	= new BytesInput(b);
-		r	= new Reader(inp, new IntHash());
+		inp.bigEndian = true;
+		r	= new Reader(new IntHash(), inp);
 	
 		return b;
 	}
 	
 	override function setup() {
 		out	= new BytesOutput();
+		out.bigEndian = true;
 	}
 	
 	override function tearDown() {
@@ -57,6 +60,18 @@ class MessagePackTest extends TestCase
 	function test__int32()			checkInt(5, 0xd2, -65000)
 	function test2_int32()			checkInt(5, 0xd2, -1073741823)
 	
+	function test_int_is_nil()
+	{
+		assertEquals(1, out.packInt(Number.INT_NOT_SET));
+		assertEquals(0xc0, unpack(1, null).get(0));
+	}
+	
+	function test_double_is_nil()
+	{
+		assertEquals(1, out.packDouble(Number.FLOAT_NOT_SET));
+		assertEquals(0xc0, unpack(1, null).get(0));
+	}
+
 	function test_nil()
 	{
 		assertEquals(1, out.packNil());
@@ -81,7 +96,7 @@ class MessagePackTest extends TestCase
 		out.writeFloat(10.0);
 		
 		initReader();
-		assertEquals(10.0, r.readMsgPackValue(inp));
+		assertEquals(10.0, r.readMsgPackValue());
 	}
 	
 	function test_double()
@@ -198,46 +213,46 @@ class MessagePackTest extends TestCase
 		unpackArray(65536 + 5, FastArrayUtil.ofArray(arr));
 	}
 	
-	function test_tinyMap()
-	{
-		var m = makeMap(15);
-		var mapBytes = 1 /* Fixed Map */ + 15 /* Fixed Raw (key type) */ + 15 /* 15 FixedInt values */ + m.stringKeyBytes;
-		
-		var r = out.packMap(m.map);
-		assertEquals(mapBytes, r);
-		
-		var b = unpackMap(mapBytes, 15);
-		assertEquals(0x8F, b.get(0));
-	}
+    function test_tinyMap()
+    {
+    	var m = makeMap(15);
+    	var mapBytes = 1 /* Fixed Map */ + 15 /* Fixed Raw (key type) */ + 15 /* 15 FixedInt values */ + m.stringKeyBytes;
 	
-	function test_shortMap()
-	{
-		var m = makeMap(16);
-		var mapBytes = 1 + 2 /* map 16 */ + 16 /* Fixed Raw (key type) */ + 16 /* FixedInt values */ + m.stringKeyBytes;
-		
-		var r = out.packMap(m.map);
-		assertEquals(mapBytes, r);
-		
-		var b = unpackMap(mapBytes, 16);
-		assertEquals(0xde, b.get(0));
-	}
+    	var r = out.packMap(m.map);
+    	assertEquals(mapBytes, r);
 	
-	function test_bigMap()
-	{
-		var m = makeMap(65536);
-		var mapBytes = 1 + 4 /* map 32 */
-		 	+ 65536				// Fixed Raw (key type)
-			+ 128				// first 0-127
-			+ 2 * 128			// uint 8
-			+ 3 * (65536 - 256)	// remaining values
-			+ m.stringKeyBytes;
-		
-		var r = out.packMap(m.map);
-		assertEquals(mapBytes, r);
-		
-		var b = unpackMap(mapBytes, 16);
-		assertEquals(0xdf, b.get(0));
-	}
+    	var b = unpackMap(mapBytes, 15);
+    	assertEquals(0x8F, b.get(0));
+    }
+
+    function test_shortMap()
+    {
+    	var m = makeMap(16);
+    	var mapBytes = 1 + 2 /* map 16 */ + 16 /* Fixed Raw (key type) */ + 16 /* FixedInt values */ + m.stringKeyBytes;
+	
+    	var r = out.packMap(m.map);
+    	assertEquals(mapBytes, r);
+	
+    	var b = unpackMap(mapBytes, 16);
+    	assertEquals(0xde, b.get(0));
+    }
+
+    function test_bigMap()
+    {
+    	var m = makeMap(65536);
+    	var mapBytes = 1 + 4 /* map 32 */
+    	 	+ 65536				// Fixed Raw (key type)
+    		+ 128				// first 0-127
+    		+ 2 * 128			// uint 8
+    		+ 3 * (65536 - 256)	// remaining values
+    		+ m.stringKeyBytes;
+	
+    	var r = out.packMap(m.map);
+    	assertEquals(mapBytes, r);
+	
+    	var b = unpackMap(mapBytes, 16);
+    	assertEquals(0xdf, b.get(0));
+    }
 
 #if flash9
 
@@ -288,7 +303,7 @@ class MessagePackTest extends TestCase
 		Assert.that(b != null);
 		assertEquals(bytes, b.length);
 		
-		var arr : FastArray<Dynamic> = r.readMsgPackValue(inp);
+		var arr : FastArray<Dynamic> = r.readMsgPackValue();
 		
 	#if flash10
 		// How to check if it's a flash Vector ?  Std.is doesn't work...
@@ -308,7 +323,7 @@ class MessagePackTest extends TestCase
 		Assert.that(b != null);
 		assertEquals(bytes, b.length);
 		
-		var map : Hash<Int> = r.readMsgPackValue(inp);
+		var map : Hash<Int> = r.readMsgPackValue();
 		assertTrue(Std.is(map, Hash));
 		
 		for (i in 0 ... size) {

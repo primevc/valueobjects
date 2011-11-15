@@ -127,6 +127,12 @@ class Module
 	//
 	// -- Public API
 	//
+	public function getPackageRoot(): Module {
+		var m = this;
+		while (m != null && !m.packageRoot) m = m.parent;
+		return m != null? m : root;
+	}
+
 	public function generateWith(code:CodeGenerator)
 	{
 		finalize();
@@ -434,6 +440,7 @@ class Util
 			
 			case Tdef(_):				false;
 			case Turi:					false;
+			case Turl:					false;
 			case TuniqueID:				false;
 			case TfileRef:				false;
 			case Tstring:				false;
@@ -446,6 +453,7 @@ class Util
 			case Tdate:					false;
 			case Tdatetime:				false;
 			case Tinterval:				false;
+			case TclassRef(_):			false;
 		}
 	}
 	
@@ -457,6 +465,7 @@ class Util
 			
 			case Tarray(_,_,_):			true;
 			case Turi:					true;
+			case Turl:					true;
 			case TuniqueID:				true;
 			case TfileRef:				true;
 			case Tstring:				true;
@@ -469,6 +478,7 @@ class Util
 			case Tdate:					true;
 			case Tdatetime:				true;
 			case Tinterval:				true;
+			case TclassRef(_):			true;
 		}
 	}
 	
@@ -484,6 +494,7 @@ class Util
 			
 			case Tarray(t,_,_):			isSingleValue(t);
 			case Turi:					true;
+			case Turl:					true;
 			case TuniqueID:				true;
 			case Tstring:				true;
 			case TfileRef:				true;
@@ -496,6 +507,7 @@ class Util
 			case Tdate:					true;
 			case Tdatetime:				true;
 			case Tinterval:				true;
+			case TclassRef(_):			true;
 		}
 	}
 	
@@ -661,6 +673,7 @@ class PropertyTypeResolver
 				if 		(Type.getEnumName(e) == Type.getEnumName(AbstractPType))	handleAbstractPType(def);
 				else if	(Type.getEnumName(e) == Type.getEnumName(PType))			handlePType(def);
 				else if	(Type.getEnumName(e) == Type.getEnumName(PropertyOption))	handlePropertyOption(def);
+				else if	(Type.getEnumName(e) == Type.getEnumName(Platform))			handlePlatform(def);
 				else throw Err_UnknownType(this, runtimeType);
 			
 			case TObject:
@@ -672,7 +685,8 @@ class PropertyTypeResolver
 				}}
 			
 			case TClass(cl):
-				throw Err_UnknownType(this, runtimeType);
+				if (cl == String) prop.description = def;
+				else throw Err_UnknownType(this, runtimeType);
 			
 			case
 			  TInt:
@@ -700,9 +714,11 @@ class PropertyTypeResolver
 			case interval:		Tinterval;
 			case string:		Tstring;
 			case URI:			Turi;
+			case URL:			Turl;
 			case EMail:			Temail;
 			case UniqueID:		TuniqueID;
 			case FileRef:		TfileRef;
+			case ClassRef(r):	TclassRef(r);
 			
 			case subclass(_,_,_),
 				namedSetOf(_,_,_,_),
@@ -720,12 +736,22 @@ class PropertyTypeResolver
 		else if (!Lambda.has(prop.opts, value))
 			prop.opts.push(value);
 	}
+
+
+	private function handlePlatform (value:Platform)
+	{
+		if (prop.platforms == null)
+			prop.platforms = [value];
+		else
+			prop.platforms.push(value);
+	}
+
 	
 	private function handleAbstractPType(value:AbstractPType)
 	{
 		type = switch(value)
 		{
-			case integer, decimal, color, date, datetime, interval, string, URI, EMail, UniqueID, FileRef:
+			case integer, decimal, color, date, datetime, interval, string, URI, URL, EMail, UniqueID, FileRef, ClassRef(_):
 				builtinAbstractPType(value);
 			
 			case is(typeName):
@@ -766,7 +792,7 @@ class PropertyTypeResolver
 							case MUndefined(n,m):	throw Err_UndefinedType(path);
 						}
 					
-					case integer, decimal, color, date, datetime, interval, string, URI, EMail, UniqueID, FileRef:
+					case integer, decimal, color, date, datetime, interval, string, URI, URL, EMail, UniqueID, FileRef, ClassRef(_):
 						builtinAbstractPType(atype);
 					
 					case namedSetOf	(_,_,_,_):	throw "namedSetOf(namedSetOf(...)) unsupported";
@@ -859,6 +885,7 @@ class Property
 	public var opts							: Array<PropertyOption>;
 	public var description					: String;
 	public var defaultValue	(default,null)	: Dynamic;
+	public var platforms					: Array<Platform>;
 	
 	
 	public function new(name:String, parent:TypeDefinitionWithProperties) {
@@ -883,50 +910,54 @@ class Property
 		return p;
 	}
 	
-	public function bitIndex()
-	{
-		return if (Std.is(parent, BaseTypeDefinition)) cast(parent,BaseTypeDefinition).bitIndex(this); else this.index;
+	public 		  function bitIndex()						return if (Std.is(parent, BaseTypeDefinition)) cast(parent,BaseTypeDefinition).bitIndex(this) else this.index
+	public inline function propertyID()						return definedIn.index << 8 | this.index
+
+	public inline function isBindable() 					return hasOption(PropertyOption.bindable)
+	public inline function isTransient()					return hasOption(PropertyOption.transient)
+	public inline function isOptional ()					return hasOption(PropertyOption.optional)
+	public inline function isMappedTo(t:MappingType) 		return Lambda.has(mappings, t)
+	public inline function isMixin ()						return Std.is(definedIn, ClassDef) && cast(definedIn, ClassDef).isMixin
+
+	public inline function setDefaultValue(val:Dynamic) 	{ checkDefaultValue(val); this.defaultValue = val; }
+	public 		  function toString():String 				return "\n\t\t<Property idx='"+index+"' name='"+name+"' defined-in='"+ this.definedIn.fullName +"' parent='"+parent.fullName+"'>"+Std.string(type)+"</Property>"
+	public 		  function copyOptions(prop:Property) 		trace("copyOptions not implemented ("+ this.definedIn.fullName +"."+ prop.name +")")
+
+	public inline function shouldHaveGetter ()		 		return !isTransient() && !Util.isPTypeBuiltin(type) && !Util.isEnum(type) && !isBindable()
+	public inline function shouldHaveSetter ()		 		return !isTransient() && !isBindable() && !isArray()
+
+	public inline function isType (type:PType)				return this.type == type
+	
+		
+	public function isArray ()			return switch (this.type) {
+		case Tarray(_,_,_):				true;
+		default:						false;
+	}
+
+	public function isDecimal ()		return switch (this.type) {
+		case Tdecimal(_,_,_):			true;
+		default:						false;
 	}
 	
-	public function propertyID()
-	{
-		return definedIn.index << 8 | this.index;
+	public function isDisposable () 	return isBindable() || switch (this.type) {
+		case Tdef(type):				!Util.isEnum(this.type);
+		case Tarray(_,_,_):				true;
+		default:						false;
 	}
 	
-	public function isBindable()
-	{
-		return hasOption(PropertyOption.bindable);
-	}
-	
-	public function isArray ()
-	{
-		return switch (this.type) {
-			case Tarray(type,min,max):	true;
-			default:					false;
-		}
-	}
-	
-	public function isDisposable ()
-	{
-		return isBindable() || switch (this.type) {
-			case Tdef(type):				!Util.isEnum(this.type);
-			case Tarray(type,min,max):		true;
-			default:						false;
-		}
-	}
-	
-	public function hasClonableType ()
-	{
-		return switch (this.type) {
-			case Tdef(_):					!Util.isEnum(this.type);
-			case Tarray(_,min,max):			true;
-			default:						false;
-		}
+	public function hasClonableType ()	return switch (this.type) {
+		case Tdef(_):					!Util.isEnum(this.type);
+		case Tarray(_,_,_):				true;
+		default:						false;
 	}
 	
 	public function hasOption(option:PropertyOption) {
 		if (opts != null) for (opt in opts) if (opt == option) return true;
 		return false;
+	}
+
+	public inline function isPlatformSpecific () : Bool {
+		return platforms != null && platforms.length > 0;
 	}
 	
 	public function checkDefaultValue(defaultval:Dynamic)
@@ -949,13 +980,15 @@ class Property
 				if (max != null)	assert(defaultval <= max);
 				if (stride != null)	assert(defaultval == (defaultval / stride) * stride);
 			
-			case Turi:				assert(hasType(String) || Util.toString(defaultval) != '');
+			case Turl,
+				 Turi:				assert(hasType(String) || Util.toString(defaultval) != '');
 			case TuniqueID:			assert(hasType(String) || hasType(Int));
 			case Tstring:			assert(hasType(String));
 			case Temail:			assert(hasType(String));
 			case Tcolor:			assert(hasType(Int));
 			case Tbool(v):			assert(hasType(Int) || hasType(Bool));
 			case TfileRef:			assert(hasType(String));
+			case TclassRef(_):		throw "not implemented";
 			
 			case TenumConverter(e):	throw "not implemented";
 			case Tdate:				throw "not implemented";
@@ -987,23 +1020,6 @@ class Property
 				}
 				
 		}
-	}
-	
-	public function setDefaultValue(val:Dynamic) {
-		checkDefaultValue(val);
-		this.defaultValue = val;
-	}
-	
-	public function toString():String {
-		return "\n\t\t<Property idx='"+index+"' name='"+name+"' defined-in='"+ this.definedIn.fullName +"' parent='"+parent.fullName+"'>"+Std.string(type)+"</Property>";
-	}
-	
-	public function isMappedTo(t:MappingType):Bool {
-		return Lambda.has(mappings, t);
-	}
-	
-	public function copyOptions(prop:Property) {
-		trace("copyOptions not implemented ("+ this.definedIn.fullName +"."+ prop.name +")");
 	}
 }
 
@@ -1079,6 +1095,7 @@ class Enumeration
 				case color:		this.type = PType.Tcolor;
 				case UniqueID:	this.type = PType.TuniqueID;
 				case URI:		this.type = PType.Turi;
+				case URL:		this.type = PType.Turl;
 				case EMail:		this.type = PType.Temail;
 				
 				default:
@@ -1116,7 +1133,11 @@ class Enumeration
 						this.conversions.set(field, Std.string(val));
 				}
 			
-			case TBool, TUnknown, TNull, TFunction, TClass(_), TEnum(_):
+			case TClass(cl):
+				if (cl == String) this.description = opt;
+				else throw "Don't know what to do with "+Std.string(opt) + ", for: "+ this;
+			
+			case TBool, TUnknown, TNull, TFunction, TEnum(_):
 				throw "Currently unsupported enum option: "+Std.string(opt) + ", for: "+ this;
 		}
 		
@@ -1232,7 +1253,7 @@ class EnumDef implements TypeDefinitionWithProperties
 		}
 	}
 	
-	public function tryTasks(){}
+	public function tryTasks() {}
 	
 	public function finalize():Void
 	{
@@ -1885,9 +1906,9 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	public var maxDefinedPropertyIndex(getMaxDefinedPropertyIndex, null) : Int; // max(propertiesDefined.index) non-transient
 	public var propertiesSorted	(getPropertiesSorted,  null) : Array<Property>;
 	
-	public var settings		(default, null)		: {
+	public var settings		(default, null)	: {
 		var mongo_proxied: MongoProxyType;
-	}
+	};
 	
 	public function hasOption(opt:Dynamic) {
 		for (o in options) if (o == opt) return true;
@@ -2260,6 +2281,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 			
 			case Tstring:			throw("TODO: implement binding to string properties");		throw Err_PropertyHasNoMembers;
 			case Turi:				throw("TODO: implement binding to URI    properties");		throw Err_PropertyHasNoMembers;
+			case Turl:				throw("TODO: implement binding to URL    properties");		throw Err_PropertyHasNoMembers;
 			case Temail:			throw("TODO: implement binding to e-mail properties");		throw Err_PropertyHasNoMembers;
 			case Tdate:				throw("TODO: implement binding to date properties");		throw Err_PropertyHasNoMembers;
 			case Tdatetime:			throw("TODO: implement binding to datetime properties");	throw Err_PropertyHasNoMembers;
@@ -2274,6 +2296,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 			case Tinteger(a,b,c):	throw Err_PropertyHasNoMembers;
 			case TuniqueID:			throw Err_PropertyHasNoMembers;
 			case TfileRef:			throw Err_PropertyHasNoMembers;
+			case TclassRef(a):		throw Err_PropertyHasNoMembers;
 		}
 		
 		return def.doFindProperty(node.slice(1));
@@ -2521,7 +2544,9 @@ enum PType
 	
 	Tstring;
 	Turi;
+	Turl;
 	Temail;
+	TclassRef		(ref:String);
 	
 	TuniqueID;
 	TfileRef;
@@ -2550,7 +2575,9 @@ enum AbstractPType
 	// string
 	string;
 	URI;
+	URL;
 	EMail;
+	ClassRef(ref:String);		//ref contains full classpath to the requested class
 	
 	// special data
 	date;
@@ -2575,6 +2602,14 @@ enum PropertyOption
 	mongo_reference;
 	mongo_typeCast;
 	optional;
+}
+
+enum Platform
+{
+	js;
+	flash9;
+	flash;
+	scala;
 }
 
 enum ClassOption

@@ -49,7 +49,7 @@ file.writeString("
 		file.close();
 	}
 	
-	public function genEnum(def:EnumDef){}
+	public function genEnum(def:EnumDef) {}
 	
 	public function newModule(module:Module) {
 		module.generateWith(this);
@@ -76,7 +76,7 @@ class HaxeMessagePacking extends MessagePacking
 			case Tdate:						a('b += o.packDate(');			a(path); ac(")".code);
 			case Tdatetime:					a('b += o.packDateTime(');		a(path); ac(")".code);
 			case Tinterval:					a('b += o.packDateInterval(');	a(path); ac(")".code);
-			case Turi:						a('b += o.packURI(');			a(path); ac(")".code);
+			case Turi, Turl:				a('b += o.packURI(');			a(path); ac(")".code);
 			case TuniqueID:					a('b += o.packObjectId(');		a(path); ac(")".code);
 			case Temail:					a('b += o.packEMail(');			a(path); ac(")".code);
 			case Tcolor:					a('b += o.packRGBA(');			a(path); ac(")".code);
@@ -98,7 +98,8 @@ class HaxeMessagePacking extends MessagePacking
 				a("\n\t\t\t\tfor (i in 0 ... a.length) "); addPropertyPackerCall("a.getItemAt(i)", type, false); ac(";".code);
 				a("\n\t\t\t}");
 				
-			case TenumConverter(_):	throw "Not implemented";
+			case TenumConverter(_):	throw "Not implemented";	
+			case TclassRef(_):		throw "Not implemented";
 			
 		}
 	}
@@ -113,10 +114,10 @@ class HaxeMessagePacking extends MessagePacking
 		}
 		a("\n");
 		
-		a("\n\tstatic public function msgpack_packVO(o : haxe.io.BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBits : Int, prependMsgpackType : Bool = false) : Int\n\t{");
+		a("\n\t@:keep static public function msgpack_packVO(o : haxe.io.BytesOutput, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBits : Int, prependMsgpackType : Bool = false) : Int\n\t{");
 		
-		a("\n		Assert.that(o != null && obj != null);");
-		a("\n		");
+		a("\n\t\tAssert.that(o != null && obj != null);");
+		a("\n\t\t");
 		
 		a("\n\t\tvar b /* bytes written */ : Int;");
 		a("\n\t\tif (prependMsgpackType) {");
@@ -132,29 +133,41 @@ class HaxeMessagePacking extends MessagePacking
 	
 	override private function defineUnPackerFunction()
 	{
-		a("\n\tstatic public function msgpack_unpackVO(reader : Reader, obj : "); if (def.isMixin){ a("I"); a(def.name); } else { a("I"); a(def.name); a("VO"); } a(", propertyBytes : Int, converter : ValueConverter) : Void\n\t{");
-		a("\n		Assert.that(reader != null && obj != null);");
-		a("\n		var input = reader.input, bits:Int, fieldOffset:Int = (untyped obj)._fieldOffset(TYPE_ID);");
+		var name = def.isMixin ? def.name : def.name + "VO";
+		a("\n\t@:keep static public function msgpack_unpackVO(reader : Reader, obj : "); a("I"); a(name); a(", propertyBytes : Int) : Void\n\t{");
+		a("\n\t\tAssert.that(reader != null && obj != null);");
+		a("\n\t\tvar bits:Int, fieldOffset:Int = (untyped obj)._fieldOffset(TYPE_ID);");
 	}
 	
-	override private function a_unpackProperty(p:Property)
-	{	
-		var setFn = false;
+
+	override private function a_unpackProperty(p:Property, bit:Int)
+	{
+		Assert.that(!p.isTransient());
+		/*
+		 1. check if property has getter -> indicating wether we should create instantiate a value even when there's nothing in the messagepack
+		 2. if property has getter, only fill the property when it has a value
+		 3. if property doesn't have a getter and isn't transient or a simple-value, always create a value for it
+		 */
 		
-		if (!p.isArray() && p.isBindable()) {
-			a("(cast(obj."); a(p.name); a(", primevc.core.Bindable<"); a(HaxeUtil.haxeType(p.type)); a(">).value = ");
+		var propertyCheck 	= "(bits & 0x" + StringTools.hex(1 << bit, 2) + ").not0()";
+		var hasWrapper 		= p.isArray() || p.isBindable();	// indicating wether there's an object or list wrapped around a value/values
+	//	a("\ttrace('"); a(p.name); a("');\n");
+	//	a("\ttry {\n");
+		a("\t\t");
+	//	if (!hasWrapper || p.shouldHaveGetter()) {	// 1
+			a("if ("); a(propertyCheck); a(")\t\t");
+	//	}
+		
+	/*	if (!p.isArray() && p.isBindable()) {
+			a("(cast(obj."); a(p.name); a(", primevc.core.Bindable<"); a(HaxeUtil.haxeType(p.type, true)); a(">).value = ");
 		}
 		else
-		{
-			a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
-		}
+		{*/
+		a((def.isMixin || p.shouldHaveSetter()) ? "(untyped obj)." : "obj."); a(p.name); a(" = ");
+	//	}
 		
-		
-		if (p.isArray())
-		{
-//			a("((untyped obj)."); a(p.name); a(" = ");
-//			a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
-			a('new ' + HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient)) + '(');
+		if (hasWrapper) {
+			a('new '); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.isTransient())); a('( '); //a(propertyCheck); a(" ? ");
 		}
 /*		else {
 			a("((untyped obj)."); a(p.name);
@@ -171,17 +184,17 @@ class HaxeMessagePacking extends MessagePacking
 		}
 */		
 		a("reader.");
-		switch (p.type)
-		{
-			case Tarray(innerT,_,_):
-				a("readMsgPackArray(");
-				a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(innerT)); a(")));");
-			
-			case Tcolor:
-				a("readMsgPackValue("); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(p.type)); a("Type));");
-			default:
-				a("readMsgPackValue("); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(p.type)); a("));");
+		switch (p.type) {
+			case Tarray(innerT,_,_):	a("readMsgPackArray("); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(innerT));
+			case Tcolor:				a("readMsgPackValue("); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(p.type)); a("Type");
+			default:					a("readMsgPackValue("); a(p.name.toUpperCase()); a(", "); a(HaxeUtil.haxeType(p.type));
 		}
+
+		if (hasWrapper)
+			a(")");
+		a(");\n");
+
+	//	a("\t} catch (e:Dynamic) { trace(e); throw 'property: "); a(p.name); a(" in ' + obj + '; error: '+e; }\n");
 	}
 }
 
@@ -240,8 +253,9 @@ class Haxe implements CodeGenerator
 		addPackage(def);
 		
 		if (immutable)
-			a("\ninterface I");
+			a("\n@:keep interface I");
 		else {
+			a(" import primevc.tools.valueobjects.ObjectChangeSet;\n");
 			a(" import primevc.tools.valueobjects.ValueObjectBase;\n");
 			a(" import primevc.tools.valueobjects.xmlmap.XMLString;\n");
 			a(" import primevc.utils.msgpack.Reader;\n");
@@ -250,7 +264,9 @@ class Haxe implements CodeGenerator
 			a("  using primevc.utils.TypeUtil;\n");
 			a("  using primevc.utils.NumberUtil;\n");
 			a("  using primevc.utils.msgpack.Format;\n");
-			a("\nclass ");
+			a("\n\n");
+			a("/**\n * @creation-date\t"); a(Date.now().toString()); a("\n */\n");
+			a("class ");
 		}
 		
 		a(def.name);
@@ -270,8 +286,8 @@ class Haxe implements CodeGenerator
 			a(" implements "); a(def.module.fullName); a(".I"); a(def.name); a("VO,");
 			a(" implements primevc.core.traits.IEditableValueObject");
 			if (!def.isMixin && def.superClass == null) {
-				a(", implements primevc.core.traits.IClonable < I" + def.name + "VO >");
-				a(", implements primevc.core.traits.IDuplicatable < I" + def.name + "VO >");
+				a(", implements primevc.core.traits.IClonable < " + def.name + "VO >");
+				a(", implements primevc.core.traits.IDuplicatable < " + def.name + "VO >");
 			}
 		}
 		else
@@ -289,14 +305,21 @@ class Haxe implements CodeGenerator
 		{
 			var p = def.propertiesSorted[i];
 			if (Util.isDefinedInSuperClassOf(def, p)) continue;
-			
+
+			openPlatformCode(p);
 			if (immutable) {
 				genGetter(p, true);
 			} else {
 				genGetter(p, false);
-				if (!p.hasOption(transient))
-					genSetter(i, p, def.fullName);
+				if (p.shouldHaveSetter())
+					genSetter(p);
+				
+				if (!p.isTransient() && (p.isBindable() || p.isArray()))
+					genChangeWatcher(p);
+				
+				a("\n");
 			}
+			closePlatformCode(p);
 		}
 		
 		if (immutable) {
@@ -308,7 +331,9 @@ class Haxe implements CodeGenerator
 	
 	public function genClass(def:ClassDef) : Void
 	{
+#if debug
 		trace(def.fullName);
+#end
 		
 		// Interfaces
 		genClassProperties(def, true);
@@ -324,7 +349,7 @@ class Haxe implements CodeGenerator
 			genClassConstructor(def, def.superClass != null, magic);
 			genDispose(def);
 			genValidation(def.superClass != null);
-			genXMLMapFunctions(def, magic);
+		//	genXMLMapFunctions(def, magic);
 			genEditFunctions(def);
 		}
 		else {
@@ -340,6 +365,7 @@ class Haxe implements CodeGenerator
 		if (!def.isMixin) {
 			genCloneFunction(def);
 			genDuplicateFunction(def);
+			genInjectValuesFunction(def);
 		}
 		
 		for (p in def.property) if (p.hasOption(unique)) {
@@ -366,7 +392,25 @@ class Haxe implements CodeGenerator
 		return dummyMagic;
 	}
 	
-	function a(str:String) code.add(str)
+	inline function a(str:String) code.add(str)
+	inline function addLineComment (str:String)
+	{
+		openComment();
+		addCommentLine(str);
+		closeComment();
+	}
+	inline function openComment ()					  a("\t/**\n")
+	inline function closeComment ()					  a("\t */\n")
+	inline function addCommentLine (str:String)		{ a("\t * "); a(str); a("\n"); }
+	inline function addComment (str:String)
+	{
+		openComment();
+		var lines = str.split("\n");
+		for (line in lines)
+			addCommentLine( StringTools.trim(line) );
+		closeComment();
+	}
+
 	
 	
 	private function genClassMetaData(def:ClassDef)
@@ -376,7 +420,50 @@ class Haxe implements CodeGenerator
 		for (p in def.propertiesSorted) if (!p.hasOption(transient)) {
 		 	a("\n\tstatic inline public var "); a(p.name.toUpperCase()); a(" = "); a("0x" + StringTools.hex(p.definedIn.index << 8 | p.index, 4)); a("; // "); a(p.definedIn.name);
 		}
-		a("\n\t");
+		a("\n\t\n\t");
+
+		//generate static propertyIdToString method
+		a("\n\t@:keep static public function propertyIdToString (id:Int) : String");
+		a("\n\t{");
+		a("\n\t\treturn switch(id) {");
+		for (p in def.propertiesSorted) if (!p.hasOption(transient)) {
+			a("\n\t\t\tcase "); a(p.name.toUpperCase()); a(": '"); a(p.name); a("';");
+		}
+		a("\n\t\t}");
+		a("\n\t}");
+		a("\n\n");
+
+		if (!def.isMixin)
+		{
+			//generate getPropertyById method
+			addLineComment("Method is used for undo/redo to get a reference to the changed property");
+			a("\n\toverride public function getPropertyById (id:Int) : Dynamic");
+			a("\n\t{");
+			a("\n\t\treturn untyped switch(id) {");
+			for (p in def.propertiesSorted) if (!p.hasOption(transient)) {
+				a("\n\t\t\tcase "); a(p.name.toUpperCase()); a(": "); a("this."); a(p.name); a(";");
+			}
+			a("\n\t\t}");
+			a("\n\t}");
+			a("\n\n");
+
+			//generate setPropertyById method
+			addLineComment("Method is used for undo/redo to update the reference of the changed property");
+			a("\n\toverride public function setPropertyById (id:Int, v:Dynamic) : Void");
+			a("\n\t{");
+			a("\n\t\tswitch(id) {");
+			for (p in def.propertiesSorted) if (!p.hasOption(transient)) {
+				a("\n\t\t\tcase "); a(p.name.toUpperCase()); a(": "); 
+				if (p.isBindable() && !p.isArray()) {
+					a("this."); a(p.name); a(".value = v;");
+				} else {
+					a("this."); a(p.name); a(" = v;");
+				}
+			}
+			a("\n\t\t}");
+			a("\n\t}");
+			a("\n\t\n\t");
+		}
 	}
 	
 	private function addFullName(t:TypeDefinition, interfaceT = false)
@@ -419,7 +506,7 @@ class Haxe implements CodeGenerator
 		var nullCheck = path + ".notNull()";
 		
 		switch (ptype) {
-			case Tarray(_,_,_), Turi:
+			case Tarray(_,_,_), Turi, Turl:
 			
 			case Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
 				if (!bindable) nullCheck = null; // Simple types can't be null...
@@ -455,7 +542,7 @@ class Haxe implements CodeGenerator
 		case Tarray(_,_,_):
 			path + ".length.not0()";
 
-		case Turi, TfileRef:
+		case Turi, Turl, TfileRef:
 			path + ".isSet";
 		
 		case Tinteger(_,_,_), Tdecimal(_,_,_):
@@ -465,7 +552,7 @@ class Haxe implements CodeGenerator
 			if (Util.isEnum(ptype)) null
 			else "!" + path + ".isEmpty()";
 		
-		case Tbool(_), TuniqueID, Tinterval, TenumConverter(_), Tdate, Tdatetime, Tcolor:
+		case Tbool(_), TuniqueID, Tinterval, TenumConverter(_), Tdate, Tdatetime, Tcolor, TclassRef(_):
 			null;
 	}
 	
@@ -476,6 +563,18 @@ class Haxe implements CodeGenerator
 		if (extraChecks != null) {
 			a("if ("); a(extraChecks); a(") "); a(expr); a(";");
 		}
+	}
+
+
+	private function getAllEmptyChecks (p:Property, path:String, bindable:Bool) : String
+	{
+		var isNull = HaxeUtil.isNullableOnEveryPlatform(p.type, bindable) ? path+".notNull()" : null;
+		var extra = extraNullCheck(path, p.type);
+
+		return 	 if (extra != null && isNull != null)	isNull + " && " + extra;
+			else if (extra != null) 					extra;
+			else if (isNull != null) 					isNull;
+			else null;
 	}
 	
 	private function addEmbedMessagePackTypeBitmask(i:Int) {
@@ -495,10 +594,10 @@ class Haxe implements CodeGenerator
 	{
 		return;
 		
-		a("\n#if (VO_Write || !VO_Read)");
+	/*	a("\n#if (VO_Write || !VO_Read)");
 		a("\n\t"); if (genOverride) a("override "); a("public function isValid():Bool\n\t{\n ");
 		a("\t\treturn true;\n");
-		a("\t}\n#end\n");
+		a("\t}\n#end\n");*/
 	}
 	
 	private function hexBitflag(propertyIndex:Int) {
@@ -517,21 +616,23 @@ class Haxe implements CodeGenerator
 		if (def.superClass != null)
 			a("\n\t\t\tsuper.addChanges(changeSet);");
 		
-		for (i in 0 ... def.propertiesSorted.length)
-		{
-			var p = def.propertiesSorted[i];
-			if (p.hasOption(transient) || Util.isDefinedInSuperClassOf(def, p)) continue;
-			
-			if (p.isArray() && p.isBindable())	a("\n\t\t\tchangeSet.addListChanges(");
-			else if (p.isBindable())			a("\n\t\t\tchangeSet.addBindableChange(");
-			else								a("\n\t\t\tchangeSet.addChange(");
+		var props = def.propertiesSorted;
+		for (p in props)	if (!p.isTransient() && !Util.isDefinedInSuperClassOf(def, p))
+		{	
+			a("\n\t\t\t");
+			if (p.isArray() && p.isBindable())	a("changeSet.addListChanges(");
+			else if (p.isBindable())			a("changeSet.addBindableChange(");
+			else								a("changeSet.addChange(");
 			
 			a(p.name.toUpperCase()); a(", _changedFlags & "); a(hexBitflag(p.bitIndex())); a(", "); 
 			
 			if (!p.isArray() && p.isBindable()) {
 				a(p.name); a(".shadowValue, "); a(p.name); a(".value");
 			}
-			else a(p.name);
+			else if (p.shouldHaveGetter()) {
+				a("(untyped this)."); a(p.name);
+			} else
+				a(p.name);
 			
 			a(");");
 		}
@@ -551,8 +652,8 @@ class Haxe implements CodeGenerator
 	{
 		var a = code.add;
 		
-		var returnType	= def.superClass == null ? def.name : def.getRootSuperClass().name;
-		returnType		= "I" + returnType + "VO";
+		var returnType	= def.superClass == null ? def.name : def.getRootSuperClass().fullName;
+		returnType		= /*"I" + */returnType + "VO";
 		
 		openFunctionDeclaration( def, "clone", false, returnType, false);
 		a("\t\tvar inst = new "+def.name + "VO(\n");
@@ -608,8 +709,8 @@ class Haxe implements CodeGenerator
 	{
 		var a = code.add;
 		
-		var returnType	= def.superClass == null ? def.name : def.getRootSuperClass().name;
-		returnType		= "I" + returnType + "VO";
+		var returnType	= def.superClass == null ? def.name : def.getRootSuperClass().fullName;
+		returnType		= /*"I" + */returnType + "VO";
 		
 		openFunctionDeclaration( def, "duplicate", false, returnType, false);
 		a("\t\tvar inst = new "+def.name + "VO(\n");
@@ -663,25 +764,81 @@ class Haxe implements CodeGenerator
 	}
 	
 	
+	private function genInjectValuesFunction(def:ClassDef)
+	{
+		var a = code.add;
+
+		var paramType		= /*"I" + */ (def.superClass == null ? def.name : def.getRootSuperClass().fullName) + "VO";
+		var realType		= /*"I" + */ def.name + "VO";
+		var functionName	= "injectValues";
+		
+		//open function declaration
+		a("\n\t");
+		a("@:keep ");
+		if (def.superClass != null)
+			a("override ");
+		
+		a("public function "); a(functionName); a(" (vo:"); a(paramType); a(") : Void");
+		a("\n\t{\n");
+		
+		//call super method
+		if (def.superClass != null) {
+			a("\t\tsuper."); a(functionName); a("(vo);\n");
+		}
+		
+		if (paramType != realType) {
+			a("\t\tvar vo = vo.as("); a(realType); a(");\n");
+		} else {
+			a("\t\t"); a("_propertiesSet = vo._propertiesSet;\n");
+		}
+		
+		//inject properties
+		for (p in def.propertiesSorted) if (!p.isTransient() && !Util.isDefinedInSuperClassOf(def, p))
+		{
+			a("\t\t");
+			if (p.shouldHaveGetter() && HaxeUtil.isNullableOnEveryPlatform(p.type, p.isBindable())) {
+				a("if ((untyped vo)."); a(p.name); a(".notNull())\t");
+			}
+			a(p.shouldHaveSetter() ? "(untyped this)." : "this.");
+			
+			if (p.isArray()) {
+				a(p.name); a(".inject( "); a("vo."); a(p.name); a(".list );");
+			} else {
+				var name = p.isBindable() ? p.name + ".value" : p.name;
+				a(name); a(" = "); a("vo."); a(name); a(";");
+			}
+			a("\n");
+		}
+		closeFunctionDeclaration( def, "injectValues");
+	}
+	
+	
+	
+	
 	/**
 	 * Method will add an toString method that will return an unique-id for
 	 * the vo instance. Method only exists in debug mode
 	 */
 	private function genToStringFunction (def:ClassDef, idProp:Property)
 	{
-		var a = code.add;
+	/*	var a = code.add;
 		a("\n\n#if debug");
-		openFunctionDeclaration( def, "toString", false, "String", false);
+		openFunctionDeclaration( def, "toString", true, "String", false);
 		a("\t\treturn '[ "+def.name+"VO :: '+ " + idProp.name + " + ' ]';\n");
 		closeFunctionDeclaration( def, "toString");
-		a("#end\n");
+		a("#end\n");*/
 	}
 	
 	
-	private function openFunctionDeclaration (def:ClassDef, functionName, forceOverride = false, returnType:String = "Void", makeSuperCall = true, isPublic = true)
+	private function openFunctionDeclaration (def:ClassDef, functionName, forceOverride = false, returnType:String = "Void", makeSuperCall = true, isPublic = true, comment:String = null)
 	{
-		a("\n\t");
-		if (forceOverride || def.superClass != null) a("override ");
+		a("\n\n\t");
+	//	a("@:keep ");
+		if (comment != null)
+			addLineComment(comment);
+		
+		if (forceOverride || def.superClass != null)
+			a("override ");
 
 		a(isPublic? "public " : "private "); a("function "); a(functionName); a("()");
 		
@@ -703,7 +860,7 @@ class Haxe implements CodeGenerator
 	
 	private function closeFunctionDeclaration (def:ClassDef, functionName)
 	{
-		code.add("\t}\n");
+		code.add("\t}\n\n");
 	}
 	
 	
@@ -715,16 +872,41 @@ class Haxe implements CodeGenerator
 		code.add(functionName);
 		code.add("();\n");
 	}
+
+	
+	function write(name:String)
+	{
+		var filename = dir +"/"+ name + ".hx";
+		
+		var file = neko.io.File.write(filename, false);
+		file.writeString(code.toString());
+		file.close();
+	}
 	
 	
 	private function genDispose(def:ClassDef)
 	{	
-		openFunctionDeclaration( def, "dispose", true );
+		openFunctionDeclaration( def, "dispose", true, "Void", false );
 		
-		for (p in def.property) if (!Util.isDefinedInSuperClassOf(def, p) && p.isDisposable()) {
-			a("\t\tif (this."); a(p.name); a(".notNull())\t\t{ "); a(p.name); a(".dispose(); "); a(p.name); a(" = null; }\n");
+		for (p in def.property) if (!Util.isDefinedInSuperClassOf(def, p) && p.isDisposable() && !p.hasOption(mongo_reference))
+		{
+			var hasSetter  = p.shouldHaveSetter();
+			var hasGetter  = p.shouldHaveGetter();
+			var hasWrapper = hasGetter || p.isTransient();
+
+			var setName = hasSetter ? "(untyped this)." + p.name : p.name;
+			var getName = hasGetter ? "(untyped this)." + p.name : p.name;
+
+			a("\t\t");
+			if (hasWrapper)	{ a("if (IfUtil.notNull("); a(getName); a("))\t\t{ "); }
+			a(p.name); a(".dispose(); "); a(setName); a(" = null;");
+			if (hasWrapper)
+				a(" }");
+			a("\n");
 		}
 		
+		//do supercall after the local properties are disposed
+		callSuperFunction(def, "dispose");
 		closeFunctionDeclaration( def, "dispose");
 	}
 	
@@ -755,196 +937,282 @@ class Haxe implements CodeGenerator
 	
 	private function genClassConstructor(def:ClassDef, genSuperCall:Bool = false, magic)
 	{
-		a("\n\tpublic function new(");
+		a("\n\n\tpublic function new(");
 		for (i in 0 ... def.propertiesSorted.length)
 		{
 			var p = def.propertiesSorted[i];
-			a("\n\t\t\t"); a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true, p.hasOption(transient)));
+			if (p.isPlatformSpecific()) {
+				a("\n"); openPlatformCode(p, false); a("\t");
+			} else {
+				a("\n\t/* " + i + "  */\t\t");
+			}
+			
+			a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true, p.hasOption(transient)));
 			var init = HaxeUtil.getConstructorInitializer(p.type, true);
 			if (init != null) {
 			 	a(" = "); a(init);
 			}
 			if (i + 1 != def.propertiesSorted.length) a(", ");
-			a("\t\t\t\t//"+i);
+
+			if (p.isPlatformSpecific())
+				closePlatformCode(p, false);
+			
+		//	a("\t\t\t\t//"+i);
 		}
 		a("\n\t\t)\n\t{\n");
+
+
+		//
+		// fill class memberes
+		//
+		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p))
+		{
+			openPlatformCode(p);
+			var hasGetter 		= p.shouldHaveGetter();
+			var hasSetter 		= p.shouldHaveSetter();
+			var localProp 		= p.name + "_";
+			var classProp 		= (hasSetter ? "(untyped this)." : "this.") + p.name; 
+
+			var val 			=  hasGetter ? localProp : HaxeUtil.getConstructorCall(p.type, p.isBindable(), localProp, p.isTransient());
+			var addNullCheck	= (hasGetter && HaxeUtil.isNullableOnEveryPlatform(p.type, p.isBindable())) || p.isDecimal();
+
+			if (addNullCheck) 	{ a("\t\tif ("); a(localProp); a(".notNull())"); }
+			a("\t\t"); a(classProp); a(" = "); a(val); a(";\n");
+			closePlatformCode(p);
+		}
 		
+		magic.constructor(code);
+
 		if (genSuperCall)
 		{
 			a("\t\tsuper(");
 			var first = true;
-			for (i in 0 ... def.propertiesSorted.length)
+			var sorted = def.propertiesSorted;
+			for (p in sorted) if (Util.isDefinedInSuperClassOf(def, p))
 			{
-				var p = def.propertiesSorted[i];
-				if (Util.isDefinedInSuperClassOf(def, p)) {
-					if (first) first = false; else a(", ");
-					a(p.name); a("_");
-				}
+				openPlatformCode(p, false);
+				if (first) first = false; else a(", ");
+				a(p.name); a("_");
+				closePlatformCode(p, false);
 			}
 			a(");\n");
 		}
 		else
-			a("\t\tsuper();\n");
+			a("\t\tinit();\n");
 		
+
+		//
+		// find out and define which properties are set
+		//
+
+		var setProperties 		= new Array<String>();
+		var shouldGenerateInit 	= false;
+
 		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p))
 		{
-			if (!Util.isPTypeBuiltin(p.type) && !Util.isEnum(p.type)) {
-				if (p.isBindable())		{ a("\t\tthis."); a(p.name); a(".value"); a(" = "); a(p.name); a("_;"); }
-				else					{ a("\t\tthis."); a(p.name); a(" = "); a(p.name); a("_;"); }
+			if (!p.isTransient()) {
+				var localProp 	= p.name + "_";
+				var flag 		= hexBitflag(p.bitIndex());
+				var checks 		= getAllEmptyChecks( p, localProp, false );
+
+				if (checks != null)		setProperties.push( "(" + flag + " * (" + checks + ").boolCalc())" );
+				else 					setProperties.push( flag );
 			}
-			else switch (p.type) {
-				case Tdecimal(_,_,_):
-					a("\t\tif ("); a(p.name); a("_.notNull()) this."); a(p.name); a(" = "); a(p.name); a("_;");
-				
-				default:
-					var c = HaxeUtil.getConstructorCall(p.type, p.isBindable(), p.name + "_", p.hasOption(transient));
-					if (c != null) {
-						a("\t\tthis."); a(p.name); a(" = ");
-						a(c);
-					}
-			}
-		 	a("\n");
+
+			if (!shouldGenerateInit && (p.isBindable() || p.isArray()))
+				shouldGenerateInit = true;
 		}
-		
-		magic.constructor(code);
-		a("\t\t_changedFlags = 0;\n\t}\n");
+		if (setProperties.length > 0) {
+			a("\t\t_propertiesSet"); a(genSuperCall ? " |= " : " = "); a(setProperties.join(" | ")); a(";\n");
+		}
+
+		a("#if debug\tAssert.equal(_changedFlags, 0); #end\n");
+	//	a("\t\t_changedFlags = 0;\n");
+		a("\t}\n");
+
+		if (shouldGenerateInit)
+			genInit(def);
 	}
-	
-	function write(name:String)
+
+
+	function genInit (def:ClassDef)
 	{
-		var filename = dir +"/"+ name + ".hx";
-		
-		var file = neko.io.File.write(filename, false);
-		file.writeString(code.toString());
-		file.close();
+		a("\n\n\toverride private function init()\n\t{\n");
+		a("\t\tsuper.init();\n");
+
+		for (p in def.propertiesSorted) if (!Util.isDefinedInSuperClassOf(def, p) && (!Util.isSingleValue(p.type) || (p.isBindable() || p.isArray())))
+		{
+			var isArray 		= p.isArray();
+			var isSingleValue	= Util.isSingleValue(p.type);
+			var flagName 		= p.name.toUpperCase();
+			var hasGetter 		= p.shouldHaveGetter();
+			
+		//	if (p.isTransient() || p.isMixin()) {	//FIXME: Temporary.. isMixin won't detect classes that are used as mixins.. To solve this, move all the unpack code to Reader
+			if (!hasGetter || p.isBindable() || p.isArray()) {
+				a("\t\t"); a("if ("); a(p.name); a(".isNull())\t"); 
+				if (p.shouldHaveSetter())
+					a("(untyped this).");	
+				
+				a(p.name); a(" = "); a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type, true), p.isTransient())); a(";\n");
+			}
+
+			if (!p.isTransient())
+			{
+				if (isArray || p.isBindable()) {
+					// listen to changes of the array or bindable
+					a("\t\t"); a(p.name); a(".change."); a(isArray ? "observe" : "bind"); a("(this, "); a(p.name); a("Changed);\n");
+				}
+
+				// listen to changes of value-objects within the array or bindable
+				if (!isSingleValue)
+				{
+					if (isArray) {
+						a("\t\t"); a(p.name); a(".setChangeHandler(objectChangedHandler("); a(flagName); a("));\n");
+					}
+					else
+					{	// it's a bindable or vo
+						var val = p.isBindable() ? p.name + ".value" : p.name;
+						a("\t");
+						if (hasGetter) {
+							a("\tif (IfUtil.notNull((untyped this)."); a(val); a("))");
+						} else if (p.isBindable()) {
+							a("\tif ("); a(val); a(".notNull())");
+						}
+						a("\tValueObjectBase.addChangeListener( "); a(val); a(", this, objectChangedHandler("); a(flagName); a("));\n");
+					}
+				}
+			}
+		}
+
+		a("\t}\n");
 	}
+
 	
 	function genGetter(p:Property, immutable:Bool)
 	{
+		var type = HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.isTransient());
+
+		if (p.description != null)
+			addComment(p.description);
+		
 		a("\tpublic var "); a(p.name);
-		var genGetterFn = false;
-		if (p.hasOption(transient) || Util.isPTypeBuiltin(p.type) || Util.isEnum(p.type))
-			a("\t(default");
-		else {
-			a("\t(get"); code.addCapitalized(p.name);
-			genGetterFn = true;
-		}
+
+
+		var genGetterFn = p.shouldHaveGetter();
+		var genSetterFn = !immutable && p.shouldHaveSetter();
+		var transient   = !immutable && p.isTransient();
 		
-		if (immutable) {
-			a(",null");
-		}
-		else if (p.hasOption(transient))
-			a("\t,default");
-		else {
-			a(",set"); code.addCapitalized(p.name);
-		}
-		a(") : "); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient))); a(";\n");
+		if 		(genGetterFn)		{ a("\t(get"); code.addCapitalized(p.name); }
+		else						{ a("\t(default"); }
 		
-		if (!immutable && genGetterFn) {
-			a("\tprivate function get"); code.addCapitalized(p.name); a(" () { return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = ");
-			a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type), p.hasOption(transient)));
-			a(" }\n");
-		}
+		if 		(genSetterFn)		{ a(", set");  code.addCapitalized(p.name); }
+		else if (transient)			{ a(", default"); }
+		else						{ a(", null"); }
 		
+		a(") : "); a(type); a(";\n");
+
 		// optional hasProperty()
-		if (p.hasOption(optional)) {
+		if (p.isOptional()) {
 			if (immutable)		{ a("\tpublic function has"); code.addCapitalized(p.name); a(" (): Bool;\n"); }
 			else				{ a("\tpublic inline function has"); code.addCapitalized(p.name); a(" (): Bool { return has("); a(p.name.toUpperCase()); a("); }\n"); }
 		}
+
+		if (!immutable && genGetterFn) {
+			a("\tprivate function get"); code.addCapitalized(p.name); a(" () { return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = ");
+			a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type), transient)); a(";");
+			a(" }\n\n");
+		}
 	}
 	
-	function genSetter(i:Int, p:Property, fullName:String)
+	function genSetter(p:Property)
 	{
-		var typeName = null;
-		var listChangeHandler = false;
-		if (p.isBindable() || p.isArray())
+		Assert.that(!p.isArray());
+		Assert.that(!p.isBindable());
+
+		var typeName			= HaxeUtil.haxeType(p.type, true, false, false, p.hasOption(transient));
+		var hasGetter			= p.shouldHaveGetter();
+		var name				= hasGetter ? "(untyped this)." + p.name : p.name;
+		var isSingleValue 		= Util.isSingleValue(p.type);
+		
+		
+		a("\tpublic function set"); code.addCapitalized(p.name); a("(newV:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient))); a(")\n\t{\n");
+		
+	//	a("\t\treturn if (v == "); a(name); a(") v;\n");
+	//	a("\t\telse\n\t\t{\n\t\t\tif (isEditable()) _changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
+		
+		a("\t\tvar oldV = "); a(name); a(";\n");
+		a("\t\tif (newV != oldV)\n");
+		a("\t\t{\n");
+		
+		if (!isSingleValue)
 		{
-			typeName = switch (p.type) {
-				case Tarray(innerType, _, _):
-					listChangeHandler = true;
-					"primevc.core.collections.ListChange<" + HaxeUtil.haxeType(innerType, true, false, false, p.hasOption(transient)) + ">";
-				
-				default:
-					HaxeUtil.haxeType(p.type, false, false, false, p.hasOption(transient));
-			}
-		}
-		
-		
-		a("\tprivate function set"); code.addCapitalized(p.name); a("(v:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient))); a(")\n\t{\n");
-		
-		a("\t\treturn if (v == "); if (Util.isEnum(p.type) || Util.isPTypeBuiltin(p.type)) a("this."); else a("(untyped this)."); a(p.name); a(") v;\n");
-		a("\t\telse\n\t\t{\n\t\t\tif (isEditable()) _changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
-		
-		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type))
-		{
-			a("\t\t\tif (IfUtil.notNull((untyped this)."); a(p.name); a(")) ");
-				if (!p.isArray()) a("(untyped ");
-			a("this."); a(p.name);
-				if(!p.isArray()) a(")");
-			a(".change.unbind(this);\n");
-			
-			a("\t\t\tif (v.notNull()) {\n\t\t\t\tv.");
-			
-			if (p.isArray() || p.isBindable())
-			{
-				a("change.");
-				a(listChangeHandler? "observe(this, " : "bind(this, "); a(p.name); a("Changed);\n\t");
-				if (listChangeHandler && !Util.isSingleValue(p.type)) {
-					a("\t\t\tv.setChangeHandler(objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t");
-				}
-			}
-			else if (!Util.isSingleValue(p.type)) {
-				a("as(ValueObjectBase).change.bind(this, objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t");
-			}
-		}
-		a("\t\t\t");
-		var ifExprAdded = addPropChangeFlagSetter(p.bitIndex(), "v" + ((!p.isArray() && p.isBindable())? ".value" : ""), p.type, false);
-		if (listChangeHandler || p.isBindable() || !Util.isSingleValue(p.type)) {
+			a("\t\t\tif (oldV.notNull()) {\n");
+			a("\t\t\t\tValueObjectBase.removeChangeListener( oldV, this );\n");
+			a("\t\t\t}\n");
+
+			a("\t\t\tif (newV.notNull()) {\n");
+			a("\t\t\t\tValueObjectBase.addChangeListener( newV, this, objectChangedHandler("); a(p.name.toUpperCase()); a("));\n");
+			a("\t\t\t\tif (newV.isEmpty()) "); addPropChangeFlagUnsetter(p.bitIndex()); a(" else _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a(";\n");
 			a("\n\t\t\t}");
-			if (ifExprAdded) {
-				a("\n\t\t\t");
-				addPropChangeFlagUnsetter(p.bitIndex());
-			}
+			a("\n\t\t\telse "); addPropChangeFlagUnsetter(p.bitIndex());
+		}
+		else {
+			a("\t\t\t");
+			addPropChangeFlagSetter(p.bitIndex(), "newV" + ((!p.isArray() && p.isBindable())? ".value" : ""), p.type, false);
 		}
 		
 		a("\n\t\t\t");
-		a("\n\t\t\tthis."); a(p.name); a(" = v;\n");
+		a("\n\t\t\t_changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";");
+		a("\n\t\t\tthis."); a(p.name); a(" = newV;\n");
 		a("\t\t}\n");
-		a("\t}\n");
-		
-		if (p.isBindable() || p.isArray())
-		{
-			a("\tprivate function "); a(p.name); a("Changed(");
-			
-			if (!listChangeHandler) {
-				a("value : "); a(typeName); a(", old : "); a(typeName);
-			}
-			a(") : Void {\n\t\t_changedFlags |= "); a(hexBitflag(p.bitIndex()));
-			a(";\n\t\t");
-			
-			if (listChangeHandler)
-			{
-				a("if ("); a(p.name); a(".length.not0()) _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a("; "); addPropChangeFlagUnsetter(p.bitIndex());
-			}
-			else
-				addPropChangeFlagSetter(p.bitIndex(), "value", p.type, false);
-			a("\n\t}\n\n");
-		}
+		a("\t\treturn newV;\n");
+		a("\t}\n\n");
 	}
+
+
+	private function genChangeWatcher (p:Property)
+	{
+		Assert.that(p.isArray() || p.isBindable());
+		var isSingleValue 	= Util.isSingleValue(p.type);
+		var isArray 		= p.isArray();
+
+		a("\tprivate function "); a(p.name); a("Changed(");
+		
+		if (!isArray) {
+			var typeName = HaxeUtil.haxeType(p.type, true, false, false, p.hasOption(transient));
+			a("newV : "); a(typeName); a(", oldV : "); a(typeName);
+		}
+		a(") : Void {\n\t\t");
+		a("_changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n\t\t");
+		
+		if (p.isBindable() && !isArray && !isSingleValue) {
+			a("if (oldV.notNull())		ValueObjectBase.removeChangeListener( oldV, this );\n\t\t");
+			a("if (newV.notNull())		ValueObjectBase.addChangeListener( newV, this, objectChangedHandler("); a(p.name.toUpperCase()); a("));\n\t\t");
+		}
+
+		if (isArray)
+		{
+			a("if ("); a(p.name); a(".length.not0()) _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a("; else "); addPropChangeFlagUnsetter(p.bitIndex());
+		}
+		else
+			addPropChangeFlagSetter(p.bitIndex(), "newV", p.type, false);
+		a("\n\t}\n\n");
+	}
+
 	
 	private function addPropChangeFlagSetter(bit, path, ptype, bindable)
 	{
 		var ifAdded = !addIfVarIsSetExpr(path, ptype, bindable, "_propertiesSet |= " + hexBitflag(bit));
 		
 		if (ifAdded) {
-			a(" "); addPropChangeFlagUnsetter(bit);
+			a(" else "); addPropChangeFlagUnsetter(bit);
 		}
 		
 		return ifAdded;
 	}
 	
 	private function addPropChangeFlagUnsetter(bit) {
-		a("else _propertiesSet &= 0x" + StringTools.hex(0x7FFFFFFF ^ (1 << bit)) + ";");
+		a("_propertiesSet &= 0x" + StringTools.hex(-1 ^ (1 << bit)) + ";");
 	}
 	
 	
@@ -997,7 +1265,7 @@ class Haxe implements CodeGenerator
 		}
 		a("\n\t\t}\n\t}\n");
 		// fromValue
-		a("\tstatic public function fromValue(i:Int) : "); a(def.fullName); a("\n\t{\n\t\t");
+		a("\t@:keep static public function fromValue(i:Int) : "); a(def.fullName); a("\n\t{\n\t\t");
 		a("return switch (i) {");
 		for (e in def.enumerations)
 		{
@@ -1058,7 +1326,7 @@ class Haxe implements CodeGenerator
 	private function genXMLMapFunctions(def:BaseTypeDefinition, magic)
 	{
 		var mapToHaxe = new HaxeXMLMap(code, def, magic);
-		code.add("#if (VO_Write || !VO_Read)\n");
+	//	a("#if (VO_Write || !VO_Read)\n");
 	/*	To XML generates incorrect code.
 		toXML() should be split into 2 functions:
 		- set values to a given node
@@ -1066,9 +1334,31 @@ class Haxe implements CodeGenerator
 	*/
 	//	TODO: Fix toXML generation
 	//	mapToHaxe.genToXML();
-		code.add("\n#end\n#if (VO_Read || !VO_Write)\n");
+	//	a("\n#end\n");
+		a("#if (VO_Read || !VO_Write)\n");
 		mapToHaxe.genFromXML();
-		this.code.add("\n#end\n");
+		a("\n#end\n");
+	}
+
+
+
+	private inline function openPlatformCode(p:Property, useNewLine:Bool = true)
+	{
+		if (p.isPlatformSpecific()) {
+			a("#if ("+p.platforms.join(" || ")+")");
+			if (useNewLine)
+				a("\n");
+		}
+	}
+
+
+	private inline function closePlatformCode (p:Property, useNewLine:Bool = true)
+	{
+		if (p.isPlatformSpecific()) {
+			a("#end");
+			if (useNewLine)
+				a("\n");
+		}
 	}
 }
 
@@ -1085,9 +1375,9 @@ private class MagicClassGenerator extends CodeBufferer
 {
 	public function new() {}
 	
-	public function fromXML(code:StringBuf){}
-	public function inject(code:StringBuf){}
-	public function constructor(code:StringBuf){}
+	public function fromXML(code:StringBuf) {}
+	public function inject(code:StringBuf) {}
+	public function constructor(code:StringBuf) {}
 }
 
 private class NamedSetDefGenerator extends MagicClassGenerator
@@ -1179,7 +1469,7 @@ private class NamedSetDefGenerator extends MagicClassGenerator
 		
 		a("\t\t\tvar tmp");
 		var c = HaxeUtil.getConstructorCall(ns.baseType, false, HaxeUtil.getConstructorInitializer(ns.baseType));
-		if (c != null) { a(" = "); a(c); }
+		if (c != null) { a(" = "); a(c); a(";"); }
 		else throw "non constructable type? " + ns;
 		
 		a("\n\t\t\ttmp.setFromXML(child);");
@@ -1192,24 +1482,14 @@ private class HaxeUtil
 {
 	public static function getConstructorCall(ptype:PType, bindable:Bool, initializer:String, transient:Bool = false)
 	{
-		var code = switch (ptype)
-		{
-			case Tarray(type, _,_):
-				return "new " + HaxeUtil.haxeType( ptype, true, bindable, false, transient ) + "("+ initializer +");";
-			
-			case Tdef(_), Turi, TfileRef, Tinterval:
-				initializer; //"new " + HaxeUtil.haxeType(ptype) + "("+ initializer +")";
-			
-			case TuniqueID:				initializer + ' == null? primevc.types.ObjectId.make() : ' + initializer;
-			
-			case Tinteger(_,_,_), Tdecimal(_,_,_), Temail, Tstring, Tbool(_), TenumConverter(_), Tdate, Tdatetime, Tcolor:
-				initializer;
+		switch (ptype) {
+			case Tarray(type, _,_):		return "new " + HaxeUtil.haxeType( ptype, true, bindable, false, transient ) + "("+ initializer +")";
+			case TuniqueID:				initializer = initializer + ' == null? primevc.types.ObjectId.make() : ' + initializer;
+			default:
 		}
 		
-		return	 if (bindable && transient)		"new primevc.core.Bindable<"+ HaxeUtil.haxeType(ptype) +">("+ code +");";
-			else if (bindable)					"new primevc.core.RevertableBindable<"+ HaxeUtil.haxeType(ptype) +">("+ code +");";
-			else if (code == null)				null;
-			else								code + ";";
+		return 	if (bindable)			"new "+ HaxeUtil.haxeType(ptype, true, bindable, false, transient) +"("+ initializer +")";
+				else					initializer;
 	}
 	
 	public static function getConstructorInitializer(ptype:PType, constOnly = false) return switch (ptype)
@@ -1228,7 +1508,7 @@ private class HaxeUtil
 //		case Tdecimal(_,_,_):		'primevc.types.Number.FLOAT_NOT_SET';
 		case Temail:				"''";
 		
-		case Turi, TfileRef, Tinterval, Tdecimal(_,_,_), TuniqueID, TenumConverter(_), Tdate, Tdatetime, Tcolor:
+		case Turi, Turl, TfileRef, Tinterval, Tdecimal(_,_,_), TuniqueID, TenumConverter(_), Tdate, Tdatetime, Tcolor, TclassRef(_):
 			null;
 	}
 		
@@ -1244,7 +1524,7 @@ private class HaxeUtil
 	{
 		case Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tcolor:
 			bindable;
-		case Tstring,Tdate,Tdatetime,Tinterval,Turi,TuniqueID,Temail,TfileRef, Tdef(_), TenumConverter(_), Tarray(_,_,_):
+		case Tstring,Tdate,Tdatetime,Tinterval,Turi,Turl,TuniqueID,Temail,TfileRef, Tdef(_), TenumConverter(_), Tarray(_,_,_), TclassRef(_):
 			true;
 	}
 	
@@ -1290,10 +1570,12 @@ private class HaxeUtil
 			case Tdatetime:					'Date';
 			case Tinterval:					'primevc.types.DateInterval';
 			case Turi:						'primevc.types.URI';
+			case Turl: 						'primevc.types.URL';
 			case TuniqueID:					'primevc.types.ObjectId';
 			case Temail:					'primevc.types.EMail';
 			case Tcolor:					'primevc.types.RGBA';
 			case TfileRef:					'primevc.types.FileRef';
+			case TclassRef(classPath):		classPath;
 			
 			case Tdef(ptypedef):			switch (ptypedef) {
 				case Tclass		(def): (immutableInterface? def.module.fullName + ".I" + def.name : def.fullName) + "VO";
@@ -1333,10 +1615,12 @@ private class HaxeUtil
 		case Tdatetime:					'TClass(Date)';
 		case Tinterval:					'TClass(primevc.types.DateInterval)';
 		case Turi:						'TClass(primevc.types.URI)';
+		case Turl:						'TClass(primevc.types.URL)';
 		case TuniqueID:					'TClass(primevc.types.ObjectId)';
 		case Temail:					'TClass(primevc.types.EMail)';
 		case Tcolor:					'TClass(primevc.types.RGBA)';
 		case TfileRef:					'TClass(primevc.types.FileRef)';
+		case TclassRef(className):		'TClass('+className+')';
 		
 		case Tdef(ptypedef):			switch (ptypedef) {
 			case Tclass		(def): "TClass("+ def.module.fullName + "VO)";
@@ -1358,7 +1642,7 @@ private class HaxeUtil
 			case Tstring:
 				path +" == "+ '"'+ val +'"';
 			
-			case Turi, TfileRef:
+			case Turi, Turl, TfileRef:
 				path +'.string == "'+ Std.string(val) +'"';
 			
 			case Tdate, Tdatetime, TuniqueID, Temail:
@@ -1375,7 +1659,7 @@ private class HaxeUtil
 			//	'String';
 				throw "Unsupported value literal";
 			
-			case Tdef(_), Tinterval, Tarray(_,_,_):
+			case Tdef(_), Tinterval, Tarray(_,_,_), TclassRef(_):
 				throw "Unsupported value literal: "+type;
 		}
 		/*
@@ -1426,6 +1710,7 @@ private class HaxeXMLMap extends CodeBufferer
 		a("\t}\n");
 		
 		a("\n\t");
+	//	a('@:keep ');
 		var has_super = add_override();
 		a("public function setFromXML(node:Xml) : Void\n\t{\n");
 		
@@ -1922,14 +2207,16 @@ private class HaxeXMLMap extends CodeBufferer
 			case Tdatetime:					path+".getTime()";
 			
 			case Turi:						throw "impossible Turi";
+			case Turl:						throw "impossible Turl";
 			case TfileRef:					throw "impossible TfileRef";
 			case Tinterval:					throw "impossible Tinterval";
 			case TuniqueID:					throw "impossible Tuniq";
 			case Temail:					throw "impossible Temail";
 			case Tdef(ptypedef):			throw "impossible int conversion Tdef: "+ptypedef;
 			
-			case TenumConverter(enums):		throw "not implemented";
-			case Tarray(type, min, max):	throw "not implemented";
+			case TclassRef(className):		throw "not implemented "+ptype;
+			case TenumConverter(enums):		throw "not implemented "+ptype;
+			case Tarray(type, min, max):	throw "not implemented "+ptype;
 		}
 	}
 	
@@ -1947,6 +2234,7 @@ private class HaxeXMLMap extends CodeBufferer
 			
 			case Tinterval:					throw "impossible";
 			case Turi:						throw "impossible";
+			case Turl:						throw "impossible";
 			case TfileRef:					throw "impossible";
 			case TuniqueID:					throw "impossible";
 			case Temail:					throw "impossible";
@@ -1954,6 +2242,7 @@ private class HaxeXMLMap extends CodeBufferer
 			
 			case TenumConverter(enums):		throw "not implemented";
 			case Tarray(type, min, max):	throw "not implemented";
+			case TclassRef(className):			throw "not implemented";
 		}
 	}
 	
@@ -1975,6 +2264,7 @@ private class HaxeXMLMap extends CodeBufferer
 			case Tdecimal(min,max,stride):	xmlstring+prefix+'Float';
 			case Tstring, TfileRef:			if (prefix == "to") xmlstring+prefix+'String'; else null;
 			case Turi:						if (prefix == "to") { setProp = false; "this." + property + ".parse"; } else xmlstring+prefix+'URI';
+			case Turl:						if (prefix == "to") { setProp = false; "this." + property + ".parse"; } else xmlstring+prefix+'URL';
 			case TuniqueID:					xmlstring+prefix+'ObjectId';
 			case Temail:					xmlstring+prefix+'EMail';
 			case Tcolor:					xmlstring+prefix+'Color';
@@ -2005,6 +2295,7 @@ private class HaxeXMLMap extends CodeBufferer
 				/*'return'*/ prop.definition.utilClassPath+"."+convFunction;
 			
 			case Tinterval:					throw "Interval not supported as XML value";
+			case TclassRef(_):				throw "Dynamic class-type not supported as XML value";
 			case Tarray(type, min, max):	"function(arr){Lambda.iter(arr, "+getXMLConversionFunction(type, "arr", prefix, property).fun+");}";
 		}
 		

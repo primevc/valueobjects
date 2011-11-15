@@ -21,6 +21,7 @@ object Type
 
   case object Tstring    extends T
   case object Turi       extends T
+  case object Turl       extends T
   case object Temail     extends T
 
   case object TuniqueID  extends T

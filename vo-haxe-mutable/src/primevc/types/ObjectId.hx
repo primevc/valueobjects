@@ -16,7 +16,7 @@ class ObjectId
 	private var pid			: Int;
 	private var increment	: Int;
 	
-	private function new(){}
+	private function new() {}
 	
 	static public function make()
 	{
@@ -30,25 +30,42 @@ class ObjectId
 	}
 	
 #if debug
-	static public function selftest() {
+	static public function __init__() { // Run selftest at startup
 		var str = "47cc67093475061e3d95369d";
 		var o = fromString(str);
-		Assert.that(str == o.toString().toLowerCase());
-#if !neko
-		Assert.that(o.timestamp	== 0x47cc6709);
-#end
-		Assert.that(o.machine	== 0x347506  );
-		Assert.that(o.pid		== 0x1e3d    );
-		Assert.that(o.increment	== 0x95369d  );
+		Assert.equal(str, o.toString().toLowerCase());
+	#if !neko
+		Assert.equal(o.timestamp,	0x47cc6709);
+	#end
+		Assert.equal(o.machine,	    0x347506  );
+		Assert.equal(o.pid,		    0x1e3d    );
+		Assert.equal(o.increment,	0x95369d  );
 		
 		var bytes = new haxe.io.BytesOutput();
+		bytes.bigEndian = true;
 		o.writeBytes(bytes);
-		var copy = fromBytes(new haxe.io.BytesInput(bytes.getBytes()));
+		var byteArr = bytes.getBytes();
+		var input = new haxe.io.BytesInput(byteArr);
+		input.bigEndian = true;
+		var copy1 = fromInput(input);
 		
-		Assert.that(copy.timestamp	== o.timestamp);
-		Assert.that(copy.machine	== o.machine);
-		Assert.that(copy.pid		== o.pid);
-		Assert.that(copy.increment	== o.increment);
+		Assert.equal(copy1.timestamp, o.timestamp);
+		Assert.equal(copy1.machine,   o.machine);
+		Assert.equal(copy1.pid,       o.pid);
+		Assert.equal(copy1.increment, o.increment);
+		
+	#if flash10
+		var b:flash.utils.ByteArray = (untyped byteArr).b;
+		b.length = 1024;
+		b.position = 0;
+		flash.Memory.select(b);
+		var copy2 = fromMemory(0);
+		
+		Assert.equal(copy2.timestamp, o.timestamp);
+		Assert.equal(copy2.machine,   o.machine);
+		Assert.equal(copy2.pid,       o.pid);
+		Assert.equal(copy2.increment, o.increment);
+	#end
 	}
 #end
 	
@@ -65,7 +82,7 @@ class ObjectId
 		return oid;
 	}
 	
-	static public function fromBytes(input: haxe.io.Input)
+	static public function fromInput(input: haxe.io.Input)
 	{
 		var oid = new ObjectId();
 		
@@ -76,7 +93,38 @@ class ObjectId
 		
 		return oid;
 	}
+
+#if flash10
 	
+	static public inline function fromMemory(addr : Int, bigEndian:Bool = true)
+	{
+		var oid = new ObjectId();
+		
+		if (bigEndian)
+		{
+			oid.timestamp =
+				flash.Memory.getByte(addr)   << 24 |
+    	        flash.Memory.getByte(addr+1) << 16 |
+        	    flash.Memory.getByte(addr+2) <<  8 |
+            	flash.Memory.getByte(addr+3)       ;
+            
+			oid.machine	  = flash.Memory.getByte(addr +  4) << 16 | (flash.Memory.getByte(addr +  5) << 8) | flash.Memory.getByte(addr +  6);
+			oid.pid       = flash.Memory.getByte(addr +  7) <<  8 |  flash.Memory.getByte(addr +  8);
+			oid.increment = flash.Memory.getByte(addr +  9) << 16 | (flash.Memory.getByte(addr + 10) << 8) | flash.Memory.getByte(addr +  11);
+		}
+		else
+		{
+			oid.timestamp	= flash.Memory.getI32(addr);
+			oid.machine		= flash.Memory.getByte(addr +  4) | (flash.Memory.getUI16(addr +  5) << 8);
+			oid.pid			= flash.Memory.getUI16(addr +  7);
+			oid.increment	= flash.Memory.getByte(addr +  9) | (flash.Memory.getUI16(addr + 10) << 8);
+		}
+		
+		return oid;
+	}
+	
+#end
+    
 	public function writeBytes(out : haxe.io.Output)
 	{
 		out.writeInt32(haxe.Int32.ofInt( cast timestamp ));

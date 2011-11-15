@@ -3,6 +3,8 @@ package primevc.types
 
 class Ref[V <: ValueObjectWithID](val ref:V#IDType, var vo_! : V = null.asInstanceOf[V])
 {
+  if (vo_! != null) require(ref != null, "No ref value for Ref[_].vo_! = "+ vo_!);
+  
   def empty_? = ref == null
   def vo(implicit proxy:VOProxy[V]) = if (ref == null) None else if (vo_! != null) Some(vo_!)
     else {
@@ -12,6 +14,11 @@ class Ref[V <: ValueObjectWithID](val ref:V#IDType, var vo_! : V = null.asInstan
     }
 
   override def toString = if (ref != null) "Ref("+ ref +")" else "Ref"
+}
+
+object Ref
+{
+  def apply[V <: ValueObjectWithID](ref : V#IDType) = new Ref[V](ref)
 }
 
 class RefArray[V <: ValueObjectWithID](_ref : Array[V#IDType] = null, _voArray : Array[V] = null)

@@ -15,7 +15,7 @@ class ScalaTypeMap implements CodeGenerator
 			map.set(def.index, if (def.isMixin) def.fullName; else def.fullName + "VO");
 	}
 
-	public function genEnum(def:EnumDef){}
+	public function genEnum(def:EnumDef) {}
 
 	public function newModule(module:Module) {
 		module.generateWith(this);
@@ -150,13 +150,14 @@ file.writeString("
 				case Tarray(_,_,_):
 					emptyChecks.add({expr: "(__"+ p.name +" == null || __"+ p.name +".length == 0)", id: i});
 				
-				case Tstring, TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
+				case Tstring, TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, Turl, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
 					++nonEmptyChecks;
 				
 				case TenumConverter(_):		throw p;
+				case TclassRef(_):			continue; //throw p;
 			}
 			else switch (p.type) {
-				case TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
+				case TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, Turl, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
 					superClassHasBitflags = true;
 				default:
 			}
@@ -209,7 +210,8 @@ file.writeString("
 		currentFieldBitNum = thisPropsStartIndex;
 		
 		for (p in def.propertiesDefined)
-			writeVarGetter(p);
+		//	if (!p.isTransient())
+				writeVarGetter(p);
 		a("\n}\n\n");
 		
 		if (def.isMixin) {
@@ -224,8 +226,7 @@ file.writeString("
 		a("\n\nsealed class "); a(def.name); a("VO");
 		
 		if (idType != null) {
-			a(def.superClass != null? " (_id:" : " (val _id:");
-			a(idType); a(" = "); a(nilValue(idProperty.type)); a(")");
+			a(def.superClass != null? " (_id:" : " (val _id:"); a(idType); a(")");
 		}
 		a(" extends ");
 		
@@ -234,11 +235,16 @@ file.writeString("
 			if (idType != null) a("(_id)");
 			a(" with ");
 		}
-		
+		else if (!def.isMixin && ns == null) {
+			a("AbstractValueObject with ");
+		}
+
 		a(def.name); a("\n{");
 		
 		for (i in thisPropsStartIndex ... def.propertiesSorted.length) {
 			var p = def.propertiesSorted[i];
+		//	if (p.isTransient())
+		//		continue;
 			var r = p.hasOption(required);
 			if (r) requiredProps.add(i);
 			writeSetter(i, p);
@@ -247,18 +253,21 @@ file.writeString("
 		
 		
 		// IDType
-		if(idType != null && !idFromSuperclassOrTrait) {
-			a("\n  type IDType = "); a(idType); ac("\n".code);
+		if(idType != null) {
+			if (!idFromSuperclassOrTrait) {
+				a("\n  type IDType = "); a(idType);
+			}
+			a("\n  def this()  = this("); a(nilValue(idProperty.type)); a(")");
 		}
 		
 		// Companion getter
 		a("\n  override def Companion : VOCompanion[_] with VOMessagePacker[_] = "); a(def.name); a("VO");
 		
-		// partial_?
+/*		// partial_?
 		if (def.propertiesSorted.length != 0) {
 			a("\n  override def partial_? = numFieldsSet_? != "); a(Std.string(def.propertiesSorted.length));
 		}
-		
+*/		
 		// Non-bitflag empty checks overrides
 		if (emptyChecks.length > 0)
 		{
@@ -365,7 +374,15 @@ file.writeString("
 				}
 			}
 			
-			a("\n\n  override val numFields = "+def.propertiesSorted.length);
+			// fields : Array
+			a("\n\n  override val fields = Array[Field](");
+			for (i in 0 ... def.propertiesSorted.length)
+			{
+				var p = def.propertiesSorted[i];
+				if (i != 0) a(", "); a(quote(p.name));
+			}
+			a(");");
+			
 			// field(Int)
 			a("\n\n  override def field(index: Int) = index match {");
 			for (i in 0 ... def.propertiesSorted.length)
@@ -451,7 +468,7 @@ file.writeString("
 			a("}\n");
 			// VOFieldInfo
 			a("trait "); a(def.name); a("FieldInfo extends VOFieldInfo {\n");
-				a('  override val numFields = '); a(def.name); a('VO.numFields;\n');
+//				a('  override val numFields = '); a(def.name); a('VO.numFields;\n');
 				a("  override def field(index: Int): Field = "); a(def.name); a('VO.field(index);\n');
 				a("  override def field(key: String): Int = " ); a(def.name); a('VO.field(key);\n');
 			a("}\n");
@@ -519,10 +536,10 @@ file.writeString("
 							a('.filter(_ != null).map(ConvertTo.string(_));\n');
 						}
 				
-					case Tcolor:					a("  "); addVOGetterCase(p); a('.toInt.asInstanceOf[AnyRef];\n');
-					case Turi, Temail, TfileRef:	a("  "); addVOGetterCase(p); a('.toString;\n');
-					case Tdate,Tdatetime:			a("  "); addVOGetterCase(p); a('.toDate;\n');
-					case Tinterval:					a("  "); addPropnameCase(p); a("new IntervalDBObject(vo."); a(quote(p.name)); a(");\n");
+					case Tcolor:						a("  "); addVOGetterCase(p); a('.toInt.asInstanceOf[AnyRef];\n');
+					case Turi, Turl, Temail, TfileRef:	a("  "); addVOGetterCase(p); a('.toString;\n');
+					case Tdate,Tdatetime:				a("  "); addVOGetterCase(p); a('.toDate;\n');
+					case Tinterval:						a("  "); addPropnameCase(p); a("new IntervalDBObject(vo."); a(quote(p.name)); a(");\n");
 					
 					default:
 				}
@@ -553,6 +570,9 @@ file.writeString("
 			
 			for (i in thisPropsStartIndex ... def.propertiesSorted.length) {
 				var p = def.propertiesSorted[i];
+			//	if (p.isTransient())
+			//		continue;
+				
 				a("      "); writeMongoGetter(p, "vo." + propertyName(p));
 			}
 			if (def.superClass != null) {
@@ -623,7 +643,7 @@ file.writeString("
 		case Tstring:
 			ac('"'.code); a(Std.string(val)); ac('"'.code);
 		
-		case Turi:
+		case Turi, Turl:
 			ac('"'.code); a(Std.string(val)); ac('"'.code);
 		
 		case Tdate, Tdatetime, TuniqueID, Temail:
@@ -639,7 +659,7 @@ file.writeString("
 		case TenumConverter(enums):
 			throw "Unsupported value literal";
 		
-		case Tdef(_), Tinterval, Tarray(_,_,_):
+		case Tdef(_), Tinterval, Tarray(_,_,_), TclassRef(_):
 			throw "Unsupported value literal: "+type;
 	}
 	
@@ -648,7 +668,7 @@ file.writeString("
 			case Tenum(def):		path;
 			default:				path;
 		}
-		case Turi, Temail, TuniqueID, TfileRef, Tdate, Tdatetime:
+		case Turi, Turl, Temail, TuniqueID, TfileRef, Tdate, Tdatetime:
 			'"" + ' + path; //+".toString";
 		case Tstring:				path;
 		case Tinteger(_,_,_):		path;
@@ -659,6 +679,7 @@ file.writeString("
 		case Tinterval:				throw t;
 		case Tarray(innerT,_,_):	throw t;
 		case TenumConverter(prop):	throw t;
+		case TclassRef(_):			throw t;
 	}
 	
 	function genNamedSetKeyMatcher(def: NamedSetDef, wildcardMethod:String, action:Int->Property->String)
@@ -888,9 +909,10 @@ file.writeString("
 			case Tstring:
 				add_ifVarNotNull(p.name, '""');
 			
-			case Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, TuniqueID, TfileRef, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
+			case Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, Turl, TuniqueID, TfileRef, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
 				a('__'); a(p.name);
 			
+			case TclassRef(className):	a(className); //throw p;
 			case TenumConverter(_):		throw p;
 		}
 		
@@ -1064,7 +1086,7 @@ file.writeString("
 			case Tdef(_):			"ConvertTo.voArray["+getType(innerT).name+"]";
 			default:				"ConvertTo.array["+getType(innerT).name+"]";
 		}
-		case Turi:					"ConvertTo.uri";
+		case Turi, Turl:			"ConvertTo.uri";
 		case Temail:				"ConvertTo.email";
 		case Tinterval:				"ConvertTo.interval";
 		case TuniqueID:				"ConvertTo.uniqueID";
@@ -1077,11 +1099,12 @@ file.writeString("
 		case Tbool(_):				"ConvertTo.boolean";
 		case Tcolor:				"ConvertTo.rgba";
 		case TenumConverter(prop):	prop.parent.fullName + ".from" + prop.name.substr(2); //"";
+		case TclassRef(className):	"ConvertTo."+className; //throw t;
 	}
 	
 	function mongoConversionHelper(t:PType, path:String, ?v:String = "v") return switch(t) {
 		case Tarray(innerT,_,_):	"JavaConversions.asScalaIterator("+v+".iterator).map(e => "+mongoConversionHelper(innerT, null, "e.asInstanceOf["+ mongoType(innerT,false) +"]") + ").toArray";
-		case Turi:					"ConvertTo.uri("+v+")";
+		case Turi, Turl:			"ConvertTo.uri("+v+")";
 		case Temail:				"ConvertTo.email("+v+")";
 		case Tinterval:				"ConvertTo.interval("+v+")";
 		case Tcolor:				"ConvertTo.rgba("+v+")";
@@ -1095,16 +1118,18 @@ file.writeString("
 		case Tdate:					"new org.joda.time.DateMidnight("+v+")";
 		case Tdatetime:				"new org.joda.time.DateTime("+v+")";
 		
-		case TuniqueID, Tstring, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
+		case TuniqueID, Tstring, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_), TclassRef(_):
 			v;
 		
 		case TenumConverter(_):		throw t; //"";
+	//	case TclassRef(_):			throw t;
 	}
 	
 	function needsMongoHelperClass(t:PType) return switch(t) {
 		case Tarray(innerT,_,_):	needsMongoHelperClass(innerT);
 		case Tdef(t):				switch(t) { case Tenum(_): false; default: true; }
 		case Turi,
+			 Turl,
 		 	 Temail,
 		 	 Tinterval,
 			 TfileRef,
@@ -1115,6 +1140,7 @@ file.writeString("
 		 	 Tdate,
 		 	 Tdatetime,
 			 Tcolor,
+			 TclassRef(_),
 		 	 Tbool(_):				false; //"Boolean";
 		
 		case TenumConverter(_):		throw t; //"";
@@ -1123,7 +1149,7 @@ file.writeString("
 	function isBasicMongoType(t:PType) return switch(t) {
 		case Tarray(innerT,_,_):	isBasicMongoType(innerT);
 		case Tdef(_):				false;
-		case Turi:					false;
+		case Turi, Turl:			false;
 		case Temail:				false; //"EMail";
 		case Tcolor:				false;
 		case Tinterval:				false; //"org.joda.time.Interval";
@@ -1135,6 +1161,7 @@ file.writeString("
 		case Tbool(v):				true; //"Boolean";
 		case Tdate:					false; //"org.joda.time.DateTime";
 		case Tdatetime:				false; //"org.joda.time.DateTime";
+		case TclassRef(_):			throw t;
 		case TenumConverter(_):		throw t; //"";
 	}
 	
@@ -1161,10 +1188,11 @@ file.writeString("
 		case Tdate:					"java.util.Date";
 		case Tdatetime:				"java.util.Date";
 		
-		case Turi, Temail, TfileRef:
+		case Turi, Turl, Temail, TfileRef:
 			"String";
 		
 		case TenumConverter(_):		throw t; //"";
+		case TclassRef(className):	className; //throw t;
 	}
 	
 	function arrayInnerType(p:Property) return switch(p.type) {
@@ -1192,13 +1220,14 @@ file.writeString("
 	}
 	
 	function nilValue(t:PType) return switch(t) {
-		case Tstring, Turi, TuniqueID, Tinterval, Tdate, Tdatetime, Temail, Tdef(_), Tarray(_,_,_), Tcolor, TfileRef:
+		case Tstring, Turi, Turl, TuniqueID, Tinterval, Tdate, Tdatetime, Temail, Tdef(_), Tarray(_,_,_), Tcolor, TfileRef:
 			"null";
 		
 		case Tinteger(_,_,_):		"0";
 		case Tdecimal(_,_,_):		"Double.NaN";
 		case Tbool(v):				Std.string(v);
 		
+		case TclassRef(_):			"null";
 		case TenumConverter(_):		throw t; //"";
 	}
 	
@@ -1208,19 +1237,20 @@ file.writeString("
 		res.name = (surroundWithType != null? surroundWithType + "[" : "") +
 		  (switch(t) {
 			case Tarray(innerT,_,_):	"Array["+ getType(innerT).name +"]";
-			case Turi:					"java.net.URI";
-			case TuniqueID:				"org.bson.types.ObjectId";
+			case Turi, Turl:			"primevc.types.URI";
+			case TuniqueID:				"primevc.types.ObjectId";
 			case TfileRef:				"primevc.types.FileRef";
 			case Tstring:				"String";
 			case Tinteger(_,_,_):		res.mongoOptionGetter = ".map(ConvertTo.integer(_))";    "Int";
 			case Tdecimal(_,_,_):		res.mongoOptionGetter = ".map(ConvertTo.decimal(_))"; "Double";
 			case Tbool(v):				res.defaultValue = v; res.mongoOptionGetter = ".map(_.booleanValue)"; "Boolean";
 			case TenumConverter(_):		throw t; //"";
-			case Temail:				"javax.mail.internet.InternetAddress";
+			case Temail:				"primevc.types.InternetAddress";
 			case Tdate:					"org.joda.time.DateMidnight";
 			case Tdatetime:				"org.joda.time.DateTime";
 			case Tinterval:				"org.joda.time.Interval";
 			case Tcolor:				"primevc.types.RGBA";
+			case TclassRef(className):	className;
 		
 			case Tdef(ptypedef): switch (ptypedef) {
 				case Tclass		(def):	def.fullName + "VO";
@@ -1252,7 +1282,7 @@ file.writeString("
 		a("class EValue(nextId:Int, name:String, val value:Int");
 		addConversionParams(true);
 		a(") extends Val(nextId, name);\n  ");
-		a("def V(name:String, value:Int");
+		a("final def V(name:String, value:Int");
 		addConversionParams(false);
 		a(") = new EValue(nextId, name, value");
 		for (prop in def.conversions) if (prop.name != "toString") {
@@ -1260,11 +1290,12 @@ file.writeString("
 		}
 		a(");\n");
 		
-		a("\n  def fromValue(v: Int) : this.EValue = v match {");
+		a("\n  final def fromValue(v: Int) : this.EValue = v match {");
 		for (e in def.enumerations) if (e.type == null)
 		{
 			a("\n    case " + e.intValue); a(" => this."); a(e.name);
 		}
+		a("\n    case _ => this.Null");
 		a("\n  }\n\n");
 		
 		a('  val Null = V("", -1');
@@ -1999,7 +2030,11 @@ class ScalaMessagePacking extends MessagePacking
 	override private function a_assert(v:String) {
 		a("require("); a(v); a(");");
 	}
-	override private function a_writeByte(byte:String) {
+
+	override private function a_maskByte(mask:Int, byte:String) {
+		return if (mask > 0xFF){ a(byte); a(" & 0xFF"); } else { a(byte); a(" & 0x"); a(StringTools.hex(mask, 2)); };
+	}
+	override private function a_writeByte(byte:String, mask:Int = 0xFFFFFF) {
 		a("o.writeByte("); a(byte); a(");");
 	}
 	override private function endPackerFunction() {
@@ -2022,17 +2057,18 @@ class ScalaMessagePacking extends MessagePacking
 				case Tenum(_):	a('o.pack('); a(path); a(".value)");
 			} 
 			
-			case Tarray(_,_,_), Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tstring, Tdate, Tdatetime, Tinterval, Turi, TuniqueID, Temail, Tcolor, TfileRef:
+			case Tarray(_,_,_), Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tstring, Tdate, Tdatetime, Tinterval, Turi, Turl, TuniqueID, Temail, Tcolor, TfileRef:
 				a('o.pack('); a(path); ac(")".code);
 			
 			
-			case TenumConverter(_):	throw "Not implemented";
+			case TenumConverter(_), TclassRef(_):
+				throw "Not implemented";
 		}
 	}
 	
 	override private function definePackerFunction()
 	{
-		a("\n\tdef msgpack_packVO(o : VOPacker, obj : "); a(def.name); a(", flagsToPack : Int)\n\t{"); //"); a(Module.pkgRoots.first().name); a("]
+		a("\n\tfinal def msgpack_packVO(o : VOPacker, obj : "); a(def.name); a(", flagsToPack : Int)\n\t{"); //"); a(Module.pkgRoots.first().name); a("]
 		a("\n		require(o != null && obj != null);");
 		a("\n		");
 		a("\n		var propertyBits = flagsToPack;");
@@ -2042,13 +2078,20 @@ class ScalaMessagePacking extends MessagePacking
 	{
 		fieldIndexOffset = new IntHash();
 		
+		a("\n  val defaultVOCompanionMap = ");
+		var pkgroot = def.module.getPackageRoot();
+		if (pkgroot != Module.root) {
+			a(pkgroot.fullName); a(".VO.typeMap");
+		}
+		else a("null");
+		
 		a("\n  val TypeID = "); a(Std.string(def.index));
-		a("\n  def fieldIndexOffset(typeID: Int) = typeID match {");
+		a("\n  final def fieldIndexOffset(typeID: Int) = typeID match {");
 		genFieldOffsetCases(def);
 		a("\n  }\n");
 	}
 	
-	override private function a_unpackProperty(p:Property)
+	override private function a_unpackProperty(p:Property, bit:Int)
 	{
 		a(p.name); a(" = "); a("input.unpack();");
 	}

@@ -32,6 +32,8 @@ package primevc.types;
 /**
  * FileRef class is meant for files that are hosted by online-touch. Use URI-class
  * for uri's that are hosted externally.
+ *
+ * TODO: Implement mostly the same functionality as the Scala version.
  */
 class FileRef extends URI
 {

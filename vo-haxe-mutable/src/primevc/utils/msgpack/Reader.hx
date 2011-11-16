@@ -78,14 +78,14 @@ class Reader implements IDisposable
 	    #if MessagePackDebug_Read if (verbose) trace("readMsgPackValue(pid: "+pid+", itemType: "+ itemType +")"); #end
 		Assert.notNull(#if flash10 this.bytes #else this.input #end);
 		
-		var value;
+		var value = null;
 		try {
 			value = readValue(readByte(), pid, itemType);
 			if (IfUtil.notNull(itemType) && !(#if flash9 untyped __is__(value, itemType) || #end Std.is(value, itemType)))
 				value = converter(value, pid, itemType);
 		}
-		catch (e:Eof)
-		 	value = null;
+		catch (e:Eof) {}
+		// 	value = null;
 		
 		return value;
 	}
@@ -110,7 +110,7 @@ class Reader implements IDisposable
 			case 0xdc:	readUInt16();
 			case 0xdd:	readUInt30();
 			default:
-				return if (b & 0xF0 == 0x90) b & 15;
+				if (b & 0xF0 == 0x90) b & 15;
 				else 1;
 		}
 	}
@@ -283,10 +283,8 @@ class Reader implements IDisposable
 			);
 			Assert.that(Std.is(target, interfaze), target +" is not a "+ interfaze + " ; voHeader: 0x"+StringTools.hex(voHeader) + ", typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes);
 #end
-#if debug   try { #end
 			if (fieldsSetBytes != 0)
 				(untyped clazz).msgpack_unpackVO(this, target, fieldsSetBytes);
-#if debug   } catch (e:Dynamic) { trace(clazz+"; bytes: "+fieldsSetBytes+"; "+e); trace("stack: "+haxe.Stack.toString(haxe.Stack.callStack())); throw clazz+" unpack error: "+e; } #end
 			
 			if (superTypeCount > 0)
 				voHeader = readByte();

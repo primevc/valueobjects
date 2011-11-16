@@ -43,6 +43,7 @@ package primevc.core.net;
  import primevc.types.URI;
  import primevc.utils.msgpack.Reader;
   using primevc.utils.Bind;
+  using primevc.utils.TypeUtil;
   using primevc.core.net.HttpStatusCodes;
 
 
@@ -83,10 +84,7 @@ class MessagePackResource <Data> implements IDisposable
 		
 		reader = new primevc.utils.msgpack.Reader(typeMap);
 		loader = new URLLoader();
-//#if flash9
-//		loader.dataFormat = flash.net.URLLoaderDataFormat.BINARY;
-//#end
-		
+
 		var load	= loader.events.load;
 		onComplete	= load.completed.bind( this, doNothing );
 		onError		= load.error.observe( this, doNothing );
@@ -144,7 +142,7 @@ class MessagePackResource <Data> implements IDisposable
 		getStarted = primevc.utils.TimerUtil.stamp();
 		trace("get "+uri);
 #end
-		l.load(uri);
+		l.binaryGET(uri);
 		e.started.send();
 	}
 	
@@ -237,15 +235,15 @@ class MessagePackResource <Data> implements IDisposable
 		var start = primevc.utils.TimerUtil.stamp();
 #end
 //		var bytes	= Bytes.ofData(data);
-		
+	
 #if flash10
 		data.endian	 = flash.utils.Endian.BIG_ENDIAN;
 		reader.bytes = data;
 #else
-		reader.input = new BytesInput(Bytes.ofData(data));
+		reader.input = #if js data.is(String)? new ByteStringInput(cast data).as(haxe.io.Input) : #end new BytesInput(Bytes.ofData(data));
+		reader.input.bigEndian = true;
 #end
-		//var input	= reader.input = new BytesInput(bytes);
-		//input.bigEndian = true;
+		
 #if debug
 		var o = reader.readMsgPackValue();
 		trace("deserialized data in "+(primevc.utils.TimerUtil.stamp() - start)+" ms");
@@ -254,7 +252,7 @@ class MessagePackResource <Data> implements IDisposable
 		return reader.readMsgPackValue();
 #end
 	}
-	
+
 	
 	/**
 	 * Method will the error send by the server
@@ -308,6 +306,35 @@ class MessagePackResource <Data> implements IDisposable
 	}*/
 }
 
+
+
+#if js
+/**
+ * Optimized Input stream for use with XMLHttpRequest undecoded byte Strings
+ * @author	Danny Wilson
+ * @since	Apr 14, 2011
+ */
+class ByteStringInput extends haxe.io.Input
+{
+	var b : String;
+	var pos : Int;
+	
+	public function new(charString : String) {
+		this.pos = 0;
+		this.b = charString;
+	}
+	
+	override public function readByte() : Int {
+		return StringTools.fastCodeAt(b, pos++) & 0xFF;
+	}
+	
+	override public function readString( len : Int ) : String {
+		var str = b.substr(pos, len);
+		pos += len;
+		return str;
+	}
+}
+#end
 
 
 

@@ -38,8 +38,12 @@ class MessagePacking
 		"\n\t\tfieldOffset += 8;" +
 		"\n\t\t--propertyBytes;"
 	
-	private function a_writeByte(byte:String) {
-		a("{ #if MessagePackDebug_Pack trace('packVO byte: 0x' + StringTools.hex("); a(byte); a(")); #end o.writeByte("); a(byte); a("); ++b; }");
+	private function a_maskByte(mask:Int, byte:String) {
+		return if (mask > 0xFF) a(byte); else { a(byte); a(" & 0x"); a(StringTools.hex(mask, 2)); }
+	}
+
+	private function a_writeByte(byte:String, mask:Int = 0xFFFFFF) {
+		a("{ #if MessagePackDebug_Pack trace('packVO byte: 0x' + StringTools.hex("); a_maskByte(mask, byte); a(")); #end o.writeByte("); a(byte); a("); ++b; }");
 	}
 	
 	private function a_return() a("return b;")

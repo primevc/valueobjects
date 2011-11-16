@@ -33,7 +33,7 @@ trait LocalFileRepository extends FileRepository {
 }
 
 class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
-  require(root.isDirectory)
+  require(root.isDirectory, root + " is not a directory.")
 
   def toURI   (f : FileRef) = ConvertTo.uri(f.toString)
   def getFile (f : FileRef) = new File(root.getAbsolutePath + "/" + f.toString)
@@ -44,7 +44,12 @@ class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
   def absorb (file : File) = {
     val ref = FileRef(file)
     val newFile = getFile(ref)
-    file renameTo newFile
+    if (newFile.exists) {
+      org.apache.commons.io.FileUtils.touch(newFile)
+      file.delete
+    }
+    else file renameTo newFile
+
     ref
   }
 
@@ -65,7 +70,7 @@ class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
   }
 }
 
-class FileRef private[primevc]( val _ref:String, val _hash:Array[Byte] )
+case class FileRef private[primevc]( val _ref:String, val _hash:Array[Byte], val originalName : String = null)
 {
   require(_ref != null || _hash != null, "either ref or hash should be set")
 
@@ -79,11 +84,12 @@ class FileRef private[primevc]( val _ref:String, val _hash:Array[Byte] )
 
 object FileRef
 {
-  def apply(s:String)   : FileRef = new FileRef(s, null)
-  def apply(o:ObjectId) : FileRef = new FileRef("^", o.toByteArray)
+  def apply(b:Array[Byte]) : FileRef = new FileRef(null, b)
+  def apply(s:String)      : FileRef = new FileRef(s, null)
+  def apply(o:ObjectId)    : FileRef = new FileRef("^", o.toByteArray)
 
-  def apply(file : File) : FileRef = apply(file, null)
-  def apply(file : File, prefix : String) : FileRef = new FileRef(prefix, DigestUtils.sha256(new FileInputStream(file)))
+  def apply(file : File)   : FileRef = apply(file, null)
+  def apply(file : File, prefix : String) : FileRef = new FileRef(prefix, DigestUtils.sha256(new FileInputStream(file)), file.getName)
 
 
   def apply(out : OutputStream) : FileRef.Builder = new FileRef.Builder(out, null)

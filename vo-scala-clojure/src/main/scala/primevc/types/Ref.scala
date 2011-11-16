@@ -16,6 +16,11 @@ class Ref[V <: ValueObjectWithID](val ref:V#IDType, var vo_! : V = null.asInstan
   override def toString = if (ref != null) "Ref("+ ref +")" else "Ref"
 }
 
+object Ref
+{
+  def apply[V <: ValueObjectWithID](ref : V#IDType) = new Ref[V](ref)
+}
+
 class RefArray[V <: ValueObjectWithID](_ref : Array[V#IDType] = null, _voArray : Array[V] = null)
                                       (implicit manifest_IDType : Manifest[V#IDType], voManifest : Manifest[V])
   extends Traversable[V#IDType]

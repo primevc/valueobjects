@@ -43,6 +43,7 @@ package primevc.core.net;
  import primevc.types.URI;
  import primevc.utils.msgpack.Reader;
   using primevc.utils.Bind;
+  using primevc.utils.TypeUtil;
   using primevc.core.net.HttpStatusCodes;
 
 
@@ -239,7 +240,7 @@ class MessagePackResource <Data> implements IDisposable
 		data.endian	 = flash.utils.Endian.BIG_ENDIAN;
 		reader.bytes = data;
 #else
-		reader.input = #if js new ByteStringInput(loader.data); #else new BytesInput(Bytes.ofData(data)); #end
+		reader.input = #if js data.is(String)? new ByteStringInput(cast data).as(haxe.io.Input) : #end new BytesInput(Bytes.ofData(data));
 		reader.input.bigEndian = true;
 #end
 		
@@ -250,27 +251,6 @@ class MessagePackResource <Data> implements IDisposable
 #else
 		return reader.readMsgPackValue();
 #end
-	}
-
-		private function handleGET ()
-	{
-		//trace(loader.bytesLoaded+" / "+loader.bytesTotal);
-		var start = haxe.Timer.stamp();
-		
-	#if js
-		var input	= reader.input = new ByteStringInput(loader.data);
-	#else
-		var bytes	= haxe.io.Bytes.ofData(loader.data);
-		
-		trace(StringTools.hex(bytes.get(0)));
-		var input	= reader.input = new haxe.io.BytesInput(bytes);
-	#end
-		
-		input.bigEndian = true;	
-		this.data = reader.readMsgPackValue();
-		
-		//trace("Message un-packing took: " + (haxe.Timer.stamp() - start));
-		events.receive.completed.send();
 	}
 
 	

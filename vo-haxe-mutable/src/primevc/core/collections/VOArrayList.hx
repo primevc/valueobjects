@@ -137,11 +137,10 @@ class VOArrayListUtil
 	static inline public function setChangeHandler<T>(owner:Dynamic, list:FastArray<T>, changeHandler : ObjectChangeSet -> Void)
 	{
 		if (changeHandler.notNull())
-			for (i in 0 ... list.length)
-			 	cast(list[i], ValueObjectBase).change.bind(owner, changeHandler);
-		
+			for (vo in list)
+				cast(vo, ValueObjectBase).change.bind(owner, changeHandler);
 		else
-			for (i in 0 ... list.length)
-			 	cast(list[i], ValueObjectBase).change.unbind(owner);
+			for (vo in list)
+			 	cast(vo, ValueObjectBase).change.unbind(owner);
 	}
 }

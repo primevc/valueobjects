@@ -656,16 +656,20 @@ class Haxe implements CodeGenerator
 		returnType		= /*"I" + */returnType + "VO";
 		
 		openFunctionDeclaration( def, "clone", false, returnType, false);
-		a("\t\tvar inst = new "+def.name + "VO(\n");
+		a("\t\tvar inst = new "+def.name + "VO(");
 		
 		var first = true;
 		for (p in def.propertiesSorted)
 		{
+			a("\n\t\t\t");
+			if (p.isPlatformSpecific()) {
+				openPlatformCode(p, false); a(" ");
+			}
+			
 			if (first) {
 				first = false;
-				a("\t\t\t");
 			}
-			else a(",\n\t\t\t");
+			else a(", ");
 			
 			if (p.isArray()) {
 				a("null"); // handle array cloning seperately
@@ -683,6 +687,11 @@ class Haxe implements CodeGenerator
 					a(".clone()");
 					addAsClass(p.type);
 				}
+			}
+			
+			if (p.isPlatformSpecific()) {
+				a(" ");
+				closePlatformCode(p);
 			}
 		}
 		a("\n\t\t);\n");
@@ -713,16 +722,20 @@ class Haxe implements CodeGenerator
 		returnType		= /*"I" + */returnType + "VO";
 		
 		openFunctionDeclaration( def, "duplicate", false, returnType, false);
-		a("\t\tvar inst = new "+def.name + "VO(\n");
+		a("\t\tvar inst = new "+def.name + "VO(");
 		
 		var first = true;
 		for (p in def.propertiesSorted)
 		{
+			a("\n\t\t\t");
+			if (p.isPlatformSpecific()) {
+				openPlatformCode(p, false); a(" ");
+			}
+
 			if (first) {
 				first = false;
-				a("\t\t\t");
 			}
-			else a(",\n\t\t\t");
+			else a(", ");
 			
 			if (p.isArray()) {
 				a("null"); // handle array cloning seperately
@@ -743,8 +756,13 @@ class Haxe implements CodeGenerator
 					addAsClass(p.type);
 				}
 			}
+
+			if (p.isPlatformSpecific()) {
+				a(" ");
+				closePlatformCode(p);
+			}
 		}
-		a("\n\t\t);\n");
+		a("\t\t);\n");
 		
 		var first = true;
 		for (p in def.propertiesSorted) if (p.isArray())
@@ -946,13 +964,14 @@ class Haxe implements CodeGenerator
 			} else {
 				a("\n\t/* " + i + "  */\t\t");
 			}
-			
+			// Add comma first to prevent platform specific property clashes
+			if (i != 0) a(", ");
+
 			a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true, p.hasOption(transient)));
 			var init = HaxeUtil.getConstructorInitializer(p.type, true);
 			if (init != null) {
 			 	a(" = "); a(init);
 			}
-			if (i + 1 != def.propertiesSorted.length) a(", ");
 
 			if (p.isPlatformSpecific())
 				closePlatformCode(p, false);

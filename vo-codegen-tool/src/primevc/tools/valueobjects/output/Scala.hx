@@ -167,6 +167,7 @@ file.writeString("
 				if (idProperty != null) throw "VO's may have only 1 ID property...\n  idProperty = "+idProperty+"\n"+def;
 				idProperty = p;
 				idType = getType(p.type).name;
+				Assert.notNull(idType);
 				
 				if (p.definedIn != def)
 					idFromSuperclassOrTrait = true;
@@ -192,6 +193,10 @@ file.writeString("
 		}
 		else if (def.superClass != null) {
 			a(def.superClass.fullName);
+			if (!def.superClass.hasUniqueID() && idType != null) {
+				// Superclass has no Unique ID. Add the required trait now.
+				a(" with ValueObjectWithID");
+			}
 		}
 		else {
 			a("ValueObject"); if (idType != null) a("WithID");
@@ -226,17 +231,19 @@ file.writeString("
 		a("\n\nsealed class "); a(def.name); a("VO");
 		
 		if (idType != null) {
-			a(def.superClass != null? " (_id:" : " (val _id:");
-			a(idType); a(" = "); a(nilValue(idProperty.type)); a(")");
+			a(def.superClass != null && def.superClass.hasUniqueID()? " (_id:" : " (val _id:"); a(idType); a(")");
 		}
 		a(" extends ");
 		
 		if (def.superClass != null) {
 			a(def.superClass.fullName); a("VO");
-			if (idType != null) a("(_id)");
+			if (idType != null && def.superClass.hasUniqueID()) a("(_id)");
 			a(" with ");
 		}
-		
+		else if (!def.isMixin && ns == null) {
+			a("AbstractValueObject with ");
+		}
+
 		a(def.name); a("\n{");
 		
 		for (i in thisPropsStartIndex ... def.propertiesSorted.length) {
@@ -251,8 +258,11 @@ file.writeString("
 		
 		
 		// IDType
-		if(idType != null && !idFromSuperclassOrTrait) {
-			a("\n  type IDType = "); a(idType); ac("\n".code);
+		if(idType != null) {
+			if (!idFromSuperclassOrTrait) {
+				a("\n  type IDType = "); a(idType);
+			}
+			a("\n  def this()  = this("); a(nilValue(idProperty.type)); a(")");
 		}
 		
 		// Companion getter
@@ -1277,7 +1287,7 @@ file.writeString("
 		a("class EValue(nextId:Int, name:String, val value:Int");
 		addConversionParams(true);
 		a(") extends Val(nextId, name);\n  ");
-		a("def V(name:String, value:Int");
+		a("final def V(name:String, value:Int");
 		addConversionParams(false);
 		a(") = new EValue(nextId, name, value");
 		for (prop in def.conversions) if (prop.name != "toString") {
@@ -1285,11 +1295,12 @@ file.writeString("
 		}
 		a(");\n");
 		
-		a("\n  def fromValue(v: Int) : this.EValue = v match {");
+		a("\n  final def fromValue(v: Int) : this.EValue = v match {");
 		for (e in def.enumerations) if (e.type == null)
 		{
 			a("\n    case " + e.intValue); a(" => this."); a(e.name);
 		}
+		a("\n    case _ => this.Null");
 		a("\n  }\n\n");
 		
 		a('  val Null = V("", -1');
@@ -2024,7 +2035,11 @@ class ScalaMessagePacking extends MessagePacking
 	override private function a_assert(v:String) {
 		a("require("); a(v); a(");");
 	}
-	override private function a_writeByte(byte:String) {
+
+	override private function a_maskByte(mask:Int, byte:String) {
+		return if (mask > 0xFF){ a(byte); a(" & 0xFF"); } else { a(byte); a(" & 0x"); a(StringTools.hex(mask, 2)); };
+	}
+	override private function a_writeByte(byte:String, mask:Int = 0xFFFFFF) {
 		a("o.writeByte("); a(byte); a(");");
 	}
 	override private function endPackerFunction() {
@@ -2058,7 +2073,7 @@ class ScalaMessagePacking extends MessagePacking
 	
 	override private function definePackerFunction()
 	{
-		a("\n\tdef msgpack_packVO(o : VOPacker, obj : "); a(def.name); a(", flagsToPack : Int)\n\t{"); //"); a(Module.pkgRoots.first().name); a("]
+		a("\n\tfinal def msgpack_packVO(o : VOPacker, obj : "); a(def.name); a(", flagsToPack : Int)\n\t{"); //"); a(Module.pkgRoots.first().name); a("]
 		a("\n		require(o != null && obj != null);");
 		a("\n		");
 		a("\n		var propertyBits = flagsToPack;");
@@ -2068,8 +2083,15 @@ class ScalaMessagePacking extends MessagePacking
 	{
 		fieldIndexOffset = new IntHash();
 		
+		a("\n  val defaultVOCompanionMap = ");
+		var pkgroot = def.module.getPackageRoot();
+		if (pkgroot != Module.root) {
+			a(pkgroot.fullName); a(".VO.typeMap");
+		}
+		else a("null");
+		
 		a("\n  val TypeID = "); a(Std.string(def.index));
-		a("\n  def fieldIndexOffset(typeID: Int) = typeID match {");
+		a("\n  final def fieldIndexOffset(typeID: Int) = typeID match {");
 		genFieldOffsetCases(def);
 		a("\n  }\n");
 	}

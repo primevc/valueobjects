@@ -127,6 +127,12 @@ class Module
 	//
 	// -- Public API
 	//
+	public function getPackageRoot(): Module {
+		var m = this;
+		while (m != null && !m.packageRoot) m = m.parent;
+		return m != null? m : root;
+	}
+
 	public function generateWith(code:CodeGenerator)
 	{
 		finalize();
@@ -1906,6 +1912,11 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	
 	public function hasOption(opt:Dynamic) {
 		for (o in options) if (o == opt) return true;
+		return false;
+	}
+	/** True if this or superclass contains any property with option 'unique' */
+	public function hasUniqueID(): Bool {
+		for (p in property) if (p.hasOption(unique)) return true;
 		return false;
 	}
 	

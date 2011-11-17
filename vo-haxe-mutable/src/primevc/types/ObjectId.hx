@@ -141,7 +141,8 @@ class ObjectId
 	
 	public inline function equals(other : ObjectId)
 	{
-		return this.timestamp == other.timestamp
+		return other 		  != null
+			&& this.timestamp == other.timestamp
 		 	&& this.machine   == other.machine
 			&& this.pid		  == other.pid
 			&& this.increment == other.increment;

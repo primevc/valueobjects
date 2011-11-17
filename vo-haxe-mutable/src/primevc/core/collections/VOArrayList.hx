@@ -137,15 +137,15 @@ class VOArrayListUtil
 	static inline public function setChangeHandler<T>(owner:Dynamic, list:FastArray<T>, changeHandler : ObjectChangeSet -> Void)
 	{
 		if (changeHandler.notNull())
-			for (i in 0 ... list.length) {
-				var obj = cast(list[i], ValueObjectBase);
+			for (vo in list) {
+				var obj = cast(vo, ValueObjectBase);
 				Assert.notNull(obj, "VOArrayList item " + i + "is null!");
 				obj.change.bind(owner, changeHandler);
 			}
 		
 		else
-			for (i in 0 ... list.length) {
-				var obj = cast(list[i], ValueObjectBase);
+			for (vo in list) {
+				var obj = cast(vo, ValueObjectBase);
 				Assert.notNull(obj, "VOArrayList item " + i + "is null!");
 				obj.change.unbind(owner);
 			}

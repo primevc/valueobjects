@@ -78,14 +78,14 @@ class Reader implements IDisposable
 	    #if MessagePackDebug_Read if (verbose) trace("readMsgPackValue(pid: "+pid+", itemType: "+ itemType +")"); #end
 		Assert.notNull(#if flash10 this.bytes #else this.input #end);
 		
-		var value;
+		var value = null;
 		try {
 			value = readValue(readByte(), pid, itemType);
 			if (IfUtil.notNull(itemType) && !(#if flash9 untyped __is__(value, itemType) || #end Std.is(value, itemType)))
 				value = converter(value, pid, itemType);
 		}
-		catch (e:Eof)
-		 	value = null;
+		catch (e:Eof) {}
+		// 	value = null;
 		
 		return value;
 	}
@@ -110,7 +110,7 @@ class Reader implements IDisposable
 			case 0xdc:	readUInt16();
 			case 0xdd:	readUInt30();
 			default:
-				return if (b & 0xF0 == 0x90) b & 15;
+				if (b & 0xF0 == 0x90) b & 15;
 				else 1;
 		}
 	}

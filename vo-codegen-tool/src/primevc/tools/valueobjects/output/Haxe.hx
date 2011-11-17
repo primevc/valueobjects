@@ -568,6 +568,9 @@ class Haxe implements CodeGenerator
 
 	private function getAllEmptyChecks (p:Property, path:String, bindable:Bool) : String
 	{
+		if (p.hasOption(unique))
+			path = "this."+p.name;
+		
 		var isNull = HaxeUtil.isNullableOnEveryPlatform(p.type, bindable) ? path+".notNull()" : null;
 		var extra = extraNullCheck(path, p.type);
 

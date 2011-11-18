@@ -121,7 +121,7 @@ class MessagePackResource <Data> implements IDisposable
 	
 
 #if debug
-	private var getStarted : Int;
+	private var getStarted : Float;
 #end
 
 

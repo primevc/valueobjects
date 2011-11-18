@@ -568,6 +568,9 @@ class Haxe implements CodeGenerator
 
 	private function getAllEmptyChecks (p:Property, path:String, bindable:Bool) : String
 	{
+		if (p.hasOption(unique))
+			path = "this."+p.name;
+		
 		var isNull = HaxeUtil.isNullableOnEveryPlatform(p.type, bindable) ? path+".notNull()" : null;
 		var extra = extraNullCheck(path, p.type);
 
@@ -739,8 +742,9 @@ class Haxe implements CodeGenerator
 			
 			if (p.isArray()) {
 				a("null"); // handle array cloning seperately
-			} else if (p.type == TuniqueID) {
-				a("null"); // never duplicate id's
+			} else if (p.hasOption(unique)) {
+			//	a("null"); // never duplicate id's
+				a(HaxeUtil.getConstructorInitializer(p.type, true));
 			} else {
 				if (HaxeUtil.isNullableOnEveryPlatform(p.type, p.isBindable())) { // && !p.hasOption(transient)) {
 					a("this."); a(p.name); a(".isNull()? null : ");

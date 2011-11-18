@@ -33,16 +33,18 @@ class ObjectId
 	
 	@:keep static public function msgpack_unpackVO(reader : Reader, obj : IObjectId, propertyBytes : Int) : Void
 	{
-		Assert.that(reader != null && obj != null);
-		var bits:Int;
-		
-		if (!(propertyBytes).not0()) return;
+		Assert.notNull(reader);
+		Assert.notNull(obj);
+		Assert.equal(propertyBytes, 1);
 
-		--propertyBytes;
-		
-		bits = reader.readByte();
-		if ((bits & 0x01).not0()) (untyped obj).id = reader.readMsgPackValue(0, primevc.types.ObjectId);
-		
-		if ((propertyBytes).not0()) reader.discardRemainingVOProperties(propertyBytes);
+		var fieldOffset:Int = (untyped obj)._fieldOffset(TYPE_ID);
+#if debug
+		var bits:Int = reader.readByte();
+		Assert.that((bits & 0x01).not0());
+		(untyped obj)._propertiesSet |= (bits              << fieldOffset);
+#else
+		(untyped obj)._propertiesSet |= (reader.readByte() << fieldOffset);
+#end
+		(untyped obj).id = reader.readMsgPackValue(0, primevc.types.ObjectId);
 	}
 }

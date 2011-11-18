@@ -3,7 +3,8 @@ package primevc.tools.valueobjects.output;
   using primevc.utils.TypeUtil;
 
 /**
- * Helper functions to generate VO message packing functions
+ * Helper functions to generate VO message packing functions.
+ * IMPORTANT: Method in this class not overridden by Scala.hx::ScalaMessagePacking - generate valid Scala code.
  * 
  * @author Danny Wilson
  * @creation-date jan 04, 2011
@@ -30,7 +31,7 @@ class MessagePacking
 	private function defineUnPackerFunction()	Assert.abstract()
 	
 	private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)	Assert.abstract()
-	private function a_unpackProperty(p:Property, bit:Int) 							Assert.abstract()
+	private function a_unpackProperty(p:Property) 									Assert.abstract()
 	
 	private function expr_incrementMixinCount()		return "++mixin"
 	private function expr_decrementPropertyBytes()	return 
@@ -199,12 +200,12 @@ class MessagePacking
 						if (bit <= 8 && p == lastProp)
 						{
 							a("\n\t\t");
-							var bitMask = (1 << (bit-1));
+							var bitMask = (1 << (bit-1)) << 8;
 							// Single last Property: optimize if + packing
-							a("\n\t\t"); a_assertNot0("propertyBits & " + bitMask);
-							a("\n\t\t"); a_writeByte(Std.string(bitMask));
+							a("\n\t\tif ("); a_not0("(propertyBits & 0x" + StringTools.hex(bitMask, 4) + ")"); a(") {");
+							a("\n\t\t"); a_writeByte("0x" + StringTools.hex(bitMask >>> 8, 2));
 							a("\n\t\t"); addPropertyPackerCall("obj." + p.name, p.type, p.isBindable()); ac(";".code);
-							
+							a("\n\t\t}");
 							break;
 						}
 						else throw "huh?";
@@ -226,7 +227,7 @@ class MessagePacking
 								a("\n\t\tif ("); a_not0("propertyBits"); a(") ");
 							}
 							
-							a_writeByte((def.numPropertiesDefined > 8 && def.numPropertiesDefined - i > 1)? "propertyBits & 0x" + StringTools.hex(mask, 2) : "propertyBits");
+							a_writeByte("propertyBits", (def.numPropertiesDefined > 8 && def.numPropertiesDefined - i > 1)? mask : null);
 							a("\n\t\t");
 							if (totalProps <= 8) {	a("\n\t\t"); a_assertNot0("propertyBits"); }
 							else				 {	a("\n\t\tif ("); a_not0("(propertyBits & 0xFF)"); a(") { // open group"); }
@@ -241,7 +242,7 @@ class MessagePacking
 							
 							if (totalProps > 8) {	a("\n\t\t} //end 8"); }
 							a("\n\t\t");
-							if (totalPropsToPack > 0) {
+							if (totalPropsToPack > 1) {
 								a("\n\t\tpropertyBits >>>= 8;");
 								a("\n\t\t");
 							}
@@ -332,9 +333,9 @@ class MessagePacking
 			for (i in 0 ... lastProp.index + 1)
 			{
 				if (bit == 8) {
-					a("\n\t\tif ("); a_is0("propertyBytes"); a(") return;\n");
-					a("\t\tbits = reader.readByte();\n");
-					a("\t\t"); a(expr_decrementPropertyBytes()); a("\n\n");
+					a("\n\t\n\t\tif ("); a_is0("propertyBytes"); a(") return;");
+					a("\n\t\n\t\tbits = reader.readByte();");
+					a("\n\t\n\t\t"); a(expr_decrementPropertyBytes());
 					bit = 0;
 				}
 				
@@ -344,13 +345,14 @@ class MessagePacking
 					continue;
 				}
 				
-				a_unpackProperty(p, bit);
+				a("\n\t\tif ("); a_not0("bits & 0x" + StringTools.hex(1 << bit, 2)); a(") ");
+				a_unpackProperty(p);
 				
 				++bit;
 			}
 		}
-		a("\n\t\tif ("); a_not0("propertyBytes"); a(") reader.discardRemainingVOProperties(propertyBytes);\n");
-		a("\t}\n");
+		a("\n\t\t\n\t\tif ("); a_not0("propertyBytes"); a(") reader.discardRemainingVOProperties(propertyBytes);");
+		a("\n\t}");
 	}
 	
 	static function bitmask(numBits:Int, offset:Int=0)

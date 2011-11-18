@@ -140,7 +140,7 @@ class HaxeMessagePacking extends MessagePacking
 	}
 	
 
-	override private function a_unpackProperty(p:Property, bit:Int)
+	override private function a_unpackProperty(p:Property)
 	{
 		Assert.that(!p.isTransient());
 		/*
@@ -149,14 +149,10 @@ class HaxeMessagePacking extends MessagePacking
 		 3. if property doesn't have a getter and isn't transient or a simple-value, always create a value for it
 		 */
 		
-		var propertyCheck 	= "(bits & 0x" + StringTools.hex(1 << bit, 2) + ").not0()";
 		var hasWrapper 		= p.isArray() || p.isBindable();	// indicating wether there's an object or list wrapped around a value/values
 	//	a("\ttrace('"); a(p.name); a("');\n");
 	//	a("\ttry {\n");
 		a("\t\t");
-	//	if (!hasWrapper || p.shouldHaveGetter()) {	// 1
-			a("if ("); a(propertyCheck); a(")\t\t");
-	//	}
 		
 	/*	if (!p.isArray() && p.isBindable()) {
 			a("(cast(obj."); a(p.name); a(", primevc.core.Bindable<"); a(HaxeUtil.haxeType(p.type, true)); a(">).value = ");
@@ -167,7 +163,7 @@ class HaxeMessagePacking extends MessagePacking
 	//	}
 		
 		if (hasWrapper) {
-			a('new '); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.isTransient())); a('( '); //a(propertyCheck); a(" ? ");
+			a('new '); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.isTransient())); a('( ');
 		}
 /*		else {
 			a("((untyped obj)."); a(p.name);
@@ -192,7 +188,7 @@ class HaxeMessagePacking extends MessagePacking
 
 		if (hasWrapper)
 			a(")");
-		a(");\n");
+		a(");");
 
 	//	a("\t} catch (e:Dynamic) { trace(e); throw 'property: "); a(p.name); a(" in ' + obj + '; error: '+e; }\n");
 	}

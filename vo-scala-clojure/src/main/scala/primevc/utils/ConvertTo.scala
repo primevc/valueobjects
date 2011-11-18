@@ -53,6 +53,7 @@ object ConvertTo
     case v:MessagePackValueObject => v.vo.asInstanceOf[T]
   }
   def voRef[T <: ValueObjectWithID](value:AnyRef)(implicit voType:Manifest[T], idType:Manifest[T#IDType]) : Ref[T] = unpack(value) match {
+    case None => null
     case v:Ref[T] => v
     case v:T => new Ref[T](v.Companion.asInstanceOf[IDAccessor[T]].idValue(v), v)
     case v:MessagePackValueObject if (voType.erasure.isAssignableFrom(v.vo.getClass)) => voRef[T](v.vo.asInstanceOf[T])

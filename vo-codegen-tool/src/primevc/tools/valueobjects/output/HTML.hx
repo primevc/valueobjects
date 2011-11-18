@@ -109,7 +109,8 @@ class HTML implements CodeGenerator
 			props.push({
 				type: typeHTML(p.name, p.type),
 				name: p.name,
-				desc: p.description != null? p.description.trim().split("\n").join("<br>") : ""
+				desc: p.description != null? p.description.trim().split("\n").join("<br>") : "",
+				opts: p.opts != null? p.opts.toString() : ""
 			});
 		}
 		
@@ -239,7 +240,8 @@ class HTML implements CodeGenerator
 			fullName		: def.fullName,
 			implemented		: linkTypes('Implemented by: ', cast def.implementedBy),
 			supers 			: linkTypes('Supertypes ', cast def.supertypes),
-			properties		: def.property == null? "" : propertiesHTML(def.propertiesSorted) + opt.toString()
+			properties		: def.property == null? "" : propertiesHTML(def.propertiesSorted) + opt.toString(),
+			options			: def.options != null? def.options.toString() : ""
 		}));
 	}
 	
@@ -266,7 +268,8 @@ class HTML implements CodeGenerator
 			fullName		: def.fullName,
 			implemented		: "", //linkTypes('Implemented by: ', cast def.implementedBy),
 			supers 			: "", //linkTypes('Supertypes ', cast def.supertypes),
-			properties		: enumHTML(def) + "<br/>" + propertiesHTML(def.propertiesSorted) + opt.toString()
+			properties		: enumHTML(def) + "<br/>" + propertiesHTML(def.propertiesSorted) + opt.toString(),
+			options			: ""
 		}));
 	}
 	
@@ -380,13 +383,14 @@ class HTML implements CodeGenerator
 		<h2><b>::type::</b> <a name="::fullName::">::name::</a></h2>
 		<div class="supers">::supers::</div>
 		<div class="implemented">::implemented::</div>
+		::options:: <br/>
 		::properties::
 	');
 	
 	static var t_properties = new haxe.Template('
 		<table cellspacing="0" cellpadding="0">
 		::foreach property::
-			<tr><td>::type::</td><td>::name::</td><td>::desc::</td></tr>
+			<tr><td>::type::</td><td>::name::</td><td>::desc::</td><td>::opts::</td></tr>
 		::end::
 		</table>
 	');

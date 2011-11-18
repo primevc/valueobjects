@@ -33,6 +33,7 @@ trait LocalFileRepository extends FileRepository {
 }
 
 class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
+  root.mkdir();
   require(root.isDirectory, root + " is not a directory.")
 
   def toURI   (f : FileRef) = ConvertTo.uri(f.toString)
@@ -49,7 +50,7 @@ class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
       file.delete
     }
     else file renameTo newFile
-
+    assert(newFile.exists, "Absorbing "+ file.getAbsolutePath +" failed. Target: " + newFile.getAbsolutePath);
     ref
   }
 

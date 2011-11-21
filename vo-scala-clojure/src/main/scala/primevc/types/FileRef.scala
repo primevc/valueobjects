@@ -87,6 +87,7 @@ object FileRef
 {
   def apply(b:Array[Byte]) : FileRef = new FileRef(null, b)
   def apply(s:String)      : FileRef = new FileRef(s, null)
+  def apply(uri:URI)       : FileRef = new FileRef(uri.toString, null)
   def apply(o:ObjectId)    : FileRef = new FileRef("^", o.toByteArray)
 
   def apply(file : File)   : FileRef = apply(file, null)

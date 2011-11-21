@@ -14,7 +14,7 @@ import collection.JavaConversions
 import org.apache.commons.httpclient.{URIException}
 
 //import java.net.{URISyntaxException, URL, URI}
-import org.msgpack.`object`.{NilType, ArrayType, IntegerType, RawType}
+import org.msgpack.`object`.{NilType, ArrayType, IntegerType, FloatType, RawType}
 import java.text.{ParseException, DecimalFormatSymbols, DecimalFormat}
 import org.msgpack.MessagePackObject
 
@@ -202,6 +202,7 @@ object ConvertTo
   def decimal       (value:Any, format:String = null) : Double = unpack(value) match {
     case v:Double => v
     case v:Number => v.doubleValue
+    case v:FloatType => decimal(v)
     case v:String => decimal(v)
     case _ => Double.NaN
   }
@@ -209,6 +210,7 @@ object ConvertTo
     case "" => Double.NaN
     case v:String => v.toDouble
   }
+  def decimal       (value:FloatType) : Double = value.asDouble
   def decimal       (value:java.lang.Double) : Double = if (value == null) 0 else value.doubleValue
 
   protected def decimalFormatter(format:String) =
@@ -249,8 +251,8 @@ object ConvertTo
     case v:Long => new DateMidnight(v)
     case v:Number => new DateMidnight(v.longValue)
     case v:String => formatter.parseDateTime(v).toDateMidnight
-    case v:org.msgpack.`object`.IntegerType => new DateMidnight( v.longValue )
-    case v:org.msgpack.`object`.FloatType => new DateMidnight( v.longValue )
+    case v:IntegerType => new DateMidnight( v.longValue )
+    case v:FloatType => new DateMidnight( v.longValue )
     case None => null
 //    case _ => new DateMidnight(value)
   }

@@ -251,8 +251,8 @@ object ConvertTo
     case v:Long => new DateMidnight(v)
     case v:Number => new DateMidnight(v.longValue)
     case v:String => formatter.parseDateTime(v).toDateMidnight
-    case v:IntegerType => new DateMidnight( v.longValue )
-    case v:FloatType => new DateMidnight( v.longValue )
+    case v:IntegerType => new DateMidnight( v.asLong )
+    case v:FloatType => new DateMidnight( v.asLong )
     case None => null
 //    case _ => new DateMidnight(value)
   }
@@ -264,8 +264,8 @@ object ConvertTo
     case v:Double => new DateTime(v.toLong)
     case v:Number => new DateTime(v.longValue)
     case v:String => if (v.isEmpty) null else formatter.parseDateTime(v)
-    case v:org.msgpack.`object`.IntegerType => new DateTime( v.asLong )
-    case v:org.msgpack.`object`.FloatType => new DateTime( v.asLong )
+    case v:IntegerType => new DateTime( v.asLong )
+    case v:FloatType => new DateTime( v.asLong )
     case None => null
 //    case _ => new DateTime(value)
   }

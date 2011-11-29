@@ -42,7 +42,7 @@ class VOPacker (out:OutputStream) extends Packer(out)
   final def pack(date : org.joda.time.DateMidnight): Unit = pack( date.toInstant )
 
   final def pack(date : org.joda.time.Instant) {
-    pack( date.getMillis / 1000 )
+    pack( date.getMillis )
   }
 
   /** Packs specific valueobject fields as set in the fields bitmask.  */

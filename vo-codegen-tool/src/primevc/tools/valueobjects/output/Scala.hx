@@ -2083,7 +2083,7 @@ class ScalaMessagePacking extends MessagePacking
 	{
 		fieldIndexOffset = new IntHash();
 		
-		a("\n  val defaultVOCompanionMap = ");
+		a("\n  def defaultVOCompanionMap = ");
 		var pkgroot = def.module.getPackageRoot();
 		if (pkgroot != Module.root) {
 			a(pkgroot.fullName); a(".VO.typeMap");

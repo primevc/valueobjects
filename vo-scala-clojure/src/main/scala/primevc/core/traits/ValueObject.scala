@@ -38,6 +38,8 @@ trait ValueObject extends java.io.Externalizable
   {
     val obj = this;
     val map = obj.Companion.defaultVOCompanionMap;
+    assert(map != null, this.getClass+"::readExternal map == null, obj = " + obj)
+
     val helper = new VOUnpacker(map)
     {
       var first = true;
@@ -46,13 +48,20 @@ trait ValueObject extends java.io.Externalizable
         new VOInstanceUnpacker(map) {
           vo  = obj
           voc = obj.Companion.asInstanceOf[VOCompanion[ValueObject]]
+          assert(voc != null, this.getClass+"::readExternal voc == null, obj = "+obj)
         }
       }
     }
     val unpacker = new Unpacker(in.asInstanceOf[java.io.ObjectInputStream])
     unpacker.setVOHelper(helper)
     
-    unpacker.next
+    try {
+      unpacker.next
+    } catch {
+      case e =>
+        e.printStackTrace();
+        throw new java.lang.Exception(this+"::readExternal of '" + this.getClass + "' failed: " + e)
+    }
   }
 
   def writeExternal(out : java.io.ObjectOutput) {
@@ -136,7 +145,7 @@ trait VOCompanion[V <: ValueObject] extends VOAccessor[V] with VOFieldInfo {
   def empty: VOType
   def fieldIndexOffset(typeID : Int) : Int
 
-  val defaultVOCompanionMap : scala.collection.immutable.IntMap[primevc.core.traits.VOCompanion[_]]
+  def defaultVOCompanionMap : scala.collection.immutable.IntMap[primevc.core.traits.VOCompanion[_]]
 }
 
 trait IDAccessor[V <: ValueObjectWithID]

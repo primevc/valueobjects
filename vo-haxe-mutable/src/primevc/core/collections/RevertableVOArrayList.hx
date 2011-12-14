@@ -225,8 +225,8 @@ class RevertableVOArrayList<DataType : IValueObject>
 		addChange( ListChange.added( item, pos ) );
 		
 	//	trace("this.add "+item +"; "+BindFlags.readProperties(flags)+"; "+length);
-		
-		cast(item, ValueObjectBase).change.bind(this, changeHandlerFn);
+		if (changeHandlerFn != null)
+			cast(item, ValueObjectBase).change.bind(this, changeHandlerFn);
 		
 		return item;
 	}
@@ -244,7 +244,8 @@ class RevertableVOArrayList<DataType : IValueObject>
 		if (list.removeAt(curPos))
 			addChange( ListChange.removed( item, curPos ) );
 		
-		cast(item, ValueObjectBase).change.unbind(this);
+		if (changeHandlerFn != null)
+			cast(item, ValueObjectBase).change.unbind(this);
 		
 		return item;
 	}

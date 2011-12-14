@@ -92,7 +92,8 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implemen
 	override public function add (item:DataType, pos:Int = -1) : DataType
 	{
 		super.add(item, pos);
-		item.as(ValueObjectBase).change.bind(this, changeHandlerFn);
+		if (changeHandlerFn != null)
+			item.as(ValueObjectBase).change.bind(this, changeHandlerFn);
 		
 		return item;
 	}
@@ -101,7 +102,8 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implemen
 	override public function remove (item:DataType, curPos:Int = -1) : DataType
 	{
 		super.remove(item, curPos);
-		item.as(ValueObjectBase).change.unbind(this);
+		if (changeHandlerFn != null)
+			item.as(ValueObjectBase).change.unbind(this);
 		
 		return item;
 	}

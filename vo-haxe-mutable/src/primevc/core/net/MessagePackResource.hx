@@ -140,7 +140,6 @@ class MessagePackResource <Data> implements IDisposable
 		
 #if debug
 		getStarted = primevc.utils.TimerUtil.stamp();
-		trace("get "+uri);
 #end
 		l.binaryGET(uri);
 		e.started.send();
@@ -165,7 +164,9 @@ class MessagePackResource <Data> implements IDisposable
 		// Send
 		onComplete.handler	= handlePOST;
 		onError.handler		= cast(events.send.error, Signal1<Dynamic>).send;
-		
+#if debug
+		getStarted = primevc.utils.TimerUtil.stamp();
+#end
 		l.binaryPOST(uri);
 		e.started.send();
 	}
@@ -187,6 +188,9 @@ class MessagePackResource <Data> implements IDisposable
 
 	private function handlePOST()
 	{
+#if debug
+		trace("posted data in "+(primevc.utils.TimerUtil.stamp() - getStarted) + " ms; bytes: "+loader.bytesTotal);
+#end
 	//	trace(loader.bytesProgress+" / "+loader.bytesTotal+" [ "+uriPrefix+" ]");
 		bytesSending = 0;
 		events.send.completed.send();

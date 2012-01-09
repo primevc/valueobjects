@@ -976,7 +976,7 @@ file.writeString("
 		}
 		else
 		{
-			a("\n  final def "); a(p.name); a("_(v:AnyRef) : Unit = { val value");
+			a("\n  final def "); a(p.name); a("_(v:AnyRef) : Unit = { val __value");
 			if (Util.isEnum(p.type)) { a(": "); a(getType(p.type).name); }
 			a(" = "); a(convertFromAnyRefTo(p.type));
 //			if (Util.isEnum(p.type))
@@ -984,7 +984,7 @@ file.writeString("
 //			else
 				a("(v);");
 			
-			a(" "); a(quote(p.name)); a(" = value;");
+			a(" "); a(quote(p.name)); a(" = __value;");
 			switch (p.type) {
 				case Tdef(_), Tarray(_,_,_): // Don't set any bits
 				default:

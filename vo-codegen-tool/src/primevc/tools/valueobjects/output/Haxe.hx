@@ -163,7 +163,7 @@ class HaxeMessagePacking extends MessagePacking
 	//	}
 		
 		if (hasWrapper) {
-			a('new '); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.isTransient())); a('( ');
+			a('new '); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.isTransient(), p.isReadOnly(), p.isSortable())); a('( ');
 		}
 /*		else {
 			a("((untyped obj)."); a(p.name);
@@ -967,7 +967,7 @@ class Haxe implements CodeGenerator
 			// Add comma first to prevent platform specific property clashes
 			if (i != 0) a(", ");
 
-			a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true, p.hasOption(transient)));
+			a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true, p.isTransient(), p.isReadOnly(), p.isSortable()));
 			var init = HaxeUtil.getConstructorInitializer(p.type, true);
 			if (init != null) {
 			 	a(" = "); a(init);
@@ -992,7 +992,7 @@ class Haxe implements CodeGenerator
 			var localProp 		= p.name + "_";
 			var classProp 		= (hasSetter ? "(untyped this)." : "this.") + p.name; 
 
-			var val 			=  hasGetter ? localProp : HaxeUtil.getConstructorCall(p.type, p.isBindable(), localProp, p.isTransient());
+			var val 			=  hasGetter ? localProp : HaxeUtil.getConstructorCall(p.type, p.isBindable(), localProp, p.isTransient(), p.isReadOnly(), p.isSortable());
 			var addNullCheck	= (hasGetter && HaxeUtil.isNullableOnEveryPlatform(p.type, p.isBindable())) || p.isDecimal();
 
 			if (addNullCheck) 	{ a("\t\tif ("); a(localProp); a(".notNull())"); }
@@ -1072,7 +1072,7 @@ class Haxe implements CodeGenerator
 				if (p.shouldHaveSetter())
 					a("(untyped this).");	
 				
-				a(p.name); a(" = "); a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type, true), p.isTransient())); a(";\n");
+				a(p.name); a(" = "); a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type, true), p.isTransient(), p.isReadOnly(), p.isSortable())); a(";\n");
 			}
 
 			if (!p.isTransient())
@@ -1109,7 +1109,7 @@ class Haxe implements CodeGenerator
 	
 	function genGetter(p:Property, immutable:Bool)
 	{
-		var type = HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.isTransient());
+		var type = HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.isTransient(), p.isReadOnly(), p.isSortable());
 
 		if (p.description != null)
 			addComment(p.description);
@@ -1138,7 +1138,7 @@ class Haxe implements CodeGenerator
 
 		if (!immutable && genGetterFn) {
 			a("\tprivate function get"); code.addCapitalized(p.name); a(" () { return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = ");
-			a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type), transient)); a(";");
+			a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type), transient, p.isReadOnly(), p.isSortable())); a(";");
 			a(" }\n\n");
 		}
 	}
@@ -1148,13 +1148,13 @@ class Haxe implements CodeGenerator
 		Assert.that(!p.isArray());
 		Assert.that(!p.isBindable());
 
-		var typeName			= HaxeUtil.haxeType(p.type, true, false, false, p.hasOption(transient));
+		var typeName			= HaxeUtil.haxeType(p.type, true, false, false, p.isTransient(), p.isReadOnly(), p.isSortable());
 		var hasGetter			= p.shouldHaveGetter();
 		var name				= hasGetter ? "(untyped this)." + p.name : p.name;
 		var isSingleValue 		= Util.isSingleValue(p.type);
 		
 		
-		a("\tpublic function set"); code.addCapitalized(p.name); a("(newV:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.hasOption(transient))); a(")\n\t{\n");
+		a("\tpublic function set"); code.addCapitalized(p.name); a("(newV:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.isTransient(), p.isReadOnly(), p.isSortable())); a(")\n\t{\n");
 		
 	//	a("\t\treturn if (v == "); a(name); a(") v;\n");
 	//	a("\t\telse\n\t\t{\n\t\t\tif (isEditable()) _changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
@@ -1198,7 +1198,7 @@ class Haxe implements CodeGenerator
 		a("\tprivate function "); a(p.name); a("Changed(");
 		
 		if (!isArray) {
-			var typeName = HaxeUtil.haxeType(p.type, true, false, false, p.hasOption(transient));
+			var typeName = HaxeUtil.haxeType(p.type, true, false, false, p.isTransient(), p.isReadOnly(), p.isSortable());
 			a("newV : "); a(typeName); a(", oldV : "); a(typeName);
 		}
 		a(") : Void {\n\t\t");
@@ -1499,15 +1499,15 @@ private class NamedSetDefGenerator extends MagicClassGenerator
 
 private class HaxeUtil
 {
-	public static function getConstructorCall(ptype:PType, bindable:Bool, initializer:String, transient:Bool = false)
+	public static function getConstructorCall(ptype:PType, bindable:Bool, initializer:String, transient:Bool = false, readonly:Bool = false, sortable:Bool = false)
 	{
 		switch (ptype) {
-			case Tarray(type, _,_):		return "new " + HaxeUtil.haxeType( ptype, true, bindable, false, transient ) + "("+ initializer +")";
+			case Tarray(type, _,_):		return "new " + HaxeUtil.haxeType( ptype, true, bindable, false, transient, readonly, sortable ) + "("+ initializer +")";
 			case TuniqueID:				initializer = initializer + ' == null? primevc.types.ObjectId.make() : ' + initializer;
 			default:
 		}
 		
-		return 	if (bindable)			"new "+ HaxeUtil.haxeType(ptype, true, bindable, false, transient) +"("+ initializer +")";
+		return 	if (bindable)			"new "+ HaxeUtil.haxeType(ptype, true, bindable, false, transient, readonly, sortable) +"("+ initializer +")";
 				else					initializer;
 	}
 	
@@ -1577,7 +1577,7 @@ private class HaxeUtil
 			 	'ConvertTo.fastArray('+ haxeType(type, true, false) +', ';
 	}
 */	
-	public static function haxeType(ptype:PType, ?immutableInterface:Bool = false, ?bindable:Bool = false, ?constructorArg = false, ?transient = false)
+	public static function haxeType(ptype:PType, ?immutableInterface:Bool = false, ?bindable:Bool = false, ?constructorArg = false, ?transient = false, ?readonly = false, ?sortable = false)
 	{
 		var type = switch (ptype)
 		{
@@ -1606,9 +1606,14 @@ private class HaxeUtil
 				return if (!constructorArg)
 				{
 					'primevc.core.collections.' +
-					 	(Util.isSingleValue(type)
-							? (bindable? 'RevertableArrayList<'   : 'ArrayList<')
-							: (bindable? 'RevertableVOArrayList<' : 'VOArrayList<'))
+						(sortable
+						? 'Sort<'
+						: readonly
+							? 'ReadOnlyArrayList<'
+					 		: (Util.isSingleValue(type)
+								? (bindable ? 'RevertableArrayList<'   : 'ArrayList<')
+								: (bindable ? 'RevertableVOArrayList<' : 'VOArrayList<'))
+						)
 						+ haxeType(type, true)  + '>';
 				}
 				else

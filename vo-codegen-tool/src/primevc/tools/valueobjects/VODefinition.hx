@@ -914,6 +914,8 @@ class Property
 	public inline function propertyID()						return definedIn.index << 8 | this.index
 
 	public inline function isBindable() 					return hasOption(PropertyOption.bindable)
+	public inline function isReadOnly() 					return hasOption(PropertyOption.readonly)
+	public inline function isSortable() 					return hasOption(PropertyOption.sortable)
 	public inline function isTransient()					return hasOption(PropertyOption.transient)
 	public inline function isOptional ()					return hasOption(PropertyOption.optional)
 	public inline function isMappedTo(t:MappingType) 		return Lambda.has(mappings, t)
@@ -2607,6 +2609,8 @@ enum PropertyOption
 	mongo_reference;
 	mongo_typeCast;
 	optional;
+	readonly;
+	sortable;
 }
 
 enum Platform

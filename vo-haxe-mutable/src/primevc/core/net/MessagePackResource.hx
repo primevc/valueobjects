@@ -128,7 +128,7 @@ class MessagePackResource <Data> implements IDisposable
 	/**
 	 * GET a single object by proving a uriSuffix.
 	 */
-	public function get (uriSuffix:String)
+	public function get (uriSuffix:String = null)
 	{
 		Assert.notNull(uriPrefix);
 		var l   = loader,
@@ -150,26 +150,28 @@ class MessagePackResource <Data> implements IDisposable
 	 * Serialize and POST an object to the Resource. 
 	 * @param uriSuffix Required to prevent accidental overwriting of an entire resource.
 	 */
-	public function send (uriSuffix:String, obj:IMessagePackable)
+	public inline function send (uriSuffix:String, obj:IMessagePackable)
+		sendBytes( uriSuffix, serialize(obj).getData() )
+
+
+	
+	public function sendBytes (uriSuffix:String, bytes:BytesData, method:String = "post")
 	{
 		Assert.notNull(uriPrefix);
 		var l   = loader,
 			e   = events.send,
-			uri = uriSuffix == null? uriPrefix : new URI(uriPrefix.string + uriSuffix);
+			uri = uriSuffix == null ? uriPrefix : new URI(uriPrefix.string + uriSuffix);
 		
-		
-		l.bytes			= serialize(obj).getData();
-		bytesSending	= l.bytesTotal;
-		
+		l.bytes		 		= bytes;
+		bytesSending 		= l.bytesTotal;
 		// Send
 		onComplete.handler	= handlePOST;
 		onError.handler		= cast(events.send.error, Signal1<Dynamic>).send;
-#if debug
-		getStarted = primevc.utils.TimerUtil.stamp();
-#end
+#if debug getStarted 		= primevc.utils.TimerUtil.stamp(); #end
 		l.binaryPOST(uri);
 		e.started.send();
 	}
+
 	
 
 	private function handleGET ()

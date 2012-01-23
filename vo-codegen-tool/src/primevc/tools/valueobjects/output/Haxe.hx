@@ -414,7 +414,7 @@ class Haxe implements CodeGenerator
 		a("\n\tstatic inline public var TYPE_ID = ");
 		a(def.index + ";\n\t");
 		for (p in def.propertiesSorted) if (!p.hasOption(transient)) {
-		 	a("\n\tstatic inline public var "); a(p.name.toUpperCase()); a(" = "); a("0x" + StringTools.hex(p.definedIn.index << 8 | p.index, 4)); a("; // "); a(p.definedIn.name);
+		 	a("\n\tstatic inline public var "); a(p.name.toUpperCase()); a(" = "); a("0x" + StringTools.hex(p.definedIn.index << 8 | p.index, 4)); a("; // "); a(p.definedIn.name); a(" - "); a(hexBitflag(p.bitIndex()));
 		}
 		a("\n\t\n\t");
 
@@ -567,7 +567,7 @@ class Haxe implements CodeGenerator
 		if (p.hasOption(unique))
 			path = "this."+p.name;
 		
-		var isNull = HaxeUtil.isNullableOnEveryPlatform(p.type, bindable) ? path+".notNull()" : null;
+		var isNull = HaxeUtil.isNullableOnEveryPlatform(p.type, bindable, true) ? path+".notNull()" : null;
 		var extra = extraNullCheck(path, p.type);
 
 		return 	 if (extra != null && isNull != null)	isNull + " && " + extra;
@@ -968,7 +968,7 @@ class Haxe implements CodeGenerator
 			if (i != 0) a(", ");
 
 			a("?"); a(p.name); a("_ : "); a(HaxeUtil.haxeType(p.type, null, null, true, p.isTransient(), p.isReadOnly(), p.isSortable()));
-			var init = HaxeUtil.getConstructorInitializer(p.type, true);
+			var init = HaxeUtil.getConstructorInitializer(p.type, true, true);
 			if (init != null) {
 			 	a(" = "); a(init);
 			}
@@ -989,7 +989,7 @@ class Haxe implements CodeGenerator
 			openPlatformCode(p);
 			var hasGetter 		= p.shouldHaveGetter();
 			var hasSetter 		= p.shouldHaveSetter();
-			var localProp 		= p.name + "_";
+			var localProp 		= HaxeUtil.addDefaultValueCheck( p, p.name + "_" );
 			var classProp 		= (hasSetter ? "(untyped this)." : "this.") + p.name; 
 
 			var val 			=  hasGetter ? localProp : HaxeUtil.getConstructorCall(p.type, p.isBindable(), localProp, p.isTransient(), p.isReadOnly(), p.isSortable());
@@ -1177,7 +1177,7 @@ class Haxe implements CodeGenerator
 			a("\n\t\t\t}");
 			a("\n\t\t\telse "); addPropChangeFlagUnsetter(p.bitIndex());
 
-			a("\n\t\t\tif ((oldV.notNull() && !oldV.isEmpty()) != (newV.notNull() && !newV.isEmpty()))\n\t");
+			a("\n\t\t\tif ((oldV.notNull() && !oldV.isEmpty()) || (newV.notNull() && !newV.isEmpty()))\n\t");
 		}
 		else {
 			a("\t\t\t");
@@ -1515,10 +1515,10 @@ private class HaxeUtil
 				else					initializer;
 	}
 	
-	public static function getConstructorInitializer(ptype:PType, constOnly = false) return switch (ptype)
+	public static function getConstructorInitializer(ptype:PType, constOnly = false, constructorArg:Bool =false) return switch (ptype)
 	{
 		case Tstring:				"''";
-		case Tbool(val):			val? "true" : "false";
+		case Tbool(val):			constructorArg ? null : (val ? "true" : "false");
 		case Tarray(type, _,_):		constOnly? "null" : "[]";
 		
 //		case Turi, TfileRef, Tinterval:
@@ -1543,9 +1543,11 @@ private class HaxeUtil
 		  else null;
 	}
 	
-	public static function isNullableOnEveryPlatform(ptype:PType, bindable:Bool) return switch (ptype)
+	public static function isNullableOnEveryPlatform(ptype:PType, bindable:Bool, isConstructorArg:Bool = false) return switch (ptype)
 	{
-		case Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tcolor:
+		case Tbool(_), Tcolor:
+			isConstructorArg || bindable;
+		case Tinteger(_,_,_), Tdecimal(_,_,_):
 			bindable;
 		case Tstring,Tdate,Tdatetime,Tinterval,Turi,Turl,TuniqueID,Temail,TfileRef, Tdef(_), TenumConverter(_), Tarray(_,_,_), TclassRef(_):
 			true;
@@ -1585,7 +1587,7 @@ private class HaxeUtil
 	{
 		var type = switch (ptype)
 		{
-			case Tbool(val):				'Bool';
+			case Tbool(val):				constructorArg ? 'Null<Bool>' : 'Bool';
 			case Tinteger(min,max,stride):	'Int';
 			case Tdecimal(min,max,stride):	'Float';
 			case Tstring:					'String';
@@ -1596,7 +1598,7 @@ private class HaxeUtil
 			case Turl: 						'primevc.types.URL';
 			case TuniqueID:					'primevc.types.ObjectId';
 			case Temail:					'primevc.types.EMail';
-			case Tcolor:					'primevc.types.RGBA';
+			case Tcolor:					constructorArg ? 'Null<primevc.types.RGBA>' : 'primevc.types.RGBA';
 			case TfileRef:					'primevc.types.FileRef';
 			case TclassRef(classPath):		classPath;
 			
@@ -1703,6 +1705,13 @@ private class HaxeUtil
 				throw "Unsupported value";
 		}
 		*/
+	}
+
+	public static function addDefaultValueCheck (p:Property, varName:String) return switch (p.type)
+	{
+		case Tbool(val): 	varName + " == null ? " + val + " : " + varName;
+		case Tcolor:		varName + " == null ? 0 : " + varName;
+		default:			varName;
 	}
 }
 

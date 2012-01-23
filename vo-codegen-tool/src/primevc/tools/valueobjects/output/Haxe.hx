@@ -1101,6 +1101,8 @@ class Haxe implements CodeGenerator
 					}
 				}
 			}
+		} else if (!Util.isDefinedInSuperClassOf(def, p) && p.isUnique()) {
+			a("\t\tthis._uniquePropertyFlag = "); a(p.name.toUpperCase()); a(";\n");
 		}
 
 		a("\t}\n");

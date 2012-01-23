@@ -1102,7 +1102,7 @@ class Haxe implements CodeGenerator
 				}
 			}
 		} else if (!Util.isDefinedInSuperClassOf(def, p) && p.isUnique()) {
-			a("\t\tthis._uniquePropertyFlag = "); a(p.name.toUpperCase()); a(";\n");
+			a("\t\tthis._uniquePropertyFlag = "); a(hexBitflag(p.bitIndex())); a(";\n");
 		}
 
 		a("\t}\n");
@@ -1176,14 +1176,16 @@ class Haxe implements CodeGenerator
 			a("\t\t\t\tif (newV.isEmpty()) "); addPropChangeFlagUnsetter(p.bitIndex()); a(" else _propertiesSet |= "); a(hexBitflag(p.bitIndex())); a(";\n");
 			a("\n\t\t\t}");
 			a("\n\t\t\telse "); addPropChangeFlagUnsetter(p.bitIndex());
+
+			a("\n\t\t\tif ((oldV.notNull() && !oldV.isEmpty()) != (newV.notNull() && !newV.isEmpty()))\n\t");
 		}
 		else {
 			a("\t\t\t");
 			addPropChangeFlagSetter(p.bitIndex(), "newV" + ((!p.isArray() && p.isBindable())? ".value" : ""), p.type, false);
+			a("\n\t\t\t\n");
 		}
 		
-		a("\n\t\t\t");
-		a("\n\t\t\t_changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";");
+		a("\t\t\t_changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";");
 		a("\n\t\t\tthis."); a(p.name); a(" = newV;\n");
 		a("\t\t}\n");
 		a("\t\treturn newV;\n");

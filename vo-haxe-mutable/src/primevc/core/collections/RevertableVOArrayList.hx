@@ -102,6 +102,11 @@ class RevertableVOArrayList<DataType : IValueObject>
 	 * List with all the changes that are made when the list is in editing mode.
 	 */
 	public var changes (default,null) : FastArray<ListChange<DataType>>;
+
+#if debug
+	public inline function readFlags ()
+		return BindFlags.readProperties(flags)
+#end
 	
 	
 	

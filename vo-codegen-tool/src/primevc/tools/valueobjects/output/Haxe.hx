@@ -1270,8 +1270,23 @@ class Haxe implements CodeGenerator
 		if (def.module.name.length > 0) {
 			a("package "); a(def.module.fullName); a(";\n");
 		}
+		a(" import primevc.core.collections.ReadOnlyArrayList;\n");
+		a("  using primevc.utils.FastArray;\n\n\n");
 		a("class "); a(def.utilClassName); a("\n{\n");
 		
+		// toValue
+		var listType = "ReadOnlyArrayList<" + def.fullName + ">";
+		var values   = [];
+		for (e in def.enumerations)
+			values.push(def.name+"."+e.name);
+
+		a("\tstatic public  var list (getList, null) : "); a(listType); a(";\n");
+		a("\t\tstatic private function getList ()\n\t\t{\n");
+		a("\t\t\tif (list == null)\n");
+		a("\t\t\t\tlist = new "); a(listType); a("(["); a(values.join(', ')); a("].toVector());\n");
+		a("\t\t\treturn list;\n");
+		a("\t\t}\n\n\n");
+
 		// toValue
 		a("\tstatic public function toValue(e:"); a(def.fullName); a(") : Int\n\t{\n\t\t");
 		a("Assert.that(e != null); return switch (e) {");

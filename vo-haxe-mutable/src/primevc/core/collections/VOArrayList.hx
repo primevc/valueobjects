@@ -149,7 +149,8 @@ class VOArrayListUtil
 			for (i in 0...list.length) {
 				var obj = cast(list[i], ValueObjectBase);
 				Assert.notNull(obj, "VOArrayList item " + i + "is null!");
-				obj.change.unbind(owner);
+				if (!obj.isDisposed())
+					obj.change.unbind(owner);
 			}
 	}
 }

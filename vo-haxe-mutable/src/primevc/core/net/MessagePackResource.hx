@@ -118,7 +118,7 @@ class MessagePackResource <Data> implements IDisposable
 	
 
 	private function doNothing () { throw "impossible " + uriPrefix; }
-	
+
 
 #if debug
 	private var getStarted : Float;
@@ -128,7 +128,7 @@ class MessagePackResource <Data> implements IDisposable
 	/**
 	 * GET a single object by proving a uriSuffix.
 	 */
-	public function get (uriSuffix:String = null)
+	public function request (uriSuffix:String = null, method:RequestMethod = null)
 	{
 		Assert.notNull(uriPrefix);
 		var l   = loader,
@@ -138,10 +138,8 @@ class MessagePackResource <Data> implements IDisposable
 		onComplete.handler	= handleGET;
 		onError.handler		= cast (events.receive.error, Signal1<Dynamic>).send;
 		
-#if debug
-		getStarted = primevc.utils.TimerUtil.stamp();
-#end
-		l.binaryGET(uri);
+#if debug getStarted = primevc.utils.TimerUtil.stamp(); #end
+		l.requestBinary(uri, method);
 		e.started.send();
 	}
 	
@@ -152,10 +150,10 @@ class MessagePackResource <Data> implements IDisposable
 	 */
 	public inline function send (uriSuffix:String, obj:IMessagePackable)
 		sendBytes( uriSuffix, serialize(obj).getData() )
-
+	
 
 	
-	public function sendBytes (uriSuffix:String, bytes:BytesData, method:String = "post")
+	public function sendBytes (uriSuffix:String, bytes:BytesData)
 	{
 		Assert.notNull(uriPrefix);
 		var l   = loader,
@@ -168,7 +166,7 @@ class MessagePackResource <Data> implements IDisposable
 		onComplete.handler	= handlePOST;
 		onError.handler		= cast(events.send.error, Signal1<Dynamic>).send;
 #if debug getStarted 		= primevc.utils.TimerUtil.stamp(); #end
-		l.binaryPOST(uri);
+		l.sendBinary(uri);
 		e.started.send();
 	}
 

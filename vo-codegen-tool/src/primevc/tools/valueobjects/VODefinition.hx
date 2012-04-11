@@ -914,6 +914,7 @@ class Property
 	public inline function propertyID()						return definedIn.index << 8 | this.index
 
 	public inline function isBindable() 					return hasOption(PropertyOption.bindable)
+	public inline function isReference() 					return hasOption(PropertyOption.mongo_reference)
 	public inline function isUnique()	 					return hasOption(PropertyOption.unique)
 	public inline function isReadOnly() 					return hasOption(PropertyOption.readonly)
 	public inline function isSortable() 					return hasOption(PropertyOption.sortable)

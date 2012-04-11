@@ -681,7 +681,7 @@ class Haxe implements CodeGenerator
 				if (p.isBindable())			a(".value");
 				addAsClass(p.type);
 				
-				if (p.hasClonableType() && !p.hasOption(transient))
+				if (p.hasClonableType() && !p.isTransient() && !p.isReference())
 				{
 					a(".clone()");
 					addAsClass(p.type);
@@ -733,6 +733,7 @@ class Haxe implements CodeGenerator
 
 			if (first) {
 				first = false;
+				a("  ");
 			}
 			else a(", ");
 			
@@ -750,7 +751,7 @@ class Haxe implements CodeGenerator
 				if (p.isBindable())			a(".value");
 				addAsClass(p.type);
 				
-				if (p.hasClonableType() && !p.hasOption(transient))
+				if (p.hasClonableType() && !p.isTransient() && !p.isReference())
 				{
 					a(".duplicate()");
 					addAsClass(p.type);
@@ -762,7 +763,7 @@ class Haxe implements CodeGenerator
 				closePlatformCode(p);
 			}
 		}
-		a("\t\t);\n");
+		a("\n\t\t);\n");
 		
 		var first = true;
 		for (p in def.propertiesSorted) if (p.isArray())

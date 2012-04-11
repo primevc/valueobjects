@@ -73,12 +73,10 @@ class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implemen
 	/**
 	 * Method will dispose the VO-list and all the VO's inside of the list
 	 */
-	public function disposeAll ()
+	public inline function disposeAll ()
 	{
 		for (item in list)
 			item.dispose();
-		
-		dispose();
 	}
 	
 	

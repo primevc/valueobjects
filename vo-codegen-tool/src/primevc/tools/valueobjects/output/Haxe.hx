@@ -435,9 +435,9 @@ class Haxe implements CodeGenerator
 			addLineComment("Method is used for undo/redo to get a reference to the changed property");
 			a("\n\toverride public function getPropertyById (id:Int) : Dynamic");
 			a("\n\t{");
-			a("\n\t\treturn untyped switch(id) {");
+			a("\n\t\treturn switch(id) {");
 			for (p in def.propertiesSorted) if (!p.hasOption(transient)) {
-				a("\n\t\t\tcase "); a(p.name.toUpperCase()); a(": "); a("this."); a(p.name); a(";");
+				a("\n\t\t\tcase "); a(p.name.toUpperCase()); a(": untyped "); a("this."); a(p.name); a(";");
 			}
 			a("\n\t\t}");
 			a("\n\t}");

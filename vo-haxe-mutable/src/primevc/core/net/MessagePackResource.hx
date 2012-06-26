@@ -136,7 +136,7 @@ class MessagePackResource <Data> implements IDisposable
 			uri = uriSuffix == null? uriPrefix : new URI(uriPrefix.string + uriSuffix);
 		
 		onComplete.handler	= handleGET;
-		onError.handler		= cast (events.receive.error, Signal1<Dynamic>).send;
+		onError.handler		= events.receive.error.send;
 		
 #if debug getStarted = primevc.utils.TimerUtil.stamp(); #end
 		l.requestBinary(uri, method);
@@ -244,7 +244,7 @@ class MessagePackResource <Data> implements IDisposable
 		data.endian	 = flash.utils.Endian.BIG_ENDIAN;
 		reader.bytes = data;
 #else
-		reader.input = #if js data.is(String)? new ByteStringInput(cast data).as(haxe.io.Input) : #end new BytesInput(Bytes.ofData(data));
+		reader.input = #if js data.is(String)? new ByteStringInput(data).as(haxe.io.Input) : #end new BytesInput(Bytes.ofData(data));
 		reader.input.bigEndian = true;
 #end
 		

@@ -53,7 +53,7 @@ file.writeString("
 	
 	public function newModule(module:Module) {
 		module.generateWith(this);
-		return cast this;
+		return this;
 	}
 }
 
@@ -249,7 +249,7 @@ class Haxe implements CodeGenerator
 		addPackage(def);
 		
 		if (immutable)
-			a("\n@:keep interface I");
+			a("\ninterface I");
 		else {
 			a(" import primevc.tools.valueobjects.ObjectChangeSet;\n");
 			a(" import primevc.tools.valueobjects.ValueObjectBase;\n");
@@ -793,7 +793,7 @@ class Haxe implements CodeGenerator
 		
 		//open function declaration
 		a("\n\t");
-		a("@:keep ");
+	//	a("@:keep ");
 		if (def.superClass != null)
 			a("override ");
 		

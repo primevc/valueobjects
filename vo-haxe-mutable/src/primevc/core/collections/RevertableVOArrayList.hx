@@ -104,7 +104,7 @@ class RevertableVOArrayList<DataType : IValueObject>
 	public var changes (default,null) : FastArray<ListChange<DataType>>;
 
 #if debug
-	public inline function readFlags ()
+	@:keep public inline function readFlags ()
 		return BindFlags.readProperties(flags)
 #end
 	
@@ -113,21 +113,21 @@ class RevertableVOArrayList<DataType : IValueObject>
 	
 	
 	
-	public inline function rememberChanges (enabled:Bool = true)				{ flags = enabled ? flags.set(ListFlags.REMEMBER_CHANGES) : flags.unset(ListFlags.REMEMBER_CHANGES); }
-	public inline function dispatchChangesBeforeCommit (enabled:Bool = true)	{ flags = enabled ? flags.set(BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT) : flags.unset(BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT); }
+	@:keep public inline function rememberChanges (enabled:Bool = true)				{ flags = enabled ? flags.set(ListFlags.REMEMBER_CHANGES) : flags.unset(ListFlags.REMEMBER_CHANGES); }
+	@:keep public inline function dispatchChangesBeforeCommit (enabled:Bool = true)	{ flags = enabled ? flags.set(BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT) : flags.unset(BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT); }
 	
 	
 	//
 	// EDITABLE VALUE-OBJECT METHODS
 	//
 	
-	public inline function isEmpty()
+	@:keep public inline function isEmpty()
 	{
 		return this.length == 0;
 	}
 	
 	
-	public inline function beginEdit ()
+	@:keep public inline function beginEdit ()
 	{
 		if (flags.hasNone( BindFlags.IN_EDITMODE ))
 		{
@@ -153,7 +153,7 @@ class RevertableVOArrayList<DataType : IValueObject>
 	}
 	
 	
-	public inline function cancelEdit ()
+	public  function cancelEdit ()
 	{
 		if (changes != null && flags.hasAll( BindFlags.IN_EDITMODE | ListFlags.REMEMBER_CHANGES))
 		{
@@ -169,7 +169,7 @@ class RevertableVOArrayList<DataType : IValueObject>
 	}
 	
 	
-	private inline function stopEdit ()
+	@:keep private inline function stopEdit ()
 	{
 		if (changes != null) {
 			changes.removeAll();
@@ -179,7 +179,7 @@ class RevertableVOArrayList<DataType : IValueObject>
 	}
 
 
-	public inline function isEditable ()
+	@:keep public inline function isEditable ()
 	{
 		return flags.has( BindFlags.IN_EDITMODE );
 	}
@@ -191,7 +191,7 @@ class RevertableVOArrayList<DataType : IValueObject>
 	//
 	
 	
-	private inline function addChange (listChange:ListChange<DataType>)
+	@:keep private inline function addChange (listChange:ListChange<DataType>)
 	{
 		if (flags.has( ListFlags.REMEMBER_CHANGES ))
 			changes.push( listChange );

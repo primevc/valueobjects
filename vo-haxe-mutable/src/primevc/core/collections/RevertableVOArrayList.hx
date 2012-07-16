@@ -27,23 +27,18 @@
  *  Danny Wilson	<danny @ prime.vc>
  */
 package primevc.core.collections;
- import primevc.core.collections.RevertableArrayList;
- import primevc.core.collections.VOArrayList;
+ import primevc.core.collections.VOArrayList;	//imports VOArrayListUtil
  import primevc.core.dispatcher.Signal1;
- import primevc.core.traits.IValueObject;
- import primevc.core.RevertableBindableFlags;
-
  import primevc.tools.valueobjects.ObjectChangeSet;
  import primevc.tools.valueobjects.ValueObjectBase;
- import primevc.utils.FastArray;
   using primevc.utils.BitUtil;
   using primevc.tools.valueobjects.ChangesUtil;
   using primevc.utils.FastArray;
   using primevc.utils.IfUtil;
 
 
-private typedef ListFlags = RevertableArrayListFlags;
-private typedef BindFlags = RevertableBindableFlags;
+private typedef ListFlags = primevc.core.collections.RevertableArrayList.RevertableArrayListFlags;
+private typedef BindFlags = primevc.core.RevertableBindableFlags;
 
 
 /**
@@ -56,9 +51,7 @@ private typedef BindFlags = RevertableBindableFlags;
  * @author Danny Wilson
  * @creation-date Dec 20, 2010
  */
-class RevertableVOArrayList<DataType : IValueObject>
-   extends ReadOnlyArrayList < DataType >, implements IRevertableList < DataType >, implements IReadOnlyList < DataType >, implements haxe.rtti.Generic
-// extends RevertableArrayList<DataType>, implements haxe.rtti.Generic, implements IRevertableList < DataType >
+@:generic class RevertableVOArrayList <DataType:primevc.core.traits.IValueObject> extends ReadOnlyArrayList <DataType>, implements IRevertableList <DataType>
 {
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;

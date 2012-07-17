@@ -8,6 +8,8 @@ import javax.mail.internet.InternetAddress
 import com.mongodb.casbah.Imports._
 import org.joda.time.{DateMidnight, DateTime, Interval}
 import java.util.{Locale, Date}
+import java.lang.Integer.parseInt
+import java.lang.Long.parseLong
 import org.bson.BSONObject
 import org.bson.types.{BasicBSONList, ObjectId}
 import collection.JavaConversions
@@ -188,8 +190,24 @@ object ConvertTo
 //    case _ => 0
   }
   def integer       (value:String) : Int = {
-    val v = value.trim
-    if (v.isEmpty || v == "NaN") 0 else v.toInt
+    val s = value.trim
+
+    if (s.isEmpty || s == "NaN")
+      0
+    else if (s(0) == '#') {
+      if (s.length <= 7)
+        parseInt(s.substring(1), 16)
+      else
+        parseLong(s.substring(1), 16).toInt
+    }
+    else if (s.startsWith("0x")) {
+      if (s.length <= 8)
+        parseInt(s.substring(2), 16)
+      else
+        parseLong(s.substring(2), 16).toInt
+    }
+    else
+      parseLong(s).toInt
   }
   def integer       (value:java.lang.Number) : Int = if (value == null) 0 else value.intValue
   def integer       (value:IntegerType) : Int = value.asInt

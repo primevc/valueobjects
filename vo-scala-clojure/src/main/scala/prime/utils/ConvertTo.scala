@@ -1,4 +1,4 @@
-package primevc.utils
+package prime.utils
 
 import msgpack.{MessagePackObjectId, MessagePackValueObject}
 import primevc.types._
@@ -21,13 +21,12 @@ import java.text.{ParseException, DecimalFormatSymbols, DecimalFormat}
 import org.msgpack.MessagePackObject
 
 /**
- * Created by IntelliJ IDEA.
- * User: blue
- * Date: Aug 24, 2010
- * Time: 11:45:56 AM
- * To change this template use File | Settings | File Templates.
+ * Author:  Danny Wilson
+ * Created: Aug 24, 2010 - 11:45:56 AM
+ *
+ * This is the 'old' conversion object. Used by mutable VOs until refactored away...
+ *
  */
-
 object ConvertTo
 {
   def toArray  [T <: AnyRef      : Manifest](t:Traversable[_]) = t.map({x => ConvertTo   [T](x.asInstanceOf[AnyRef])}).filter( _ != null).toArray[T]

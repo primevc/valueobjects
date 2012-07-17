@@ -12,4 +12,8 @@ package object types {
   type URI = org.apache.commons.httpclient.URI
   type ObjectId = org.bson.types.ObjectId
   type InternetAddress = javax.mail.internet.InternetAddress
+
+  type Date     = org.joda.time.DateMidnight
+  type DateTime = org.joda.time.DateTime
+  type Interval = org.joda.time.Interval
 }

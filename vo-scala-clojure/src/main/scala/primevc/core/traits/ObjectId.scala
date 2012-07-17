@@ -1,7 +1,7 @@
 package primevc.core.traits;
  import com.mongodb.casbah.Imports._
  import prime.types._
- import prime.utils.msgpack.VOPacker
+ import prime.utils.msgpack.MutableVOPacker
 
 trait ObjectId {
   type IDType = org.bson.types.ObjectId;
@@ -17,7 +17,7 @@ object ObjectIdVO {
 }
 
 object ObjectId {
-	def msgpack_packVO(o : VOPacker, obj : ObjectId, flagsToPack : Int)
+	def msgpack_packVO(o : MutableVOPacker, obj : ObjectId, flagsToPack : Int)
 	{
 		require(o != null && obj != null && flagsToPack != 0);
 

@@ -2,7 +2,7 @@ package prime.vo.mutable;
  import prime.types._
  import scala.collection.JavaConversions
  import org.msgpack.Unpacker
- import prime.utils.msgpack.{VOPacker, VOUnpacker, VOInstanceUnpacker}
+ import prime.utils.msgpack.{MutableVOPacker, VOUnpacker, VOInstanceUnpacker}
 
 trait ValueObject extends java.io.Externalizable
 {
@@ -65,7 +65,7 @@ trait ValueObject extends java.io.Externalizable
   }
 
   def writeExternal(out : java.io.ObjectOutput) {
-    new VOPacker(out.asInstanceOf[java.io.ObjectOutputStream]).pack(this)
+    new MutableVOPacker(out.asInstanceOf[java.io.ObjectOutputStream]).pack(this)
   }
 }
 
@@ -115,7 +115,7 @@ trait VOFieldInfo
 }
 
 trait VOMessagePacker[V <: ValueObject] {
-  protected[prime] def msgpack_packVO(o : VOPacker, obj : V, flagsToPack : Int) : Unit
+  protected[prime] def msgpack_packVO(o : MutableVOPacker, obj : V, flagsToPack : Int) : Unit
 }
 
 trait VOCompanion[V <: ValueObject] extends VOAccessor[V] with VOFieldInfo {

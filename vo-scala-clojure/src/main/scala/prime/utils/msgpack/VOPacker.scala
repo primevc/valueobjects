@@ -3,7 +3,6 @@ package prime.utils.msgpack
 import org.msgpack.Packer
 import java.lang.Math
 import java.io.OutputStream
-import prime.vo.mutable.{VOMessagePacker, VOCompanion, ValueObject}
 import org.bson.types.ObjectId
 import prime.types.{Ref, RefArray, Enum, RGBA, FileRef, URI}
 
@@ -15,8 +14,10 @@ import prime.types.{Ref, RefArray, Enum, RGBA, FileRef, URI}
  * To change this template use File | Settings | File Templates.
  */
 
-class VOPacker (out:OutputStream) extends Packer(out)
+class MutableVOPacker (out:OutputStream) extends Packer(out)
 {
+  import prime.vo.mutable.{VOMessagePacker, VOCompanion, ValueObject}
+
   final def pack(id : ObjectId)
   {
     out.write(0xD7)

@@ -79,8 +79,8 @@ class VOInstanceUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends Unpack
 }
 
 class MessagePackValueObject(val vo  : ValueObject) extends MessagePackObject {
-  def messagePack(packer : Packer) = packer.asInstanceOf[VOPacker].pack(vo);
+  def messagePack(packer : Packer) = packer.asInstanceOf[MutableVOPacker].pack(vo);
 }
 class MessagePackObjectId   (val oid : ObjectId)    extends MessagePackObject {
-  def messagePack(packer : Packer) = packer.asInstanceOf[VOPacker].pack(oid);
+  def messagePack(packer : Packer) = packer.asInstanceOf[MutableVOPacker].pack(oid);
 }

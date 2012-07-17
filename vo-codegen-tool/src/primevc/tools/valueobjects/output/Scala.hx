@@ -1820,7 +1820,7 @@ class ScalaMessagePacking extends MessagePacking
 	
 	override private function definePackerFunction()
 	{
-		a("\n\tfinal def msgpack_packVO(o : VOPacker, obj : "); a(def.name); a(", flagsToPack : Int)\n\t{"); //"); a(Module.pkgRoots.first().name); a("]
+		a("\n\tfinal def msgpack_packVO(o : MutableVOPacker, obj : "); a(def.name); a(", flagsToPack : Int)\n\t{"); //"); a(Module.pkgRoots.first().name); a("]
 		a("\n		require(o != null && obj != null);");
 		a("\n		");
 		a("\n		var propertyBits = flagsToPack;");

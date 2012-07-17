@@ -39,11 +39,11 @@ class Scala implements CodeGenerator
 
 import scala.collection.JavaConversions
 import scala.xml.NodeSeq
-import primevc.types._
-import primevc.utils._
-import primevc.utils.msgpack._
-import primevc.core.traits._
-import primevc.mvc.mongodb._
+import prime.types._
+import prime.utils._
+import prime.utils.msgpack._
+import prime.vo.mutable._
+import prime.mvc.mongodb._
 import com.mongodb.casbah.Imports._
 
 ");
@@ -53,8 +53,8 @@ import com.mongodb.casbah.Imports._
 			var map = new ScalaTypeMap();
 			m.generateWith(map);
 			file.writeString("
-package "+ m.fullName +" {
-  object VO { val typeMap : scala.collection.immutable.IntMap[primevc.core.traits.VOCompanion[_]] = scala.collection.immutable.IntMap(");
+package "+ m.fullName +".mutable {
+  object VO { val typeMap : scala.collection.immutable.IntMap[prime.vo.mutable.VOCompanion[_]] = scala.collection.immutable.IntMap(");
 			var first = true;
 			for (index in map.map.keys()) {
 				if (first) first = false;
@@ -181,7 +181,7 @@ file.writeString("
 			if (ns.keys.length > 0) {
 			//	a("scala.collection.mutable.HashSet[");
 			//	a(getType(ns.baseType).name);
-				a("primevc.core.traits.NamedSet["); a(getType(ns.baseType).name); // a("] with ");
+				a("prime.vo.mutable.NamedSet["); a(getType(ns.baseType).name); // a("] with ");
 			//	a("scala.collection.mutable.SetLike["); a(getType(ns.baseType).name); a(", "); a(def.name); a("VO");
 			}
 			else {
@@ -1242,19 +1242,19 @@ file.writeString("
 		res.name = (surroundWithType != null? surroundWithType + "[" : "") +
 		  (switch(t) {
 			case Tarray(innerT,_,_):	"Array["+ getType(innerT).name +"]";
-			case Turi, Turl:			"primevc.types.URI";
-			case TuniqueID:				"primevc.types.ObjectId";
-			case TfileRef:				"primevc.types.FileRef";
+			case Turi, Turl:			"prime.types.URI";
+			case TuniqueID:				"prime.types.ObjectId";
+			case TfileRef:				"prime.types.FileRef";
 			case Tstring:				"String";
 			case Tinteger(_,_,_):		res.mongoOptionGetter = ".map(ConvertTo.integer(_))";    "Int";
 			case Tdecimal(_,_,_):		res.mongoOptionGetter = ".map(ConvertTo.decimal(_))"; "Double";
 			case Tbool(v):				res.defaultValue = v; res.mongoOptionGetter = ".map(_.booleanValue)"; "Boolean";
 			case TenumConverter(_):		throw t; //"";
-			case Temail:				"primevc.types.InternetAddress";
+			case Temail:				"prime.types.InternetAddress";
 			case Tdate:					"org.joda.time.DateMidnight";
 			case Tdatetime:				"org.joda.time.DateTime";
 			case Tinterval:				"org.joda.time.Interval";
-			case Tcolor:				"primevc.types.RGBA";
+			case Tcolor:				"prime.types.RGBA";
 			case TclassRef(className):	className;
 		
 			case Tdef(ptypedef): switch (ptypedef) {

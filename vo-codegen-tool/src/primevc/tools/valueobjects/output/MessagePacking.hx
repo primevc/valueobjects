@@ -82,6 +82,11 @@ class MessagePacking
 	{
 		Util.addFullName(code, t, interfaceT);
 	}
+
+	private function addMutableFullName(t:TypeDefinition, interfaceT = false)
+	{
+		Util.addMutableFullName(code, t, interfaceT);
+	}
 	
 	private function a_packVOHeaderCallStart() {
 		a("\n\t\tb += o.packValueObjectHeader(TYPE_ID, ");

@@ -1,7 +1,7 @@
 package primevc.core.traits;
  import com.mongodb.casbah.Imports._
- import primevc.types._
-import primevc.utils.msgpack.VOPacker
+ import prime.types._
+ import prime.utils.msgpack.VOPacker
 
 trait ObjectId {
   type IDType = org.bson.types.ObjectId;

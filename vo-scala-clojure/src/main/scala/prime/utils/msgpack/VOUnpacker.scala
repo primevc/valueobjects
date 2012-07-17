@@ -1,6 +1,6 @@
-package primevc.utils.msgpack
+package prime.utils.msgpack
 
-import primevc.core.traits.{VOCompanion, ValueObject}
+import prime.vo.mutable.{VOCompanion, ValueObject}
 import collection.immutable.IntMap
 import org.msgpack.{Packer, MessagePackObject, UnpackerImpl}
 import org.bson.types.ObjectId
@@ -59,7 +59,7 @@ class VOInstanceUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends Unpack
     val field = fieldOffset + i
     //assert(vo != null, "Cannot write field:" + field + " = '" + value + "'' to null VO type:" + currentType)
     //println("putValue: %50s @ %2s in %s; i = %s, fieldOffset = %2s, fields = %6$s ".format(value,field,vo,i,fieldOffset,fields))
-    vo.Companion.putValue(vo, field, value)
+    vo.voCompanion.putValue(vo, field, value)
 
     fields ^= (1 << i);
     if (fields == 0) fieldOffset += 8 - i; // index fixup for last bit

@@ -1,8 +1,6 @@
-package primevc.core.traits
-
-import collection.generic.{GenericCompanion, GenericSetTemplate}
-import collection.mutable.{HashSet, Set, SetLike, FlatHashTable}
-import primevc.core.traits._
+package prime.vo.mutable
+ import collection.generic.{GenericCompanion, GenericSetTemplate}
+ import collection.mutable.{HashSet, Set, SetLike, FlatHashTable}
 
 /**
  * Created by IntelliJ IDEA.

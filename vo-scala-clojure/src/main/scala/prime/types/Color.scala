@@ -1,4 +1,4 @@
-package primevc.types;
+package prime.types;
  import java.lang.Integer.parseInt
  import java.lang.Long.parseLong
  import scala.util.matching.Regex

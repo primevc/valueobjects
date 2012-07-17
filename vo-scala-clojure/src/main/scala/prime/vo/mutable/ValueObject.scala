@@ -1,27 +1,27 @@
-package primevc.core.traits
- import primevc.types._
+package prime.vo.mutable;
+ import prime.types._
  import scala.collection.JavaConversions
  import org.msgpack.Unpacker
- import primevc.utils.msgpack.{VOPacker, VOUnpacker, VOInstanceUnpacker}
+ import prime.utils.msgpack.{VOPacker, VOUnpacker, VOInstanceUnpacker}
 
 trait ValueObject extends java.io.Externalizable
 {
-  protected[primevc] def updateFieldsSet_!() { }
+  protected[prime] def updateFieldsSet_!() { }
 
-  protected[primevc] def Companion : VOCompanion[_] with VOMessagePacker[_]
-  protected[primevc] var $fieldsSet : Int = 0
+  protected[prime] def voCompanion : VOCompanion[_] with VOMessagePacker[_]
+  protected[prime] var $fieldsSet : Int = 0
 
   def fieldIsSet_?(field:Field): Boolean = {
     updateFieldsSet_!
-    fieldIsSet_?(Companion.field(field.name.name))
+    fieldIsSet_?(voCompanion.field(field.name.name))
   }
-  def fieldIsSet_?(name:Symbol): Boolean = fieldIsSet_?(Companion.field(name))
+  def fieldIsSet_?(name:Symbol): Boolean = fieldIsSet_?(voCompanion.field(name))
   
   /** Which field (as defined by the companion object fields Vector indices) is set? */
   def fieldIsSet_?(index:Int): Boolean = ($fieldsSet & (1 << index)) != 0
   def empty_? = { updateFieldsSet_! ; $fieldsSet == 0 }
 
-  def partial_? : Boolean = numFieldsSet_? != Companion.numFields
+  def partial_? : Boolean = numFieldsSet_? != voCompanion.numFields
   def validationErrors_? : List[(Symbol, String)] = Nil
 
   // Courtesy of: http://graphics.stanford.edu/%7Eseander/bithacks.html#CountBitsSetParallel
@@ -37,7 +37,7 @@ trait ValueObject extends java.io.Externalizable
   def readExternal(in : java.io.ObjectInput)
   {
     val obj = this;
-    val map = obj.Companion.defaultVOCompanionMap;
+    val map = obj.voCompanion.defaultVOCompanionMap;
     assert(map != null, this.getClass+"::readExternal map == null, obj = " + obj)
 
     val helper = new VOUnpacker(map)
@@ -47,7 +47,7 @@ trait ValueObject extends java.io.Externalizable
         first = false;
         new VOInstanceUnpacker(map) {
           vo  = obj
-          voc = obj.Companion.asInstanceOf[VOCompanion[ValueObject]]
+          voc = obj.voCompanion.asInstanceOf[VOCompanion[ValueObject]]
           assert(voc != null, this.getClass+"::readExternal voc == null, obj = "+obj)
         }
       }
@@ -87,12 +87,12 @@ trait VOAccessor[V <: ValueObject]
   def field(vo:V, key:String): Int
   def fieldsFor(vo:V): IndexedSeq[Field]
   def getValue(vo:V, key:String): AnyRef
-//  def putValue(vo:V, key:String, value:AnyRef): V
+  def putValue(vo:V, key:String, value:AnyRef): V
 
   // concrete
   final def fieldNamed(vo:V, key:String) = field(vo, field(vo, key))
-//  final def getValue  (vo:V, key:Symbol): AnyRef = getValue(vo,key)
-//  final def putValue  (vo:V, key:Symbol, value:AnyRef): V = putValue(vo,key.name,value)
+  final def getValue  (vo:V, key:Symbol): AnyRef = getValue(vo,key)
+  final def putValue  (vo:V, key:Symbol, value:AnyRef): V = putValue(vo,key.name,value)
 
   def isSet(vo:V, key:String): Boolean = vo.fieldIsSet_?(field(vo, key));
 
@@ -115,7 +115,7 @@ trait VOFieldInfo
 }
 
 trait VOMessagePacker[V <: ValueObject] {
-  protected[primevc] def msgpack_packVO(o : VOPacker, obj : V, flagsToPack : Int) : Unit
+  protected[prime] def msgpack_packVO(o : VOPacker, obj : V, flagsToPack : Int) : Unit
 }
 
 trait VOCompanion[V <: ValueObject] extends VOAccessor[V] with VOFieldInfo {
@@ -138,14 +138,14 @@ trait VOCompanion[V <: ValueObject] extends VOAccessor[V] with VOFieldInfo {
     case index:Int => putValue(vo, index, value)
   }
 
-  def clear(vo:VOType) = for (i <- 0 until numFields) putValue(vo, i, null)
+//  def clear(vo:VOType) = for (i <- 0 until numFields) putValue(vo, i, null)
 
   def getValue(vo:VOType, index:Int): AnyRef
   def putValue(vo:VOType, index:Int, value:AnyRef): VOType
   def empty: VOType
   def fieldIndexOffset(typeID : Int) : Int
 
-  def defaultVOCompanionMap : scala.collection.immutable.IntMap[primevc.core.traits.VOCompanion[_]]
+  def defaultVOCompanionMap : scala.collection.immutable.IntMap[VOCompanion[_]]
 }
 
 trait IDAccessor[V <: ValueObjectWithID]

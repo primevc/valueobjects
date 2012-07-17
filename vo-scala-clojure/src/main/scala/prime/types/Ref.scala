@@ -1,5 +1,5 @@
-package primevc.types
- import primevc.core.traits._
+package prime.types
+ import prime.vo.mutable._
 
 class Ref[V <: ValueObjectWithID](val ref:V#IDType, var vo_! : V = null.asInstanceOf[V])
 {

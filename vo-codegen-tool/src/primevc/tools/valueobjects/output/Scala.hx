@@ -1,6 +1,7 @@
 package primevc.tools.valueobjects.output;
  import primevc.tools.valueobjects.VODefinition;
   using primevc.utils.TypeUtil;
+  using primevc.tools.valueobjects.output.ScalaUtil;
 
 class ScalaTypeMap implements CodeGenerator
 {
@@ -12,70 +13,24 @@ class ScalaTypeMap implements CodeGenerator
 
 	public function genClass(def : ClassDef) {
 		if (!def.isMixin)
-			map.set(def.index, def.fullName.substr() + "VO");
+			map.set(def.index, def.fullName.substr(def.module.getPackageRoot().fullName.length + 1) + "VO");
 	}
 
 	public function genEnum(def:EnumDef) {}
 
-	public function newModule(module:Module) {
+	public function newModule(module:Module) : CodeGenerator {
 		module.generateWith(this);
-		return cast this;
+		return this;
 	}
 }
-
-class ScalaUtil
-{
-	static function bitmask(numBits:Int, offset:Int=0)
-	{
-		var mask = 0;
-		for (bit in 0 ... numBits) {
-			mask |= 1 << (bit + offset);
-		}
-		return "0x" + StringTools.hex(mask, 4);
-	}
-
-	static function propertyName(p:Property) return quote(p.name)
-	static public function quote(name:String) return switch (name) {
-		case "abstract": "`abstract`";
-		case "type": "`type`";
-		default: name;
-	}
-
-	static function getType(t:PType, ?surroundWithType:String) : {name:String, defaultValue:Dynamic}
-	{
-		var res = {name:null, defaultValue: null};
-		res.name = (surroundWithType != null? surroundWithType + "[" : "") +
-		  (switch(t) {
-			case Tarray(innerT,_,_):	"IndexedSeq["+ getType(innerT).name +"]";
-			case Turi, Turl:			"prime.valuetype.URI";
-			case TuniqueID:				"prime.valuetype.ObjectId";
-			case TfileRef:				"prime.valuetype.FileRef";
-			case Tstring:				"String";
-			case Tinteger(_,_,_):		"Int";
-			case Tdecimal(_,_,_):		"Double";
-			case Tbool(v):				res.defaultValue = v; "Boolean";
-			case TenumConverter(_):		throw t; //"";
-			case Temail:				"prime.valuetype.InternetAddress";
-			case Tdate:					"prime.valuetype.Date";
-			case Tdatetime:				"prime.valuetype.DateTime";
-			case Tinterval:				"prime.valuetype.Interval";
-			case Tcolor:				"prime.valuetype.RGBA";
-			case TclassRef(className):	className;
-
-			case Tdef(ptypedef): switch (ptypedef) {
-				case Tclass		(def):	def.fullName + "VO";
-				case Tenum		(def):	def.fullName + ".EValue";
-			};
-		  }) + (surroundWithType != null? "]" : "");
-
-		return res;
-	}
-}
-using ScalaUtil;
 
 class Scala implements CodeGenerator
 {
+	private static var writelist = new List<Scala>();
+
 	public static function generate() {
+		MutableScala.generate();
+		return;
 		Module.root.generateWith(new Scala(Module.root));
 
 		var filename = "ValueObjects.scala";
@@ -112,9 +67,45 @@ file.writeString("
 		}
 		for (m in writelist) m.write(file);
 		file.close();
-		MutableScala.generate();
+	}
+
+	var mod			: Module;
+	var code		: StringBuf;
+	var dir			: String;
+	var shouldWrite : Bool;
+
+	var currentFieldBitNum : Int;
+
+	private function new(m:Module) {
+		this.mod = m;
+		this.code = new StringBuf();
+		writelist.add(this);
+	}
+
+	function write(file:neko.io.FileOutput)
+	{
+		if (!shouldWrite) return;
+
+		file.writeString("\n\npackage ");
+		file.writeString(this.mod.fullName);
+
+		file.writeString("\n{\n\n");
+		file.writeString(code.toString());
+		file.writeString("\n\n} // end ");
+		file.writeString(this.mod.fullName);
+	}
+
+	public function genClass(def : ClassDef) {
+	}
+
+	public function genEnum(def:EnumDef) {
+	}
+
+	public function newModule(module:Module) {
+		return new Scala(module);
 	}
 }
+
 
 class MutableScala implements CodeGenerator
 {
@@ -143,7 +134,7 @@ import prime.vo.mutable._
 			var map = new ScalaTypeMap();
 			m.generateWith(map);
 			file.writeString("
-package "+ m.fullName +".mutable {
+package "+ m.fullName +".mutable\n{\n
   object VO { val typeMap : scala.collection.immutable.IntMap[prime.vo.mutable.VOCompanion[_]] = scala.collection.immutable.IntMap(");
 			var first = true;
 			for (index in map.map.keys()) {
@@ -171,9 +162,9 @@ file.writeString("
 	{
 		if (!shouldWrite) return;
 		
+		var pkgName = this.mod.mutableFullName;
 		file.writeString("\n\npackage ");
-		file.writeString(this.mod.fullName);
-		
+		file.writeString(pkgName);
 		file.writeString("\n{\n\n");
 		file.writeString(code.toString());
 		file.writeString("\n\n} // end ");
@@ -190,7 +181,7 @@ file.writeString("
 	public function newModule	(m:Module)		: CodeGenerator
 	{
 		trace("\n- Scala module: "+m.fullName);
-		return new Scala(m);
+		return new MutableScala(m);
 	}
 	
 	inline function a(str) code.add(str)
@@ -216,7 +207,7 @@ file.writeString("
 		}
 		
 		var superClassHasBitflags = false;
-		var fullName = def.fullName;
+		var fullName = def.mutableFullName;
 		// Check if this is a NamedSetDef
 		var ns:NamedSetDef = Std.is(def, NamedSetDef)? cast def : null;
 		
@@ -254,7 +245,7 @@ file.writeString("
 			{
 				if (idProperty != null) throw "VO's may have only 1 ID property...\n  idProperty = "+idProperty+"\n"+def;
 				idProperty = p;
-				idType = getType(p.type).name;
+				idType = p.type.typeNameInMutablePkg().name;
 				Assert.notNull(idType);
 				
 				if (p.definedIn != def)
@@ -268,19 +259,19 @@ file.writeString("
 		{
 			if (ns.keys.length > 0) {
 			//	a("scala.collection.mutable.HashSet[");
-			//	a(getType(ns.baseType).name);
-				a("prime.vo.mutable.NamedSet["); a(getType(ns.baseType).name); // a("] with ");
-			//	a("scala.collection.mutable.SetLike["); a(getType(ns.baseType).name); a(", "); a(def.name); a("VO");
+			//	a(typeNameInMutablePkg(ns.baseType).name);
+				a("prime.vo.mutable.NamedSet["); a(ns.baseType.typeNameInMutablePkg().name); // a("] with ");
+			//	a("scala.collection.mutable.SetLike["); a(typeNameInMutablePkg(ns.baseType).name); a(", "); a(def.name); a("VO");
 			}
 			else {
 				a("ValueObject"); if (idType != null) a("WithID");
 				a(" with scala.collection.Traversable[");
-				a(getType(ns.baseType).name);
+				a(ns.baseType.typeNameInMutablePkg().name);
 			}
 			a("]");
 		}
 		else if (def.superClass != null) {
-			a(def.superClass.fullName);
+			a(def.superClass.mutableFullName);
 			if (!def.superClass.hasUniqueID() && idType != null) {
 				// Superclass has no Unique ID. Add the required trait now.
 				a(" with ValueObjectWithID");
@@ -293,7 +284,7 @@ file.writeString("
 		
 		//TODO: Generate traits for supertypes ?
 		for (t in def.supertypes) if (Std.is(t, MagicClassDef) || def.superClass != t) {
-			 a("\n with "); a(t.fullName);
+			 a("\n with "); a(t.mutableFullName);
 		}
 		
 		a("\n{");
@@ -324,7 +315,7 @@ file.writeString("
 		a(" extends ");
 		
 		if (def.superClass != null) {
-			a(def.superClass.fullName); a("VO");
+			a(def.superClass.mutableFullName); a("VO");
 			if (idType != null && def.superClass.hasUniqueID()) a("(_id)");
 			a(" with ");
 		}
@@ -354,7 +345,7 @@ file.writeString("
 		}
 		
 		// Companion getter
-		a("\n  override def Companion : VOCompanion[_] with VOMessagePacker[_] = "); a(def.name); a("VO");
+		a("\n  override def voCompanion : VOCompanion[_] with VOMessagePacker[_] = "); a(def.name); a("VO");
 		
 /*		// partial_?
 		if (def.propertiesSorted.length != 0) {
@@ -407,7 +398,7 @@ file.writeString("
 		genCompanion(def, idProperty, ns, thisPropsStartIndex, hasSubtypes, subtypes);
 	}
 	
-	private function genCompanion(def:ClassDef, idProperty:Property, ns, thisPropsStartIndex, hasSubtypes, subtypes:List<ClassDef>)
+	private function genCompanion(def:ClassDef, idProperty:Property, ns:NamedSetDef, thisPropsStartIndex, hasSubtypes, subtypes:List<ClassDef>)
 	{
 		// VO MessagePacker object
 		a("object "); a(def.name);
@@ -442,7 +433,7 @@ file.writeString("
 		if (ns != null && ns.keys.length > 0)
 		{
 //			a("\n  override def getValue(vo:"); a(def.name); a("VO, key:String): AnyRef = vo.get(key)");
-			a("\n  override def putValue(vo:"); a(def.name); a("VO, key:String, value:AnyRef): "); a(def.name); a("VO = { vo.addEntry(ConvertTo.vo["); a(getType(ns.baseType).name); a("](value)); vo; }");
+			a("\n  override def putValue(vo:"); a(def.name); a("VO, key:String, value:AnyRef): "); a(def.name); a("VO = { vo.addEntry(ConvertTo.vo["); a(ns.baseType.typeNameInMutablePkg().name); a("](value)); vo; }");
 //			a("\n  override def fieldsSetNames(vo:"); a(def.name); a("VO) = vo.keySet");
 		}
 		
@@ -452,7 +443,7 @@ file.writeString("
 			for (i in 0 ... def.propertiesSorted.length)
 			{
 				var p = def.propertiesSorted[i];
-				a("\n  val "); a(quote(p.name));
+				a("\n  val "); a(p.name.quote());
 				if (p.parent == def)
 				{
 				 	a(" = Field('"); a(p.name); a(", ");
@@ -463,7 +454,7 @@ file.writeString("
 					a(")");
 				}	
 				else {
-					a(" = "); a(p.parent.fullName); a("VO."); a(quote(p.name));
+					a(" = "); a(p.parent.mutableFullName); a("VO."); a(p.name.quote());
 				}
 			}
 			
@@ -472,7 +463,7 @@ file.writeString("
 			for (i in 0 ... def.propertiesSorted.length)
 			{
 				var p = def.propertiesSorted[i];
-				if (i != 0) a(", "); a(quote(p.name));
+				if (i != 0) a(", "); a(p.name.quote());
 			}
 			a(");");
 			
@@ -481,7 +472,7 @@ file.writeString("
 			for (i in 0 ... def.propertiesSorted.length)
 			{
 				var p = def.propertiesSorted[i];
-				a("\n    case "+ p.bitIndex()); a(" => this."); a(quote(p.name));
+				a("\n    case "+ p.bitIndex()); a(" => this."); a(p.name.quote());
 			}
 			a("\n    case _ => super.field(index)");
 			a("\n  }");
@@ -507,14 +498,14 @@ file.writeString("
 			// getValue()
 			a("\n\n  def getValue(vo:"); a(def.name); a("VO, index:Int) : AnyRef = ");
 			if (def.superClass != null && thisPropsStartIndex == null) {
-				a(def.superClass.fullName); a("VO.getValue(vo, index);\n");
+				a(def.superClass.mutableFullName); a("VO.getValue(vo, index);\n");
 			}
 			else
 			{
 				a("(index match {\n");
 				for (i in 0 ... def.propertiesSorted.length) {
 					var p = def.propertiesSorted[i];
-					a('    case ' + p.bitIndex()); a(' => vo.'); a(propertyName(p)); a('\n');
+					a('    case ' + p.bitIndex()); a(' => vo.'); a(p.propertyName()); a('\n');
 				}
 				a("    case _ => null\n  }).asInstanceOf[AnyRef]\n\n");
 			}
@@ -522,7 +513,7 @@ file.writeString("
 			// putValue(vo, index:Int, value)
 			a("  def putValue(vo:"); a(def.name); a("VO, index:Int, value:AnyRef) : "); a(def.name); a("VO = ");
 			if (def.superClass != null && thisPropsStartIndex == null) {
-				a(def.superClass.fullName); a("VO.putValue(vo, index, value).asInstanceOf["); a(def.name); a("VO];\n");
+				a(def.superClass.mutableFullName); a("VO.putValue(vo, index, value).asInstanceOf["); a(def.name); a("VO];\n");
 			}
 			else
 			{
@@ -552,10 +543,10 @@ file.writeString("
 		// IDAccessor & VOProxy
 		if (idProperty != null)
 		{
-			var idType = getType(idProperty.type).name;
+			var idType = idProperty.type.typeNameInMutablePkg().name;
 			
 			a("trait "); a(def.name); a("IDAccessor extends IDAccessor["); a(def.name); a("VO] {\n");
-				a("  val idField = " ); a(idProperty.definedIn.fullName); a("VO."); a(idProperty.name); a('\n');
+				a("  val idField = " ); a(idProperty.definedIn.mutableFullName); a("VO."); a(idProperty.name); a('\n');
 				a("  def idValue(vo:"); a(def.name); a("VO): "); a(idType); a(" = if(vo == null) "); a(nilValue(idProperty.type)); a(" else vo."); a(idProperty.name); ac("\n".code);
 				a("  def idValue(vo:"); a(def.name); a("VO, idValueToSet:"); a(idType); a(") = { vo."); a(idProperty.name); a(" = idValueToSet; }\n");
 			a("}\n");
@@ -586,7 +577,7 @@ file.writeString("
 		a('      case "'); a(p.name); a('" => ');
 	}
 	function addVOGetterCase(p:Property) {
-		addPropnameCase(p); a('vo.'); a(quote(p.name));
+		addPropnameCase(p); a('vo.'); a(p.name.quote());
 	}
 	
 	function writeLiteral(type:PType, val:Dynamic) switch (type)
@@ -684,7 +675,7 @@ file.writeString("
 	
 	function genNamedSetDefMethods(def: NamedSetDef)
 	{
-		var type = getType(def.baseType);
+		var type = def.baseType.typeNameInMutablePkg();
 		
 		a("\n  override def foreach[U](f: "); a(type.name); a(" => U) {");
 		for (i in 0 ... def.propertiesSorted.length) {
@@ -698,7 +689,7 @@ file.writeString("
 		if (def.keys.length == 0) return; // No keys, no way to map...
 		
 //		a("\n  def this$ = "); a(def.name); a("VO.asInstanceOf[VOCompanion[org.valueobjects.traits.NamedSet["); a(type.name); a("]]];");
-		a("\n  override def clear() { "); a(def.name); a("VO.clear(this); super.clear(); }\n");
+//		a("\n  override def clear() { "); a(def.name); a("VO.clear(this); super.clear(); }\n");
 		a("\n  override def empty: "); a(def.name); a("VO = new "); a(def.name); a("VO;\n");
 //		a("\n  override def clone(): this.type = new "); a(def.name); a("VO ++= this;\n");
 //		a("\n  override def companion() = "); a(def.name); a("VO;\n");
@@ -719,7 +710,7 @@ file.writeString("
 		a("  }\n");
 		
 		a("\n  final override def addEntry(item:"); a(type.name); a(") = {");
-		genNamedSetKeyMatcher(def, "super.addEntry", function(i,p) return "this."+quote(p.name)+" = item;");
+		genNamedSetKeyMatcher(def, "super.addEntry", function(i,p) return "this."+p.name.quote()+" = item;");
 		a("  }; true; }\n");
 		
 		a("\n  final override def removeEntry(item:"); a(type.name); a(") = ");
@@ -745,7 +736,7 @@ file.writeString("
 		{
 			var p = def.propertiesSorted[i];
 			
-			a("\n    if (fieldIsSet_?("+i+")) "); a("this."); a(quote(p.name));
+			a("\n    if (fieldIsSet_?("+i+")) "); a("this."); a(p.name.quote());
 		}
 		a("\n    ");
 		
@@ -799,7 +790,7 @@ file.writeString("
 	{
 		a("\n  ");
 		
-		var propName = propertyName(p);
+		var propName = p.propertyName();
 		
 		// Storage
 		a("/*@field*/ protected[this] var __"); a(p.name); a(": ");
@@ -813,15 +804,15 @@ file.writeString("
 		{
 			case Tdef(cl): switch (cl) {
 				case Tclass(cl):
-					var vo = cl.fullName + "VO";
+					var vo = cl.mutableFullName + "VO";
 					add_ifVarNotNull(p.name, (!p.hasOption(reference))? "new " + vo : "new Ref[" + vo +"](null)");
 				
 				case Tenum(e):
-					add_ifVarNotNull(p.name, e.fullName + ".Null");
+					add_ifVarNotNull(p.name, e.mutableFullName + ".Null");
 			}
 			
 			case Tarray(innerT,_,_):
-				add_ifVarNotNull(p.name, (p.hasOption(reference)? "RefArray[" : "Array[") + getType(innerT).name +"]()");
+				add_ifVarNotNull(p.name, (p.hasOption(reference)? "RefArray[" : "Array[") + innerT.typeNameInMutablePkg().name +"]()");
 			
 			case Tstring:
 				add_ifVarNotNull(p.name, '""');
@@ -829,7 +820,7 @@ file.writeString("
 			case Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, Turl, TuniqueID, TfileRef, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
 				a('__'); a(p.name);
 			
-			case TclassRef(className):	a(className); //throw p;
+			case TclassRef(className):	throw p;
 			case TenumConverter(_):		throw p;
 		}
 		
@@ -871,17 +862,17 @@ file.writeString("
 		
 		if (p.hasOption(reference))
 		{
-			var clname = getType(p.type).name;
-			a("\n  final def "); a(p.name); a("_=(v:"); a(clname); a(") : Unit = this."); a(quote(p.name));
+			var clname = p.type.typeNameInMutablePkg().name;
+			a("\n  final def "); a(p.name); a("_=(v:"); a(clname); a(") : Unit = this."); a(p.name.quote());
 			switch (p.type) {
 				case Tarray(innerType, _,_):
-					var innerName = getType(innerType).name;
+					var innerName = innerType.typeNameInMutablePkg().name;
 					a(" = new RefArray["); a(innerName); a("](v.map("); a(innerName); a(".idValue(_)).toArray, v)");
 				default:
 					a(" = new Ref["); a(clname); a("]("); a(clname); a(".idValue(v), v)");
 			}
 			a("\n  final def "); a(p.name); a("_(v:AnyRef) : Unit = ");
-			a(quote(p.name));
+			a(p.name.quote());
 			a(" = ");
 			a(convertFromAnyRefTo(p.type, p.hasOption(reference)));
 			a("(v);\n");
@@ -889,14 +880,14 @@ file.writeString("
 		else
 		{
 			a("\n  final def "); a(p.name); a("_(v:AnyRef) : Unit = { val __value");
-			if (Util.isEnum(p.type)) { a(": "); a(getType(p.type).name); }
+			if (Util.isEnum(p.type)) { a(": "); a(p.type.typeNameInMutablePkg().name); }
 			a(" = "); a(convertFromAnyRefTo(p.type));
 //			if (Util.isEnum(p.type))
 //				a("(v.toString).getOrElse(null);");
 //			else
 				a("(v);");
 			
-			a(" "); a(quote(p.name)); a(" = __value;");
+			a(" "); a(p.name.quote()); a(" = __value;");
 			switch (p.type) {
 				case Tdef(_), Tarray(_,_,_): // Don't set any bits
 				default:
@@ -911,7 +902,7 @@ file.writeString("
 	
 	function addClassProxy(clname:String, valSuffix:String = "Proxy")
 	{
-		addLowerCaseFirst(clname.substr(mod.fullName.length + 1).split('.').join('_')); a(valSuffix); a(": VOProxy["); a(clname); a("VO]");
+		addLowerCaseFirst(clname.substr(mod.mutableFullName.length + 1).split('.').join('_')); a(valSuffix); a(": VOProxy["); a(clname); a("VO]");
 	}
 	
 	function add_ifVarNotNull(name:String, defaultValue:String)
@@ -930,8 +921,8 @@ file.writeString("
 		switch(t)
 		{
 			case Tdef(cl): switch (cl) {
-				case Tclass(cl):	a("Tdef("); a(cl.fullName); a("VO, "); a(Std.string(isRef)); a(")");
-				case Tenum(e):		a("Tenum("); a(e.fullName); ac(")".code);
+				case Tclass(cl):	a("Tdef("); a(cl.mutableFullName); a("VO, "); a(Std.string(isRef)); a(")");
+				case Tenum(e):		a("Tenum("); a(e.mutableFullName); ac(")".code);
 			}
 			case Tbool(v):			a("Tbool("); a(Std.string(v)); ac(")".code);
 			
@@ -963,12 +954,12 @@ file.writeString("
 	
 	static public function convertFromAnyRefTo(t:PType, ref = false) return switch(t) {
 		case Tdef(ptypedef):		switch (ptypedef) {
-			case Tenum(def):		def.fullName+".convert";
-			default:				"ConvertTo." + (ref? "voRef" : "vo") + "["+ getType(t).name + "]";
+			case Tenum(def):		def.mutableFullName+".convert";
+			default:				"ConvertTo." + (ref? "voRef" : "vo") + "["+ t.typeNameInMutablePkg().name + "]";
 		}
 		case Tarray(innerT,_,_):	switch (innerT) {
-			case Tdef(_):			"ConvertTo.voArray["+getType(innerT).name+"]";
-			default:				"ConvertTo.array["+getType(innerT).name+"]";
+			case Tdef(_):			(Util.isEnum(innerT)? "ConvertTo.array[" : "ConvertTo.voArray[") + innerT.typeNameInMutablePkg().name + "]";
+			default:				"ConvertTo.array["+innerT.typeNameInMutablePkg().name+"]";
 		}
 		case Turi, Turl:			"ConvertTo.uri";
 		case Temail:				"ConvertTo.email";
@@ -982,7 +973,7 @@ file.writeString("
 		case Tdatetime:				"ConvertTo.datetime";
 		case Tbool(_):				"ConvertTo.boolean";
 		case Tcolor:				"ConvertTo.rgba";
-		case TenumConverter(prop):	prop.parent.fullName + ".from" + prop.name.substr(2); //"";
+		case TenumConverter(prop):	prop.parent.mutableFullName + ".from" + prop.name.substr(2); //"";
 		case TclassRef(className):	"ConvertTo."+className; //throw t;
 	}
 	
@@ -999,11 +990,11 @@ file.writeString("
 	function getPropertyTypename(p:Property) return switch(p.type)
 	{	
 		case Tarray(innerT, _, _):
-			if (p.hasOption(reference)) {name:"RefArray["+getType(innerT).name+"]", defaultValue: null};
-			else getType(p.type);
+			if (p.hasOption(reference)) {name:"RefArray["+innerT.typeNameInMutablePkg().name+"]", defaultValue: null};
+			else p.type.typeNameInMutablePkg();
 		
 		default:
-			var type = getType(p.type);
+			var type = p.type.typeNameInMutablePkg();
 			if (p.hasOption(reference)) {
 			 	type.name = "Ref["+type.name+"]";
 			}
@@ -1032,7 +1023,7 @@ file.writeString("
 //				Assert.that(prop.type == Tstring, Std.string(def));
 				a(", ");
 				if (withVal) a("val ");
-				a(quote(prop.name)); a(":String"); // a(conv); ac('"'.code);
+				a(prop.name.quote()); a(":String"); // a(conv); ac('"'.code);
 			}
 		}
 		
@@ -1047,7 +1038,7 @@ file.writeString("
 		addConversionParams(false);
 		a(") = new EValue(nextId, name, value");
 		for (prop in def.conversions) if (prop.name != "toString") {
-			a(", "); a(quote(prop.name));
+			a(", "); a(prop.name.quote());
 		}
 		a(");\n");
 		
@@ -1068,7 +1059,7 @@ file.writeString("
 			
 			if (e.type != null)
 			{
-				a('  def '); a(e.name); a('(value:'); a(getType(e.type).name); a(') = new EValue(nextId, "'); a(e.name); ac('"'.code); a(", -1");
+				a('  def '); a(e.name); a('(value:'); a(e.type.typeNameInMutablePkg().name); a(') = new EValue(nextId, "'); a(e.name); ac('"'.code); a(", -1");
 				for (key in e.conversions.keys()) if (key != "toString") {
 					var conv = e.conversions.get(key);
 					a(', "'); a(conv); ac('"'.code);
@@ -1162,7 +1153,7 @@ class XMLProxyGenerator
 		
 		if (def.superClass != null && def.superClass.defaultXMLMap != null && !def.superClass.defaultXMLMap.root.isXMLTypeMap()) {
 			addSuperClassMapping = true;
-			dependencies.set(def.superClass.fullName, true);
+			dependencies.set(def.superClass.mutableFullName, true);
 		}
 	}
 	
@@ -1175,9 +1166,9 @@ class XMLProxyGenerator
 		/*	if (Std.is(cl, NamedSetDef)) {
 				cl = Util.unpackPTypedef(Util.getPTypedef(cast(cl, NamedSetDef).baseType));
 			}
-		*/	dependencies.set(cl.fullName, true);
+		*/	dependencies.set(cl.mutableFullName, true);
 		
-		case XM_typeMap(map):			for (k in map.keys()) dependencies.set(map.get(k).fullName, true);
+		case XM_typeMap(map):			for (k in map.keys()) dependencies.set(map.get(k).mutableFullName, true);
 		
 		default:
 	}
@@ -1215,7 +1206,7 @@ class XMLProxyGenerator
 		a("\n    val vo = if (valueobject != null) valueobject else new "); a(def.name); a("VO;\n");
 		if (addSuperClassMapping)
 		{
-			a("\n    setValueObject(vo.asInstanceOf["); a(def.superClass.fullName); a("VO], xml);");
+			a("\n    setValueObject(vo.asInstanceOf["); a(def.superClass.mutableFullName); a("VO], xml);");
 			// Don't use the merged map, since we can rely on superClass setValueObject calls.
 			fromXMLNode(map.root, "vo.", 2);
 		}
@@ -1237,7 +1228,7 @@ class XMLProxyGenerator
 		}
 */		
 		#if debug
-		a('println("'); for (i in 0 ... indentLevel) ac(' '.code); a(def.fullName); a(': " + xml.headOption.map(_.label).getOrElse("-"))\n');
+		a('println("'); for (i in 0 ... indentLevel) ac(' '.code); a(def.mutableFullName); a(': " + xml.headOption.map(_.label).getOrElse("-"))\n');
 		#end
 		
 		// Multiple childnodes mapped props:
@@ -1323,7 +1314,7 @@ class XMLProxyGenerator
 						matchAdded = true;
 					}
 					
-					var clname = map.get(k).fullName;
+					var clname = map.get(k).mutableFullName;
 					a('\n    case "'); a(k); a('" => outer.setValueObject(valueobject match { case v: '); a(clname); a("VO => v; case _ => new "); a(clname); a("VO }, xml);");
 					
 					code_added = true;
@@ -1354,7 +1345,7 @@ class XMLProxyGenerator
 				var clname = null;
 				
 				a("vo match {");
-				for (val in map) if (!added.exists(clname = val.fullName)) {
+				for (val in map) if (!added.exists(clname = val.mutableFullName)) {
 					a("\n    case vo:"); a(clname); a('VO => toXML(vo)');
 					added.set(clname, true);
 				}
@@ -1493,7 +1484,7 @@ class XMLProxyGenerator
 		var pieces = path.split('.');
 		var i = 0;
 		for (s in pieces) {
-			a(Scala.quote(s));
+			a(s.quote());
 			if (++i != pieces.length) ac('.'.code);
 		}
 	}
@@ -1536,7 +1527,7 @@ class XMLProxyGenerator
 	{
 		case Tstring:
 		default:
-			a(Scala.convertFromAnyRefTo(type));
+			a(MutableScala.convertFromAnyRefTo(type));
 	}
 	
 	function matchAttribute(v:XMLMapValue) return switch (v) {
@@ -1576,7 +1567,7 @@ class XMLProxyGenerator
 			 	 XM_child		(path, prop):
 				
 				
-				var clname = Util.unpackPTypedef(Util.getPTypedef(prop.type)).fullName;
+				var clname = Util.unpackPTypedef(Util.getPTypedef(prop.type)).mutableFullName;
 				
 				if (Util.isPTypeIterable(prop.type)) {
 					a("val tmp_"); a(path); a(" = ");
@@ -1630,9 +1621,9 @@ class XMLProxyGenerator
 			
 			a("if ("); a(pathPrefix);
 			if (objPathEnd != -1) {
-				a(Scala.quote(path.substr(0, objPathEnd))); ac('.'.code);
+				a(path.substr(0, objPathEnd).quote()); ac('.'.code);
 			}
-			a("fieldIsSet_?("); a(fieldIndex+" /*"); a(prop.parent.fullName); a(" */)) ");
+			a("fieldIsSet_?("); a(fieldIndex+" /*"); a(prop.parent.mutableFullName); a(" */)) ");
 			
 			return true;
 		
@@ -1706,7 +1697,7 @@ class XMLProxyGenerator
 	function add_toXMLChildren(path, type) switch(type)
 	{
 		case Tdef(t):
-			var clname = Util.unpackPTypedef(t).fullName;
+			var clname = Util.unpackPTypedef(t).mutableFullName;
 			a("toXML("); addPathEscaped(path); a(")");
 		
 		default:
@@ -1785,7 +1776,7 @@ class ScalaMessagePacking extends MessagePacking
 	}
 	
 	override private function a_msgpackVOCallStart(t : TypeDefinition) {
-		a("\n\t\t\t"); addFullName(t); a(".msgpack_packVO(o, obj, ");
+		a("\n\t\t\t"); addMutableFullName(t); a(".msgpack_packVO(o, obj, ");
 	}
 	
 	override private function a_assert(v:String) {
@@ -1802,13 +1793,13 @@ class ScalaMessagePacking extends MessagePacking
 		a("\n\t}\n");
 	}
 	override private function addFieldIndexOffsetCase(t : TypeDefinition, offset : Int) {
-		a("\n    case "); a(Std.string(t.index)); a(" => "); a(offset + ";"); a(" // "); a(t.fullName);
+		a("\n    case "); a(Std.string(t.index)); a(" => "); a(offset + ";"); a(" // "); a(t.mutableFullName);
 	}
 	
 	override private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)
 	{
 		if (path.indexOf("obj.") == 0) {
-			path = "obj." + Scala.quote(path.substr(4));
+			path = "obj." + path.substr(4).quote();
 		}
 		
 		switch (pType)
@@ -1842,7 +1833,7 @@ class ScalaMessagePacking extends MessagePacking
 		a("\n  def defaultVOCompanionMap = ");
 		var pkgroot = def.module.getPackageRoot();
 		if (pkgroot != Module.root) {
-			a(pkgroot.fullName); a(".VO.typeMap");
+			a(pkgroot.mutableFullName); a(".VO.typeMap");
 		}
 		else a("null");
 		

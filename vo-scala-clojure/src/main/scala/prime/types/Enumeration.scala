@@ -1,6 +1,6 @@
-package primevc.types
+package prime.types
 
-import primevc.utils.ConvertTo
+import prime.utils.ConvertTo
 
 /**
  * Created by IntelliJ IDEA.

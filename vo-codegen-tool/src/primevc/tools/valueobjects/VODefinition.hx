@@ -83,9 +83,11 @@ class Module
 	public  var name		(default,null)		: String;
 	private var members		(default,null)		: Hash<ModuleMember>;
 	public  var parent		(default,null)		: Module;
-	public  var fullName	(getFullName,null)	: String;
+	public  var fullName		(getFullName,null) : String;
+	public  var mutableFullName	(getMutableFullName,null) : String;
 	
-	private function getFullName():String { return (parent == null || parent == Module.root ? name : parent.getFullName() + '.' + name); }
+	private function getFullName():String { return fullName != null? fullName : fullName = (parent == null || parent == Module.root ? name : parent.getFullName() + '.' + name); }
+	private function getMutableFullName():String { return mutableFullName != null? mutableFullName : mutableFullName = (parent == null || parent == Module.root ? name : parent.getMutableFullName() + "." + (packageRoot? name + ".mutable" : name)); }
 	
 	private function new(name:String, parent:Module) {
 		this.name = name;
@@ -319,6 +321,18 @@ class Util
 			a(t.module.fullName); a(".I"); a(t.name);
 		}
 		else a(t.fullName);
+
+		if (Std.is(t,ClassDef) && !cast(t, ClassDef).isMixin) a("VO");
+	}
+
+	static public function addMutableFullName(code:StringBuf, t:TypeDefinition, interfaceT = false)
+	{
+		var a = code.add;
+
+		if (interfaceT) {
+			a(t.module.mutableFullName); a(".I"); a(t.name);
+		}
+		else a(t.mutableFullName);
 		
 		if (Std.is(t,ClassDef) && !cast(t, ClassDef).isMixin) a("VO");
 	}
@@ -1031,7 +1045,8 @@ interface TypeDefinition
 {
 	public var index		(default,null)		: Int;
 	public var name			(default,null)		: String;
-	public var fullName		(getFullName,null)	: String;
+	public var fullName			(getFullName,null) : String;
+	public var mutableFullName	(getMutableFullName,null) : String;
 	public var module		(default,null)		: Module;
 	public var description						: String;
 	public var finalized	(default,null)		: Bool;
@@ -1180,10 +1195,12 @@ class EnumDef implements TypeDefinitionWithProperties
 	public var conversions	(default,null)		: Hash<EnumConversionProperty>;
 	public var finalized	(default,null)		: Bool;
 	
-	public var fullName		(getFullName,null)	: String;
+	public var fullName			(getFullName,null) : String;
+	public var mutableFullName	(getMutableFullName,null) : String;
 	private var supertypes	(default,null)		: List<EnumDef>;
 	
-	private function getFullName():String { return module.fullName +'.'+ name; }
+	private function getFullName():String { return fullName != null? fullName : fullName = module.fullName +'.'+ name; }
+	private function getMutableFullName():String { return mutableFullName != null? mutableFullName : mutableFullName = module.mutableFullName +'.'+ name; }
 	
 	public var property		(default,null)		: Hash<Property>;
 	public var propTodo		(default,null)		: TodoList;
@@ -1896,7 +1913,8 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	public var property		(default,null)		: Hash<Property>;
 	public var propertyByNum(default,null)		: IntHash<Property>;
 	public var supertypes	(default,null)		: List<BaseTypeDefinition>;
-	public var fullName		(getFullName,null)	: String;
+	public var fullName			(getFullName,null)	: String;
+	public var mutableFullName	(getMutableFullName,null)	: String;
 	
 	public var options		(default,null)		: List<ClassOption>;
 	public var defaultXMLMap(default,null)		: XMLMapping;
@@ -2027,7 +2045,8 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		return l;
 	}
 	
-	private function getFullName():String { return module.fullName +'.'+ name; }
+	private function getFullName():String { return fullName != null? fullName : fullName = module.fullName +'.'+ name; }
+	private function getMutableFullName():String { return mutableFullName != null? mutableFullName : mutableFullName = module.mutableFullName +'.'+ name; }
 	
 	private var todo		: TodoList;
 	private var optionsTodo	: TodoList;

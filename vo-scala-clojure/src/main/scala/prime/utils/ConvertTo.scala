@@ -43,7 +43,6 @@ object ConvertTo
          if (t == classOf[String] )  string (value)
     else if (t == classOf[Integer])  integer(value)
     else if (t == classOf[URI]    )  uri    (value)
-    else if (t == classOf[FileRef])  fileRef(value)
     else if (t == classOf[ObjectId]) uniqueID(value)
     else
       throw new MatchError("ConvertTo[" + manifest[T].erasure.getName + "] not implemented; value = " + value)
@@ -111,22 +110,6 @@ object ConvertTo
     case v:Traversable[_] => toVOArray[T](v)
     case v:ArrayType => v.asArray.map(_ match { case none : NilType => null.asInstanceOf[T] ; case v : MessagePackValueObject => v.vo.asInstanceOf[T] })
     // throw "Don't know what to do with: " + value.toString
-  }
-
-  def fileRef			(value:Any) : FileRef = unpack(value) match {
-    case v:FileRef     => v
-    case s:String      => FileRef(s)
-    case b:Array[Byte] => FileRef(b)
-    case v:RawType     => FileRef(string(v))
-    case None          => null
-  }
-
-  def rgba			(value:Any) : RGBA = unpack(value) match {
-    case v:RGBA => v
-    case s:String => RGBA(s)
-    case i:Int => RGBA(i)
-    case i:Long => RGBA(i)
-    case i:IntegerType => RGBA(i.asLong)
   }
 
   def uri           (value:Any) : URI = unpack(value) match {

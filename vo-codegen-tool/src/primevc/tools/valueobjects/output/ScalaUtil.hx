@@ -33,7 +33,7 @@ class ScalaUtil
 			case Tdecimal(_,_,_):		"Double";
 			case Tbool(v):				res.defaultValue = v; "Boolean";
 			case TenumConverter(_):		throw t; //"";
-			case Temail:				"prime.types.InternetAddress";
+			case Temail:				"prime.types.EmailAddr";
 			case Tdate:					"prime.types.Date";
 			case Tdatetime:				"prime.types.DateTime";
 			case Tinterval:				"prime.types.Interval";
@@ -42,7 +42,7 @@ class ScalaUtil
 
 			case Tdef(ptypedef): switch (ptypedef) {
 				case Tclass		(def):	def.mutableFullName + "VO";
-				case Tenum		(def):	def.mutableFullName + ".EValue";
+				case Tenum		(def):	def.mutableFullName;
 			};
 		  }) + (surroundWithType != null? "]" : "");
 

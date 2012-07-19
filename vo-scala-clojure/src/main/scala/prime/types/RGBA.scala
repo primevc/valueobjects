@@ -3,9 +3,9 @@ package prime.types;
  import java.lang.Long.parseLong
  import scala.util.matching.Regex
 
-class RGBA private[types](val rgba:Int)
+class RGBA private[prime](val rgba:Int)
 {
-  private[types] def this(s:String) = this(s.trim match
+  private[prime] def this(s:String) = this(s.trim match
   {
   	case "" => 0
       // Could add color names here...
@@ -45,25 +45,8 @@ class RGBA private[types](val rgba:Int)
   }
 }
 
-object RGBA
+object Colors
 {
   val black = new RGBA(0)
   val white = new RGBA(0xFFFFFFFF)
-
-  private val all_0 = new Regex("(?i)([0x#]*)")
-  private val all_F = new Regex("(?i)([Fx#]*)")
-
-  def apply(s:String): RGBA = s match {
-    case all_0(_) => black
-    case all_F(_) => white
-    case _ => new RGBA(s)
-  }
-  def apply(i:Int): RGBA = i match {
-    case 0 => black
-    case 0xFFFFFFFF => white
-    case _ => new RGBA(i)
-  }
-  def apply(i:Long): RGBA = apply((i & 0xFFFFFFFF).toInt);
-  def apply(rgb:Int, a:Int): RGBA = apply((rgb << 8) | a)
-  def apply(rgb:Int, alphaPercentage:Float): RGBA = apply(rgb, (255 * alphaPercentage).toInt)
 }

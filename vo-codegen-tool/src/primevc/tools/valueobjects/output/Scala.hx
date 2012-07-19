@@ -41,8 +41,7 @@ class Scala implements CodeGenerator
 
 import prime.vo._;
 import prime.vo.source._;
-import prime.vo.definition._;
-import prime.vo.valuetype.Conversion;
+import prime.types.Conversion._;
 
 ");
 
@@ -122,7 +121,8 @@ class MutableScala implements CodeGenerator
 
 import scala.collection.JavaConversions
 import scala.xml.NodeSeq
-import prime.types._
+import prime.types.{Type, Field, Ref, Enum, EnumValue}
+import prime.types.Conversion._;
 import prime.utils._
 import prime.utils.msgpack._
 import prime.vo.mutable._
@@ -954,7 +954,7 @@ file.writeString("
 	
 	static public function convertFromAnyRefTo(t:PType, ref = false) return switch(t) {
 		case Tdef(ptypedef):		switch (ptypedef) {
-			case Tenum(def):		def.mutableFullName+".convert";
+			case Tenum(def):		def.mutableFullName+".valueOf";
 			default:				"ConvertTo." + (ref? "voRef" : "vo") + "["+ t.typeNameInMutablePkg().name + "]";
 		}
 		case Tarray(innerT,_,_):	switch (innerT) {
@@ -965,14 +965,14 @@ file.writeString("
 		case Temail:				"ConvertTo.email";
 		case Tinterval:				"ConvertTo.interval";
 		case TuniqueID:				"ConvertTo.uniqueID";
-		case TfileRef:				"ConvertTo.fileRef";
+		case TfileRef:				"FileRef";
 		case Tstring:				"ConvertTo.string";
 		case Tinteger(_,_,_):		"ConvertTo.integer";
 		case Tdecimal(_,_,_):		"ConvertTo.decimal";
 		case Tdate:					"ConvertTo.date";
 		case Tdatetime:				"ConvertTo.datetime";
 		case Tbool(_):				"ConvertTo.boolean";
-		case Tcolor:				"ConvertTo.rgba";
+		case Tcolor:				"RGBA";
 		case TenumConverter(prop):	prop.parent.mutableFullName + ".from" + prop.name.substr(2); //"";
 		case TclassRef(className):	"ConvertTo."+className; //throw t;
 	}
@@ -1018,7 +1018,7 @@ file.writeString("
 		shouldWrite = true;
 		
 		var a = code.add;
-		var addConversionParams = function(withVal) {
+		function addConversionParams(withVal) {
 			for (prop in def.conversions) if (prop.name != "toString") {
 //				Assert.that(prop.type == Tstring, Std.string(def));
 				a(", ");
@@ -1027,49 +1027,36 @@ file.writeString("
 			}
 		}
 		
-		a("\nobject "); a(def.name); a(" extends Enumeration with Enum {\n  ");
+		a(Std.format("
+
+//---
+
+sealed abstract class ${def.name}(val value:Int, override val toString:String"));
 		
-		var overrideValueOf = null;
-		
-		a("class EValue(nextId:Int, name:String, val value:Int");
 		addConversionParams(true);
-		a(") extends Val(nextId, name);\n  ");
-		a("final def V(name:String, value:Int");
-		addConversionParams(false);
-		a(") = new EValue(nextId, name, value");
-		for (prop in def.conversions) if (prop.name != "toString") {
-			a(", "); a(prop.name.quote());
-		}
-		a(");\n");
-		
-		a("\n  final def fromValue(v: Int) : this.EValue = v match {");
-		for (e in def.enumerations) if (e.type == null)
-		{
-			a("\n    case " + e.intValue); a(" => this."); a(e.name);
-		}
-		a("\n    case _ => this.Null");
-		a("\n  }\n\n");
-		
-		a('  val Null = V("", -1');
-		for (prop in def.conversions) if (prop.name != "toString") a(', ""');
-		a(")\n");
-		
+
+		a(Std.format(") extends EnumValue;
+object ${def.name} extends Enum {
+  type Value = ${def.name};\n"));
+
+		var overrideValueOf = null;
+
 		for (e in def.enumerations)
 		{
-			
 			if (e.type != null)
 			{
-				a('  def '); a(e.name); a('(value:'); a(e.type.typeNameInMutablePkg().name); a(') = new EValue(nextId, "'); a(e.name); ac('"'.code); a(", -1");
+				a("\n  override protected def stringCatchAll(value : String) = "); a(e.name); a('(value);\n  case class  ');
+				a(e.name); a('(override val toString : '); a(e.type.typeNameInMutablePkg().name); a(') extends Value(toString = toString, value = '); a(Std.string(e.intValue));
 				for (key in e.conversions.keys()) if (key != "toString") {
 					var conv = e.conversions.get(key);
 					a(', "'); a(conv); ac('"'.code);
 				}
-				a(");\n\n");
+				a(");\n");
 				
 				overrideValueOf = e;
 			}
 			else {
-				a("  val "); a(e.name); a(' = V("'); a(e.name); ac('"'.code); a(", " + e.intValue);
+				a("  case object "); a(e.name); a(' extends Value('); a(e.intValue + ', "'); a(e.name); ac('"'.code);
 				for (prop in def.conversions) if (prop.name != "toString") {
 					var conv = e.conversions.get(prop.name);
 					a(', "'); a(conv != null? conv : e.name); ac('"'.code);
@@ -1077,25 +1064,21 @@ file.writeString("
 				a(")\n");
 			}
 		}
-		
+
+		var first = true;
+
+		a("\n  val values : Set[Value] = Set(");
+		for (e in def.enumerations) if (e.type == null) {
+			if (first) first = false; else a(", ");
+			a(e.name);
+		}
+		a(");\n\n");
+
   		for (conv in def.conversions)
 		{
-			a("\n\n  final def from"); a(conv.name.substr(2)); a("(str:String) : EValue = str match\n  {");
-			for (e in conv.enums) if (e != def.catchAll)
-			{
-				a('\n    case "'); a(e.conversions.get(conv.name)); a('" => this.'); a(e.name); a(";");
-			}
-			if (overrideValueOf != null) {
-				a("\n    case _ => "); a(overrideValueOf.name); a("(str);");
-			}
-			else if (conv.name != "toString")
-				a("\n    case _ => fromString(str);");
-			else
-			 	a("\n    case _ => Null");
-				
-			a("\n  }");
+			a("  final def from"); a(conv.name.substr(2)); a("(str:String) : Value = values.find(_."); a(conv.name); a(" == str).getOrElse(apply(str));\n");
 		}
-		a("\n}\n");
+		a("}");
 	}
 	
 	function genXMLComponent(def:ClassDef, idProperty:Property)

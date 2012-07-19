@@ -6,7 +6,7 @@ object Type
   sealed abstract class T // Sealed tells Scala nothing outside of this object (Type) may possibly extends T
 
   case class Tdef       (vo:VOCompanion[_ <: ValueObject], ref:Boolean) extends T
-  case class Tenum      (t: Enumeration) extends T
+  case class Tenum      (t: Enum) extends T
   case class Tarray     (innerType:T,   min:Int=0,  max:Int=Int.MaxValue)  extends T
 
   case class Tbool      (default:Boolean=false)  extends T

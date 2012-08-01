@@ -9,35 +9,46 @@ trait ValueObjectManifest[VOType <: ValueObject]
   val VOType         : Manifest[VOType];
   val ID             : Int;
 
+  /** Mask of which fields are lazily initialized. 0 means all fields are eager. */
+  val lazyIndexMask  : Int;
+  /** Mask of which fields bit indexes are used. */
+  val fieldIndexMask : Int;
+  /** Number of the last bit index used. */
   val lastFieldIndex : Int;
-  def fieldIndexMask : Int;
 
-  /** Find the ValueObjectField for name, or throws NoSuchFieldException. */
-  def apply(index : Int)   : ValueObjectField[VOType];
-  /** Find the ValueObjectField for name, or throws NoSuchFieldException. */
+  /** Find the ValueObjectField with the given id or field-index, or throw NoSuchFieldException. */
+  def apply(idx  : Int)    : ValueObjectField[VOType];
+  /** Find the ValueObjectField with the given name, or throw NoSuchFieldException. */
   def apply(name : String) : ValueObjectField[VOType];
 
-  def firstIndexSet(data : VOType) : Int;
-  def  nextIndexSet(data : VOType, index : Int) : Int;
+  val first : ValueObjectField[VOType];
+  def index(idx   : Int) : Int;
+  def index(field : ValueObjectField[VOType]) : Int;
+
+  def firstFieldSet(data : VOType)                   : ValueObjectField[VOType];
+  def  nextFieldSet(data : VOType, startIndex : Int) : ValueObjectField[VOType];
 
   // ----------------
   // Concrete members
   // ----------------
   @inline final def isFull(data : VOType) = data.voIndexSet == fieldIndexMask;
-  
-  @inline final def index(n : Int) : Int = {
-    val index = if (n <= 32) n else (n & 0xFF);
-    if ((fieldIndexMask & (1 << index)) != 0) index
-    else throw new java.lang.NoSuchFieldException("n=" + n + ", index=" + index)
-  }
 
-  final def index(key : Any) : Int = key match {
+/*
+  @inline final def index(n : Int) : Int = {
+    val index = if (n <= 32) n else (n & 0xFF) + supertype(n >>> 8).;
+    if ((fieldIndexMask & (1 << index)) != 0) index
+    else throw ValueObjectManifest.NoSuchFieldException;// new java.lang.NoSuchFieldException("n=" + n + ", index=" + index)
+  }
+*/
+
+  final def index_!(key : Any) : Int = key match {
     case key:Int     => index(key)
     case key:Long    => index(key.toInt)
-    case key:Keyword => apply(key.sym.getName).index
-    case key:Symbol  => apply(key.name).index
-    case key:String  => apply(key).index
-    case _           => apply(key.toString).index
+    case key:Number  => index(key.intValue)
+    case key:Keyword => index(apply(key.sym.getName))
+    case key:Symbol  => index(apply(key.name))
+    case key:String  => index(apply(key))
+    case _           => index(apply(key.toString))
   }
 
   final def symbol (idx:  Int) = apply(idx).symbol;
@@ -45,7 +56,7 @@ trait ValueObjectManifest[VOType <: ValueObject]
 
   final def keyword(key: String) : Keyword = apply(key).keyword
   final def keyword(key: Symbol) : Keyword = apply(key.name).keyword
-  final def keyword(key: Any)    : Keyword = key match {
+  final def keyword_!(key: Any)  : Keyword = key match {
     case key:Keyword => key
     case key:Symbol  => keyword(key.name)
     case key:Int     => keyword(key)
@@ -53,43 +64,80 @@ trait ValueObjectManifest[VOType <: ValueObject]
   }
 }
 
+object ValueObjectManifest {
+  object NoSuchFieldException extends java.lang.IllegalArgumentException("The given name or index is not part of this ValueObject.");
+}
+
 abstract class ValueObjectManifest_1[VOType <: ValueObject : Manifest] extends ValueObjectManifest[VOType]
 {
   val VOType : Manifest[VOType] = manifest[VOType];
 
-  final def fieldIndexMask = 1 << lastFieldIndex;
+  val lastFieldIndex = index(first);
+  val fieldIndexMask = 1 << lastFieldIndex;
+  val lazyIndexMask  = if (first isLazy) lastFieldIndex else 0;
 
-  final def firstIndexSet(data : VOType)              = if (data.contains(lastFieldIndex)) lastFieldIndex      else -1;
-  final def  nextIndexSet(data : VOType, index : Int) = if (index < lastFieldIndex)        firstIndexSet(data) else -1;
+  final def apply(idx : Int)    = if (index(idx) == lastFieldIndex) first else throw ValueObjectManifest.NoSuchFieldException;
+  final def apply(name: String) = if (first.name == name)           first else throw ValueObjectManifest.NoSuchFieldException;
+
+  final def index(idx   : Int)                      : Int = if (idx == 0 || idx == first.id) 0 else -1;
+  final def index(field : ValueObjectField[VOType]) : Int = if (field == first) 0 else -1;
+
+  final def firstFieldSet(data : VOType)              = if (first in data)          first               else null;
+  final def  nextFieldSet(data : VOType, index : Int) = if (index < lastFieldIndex) firstFieldSet(data) else null;
 }
 
 abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends ValueObjectManifest[VOType]
 {
   val VOType : Manifest[VOType] = implicitly[Manifest[VOType]];
 
-  protected val fields : Array[ValueObjectField[VOType]];
-  val fieldIndexMask : Int;
+  protected val fields : Array[_ <: ValueObjectField[VOType]];
+  val first          = fields(0);
+  val lazyIndexMask  = fields.foldLeft(0) { (mask,field) => mask | (if (field isLazy) 1 << index(field) else 0) }
+  val fieldIndexMask = fields.foldLeft(0) { (mask,field) => mask | (1 << index(field))                          }
+  val lastFieldIndex = index(fields.last);
 
-  
-  final def apply(idx : Int) = fields(index(idx));
-  
-  final def nextIndexSet(data : VOType, startIndex : Int) : Int = {
+  final def apply(idx : Int)    : ValueObjectField[VOType] = fields(index(idx));
+  final def apply(name: String) : ValueObjectField[VOType] = { for (f <- fields) if (f != null && f.name == name) return f; throw ValueObjectManifest.NoSuchFieldException; }
+
+  final def index(n : Int) : Int = {
+    if (n <= 32) {
+      if ((fieldIndexMask & (1 << n)) != 0) return n;
+    } else {
+      var i = 0;
+      for (f <- fields) if (f != null && f.id == n) return i; else i += 1;
+    }
+    throw ValueObjectManifest.NoSuchFieldException;
+  }
+
+  final def index(field : ValueObjectField[VOType]) : Int = {
+    var i = 0;
+    for (f <- fields) if (f != null && (f eq field)) return i; else i += 1;
+    -1;
+  }
+
+  final def nextFieldSet(data : VOType, startIndex : Int) : ValueObjectField[VOType] = {
     var k = startIndex;
     do {
       k += 1;
-      if (data.contains(k)) return k;
+      try {
+        val field = apply(k);
+        if (field in data) return field;
+      }
+      catch {
+        case ValueObjectManifest.NoSuchFieldException =>
+      }
     }
     while (k < this.lastFieldIndex);
 
-    -1; // nothing set after index
+    null; // nothing set after index
   }
-  final def firstIndexSet(data : VOType) = nextIndexSet(data, -1)
+
+  final def firstFieldSet(data : VOType) = nextFieldSet(data, -1)
 }
 
 
-abstract class ValueObjectField[VO <: ValueObject](
+abstract class ValueObjectField[-VO <: ValueObject](
   val id           : Int,
-  val index        : Int,
   val name         : String,
   val symbol       : Symbol,
   val keyword      : clojure.lang.Keyword,
@@ -100,40 +148,42 @@ abstract class ValueObjectField[VO <: ValueObject](
     - Implement clojure's KeywordThunk optimization thingy
   */
 
-  def this(id:Int, index:Int, symbol:Symbol, valueType:ValueType, defaultValue:Any) = this(id, index, symbol.name, symbol, Keyword.intern(null, symbol.name), valueType, defaultValue)
+  def this(id:Int, symbol:Symbol, valueType:ValueType, defaultValue:Any) = this(id, symbol.name, symbol, Keyword.intern(null, symbol.name), valueType, defaultValue)
 
   def apply(vo  : VO) : Any;
-  def apply(src : ValueSource, orElse : Any) : Any = src.anyAt(name, index, orElse);
+  def apply(src : ValueSource, orElse : Any) : Any = src.anyAt(name, id, orElse);
 
   def get(vo : ValueObject) : Any =  vo match { case vo : VO => this(vo); case _ => null; }
-  def in (vo : VO)                = (vo.lazyIndexSet & index) != 0;
+  def in (vo : VO)                = (vo.lazyIndexSet & vo.voManifest.asInstanceOf[ValueObjectManifest[VO]].index(this)) != 0;
+
+  def isLazy = valueType isLazy;
 }
 
-abstract class VOValueObjectField[VO <: ValueObject, T <: ValueObject](
+abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject](
   id           : Int,
-  index        : Int,
   symbol       : Symbol,
-  voCompanion  : ValueObjectCompanion[T], //[_ <: ValueObject],
-  override val defaultValue : T,
+  override val defaultValue : T, // Must always refer to the `empty` instance.
   ref          : Boolean
-) extends ValueObjectField[VO](id, index, symbol.name, symbol, Keyword.intern(null, symbol.name), ValueTypes.Tdef(voCompanion, ref), defaultValue) {
+) extends ValueObjectField[VO](id, symbol.name, symbol, Keyword.intern(null, symbol.name), ValueTypes.Tdef(defaultValue.voCompanion, ref), defaultValue) {
+
+  val voCompanion : ValueObjectCompanion[T] = defaultValue.voCompanion.asInstanceOf[ValueObjectCompanion[T]];
 
   override def apply(vo : VO) : T;
 
-  override def in(vo : VO) = apply(vo) != defaultValue;
-
-  def apply(self:VO, src:ValueSource, root:ValueSource, lazyVar:T): T = this(src, None) match {
+  def apply(self:VO, src:ValueSource, root:ValueSource, lazyVar:T): T = apply(src, None) match {
     case null => defaultValue;
-    case v:T => v;
-    
+    case v: T => v;
+
     case ValueSource(vo) =>
-      if (root != src) /*eager*/ voCompanion(vo);
-      else /*lazy*/ lazyVar;
+      if (root != src) /*eager convert to T*/ voCompanion(vo);
+      else /*lazy convert*/ if (self.voSource == EmptyVO) null.asInstanceOf[T] else lazyVar;
     
     case voCompanion(vo) => vo
 
-    case _ => if (root != self.voSource) /*eager*/ this(self) else /*lazy*/ lazyVar;
+    case _ => if (root != self.voSource) /*eager*/ apply(self) else /*lazy*/ lazyVar;
   }
+
+  override def in(vo : VO) = apply(vo) != defaultValue;
 }
 
 trait IntValueObjectField {

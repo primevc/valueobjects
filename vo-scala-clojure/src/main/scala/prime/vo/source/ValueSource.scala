@@ -20,6 +20,10 @@ trait ValueSource extends ValueSourceable {
     Tries to lookup the value for the given name. 
     If that fails: tries to lookup the value by index.
     
+    VOTypeMask   = 0xFFFF0000
+    VOIndexMask  = 0x0000FF00
+    BitIndexMask = 0x000000FF
+
     Returns 'notFound if both name and index are empty/missing/unknown/undefined.
   */
   def anyAt   (name: String, idx: Int, notFound: Any     ): Any;
@@ -35,20 +39,36 @@ trait ValueSource extends ValueSourceable {
   final def as_source = this;
 }
 
+trait Booleans {
+  this : ValueSource =>
+
+  final override def anyAt   (name: String, idx: Int, notFound: Any   ): Any    = if (contains(name,idx)) boolAt(name, idx) else notFound;
+  final override def intAt   (name: String, idx: Int, notFound: Int   ): Int    = if (contains(name,idx)) (if (boolAt(name, idx)) 1   else 0)   else notFound;
+  final override def doubleAt(name: String, idx: Int, notFound: Double): Double = if (contains(name,idx)) (if (boolAt(name, idx)) 1.0 else 0.0) else notFound;
+}
+
 trait Integers {
   this : ValueSource =>
 
-  final override def anyAt   (name: String, idx: Int, notFound: Any): Any                    = if (contains(name,idx)) intAt(name, idx) else notFound;
-  final override def boolAt  (name: String, idx: Int, notFound: Boolean): Boolean            = 0 < intAt(name, idx, if (notFound) 1 else 0);
-  final override def doubleAt(name: String, idx: Int, notFound: Double = Double.NaN): Double = intAt(name, idx, notFound.toInt) toDouble
+  final override def anyAt   (name: String, idx: Int, notFound: Any    ): Any     = if (contains(name,idx)) intAt(name, idx) else notFound;
+  final override def boolAt  (name: String, idx: Int, notFound: Boolean): Boolean = 0 < intAt(name, idx, if (notFound) 1 else 0);
+  final override def doubleAt(name: String, idx: Int, notFound: Double ): Double  = intAt(name, idx, notFound.toInt) toDouble
 }
 
 trait Doubles {
   this : ValueSource =>
 
-  final override def anyAt   (name: String, idx: Int, notFound: Any): Any         = if (contains(name,idx)) doubleAt(name, idx) else notFound;
+  final override def anyAt   (name: String, idx: Int, notFound: Any    ): Any     = if (contains(name,idx)) doubleAt(name, idx) else notFound;
   final override def boolAt  (name: String, idx: Int, notFound: Boolean): Boolean = 0.0 < doubleAt(name, idx, if (notFound) 1.0 else 0.0);
-  final override def intAt   (name: String, idx: Int, notFound: Int = -1): Int    = doubleAt(name, idx, notFound.toDouble) toInt
+  final override def intAt   (name: String, idx: Int, notFound: Int    ): Int     = doubleAt(name, idx, notFound.toDouble) toInt
+}
+
+trait NoPrimitives {
+  this : ValueSource =>
+
+  final override def boolAt  (name: String, idx: Int, notFound: Boolean): Boolean = if (contains(name,idx)) Boolean(anyAt(name,idx)) else notFound;
+  final override def intAt   (name: String, idx: Int, notFound: Int    ): Int     = if (contains(name,idx)) Integer(anyAt(name,idx)) else notFound;
+  final override def doubleAt(name: String, idx: Int, notFound: Double ): Double  = if (contains(name,idx)) Decimal(anyAt(name,idx)) else notFound;
 }
 
 
@@ -118,15 +138,15 @@ class AnonymousValueSource(values : Any*) extends ValueSource {
   def boolAt   (ignored: String, i: Int, notFound: Boolean) : Boolean = if (i < values.length) Boolean(values(i)) else notFound;
 }
 
-case class SingleValueSource[@specialized(Int,Double) T](idx : Int, value : T) extends ValueSource with IndexedValueSource[T] {
-  def apply    (i: Int, notFound: T) : T = if (idx == i) value else notFound;
-  def contains (i: Int): Boolean         = idx == i;
+case class SingleValueSource[@specialized(Int,Double) T](key : String, value : T) extends ValueSource with NamedValueSource[T] {
+  def apply    (name: String, notFound: T) : T = if (key == name) value else notFound;
+  def contains (name: String): Boolean         = key == name;
 
-  def contains (name: String, i: Int)                    : Boolean = contains(i);
-  def anyAt    (name: String, i: Int, notFound: Any)     : Any     = if                  (idx == i) value          else notFound;
-  def intAt    (name: String, i: Int, notFound: Int)     : Int     = if (value != null && idx == i) Integer(value) else notFound;
-  def doubleAt (name: String, i: Int, notFound: Double)  : Double  = if (value != null && idx == i) Decimal(value) else notFound;
-  def boolAt   (name: String, i: Int, notFound: Boolean) : Boolean = if (value != null && idx == i) Boolean(value) else notFound;
+  def contains (name: String, i: Int)                    : Boolean = contains(name);
+  def anyAt    (name: String, i: Int, notFound: Any)     : Any     = if                  (name == key) value          else notFound;
+  def intAt    (name: String, i: Int, notFound: Int)     : Int     = if (value != null && name == key) Integer(value) else notFound;
+  def doubleAt (name: String, i: Int, notFound: Double)  : Double  = if (value != null && name == key) Decimal(value) else notFound;
+  def boolAt   (name: String, i: Int, notFound: Boolean) : Boolean = if (value != null && name == key) Boolean(value) else notFound;
 }
 
 object EmptyVO extends ValueSource {

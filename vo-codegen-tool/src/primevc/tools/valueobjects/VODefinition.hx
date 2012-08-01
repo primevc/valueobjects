@@ -30,7 +30,7 @@ class Module
 	static public function declare(path:String, isPackageRoot = false):Module
 	{
 		return switch(Module.root.find(path)) {
-			case MModule(m):		if (m.packageRoot = isPackageRoot) pkgRoots.add(m); m;
+			case MModule(m):		trace(m.fullName + ", " + m.packageRoot); if (m.packageRoot = isPackageRoot) pkgRoots.add(m); m;
 			case MType(t):			throw "Cannot redeclare type: '"+path+"' "+Std.string(t)+" as module";
 			case MUndefined(n,m):	throw "Cannot declare modules that start in Uppercase";
 			case MPending(a,b,c,d):	throw "Impossible error?";
@@ -41,7 +41,7 @@ class Module
 		pkgRoots = new List();
 		root     = new Module("", null);
 		types    = new IntHash();
-		traits   = declare("primevc.core.traits");
+		traits   = declare("primevc.core.traits", true);
 	}
 	static var initialize = reinitialize();
 	
@@ -495,33 +495,32 @@ class Util
 			case TclassRef(_):			true;
 		}
 	}
+
+	static public function isTclass(ptype:PType)
+	{
+		return switch(ptype)
+		{
+			case Tdef(p): switch(p) {
+				case Tclass(_):	true;
+				default:		false;
+			}
+			default: false;
+		}
+	}
 	
 	static public function isSingleValue(ptype:PType)
 	{
 		return switch(ptype)
 		{
-			case Tdef(p):				
+			case Tdef(p):
 				switch(p) {
 					case Tenum		(_): true;
 					case Tclass		(_): false;
 				}
 			
 			case Tarray(t,_,_):			isSingleValue(t);
-			case Turi:					true;
-			case Turl:					true;
-			case TuniqueID:				true;
-			case Tstring:				true;
-			case TfileRef:				true;
-			case Tinteger(_,_,_):		true;
-			case TenumConverter(_):		true;
-			case Temail:				true;
-			case Tdecimal(_,_,_):		true;
-			case Tcolor:				true;
-			case Tbool(_):				true;
-			case Tdate:					true;
-			case Tdatetime:				true;
-			case Tinterval:				true;
-			case TclassRef(_):			true;
+			case Turi, Turl, TuniqueID, Tstring, TfileRef, Temail, Tcolor, Tdate, Tdatetime, Tinterval,
+			     Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_), TenumConverter(_), TclassRef(_): true;
 		}
 	}
 	
@@ -1200,7 +1199,7 @@ class EnumDef implements TypeDefinitionWithProperties
 	private var supertypes	(default,null)		: List<EnumDef>;
 	
 	private function getFullName():String { return fullName != null? fullName : fullName = module.fullName +'.'+ name; }
-	private function getMutableFullName():String { return mutableFullName != null? mutableFullName : mutableFullName = module.mutableFullName +'.'+ name; }
+	private function getMutableFullName():String return getFullName()
 	
 	public var property		(default,null)		: Hash<Property>;
 	public var propTodo		(default,null)		: TodoList;

@@ -3,6 +3,7 @@ package prime.types;
  import prime.vo.{ValueObjectCompanion => IVOC};
  import org.joda.time.format.{DateTimeFormatter, ISODateTimeFormat}
  import org.msgpack.`object`._
+ import prime.utils.msgpack.MessagePackObjectId;
  import java.text.{ParseException, DecimalFormatSymbols, DecimalFormat}
  import java.util.{Locale}
  import scala.util.matching.Regex
@@ -14,8 +15,8 @@ object Conversion
   object FailureException extends ConversionException("Conversion failed.");
 
   @inline final def unpack(value:Any) : Any = value match {
+    case null | _ : NilType | None => None
     case Some(v) => unpack(v)
-    case None | null | _ : NilType => None
     case _ => value
   }
   @inline final def to[A]( v : Any )(implicit to_A: Any => A) : A = to_A(v);
@@ -23,7 +24,6 @@ object Conversion
   import ClojureProtocolVars._
 
   // Conversion Protocol per Value type
-  def UniqueID  (value:Any) : ObjectId = unique_id.invoke(value)           .asInstanceOf[ObjectId]
 
   //  -------
 
@@ -265,6 +265,27 @@ object Conversion
     case value          => val v = uri.invoke(value); if (v != null) v.asInstanceOf[URI] else throw FailureException;
   }
 
+  def URL (value:URI) = if (value.getHost != null) value else throw FailureException;
+
+  //  -------
+
+  def Vector[T] (value:IndexedSeq[T])                                   : IndexedSeq[T] = value
+  def Vector[T] (value:Array[T])                                        : IndexedSeq[T] = value
+  def Vector[T] (value:ArrayType)       (implicit converter : Any => T) : IndexedSeq[T] = Vector(value.asArray)
+  def Vector[T] (value:Traversable[T])                                  : IndexedSeq[T] = value.toIndexedSeq
+  def Vector[T] (value:Traversable[_])  (implicit converter : Any => T) : IndexedSeq[T] = value.map(converter).toIndexedSeq
+
+  implicit def Vector[T](value:Any)(implicit converter : Any => T) : IndexedSeq[T] = unpack(value) match {
+    case v:Array[_]       => v.map(converter)
+    case v:ArrayType      => Vector(v)
+    case v:Traversable[_] => Vector(v)
+    case None             => throw NoInputException;
+
+    case value =>
+      val v = vector.invoke(value, converter);
+      if (v != null) v.asInstanceOf[Vector[T]] else throw FailureException;
+  }
+
   //  -------
 
   def FileRef   (value:FileRef)      : FileRef = value;
@@ -297,6 +318,22 @@ object Conversion
     case None     => throw NoInputException;
     case value    => try id2ref(vo_IDType_converter(value))(V) catch { case FailureException => vo_ref.invoke(value, V); }
   }
+
+  //  -------
+
+  def ObjectId  (value:ObjectId)            : ObjectId = value;
+  def ObjectId  (value:MessagePackObjectId) : ObjectId = value.oid;
+  def ObjectId  (value:String)              : ObjectId = new ObjectId(value);
+  def ObjectId  (value:Array[Byte])         : ObjectId = new ObjectId(value);
+
+  implicit def ObjectId  (value:Any) : ObjectId = unpack(value) match {
+    case v:ObjectId            => ObjectId(v)
+    case v:MessagePackObjectId => ObjectId(v)
+    case v:String              => ObjectId(v)
+    case v:Array[Byte]         => ObjectId(v)
+    case None                  => new ObjectId(); //TODO: check if this is expected behaviour
+    case value                 => val v = unique_id.invoke(value); if (v != null) v.asInstanceOf[ObjectId] else throw FailureException;
+  }
 }
 
 object ClojureProtocolVars
@@ -317,4 +354,5 @@ object ClojureProtocolVars
   val uri       = RT.`var`("prime.types", "to-URI"      );
   val file_ref  = RT.`var`("prime.types", "to-FileRef"  );
   val vo_ref    = RT.`var`("prime.types", "to-VORef"    );
+  val vector    = RT.`var`("prime.types", "to-Vector"   );
 }

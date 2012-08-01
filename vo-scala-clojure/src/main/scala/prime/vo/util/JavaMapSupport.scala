@@ -10,35 +10,33 @@ trait JavaMapSupport[KeyType] extends java.util.Map[KeyType,Any]
   // ---
   // Map
   // ---
-  final def containsKey (key: Any) = this.contains(voManifest.index(key));
+  final def containsKey (key: Any) = this.contains(voManifest.index_!(key));
 
   /** Not final: Search could be short circuited in subclasses. Subclass knows what types can possibly be stored. */
   def containsValue(value : Any) : Boolean = { foreach { (key, value2) => if (value == value2) return true; }; false; }
 
-  final def get(key: Any)     = try voManifest(voManifest.index(key))(self) catch { case e:NoSuchFieldException => null };
+  final def get(key: Any)     = try voManifest(voManifest.index_!(key))(self) catch { case e:NoSuchFieldException => null };
   final def isEmpty           = voIndexSet == 0;
   final def size              = JavaMapSupport.this.count;
 
   abstract class VOIterator[T] extends java.util.Iterator[T]()
   {
-    def remove  = throw new UnsupportedOperationException();
-    
-    def nextIndex() { 
-      index = JavaMapSupport.this.voManifest/*  Scala's type system is too limited */.asInstanceOf[ValueObjectManifest[JavaMapSupport.this.type]]
-        .nextIndexSet(JavaMapSupport.this, index)
+    var field     = voManifest.firstFieldSet(self);
+    def hasNext   = field != null;
+    def remove    = throw new UnsupportedOperationException();
+
+    def nextField() {
+      field = voManifest.nextFieldSet(self, voManifest.index(field))
     }
-    
-    var index     = -1; nextIndex();
-    def hasNext   = index != -1;
   }
 
   final def values = new java.util.AbstractCollection[Any]() {
-    def size = JavaMapSupport.this.size;
+    def size = JavaMapSupport.this.count;
 
     def iterator = new VOIterator[Any] {
       def next = {
-        val v = voManifest(index)(self);
-        nextIndex();
+        val v = field(self);
+        nextField();
         v
       }
     }

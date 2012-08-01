@@ -1,7 +1,9 @@
 package primevc.tools.valueobjects.output;
  import primevc.tools.valueobjects.VODefinition;
+ import primevc.utils.NumberUtil;
   using primevc.utils.TypeUtil;
   using primevc.tools.valueobjects.output.ScalaUtil;
+  using primevc.tools.valueobjects.VODefinition;
 
 class ScalaTypeMap implements CodeGenerator
 {
@@ -13,7 +15,7 @@ class ScalaTypeMap implements CodeGenerator
 
 	public function genClass(def : ClassDef) {
 		if (!def.isMixin)
-			map.set(def.index, def.fullName.substr(def.module.getPackageRoot().fullName.length + 1) + "VO");
+			map.set(def.index, def.fullName.substr(def.module.getPackageRoot().fullName.length + 1));
 	}
 
 	public function genEnum(def:EnumDef) {}
@@ -24,13 +26,111 @@ class ScalaTypeMap implements CodeGenerator
 	}
 }
 
-class Scala implements CodeGenerator
+private class ScalaBase
+{
+	var mod			: Module;
+	var code		: StringBuf;
+	var dir			: String;
+	var shouldWrite : Bool = false;
+
+	inline function a(str) code.add(str)
+	inline function ac(ch) code.addChar(ch)
+
+	private function new() {
+		code = new StringBuf();
+	}
+
+	function writeValueLiteral(type:PType, val:Dynamic) switch (type)
+	{
+		case Tbool(dval):
+			a(Std.string(val == null? dval : val));
+
+		case Tinteger(_,_,_):
+			a(val == null? "Int.MinValue" : Std.string(val));
+
+		case Tdecimal(_,_,_):
+			a(val == null? "Double.NaN" : Std.string(val));
+
+		case TfileRef:
+			if (val != null) {
+				a("FileRef("); ac('"'.code); a(Std.string(val)); a('")');
+			}
+			else a("prime.types.emptyFileRef");
+
+		case Tstring:
+			if (val != null) {
+				ac('"'.code); a(Std.string(val)); ac('"'.code);
+			}
+			else a('""');
+
+		case Turi, Turl:
+			if (val != null) {
+				a("URI("); ac('"'.code); a(Std.string(val)); a('")');
+			}
+			else a("prime.types.emptyURI");
+
+		case Temail:
+			if (val != null) {
+				a("EmailAddr("); ac('"'.code); a(Std.string(val)); a('")');
+			}
+			else a("prime.types.emptyEmailAddr");
+
+		case Tdate:
+			if (val != null) {
+				a("Date("); ac('"'.code); a(Std.string(val)); a('")');
+			}
+			else a("prime.types.minDate");
+
+		case Tdatetime:
+			if (val != null) {
+				a("DateTime("); ac('"'.code); a(Std.string(val)); a('")');
+			}
+			else a("prime.types.minDateTime");
+
+		case Tinterval:
+			if (val != null) throw val;
+			else a("prime.types.minInterval");
+
+		case Tcolor:
+			if (val != null) {
+				if (Std.is(val, String)) {
+					ac('"'.code); a(Std.string(val)); ac('"'.code);
+				}
+				else
+					a(StringTools.hex(val, 6));
+			} else {
+				a("Colors.black");
+			}
+
+		case TenumConverter(enums):
+			throw "Unsupported value literal";
+
+		case Tarray(innerT,_,_):
+			if (val == null)
+				a("IndexedSeq.empty");
+			else {
+				var values : Array<Dynamic> = val;
+				var first = true;
+				a("IndexedSeq(");
+				for (v in values) {
+					if (!first) a(","); else first = false;
+					writeValueLiteral(innerT, v);
+				}
+				a(")");
+			}
+
+
+		case TuniqueID, Tdef(_), TclassRef(_):
+			if (val == null) a("null"); else throw val;
+	}
+}
+
+class Scala extends ScalaBase, implements CodeGenerator
 {
 	private static var writelist = new List<Scala>();
 
 	public static function generate() {
 		MutableScala.generate();
-		return;
 		Module.root.generateWith(new Scala(Module.root));
 
 		var filename = "ValueObjects.scala";
@@ -41,7 +141,9 @@ class Scala implements CodeGenerator
 
 import prime.vo._;
 import prime.vo.source._;
+import prime.types.{Enum, EnumValue, Conversion, Colors};
 import prime.types.Conversion._;
+import prime.types.ValueTypes._;
 
 ");
 
@@ -50,8 +152,8 @@ import prime.types.Conversion._;
 			var map = new ScalaTypeMap();
 			m.generateWith(map);
 			file.writeString("
-package "+ m.fullName +".mutable {
-  object VO { val typeMap : scala.collection.immutable.IntMap[prime.vo.mutable.VOCompanion[_]] = scala.collection.immutable.IntMap(");
+package "+ m.fullName +" {
+  object VO { val typeMap : scala.collection.immutable.IntMap[prime.vo.ValueObjectCompanion[_]] = scala.collection.immutable.IntMap(");
 			var first = true;
 			for (index in map.map.keys()) {
 				if (first) first = false;
@@ -68,16 +170,11 @@ file.writeString("
 		file.close();
 	}
 
-	var mod			: Module;
-	var code		: StringBuf;
-	var dir			: String;
-	var shouldWrite : Bool;
-
 	var currentFieldBitNum : Int;
 
 	private function new(m:Module) {
+		super();
 		this.mod = m;
-		this.code = new StringBuf();
 		writelist.add(this);
 	}
 
@@ -94,10 +191,514 @@ file.writeString("
 		file.writeString(this.mod.fullName);
 	}
 
-	public function genClass(def : ClassDef) {
+	public function genClass(def : ClassDef)
+	{
+		shouldWrite = true;
+
+		// -----
+		// Inferred Class metadata
+
+		var leafNode                  = true;
+		var onlyBooleans              = true;
+		var onlyDoubles               = true;
+		var onlyIntegers              = true;
+		var hasBooleans               = false;
+		var hasDoubles                = false;
+		var hasIntegers               = false;
+		var lastField                 = null;
+		var idType                    = null;
+		var idFromSuperclassOrTrait   = false;
+		var idField : Property        = null;
+		var longestFieldNameLength    = 0;
+		var longestSubFieldNameLength = 0;
+
+		inline function spaces(n:Int) while(n-->0) ac(' '.code);
+
+		function copyPrototype(defaultParams = true, types = true, defaultFromEmpty = false)
+		{
+			var first = true;
+			for (p in def.propertiesSorted) {
+				if (first) first = false; else a(", ");
+				a(p.name.quote());
+				if (types) {
+					a(": "); a(p.type.scalaType().name);
+				}
+				if (defaultParams) {
+					a(" = ");
+					if      (defaultFromEmpty)      { a("empty."); a(p.name.quote());    }
+					else if (p.type.isSingleValue()){ a("this.");  a(p.name.quote());    }
+					else                            { a("this.");  a(p.name.quote("0")); }
+				}
+			}
+		}
+		function fieldDefinition(p : Property, protectedOnly = false) {
+			if ((!p.type.isArray() && p.type.isSingleValue()) || !protectedOnly) {
+				a(!p.type.isArray() && p.type.isSingleValue()? "  val " : "  def "); a(p.name.quote());
+				spaces(longestFieldNameLength - p.name.quote().length); a(" : "); a(p.type.scalaType().name);
+			}
+			if (p.type.isArray() || !p.type.isSingleValue()) {
+				if (!protectedOnly) a(";"); a("  protected var "); a(p.name.quote('0')); a(": "); a(p.type.scalaType().name);
+			}
+		}
+
+		var fields = def.propertiesSorted;
+
+		// Do the Meta inferring
+		for (p in fields)
+		{
+			lastField = p;
+			longestFieldNameLength = IntMath.max(p.name.quote().length, longestFieldNameLength);
+			if (!p.type.isSingleValue()) longestSubFieldNameLength = IntMath.max(p.name.quote().length, longestSubFieldNameLength);
+
+			if (p.hasOption(unique))
+			{
+				if (idField != null) throw "ValueObjects may have only 1 ID field...\n  idField = "+idField+"\n"+def;
+
+				idField = p;
+				idType  = p.type.scalaType().name;
+				Assert.notNull(idType);
+
+				if (p.definedIn != def)
+					idFromSuperclassOrTrait = true;
+			}
+			switch(p.type)
+			{
+				case Tdef(p):
+					onlyBooleans = onlyDoubles = onlyIntegers = false;
+					switch(p) {
+						case Tenum (_):
+						case Tclass(_): leafNode = false;
+					}
+
+				case Tarray(t,_,_):
+					onlyBooleans = onlyDoubles = onlyIntegers = false;
+					if (leafNode) leafNode = t.isSingleValue();
+
+				case Tinteger(_,_,_): onlyBooleans = onlyDoubles  = false; hasIntegers = true;
+				case Tdecimal(_,_,_): onlyBooleans = onlyIntegers = false; hasDoubles  = true;
+				case Tbool(_):        onlyDoubles  = onlyIntegers = false; hasBooleans = true;
+
+				case Turi, Turl, TuniqueID, Tstring, TfileRef, Temail, Tcolor, Tdate, Tdatetime, Tinterval,
+				     TenumConverter(_), TclassRef(_):
+				    onlyBooleans = onlyDoubles = onlyIntegers = false;
+			}
+		}
+
+		// -----
+		// Trait definition
+
+a(Std.format("
+
+//---
+
+sealed trait ")); a(def.name); a(" extends ");
+		// Supertypes
+		if (def.superClass != null) {
+			a(def.superClass.fullName);
+		}
+		else {
+			a("ValueObject");
+		}
+		if (idField != null && !idFromSuperclassOrTrait) {
+			// Superclass has no Unique ID. Add the required trait now.
+			a(" with ID");
+		}
+		for (t in def.supertypes) if (Std.is(t, MagicClassDef) || def.superClass != t) {
+			 a("\n with "); a(t.fullName);
+		}
+		a(" {\n");
+
+		for (p in fields) if (p.definedIn == def) {
+			fieldDefinition(p); a(";\n");
+		}
+		// def _id
+		if (idField != null && !idFromSuperclassOrTrait) {
+			// Superclass has no Unique ID. Add the required trait now.
+			a("\n type IDType = "); a(idField.type.scalaType().name); a("; def _id = "); a(idField.name); a(";\n");
+		}
+
+		if (!def.isMixin && !def.implementedBy.iterator().hasNext()){
+			a("\n  def copy(");
+			copyPrototype();
+			a(") : this.type;\n}\n");
+		} else {
+			a("}\n");
+		}
+
+		// -----
+		// Class definition
+
+		function voSourceAt(p:Property, localEmpty = false) return 'At("'+ p.name +'", 0x'+ StringTools.hex((p.propertyID() << 8) | p.bitIndex(), 6) +', '+ (localEmpty? 'empty.' : def.fullName +'.empty.') + p.name.quote() +')';
+		function intAt     (p:Property, localEmpty = false) return 'voSource.int'    + voSourceAt(p, localEmpty);
+		function anyAt     (p:Property, localEmpty = false) return 'voSource.any'    + voSourceAt(p, localEmpty);
+		function boolAt    (p:Property, localEmpty = false) return 'voSource.bool'   + voSourceAt(p, localEmpty);
+		function doubleAt  (p:Property, localEmpty = false) return 'voSource.double' + voSourceAt(p, localEmpty);
+
+		if (!def.isMixin)
+		{
+
+			a("\nfinal class "); a(def.name); a("VO protected["); a(def.module.getPackageRoot().name != ""? def.module.getPackageRoot().name : def.module.name);
+			a("](\n  "); if (fields.length > 1) a("voIndexSet : Int, srcDiff : Int, "); a("val voSource : ValueSource,\n\n");
+
+			for (p in fields)
+			{
+				fieldDefinition(p, true);
+				if (p != lastField) a(",\n");
+			}
+
+			a("\n) extends ValueObject_");
+			switch (fields.length) {
+				case 0:                      ac( "0".code);
+				case 1:                      ac( "1".code);
+				case 2,3,4:                   a( "4(voIndexSet, srcDiff)");
+				case 5,6,7,8:                 a( "8(voIndexSet.toByte,  srcDiff.toByte)");
+				case 9,10,11,12,13,14,15,16:  a("16(voIndexSet.toShort, srcDiff.toShort)");
+				default:                      a("32(voIndexSet, srcDiff)");
+			}
+			a(" with "); a(def.name);
+
+			if (leafNode) { if (fields.length > 0) a(" with LeafNode"); }
+			else          a(" with BranchNode");
+
+			if      (onlyBooleans) a(" with Booleans");
+			else if (onlyDoubles)  a(" with Doubles");
+			else if (onlyIntegers) a(" with Integers");
+			else if (!(hasBooleans || hasDoubles || hasIntegers)) a(" with NoPrimitives");
+
+			a(" {\n");
+			// VOType, voCompanion, voManifest
+			a("  type VOType     = "); a(def.name); a("\n");
+			a("  def voCompanion = "); a(def.name); a("\n");
+			a("  def voManifest  = "); a(def.name); a(".manifest\n\n");
+
+			// Lazy getters
+			for (p in fields) if (p.type.isArray() || !p.type.isSingleValue())
+			{
+				function p0() { a(p.name); ac("0".code); }
+
+				a("  final def "); spaces(4 - p.name.quote().length); a(p.name.quote()); a(" = if ("); p0(); a(" != null) "); p0(); a(" else {\n");
+				a("    synchronized"); spaces(p.name.quote().length - 4); a(" { if ("); p0(); a(" == null) "); p0(); a(' = '); a(p.type.scalaConversionExpr(anyAt(p))); a('; }\n');
+				a("    "); p0();
+				a("\n  }\n");
+			}
+
+			// foreach
+			if (fields.length > 1)
+			{
+				a("\n  def foreach (f: (ValueObjectField["); a(def.name); a("], Any) => Unit) {\n");
+				a("    val voIndexSet = this._voIndexSet;\n    val voManifest = "); a(def.name); a(".manifest;\n");
+				if (!leafNode) { a("    val empty = "); a(def.name); a(".empty;\n"); }
+				for (p in fields)
+				{
+					if (p.type.isSingleValue()) {
+						a("    if ((voIndexSet"); if (!leafNode) spaces(longestSubFieldNameLength - 6); a(" & 0x"); a(StringTools.hex(1 << p.bitIndex(), 8)); a(") > 0)"); if (!leafNode) spaces(longestSubFieldNameLength - 8);
+					} else {
+						a("    if (this."); a(p.name.quote()); spaces(IntMath.max(6, longestSubFieldNameLength) - p.name.quote().length); a(" != empty."); a(p.name.quote()); a(")");  spaces(IntMath.max(8, longestSubFieldNameLength) - p.name.quote().length);
+					}
+					a(" f(voManifest."); a(p.name.quote()); ac(",".code); spaces(longestFieldNameLength - p.name.quote().length); a(" this.");
+					a(p.name.quote(p.type.isSingleValue()? null : "0"));
+					a(");\n");
+				}
+				a("  }\n");
+			}
+
+			if (!leafNode)
+			{
+				// def realized, isRealized
+				a("\n  def isRealized =   ");
+				var first = true;
+				for (p in fields) if (!p.type.isSingleValue()) {
+					if (!first) a(" && "); else first = false;
+					a("this."); a(p.name); a("0 != null");
+				}
+				a(";\n");
+
+				a("  def realized   = { ");
+				for (p in fields) if (!p.type.isSingleValue()) {
+					a("this."); a(p.name.quote()); a(p.type.isArray()? ".foreach(_.realized);" : ".realized; ");
+				}
+				a("self }\n\n");
+			}
+
+			function unboxedAt(name : String, type : String, converter : String, hasOfType : Bool, predicate : Property -> Bool)
+			{
+				a("  def "); a(name); a("At (name: String, idx: Int, notFound: "); a(type); a("): "); a(type); a(" = ");
+				if (!hasOfType) {
+					a("if (this.contains(name,idx)) "); a(converter); a("(anyAt(name,idx)) else notFound;\n");
+				}
+				else
+				{
+					a("name match {\n");
+					for (p in fields) if (predicate(p)) {
+						a('    case "'); a(p.name); a('" => this.'); a(p.name.quote()); a(";\n");
+					}
+					a("    case _ => try voManifest.index(idx) match {\n");
+					for (p in fields) if (predicate(p)) {
+						a("      case " + p.bitIndex()); a(" => this."); a(p.name.quote()); a(";\n");
+					}
+					a("    } catch { case _ => if (this.contains(name,idx)) "); a(converter); a("(anyAt(name,idx)) else notFound; }\n  }\n");
+				}
+			}
+
+			if (hasBooleans || hasDoubles || hasIntegers)
+			{
+				if (!(onlyIntegers || onlyDoubles))
+					unboxedAt("bool",  "Boolean", "Boolean", hasBooleans, function (p) return switch (p.type) { default: false; case Tbool(_): true; });
+				if (!(onlyBooleans || onlyIntegers))
+					unboxedAt("double", "Double", "Decimal", hasDoubles,  function (p) return switch (p.type) { default: false; case Tdecimal(_,_,_): true; });
+				if (!(onlyBooleans || onlyDoubles))
+					unboxedAt("int",    "Int",    "Integer", hasIntegers, function (p) return switch (p.type) { default: false; case Tinteger(_,_,_): true; });
+			}
+
+			// def copy(...)
+			if (fields.length > 0)
+			{
+				function ifFieldDiff(p:Property, s:Int, os:Int, isObj:Bool, obj:String = "this") {
+					var objCheckWidth = fields.length == 1? 0 : leafNode? 0 : longestSubFieldNameLength + 5 + longestSubFieldNameLength + 4 + 5 + longestSubFieldNameLength;
+
+					a("    if ("); a(p.name.quote()); spaces(s); a(" != "); a(obj); a(".");
+					if (!isObj) a(p.name.quote()); else {
+						a(p.name.quote("0")); spaces(os); a(" && "); a(p.name.quote()); spaces(os); a(" != "); a(obj); a("."); a(p.name.quote());
+					}
+					spaces(isObj? os : IntMath.max(objCheckWidth - p.name.quote().length, s));
+					a(")");
+				}
+
+				a("\n  protected def copy("); copyPrototype(false); a(", voRoot : ValueSource) : this.type = {\n");
+				if (fields.length > 1)
+				{
+					a("    val empty     = "); a(def.name); a(".empty;\n");
+					a("    var voDiff    = 0;\n");
+					a("    var voEmptied = 0;\n");
+					for (p in fields)
+					{
+						var bitFlag = StringTools.hex(1 << p.bitIndex(), 8);
+						var isObj = p.type.isArray() || !p.type.isSingleValue();
+						var s  = longestFieldNameLength    - p.name.quote().length;
+						var os = longestSubFieldNameLength - p.name.quote().length;
+
+						ifFieldDiff(p,s,os,isObj); a(" { voDiff |= 0x"); a(bitFlag);
+						a("; if ("); a(p.name.quote()); spaces(s); a(" == empty."); a(p.name.quote()); spaces(s); a(") voEmptied |= 0x"); a(bitFlag); a("; }\n");
+					}
+					a("
+		    if (voDiff != 0) {
+		      val voNewIndexSet = (this._voIndexSet | voDiff) ^ voEmptied;
+		      if (voNewIndexSet != 0) new "); a(def.name); a("VO(voNewIndexSet, voDiff, voRoot, "); copyPrototype(false,false); a(").asInstanceOf[this.type]
+		      else                    empty.asInstanceOf[this.type];
+		    }
+		    else this;\n  }\n");
+		  		}
+		  		else // fields.length == 1
+		  		{
+		  			var p = fields[0];
+		  			var isObj = p.type.isArray() || !p.type.isSingleValue();
+		  			ifFieldDiff(p,0,0,isObj); a(" {\n      val empty = "); a(def.name); a(".empty;\n  ");
+		  			ifFieldDiff(p,0,0,isObj, "empty"); a(" new "); a(def.name); a("VO(voRoot, "); copyPrototype(false,false); a(").asInstanceOf[this.type]
+      else empty.asInstanceOf[this.type];\n    }\n    else this;\n  }\n");
+		  		}
+
+				a("  override def copy(voSource : ValueSource, newRoot : ValueSource) : this.type = { val voManifest = "); a(def.name); a(".manifest; val empty = "); a(def.name); a(".empty; this.copy(\n");
+	      		for (p in fields)
+	      		{
+	      			a("    "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" = ");
+	      			switch (p.type) {
+	      				case Tinteger(_,_,_): a("try "); a(   intAt(p, true)); a(" catch { case Conversion.NoInputException => empty."); a(p.name.quote()); a(" },\n");
+						case Tdecimal(_,_,_): a("try "); a(doubleAt(p, true)); a(" catch { case Conversion.NoInputException => empty."); a(p.name.quote()); a(" },\n");
+						case Tbool(_):        a("try "); a(  boolAt(p, true)); a(" catch { case Conversion.NoInputException => empty."); a(p.name.quote()); a(" },\n");
+						default:
+							if (p.type.isArray()) {
+								a("(if (voSource != newRoot) "); a(p.type.scalaConversionExpr(anyAt(p))); a(" else if (this.voSource == EmptyVO) null else "); a(p.name); a("0)");
+							}
+							else if (p.type.isSingleValue()) {
+								a(p.type.scalaConversionExpr(anyAt(p)));
+							}
+							else {
+								a("voManifest."); a(p.name.quote()); a("(this, voSource, newRoot, "); a(p.name); a("0)");
+							}
+						    a(",\n");
+	      			}
+	      		}
+				a("    voRoot = newRoot\n  ); }\n  def copy("); copyPrototype(); a(") : this.type = this.copy("); copyPrototype(false,false); a(", voRoot = this.voSource);\n");
+
+				// -- end copy(...)
+			}
+			a("}\n"); // end final class
+		} // End class definition
+
+		// -----
+		// Companion definition
+
+		a("\nobject "); a(def.name);
+
+		if (!def.isMixin)
+		{
+			a(" extends ValueObjectCompanion["); a(def.name); a("] {\n");
+
+			// val empty
+			a("  val empty : "); a(def.name); a("VO = new "); a(def.name); a("VO("); if (fields.length > 1) a("0,0,"); a("EmptyVO");
+			for (p in fields)
+			{
+				a(", ");
+				if (!p.type.isTclass())
+					writeValueLiteral(p.type, p.defaultValue);
+				else {
+					a(p.type.scalaType().name); a(".empty");
+				}
+			}
+			a(");\n");
+
+			// def apply(...)
+			a("  def apply("); copyPrototype(true,true,true); a(") = empty.copy("); copyPrototype(false,false); a(");\n\n");
+		}
+		else {
+			a(" {\n");
+		}
+		// object manifest
+		function manifestFieldType(p:Property) {
+			a(!p.type.isTclass()? "ValueObjectField[" : "VOValueObjectField["); a(def.name);
+			if (p.type.isTclass()) { a(", "); a(p.type.scalaType().name); }
+			a("]");
+		}
+		a("  object manifest extends {\n");// type ID
+		a("    val ID = "); a(def.index + ";\n\n");
+		for (p in fields) if (p.definedIn == def)
+		{
+			a("    val "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" = new "); manifestFieldType(p);
+			a("(0x"); a(StringTools.hex(p.propertyID())); a(", '"); a(p.name); a(", ");
+
+			if (!p.type.isTclass()) {
+				addFieldTypeConstructor(p.type, p.isReference());
+				a(", ");
+			}
+
+			if (def.isMixin) {
+				if (!p.type.isTclass())
+					writeValueLiteral(p.type, p.defaultValue);
+				else {
+					a(p.type.scalaType().name); a(".empty");
+				}
+			}
+			else {
+				a("empty."); a(p.name.quote());
+			}
+			if (p.type.isTclass()) a(", " + p.isReference());
+
+			a(") { def apply(vo: "); a(def.name); a("): "); a(!p.type.isTclass()? "Any" : p.type.scalaType().name); a(" = vo."); a(p.name.quote()); a("; }\n");
+		} else {
+			a("    val "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" = "); a(p.definedIn.fullName); a(".manifest."); a(p.name.quote()); a(";\n"); // a(".asInstanceOf["); manifestFieldType(p); a("];\n");
+		}
+		if (fields.length > 1) {
+			var first = true;
+			a("\n    val fields = Array("); for (p in fields) { if (!first) a(", "); else first = false; a(p.name.quote()); } a(");\n");
+		} else if (fields.length == 1) {
+			a("\n    val first = "); a(fields[0].name.quote()); a(";\n");
+		}
+
+		a("  } with ValueObjectManifest_"); a(fields.length == 0? "0[" : fields.length == 1? "1[" : "N["); a(def.name); a("];\n");
+		a("}\n");
 	}
 
-	public function genEnum(def:EnumDef) {
+	function addFieldTypeConstructor(t:PType, isRef:Bool) : Void
+	{
+		switch(t)
+		{
+			case Tdef(cl): switch (cl) {
+				case Tclass(cl):	a("Tdef("); a(cl.fullName); a(", "); a(Std.string(isRef)); a(")");
+				case Tenum(e):		a("Tenum("); a(e.fullName); ac(")".code);
+			}
+			case Tbool(v):			a("Tbool("); a(Std.string(v)); ac(")".code);
+
+			case Tinteger(l,u,s):
+				a("Tinteger(");
+				if (l != null){											a("min = "); a(Std.string(l)); }
+				if (u != null){ if (l != null)				a(", ");	a("max = "); a(Std.string(u)); }
+				if (s != null){ if (u != null || l != null)	a(", ");	a("stride = "); a(Std.string(s)); }
+				ac(")".code);
+
+			case Tdecimal(l,u,s):
+				a("Tdecimal(");
+				if (l != null){											a("min = "); a(Std.string(l)); }
+				if (u != null){ if (l != null)				a(", ");	a("max = "); a(Std.string(u)); }
+				if (s != null){ if (u != null || l != null)	a(", ");	a("stride = "); a(Std.string(s)); }
+				ac(")".code);
+
+			case Tarray(t,l,u):
+				a("Tarray("); addFieldTypeConstructor(t,isRef);
+				if (l != null || u != null) a(', ');
+				if (l != null){							a("min = "); a(Std.string(l)); }
+				if (u != null){ if (l != null) a(", ");	a("max = "); a(Std.string(u)); }
+				ac(")".code);
+
+			default:
+				a(Std.string(t));
+		}
+	}
+
+	public function genEnum(def:EnumDef)
+	{
+		shouldWrite = true;
+
+		var a = code.add;
+		function addConversionParams(withVal) {
+			for (prop in def.conversions) if (prop.name != "toString") {
+				a(", ");
+				if (withVal) a("val ");
+				a(prop.name.quote()); a(":String"); // a(conv); ac('"'.code);
+			}
+		}
+
+		a(Std.format("
+
+//---
+
+sealed abstract class ${def.name}(val value:Int, override val toString:String"));
+
+		addConversionParams(true);
+
+		a(Std.format(") extends EnumValue;
+object ${def.name} extends Enum {
+  type Value = ${def.name};\n"));
+
+		var overrideValueOf = null;
+
+		for (e in def.enumerations)
+		{
+			if (e.type != null)
+			{
+				a("\n  override protected def stringCatchAll(value : String) = "); a(e.name); a('(value);\n  case class  ');
+				a(e.name); a('(override val toString : '); a(e.type.typeNameInMutablePkg().name); a(') extends Value(toString = toString, value = '); a(Std.string(e.intValue));
+				for (key in e.conversions.keys()) if (key != "toString") {
+					var conv = e.conversions.get(key);
+					a(', "'); a(conv); ac('"'.code);
+				}
+				a(");\n");
+
+				overrideValueOf = e;
+			}
+			else {
+				a("  case object "); a(e.name); a(' extends Value('); a(e.intValue + ', "'); a(e.name); ac('"'.code);
+				for (prop in def.conversions) if (prop.name != "toString") {
+					var conv = e.conversions.get(prop.name);
+					a(', "'); a(conv != null? conv : e.name); ac('"'.code);
+				}
+				a(")\n");
+			}
+		}
+
+		var first = true;
+
+		a("\n  val values : Set[Value] = Set(");
+		for (e in def.enumerations) if (e.type == null) {
+			if (first) first = false; else a(", ");
+			a(e.name);
+		}
+		a(");\n\n");
+
+  		for (conv in def.conversions)
+		{
+			a("  final def from"); a(conv.name.substr(2)); a("(str:String) : Value = values.find(_."); a(conv.name); a(" == str).getOrElse(apply(str));\n");
+		}
+		a("}");
 	}
 
 	public function newModule(module:Module) {
@@ -106,7 +707,7 @@ file.writeString("
 }
 
 
-class MutableScala implements CodeGenerator
+class MutableScala extends ScalaBase, implements CodeGenerator
 {
 	private static var writelist = new List<MutableScala>();
 
@@ -140,7 +741,7 @@ package "+ m.fullName +".mutable\n{\n
 			for (index in map.map.keys()) {
 				if (first) first = false;
 				else file.writeString(",");
-				file.writeString("\n    " + index + " -> " + map.map.get(index));
+				file.writeString("\n    " + index + " -> " + map.map.get(index) + "VO");
 			}
 
 file.writeString("
@@ -153,8 +754,8 @@ file.writeString("
 	}
 	
 	private function new(m:Module) {
+		super();
 		this.mod = m;
-		this.code = new StringBuf();
 		writelist.add(this);
 	}
 	
@@ -171,11 +772,6 @@ file.writeString("
 		file.writeString(this.mod.fullName);
 	}
 	
-	var mod			: Module;
-	var code		: StringBuf;
-	var dir			: String;
-	var shouldWrite : Bool;
-	
 	var currentFieldBitNum : Int;
 	
 	public function newModule	(m:Module)		: CodeGenerator
@@ -183,9 +779,6 @@ file.writeString("
 		trace("\n- Scala module: "+m.fullName);
 		return new MutableScala(m);
 	}
-	
-	inline function a(str) code.add(str)
-	inline function ac(ch) code.addChar(ch)
 	
 	
 	
@@ -505,7 +1098,7 @@ file.writeString("
 				a("(index match {\n");
 				for (i in 0 ... def.propertiesSorted.length) {
 					var p = def.propertiesSorted[i];
-					a('    case ' + p.bitIndex()); a(' => vo.'); a(p.propertyName()); a('\n');
+					a('    case ' + p.bitIndex()); a(' => vo.'); a(p.name.quote()); a('\n');
 				}
 				a("    case _ => null\n  }).asInstanceOf[AnyRef]\n\n");
 			}
@@ -520,7 +1113,7 @@ file.writeString("
 				a("{ index match {\n");
 				for (i in 0 ... def.propertiesSorted.length) {
 					var p = def.propertiesSorted[i];
-					a('    case ' + p.bitIndex()); a(' => vo.'); a(p.name); a("_("); a("value );\n");
+					a('    case ' + p.bitIndex()); a(' => vo.'); a(p.name.quote("_")); a("(value);\n");
 				}
 				a("  }; vo; }\n");
 			}
@@ -610,7 +1203,7 @@ file.writeString("
 		case Tdef(_), Tinterval, Tarray(_,_,_), TclassRef(_):
 			throw "Unsupported value literal: "+type;
 	}
-	
+
 	function getSimpleValue(t:PType, path:String) return switch(t) {
 		case Tdef(ptypedef):		switch (ptypedef) {
 			case Tenum(def):		path;
@@ -720,12 +1313,12 @@ file.writeString("
 		a("}\n");
 		
 		a("\ntrait "); a(def.name); a("VOXMLComponent extends XMLComponent\n{");
-		a("\n  this: "); a(cl.fullName); a("VOXMLComponent =>\n");
+		a("\n  this: "); a(cl.mutableFullName); a("VOXMLComponent =>\n");
 		
 		a('\n  def setValueObject(valueobject: '); a(def.name); a('VO, xml: NodeSeq) : '); a(def.name); a('VO = ');
 		a("\n  {");
 		a("\n    val vo = if (valueobject != null) valueobject else new "); a(def.name); a("VO;");
-		a("\n    for (xml <- xml) for (node <- xml.child) if (node.isInstanceOf[scala.xml.Elem]) vo.add(setValueObject(new "); a(cl.fullName); a("VO, node));");
+		a("\n    for (xml <- xml) for (node <- xml.child) if (node.isInstanceOf[scala.xml.Elem]) vo.add(setValueObject(new "); a(cl.mutableFullName); a("VO, node));");
 		a("\n    vo");
 		a("\n  }");
 		
@@ -790,7 +1383,7 @@ file.writeString("
 	{
 		a("\n  ");
 		
-		var propName = p.propertyName();
+		var propName = p.name.quote();
 		
 		// Storage
 		a("/*@field*/ protected[this] var __"); a(p.name); a(": ");
@@ -836,7 +1429,7 @@ file.writeString("
 		var bit = (1 << this.currentFieldBitNum);
 		
 		// Setter
-		a("\n  final def "); a(p.name); a("_=(v:"); a(tdef.name); a(") : Unit = { ");
+		a("\n  final def "); a(p.name.quote("_")); a("=(v:"); a(tdef.name); a(") : Unit = { ");
 		
 		switch (p.type) {
 			case Tdef(_), Tarray(_,_,_): // Don't set any bits
@@ -863,7 +1456,7 @@ file.writeString("
 		if (p.hasOption(reference))
 		{
 			var clname = p.type.typeNameInMutablePkg().name;
-			a("\n  final def "); a(p.name); a("_=(v:"); a(clname); a(") : Unit = this."); a(p.name.quote());
+			a("\n  final def "); a(p.name.quote("_")); a("=(v:"); a(clname); a(") : Unit = this."); a(p.name.quote());
 			switch (p.type) {
 				case Tarray(innerType, _,_):
 					var innerName = innerType.typeNameInMutablePkg().name;
@@ -871,7 +1464,7 @@ file.writeString("
 				default:
 					a(" = new Ref["); a(clname); a("]("); a(clname); a(".idValue(v), v)");
 			}
-			a("\n  final def "); a(p.name); a("_(v:AnyRef) : Unit = ");
+			a("\n  final def "); a(p.name.quote("_")); a("(v:AnyRef) : Unit = ");
 			a(p.name.quote());
 			a(" = ");
 			a(convertFromAnyRefTo(p.type, p.hasOption(reference)));
@@ -879,7 +1472,7 @@ file.writeString("
 		}
 		else
 		{
-			a("\n  final def "); a(p.name); a("_(v:AnyRef) : Unit = { val __value");
+			a("\n  final def "); a(p.name.quote("_")); a("(v:AnyRef) : Unit = { val __value");
 			if (Util.isEnum(p.type)) { a(": "); a(p.type.typeNameInMutablePkg().name); }
 			a(" = "); a(convertFromAnyRefTo(p.type));
 //			if (Util.isEnum(p.type))
@@ -1014,72 +1607,7 @@ file.writeString("
 	}
 	
 	public function genEnum	(def:EnumDef)	: Void
-	{
-		shouldWrite = true;
-		
-		var a = code.add;
-		function addConversionParams(withVal) {
-			for (prop in def.conversions) if (prop.name != "toString") {
-//				Assert.that(prop.type == Tstring, Std.string(def));
-				a(", ");
-				if (withVal) a("val ");
-				a(prop.name.quote()); a(":String"); // a(conv); ac('"'.code);
-			}
-		}
-		
-		a(Std.format("
-
-//---
-
-sealed abstract class ${def.name}(val value:Int, override val toString:String"));
-		
-		addConversionParams(true);
-
-		a(Std.format(") extends EnumValue;
-object ${def.name} extends Enum {
-  type Value = ${def.name};\n"));
-
-		var overrideValueOf = null;
-
-		for (e in def.enumerations)
-		{
-			if (e.type != null)
-			{
-				a("\n  override protected def stringCatchAll(value : String) = "); a(e.name); a('(value);\n  case class  ');
-				a(e.name); a('(override val toString : '); a(e.type.typeNameInMutablePkg().name); a(') extends Value(toString = toString, value = '); a(Std.string(e.intValue));
-				for (key in e.conversions.keys()) if (key != "toString") {
-					var conv = e.conversions.get(key);
-					a(', "'); a(conv); ac('"'.code);
-				}
-				a(");\n");
-				
-				overrideValueOf = e;
-			}
-			else {
-				a("  case object "); a(e.name); a(' extends Value('); a(e.intValue + ', "'); a(e.name); ac('"'.code);
-				for (prop in def.conversions) if (prop.name != "toString") {
-					var conv = e.conversions.get(prop.name);
-					a(', "'); a(conv != null? conv : e.name); ac('"'.code);
-				}
-				a(")\n");
-			}
-		}
-
-		var first = true;
-
-		a("\n  val values : Set[Value] = Set(");
-		for (e in def.enumerations) if (e.type == null) {
-			if (first) first = false; else a(", ");
-			a(e.name);
-		}
-		a(");\n\n");
-
-  		for (conv in def.conversions)
-		{
-			a("  final def from"); a(conv.name.substr(2)); a("(str:String) : Value = values.find(_."); a(conv.name); a(" == str).getOrElse(apply(str));\n");
-		}
-		a("}");
-	}
+	{ }
 	
 	function genXMLComponent(def:ClassDef, idProperty:Property)
 	{
@@ -1828,6 +2356,6 @@ class ScalaMessagePacking extends MessagePacking
 	
 	override private function a_unpackProperty(p:Property)
 	{
-		a(p.name); a(" = "); a("input.unpack();");
+		a(p.name.quote()); a(" = "); a("input.unpack();");
 	}
 }

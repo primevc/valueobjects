@@ -48,7 +48,8 @@ trait ValueObject extends ValueSource
   // Default implementations
   //
   @inline final def self = this.asInstanceOf[VOType];
-  final def contains(key : Symbol) : Boolean = this.contains(key.name);
+
+  @inline final def contains(key : Symbol) : Boolean = this.contains(key.name);
 
   /** True if all sub-ValueObjects recursively have been initialized from their ValueSources. */
   def isRealized : Boolean;
@@ -63,8 +64,8 @@ trait ValueObject extends ValueSource
   */
   final def    conj(src : ValueSource)         : this.type = copy(src, this.voSource);
 
-  def         assoc(idx : Int,    value : Any) : this.type = conj(new SingleValueSource(voManifest.index(idx), value));
-  def         assoc(key : String, value : Any) : this.type = conj(new SingleValueSource(voManifest.index(key), value));
+  def         assoc(idx : Int,    value : Any) : this.type = conj(new SingleValueSource(voManifest(idx).name, value));
+  def         assoc(key : String, value : Any) : this.type = conj(new SingleValueSource(voManifest(key).name, value));
   final def   assoc(key : Symbol, value : Any) : this.type = assoc(key.name, value);
   final def without(idx : Int)                 : this.type = assoc(idx, null);
   final def without(key : String)              : this.type = assoc(key, null);
@@ -90,24 +91,20 @@ trait ID {
 trait LeafNode {
   this : ValueObjectBase =>
 
-  @inline override def contains(id  : Int) : Boolean = (voIndexSet & (1 << id)) != 0;
+  @inline override def contains(id : Int) : Boolean = (lazyIndexSet & (1 << voManifest.index(id))) != 0;
 
   final def isRealized = true;
   final def realized   = self;
 }
 
-trait NoProperties extends LeafNode {
+trait BranchNode {
   this : ValueObjectBase =>
-//  @inline final override def containsKey(idx:Int, name:String) = false;
-  @inline final override def contains(idx:  Int)            = false;
-  @inline final override def contains(name: String)         = false;
-  
-  def voIndexSet : Int = 0;
-  def srcDiff    : Int = 0;
-  override def   count = 0;
 
-  def copy       (src: ValueSource, root: ValueSource) = this;
-  def foreach    (b: (ValueObjectField[ValueObject#VOType], Any) => Unit) {}
+  @inline override def contains(id : Int) : Boolean = {
+    val idx = voManifest.index(id);
+    val msk = 1 << idx;
+    if ((voManifest.lazyIndexMask & msk) != 0) (lazyIndexSet & msk) != 0; else voManifest(idx) in self;
+  }
 }
 
 
@@ -116,7 +113,8 @@ trait NoProperties extends LeafNode {
 // ---------------
 
 abstract class ValueObjectBase extends ValueObject with ClojureMapSupport {
-  final def contains(name: String, orIdx: Int) : Boolean = contains(name) || contains(voManifest.index(orIdx));
+  def contains(name: String)             : Boolean = try voManifest(name) in self catch { case ValueObjectManifest.NoSuchFieldException => false }
+  def contains(name: String, orIdx: Int) : Boolean = contains(name) || contains(voManifest.index(orIdx));
 
 //  final def apply(idx:  Int,    notFound: Any) : Any = apply(null, idx, notFound)
 //  final def apply(name: String, notFound: Any) : Any = apply(name,  -1, notFound)
@@ -136,10 +134,37 @@ abstract class ValueObjectBase extends ValueObject with ClojureMapSupport {
   ")";
 }
 
+abstract class ValueObject_0 extends ValueObjectBase {
+  override def count     = 0;
+  def lazyIndexSet : Int = 0;
+  def voIndexSet   : Int = 0;
+  def srcDiff      : Int = 0;
+
+  @inline final override def contains(none: Int)               = false;
+  @inline final override def contains(none: String)            = false;
+  @inline final override def contains(none: String, nada: Int) = false;
+
+  protected[prime] def copy(src : ValueSource, root : ValueSource) : this.type = this;
+  def copy() : this.type = this;
+
+  def foreach (f: (ValueObjectField[VOType], Any) => Unit) {}
+}
+
 abstract class ValueObject_1 extends ValueObjectBase {
-  // No indexBits, it's just zero or one property
-  override def count = if (this.contains(voManifest.lastFieldIndex)) 1 else 0
-  protected[prime] def lazyIndexSet = 0;
+  // Compute indexBits as it's just zero or one property
+  override def count = if (voManifest.first(self) != voManifest.first(voCompanion.empty)) 1 else 0;
+  def lazyIndexSet   = if (voManifest.first.isInstanceOf[VOValueObjectField[_,_]]) 0 else voManifest.fieldIndexMask * count;
+  def voIndexSet     = voManifest.fieldIndexMask * count;
+
+  def srcDiff = {
+    val mine = voManifest.first(self);
+    if (voManifest.first(voSource,None) != mine) 1 << voManifest.lastFieldIndex else 0;
+  }
+
+  def foreach (f: (ValueObjectField[VOType], Any) => Unit) {
+    val field = voManifest.first;
+    if (count == 1) f(field, field(self));
+  }
 }
 
 abstract class ValueObject_4(_voIndexSet0 : Int, _srcDiff0 : Int) extends ValueObjectBase {
@@ -152,7 +177,7 @@ abstract class ValueObject_4(_voIndexSet0 : Int, _srcDiff0 : Int) extends ValueO
   def voIndexSet : Int = _voIndexSet;
   def srcDiff    : Int = (_bits >>> 4);// & 0xF;
 
-  protected[prime] def lazyIndexSet = _voIndexSet;
+  def lazyIndexSet = _voIndexSet;
 }
 
 abstract class ValueObject_8(protected val _voIndexSet : Byte, protected val _srcDiff : Byte) extends ValueObjectBase {
@@ -162,7 +187,7 @@ abstract class ValueObject_8(protected val _voIndexSet : Byte, protected val _sr
   def voIndexSet : Int = _voIndexSet;
   def srcDiff    : Int = _srcDiff;
 
-  protected[prime] def lazyIndexSet = _voIndexSet;
+  def lazyIndexSet = _voIndexSet;
 }
 
 abstract class ValueObject_16(protected val _voIndexSet : Short, protected val _srcDiff : Short) extends ValueObjectBase {
@@ -172,15 +197,17 @@ abstract class ValueObject_16(protected val _voIndexSet : Short, protected val _
   def voIndexSet : Int = _voIndexSet;
   def srcDiff    : Int = _srcDiff;
 
-  protected[prime] def lazyIndexSet = _voIndexSet;
+  def lazyIndexSet = _voIndexSet;
 }
 
-abstract class ValueObject_32(protected[prime] val lazyIndexSet : Int, val _srcDiff : Int) extends ValueObjectBase {
+abstract class ValueObject_32(protected val _voIndexSet : Int, protected val _srcDiff : Int) extends ValueObjectBase {
   if (voSource == voCompanion.empty)
     assert(lazyIndexSet == _srcDiff, "When src is empty, the voIndexSet{%x} should == srcDiff{%x}".format(lazyIndexSet, _srcDiff));
 
   def voIndexSet : Int = lazyIndexSet;
   def srcDiff    : Int = _srcDiff;
+
+  def lazyIndexSet = _voIndexSet;
 }
 
 

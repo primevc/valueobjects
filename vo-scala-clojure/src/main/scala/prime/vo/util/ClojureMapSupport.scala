@@ -22,7 +22,7 @@ trait ClojureMapSupport extends IPersistentMap
   // Associative
   // ---
   final def assoc       (key: Any, value: Any) : IPersistentMap = {
-    val k = voManifest.index(key);
+    val k = voManifest.index_!(key);
     if (k >= 0)
       assoc(k, value)
     else {
@@ -34,13 +34,13 @@ trait ClojureMapSupport extends IPersistentMap
   }
   /** assoc exclusive: Only assoc when 'key is not present. */
   final def assocEx     (key: Any, value: Any) = {
-    val k = voManifest.index(key);
+    val k = voManifest.index_!(key);
     require(!containsKey(k), "Index "+k+" (key="+key+") invalid or already present")
     assoc(k, value)
   }
   
   final def entryAt(key: Any) = {
-    val k = voManifest.index(key);
+    val k = voManifest.index_!(key);
     if (k >= 0) new MapEntry(voManifest.keyword(k), nth(k))
     else null
   }
@@ -78,11 +78,14 @@ trait ClojureMapSupport extends IPersistentMap
 
   protected def hasSameKeysAndValues(m : java.util.Map[_,_]) : Boolean = {
     foreach { (field, value) =>
-      val foundKey = if (m.containsKey(field.id))      field.id
-                else if (m.containsKey(field.keyword)) field.keyword
-                else if (m.containsKey(field.name))    field.name
-                else if (m.containsKey(field.index))   field.index
-                else null;
+      val foundKey = if (m.containsKey(field.keyword))           field.keyword
+                else if (m.containsKey(field.name))              field.name
+                else if (m.containsKey(field.id))                field.id
+                else {
+                  val idx : Any = voManifest.index(field);
+                  if (m.containsKey(idx)) idx;
+                  else null;
+                }
       
       if(foundKey == null || !Util.equiv(value, m.get(foundKey)))
         return false;
@@ -137,31 +140,31 @@ trait ClojureMapSupport extends IPersistentMap
   }
   
   // Seqable
-  final class Seq(i : Int, meta: IPersistentMap = null) extends ASeq(meta) with Counted
+  final class Seq(field : ValueObjectField[VOType], meta: IPersistentMap = null) extends ASeq(meta) with Counted
   {
-    def first = new MapEntry(voManifest.keyword(i), voManifest(i)(self));
+    def first = new MapEntry(field.keyword, field(self));
     def next  = {
-      val nextIndex = voManifest.nextIndexSet(self, i);
-      if (nextIndex >= 0) new Seq(nextIndex) else null;
+      val nextField = voManifest.nextFieldSet(self, voManifest.index(field));
+      if (nextField != null) new Seq(nextField) else null;
     }
     
-    override def count = java.lang.Integer.bitCount( voIndexSet & (0x7FFFFFFF << (i + 1)) );
+    override def count = java.lang.Integer.bitCount( voIndexSet & (0x7FFFFFFF << (voManifest.index(field) + 1)) );
     
-    def withMeta(meta : IPersistentMap) = new Seq(i, meta);
+    def withMeta(meta : IPersistentMap) = new Seq(field, meta);
   }
   def seq = {
-    val i = voManifest.firstIndexSet(self);
-    if (i >= 0) new Seq(i) else null;
+    val f = voManifest.firstFieldSet(self);
+    if (f != null) new Seq(f) else null;
   }
 
   // ---
   // IPersistentMap
   // ---
-  def without     (key: Any): this.type = without(voManifest.index(key));
+  def without     (key: Any): this.type = without(voManifest.index_!(key));
   
   // IPersistentMap interfaces
   // ILookup
-  final def valAt (key: Any, notFound: AnyRef): AnyRef = nth(voManifest.index(key), notFound).asInstanceOf[AnyRef]
+  final def valAt (key: Any, notFound: AnyRef): AnyRef = nth(voManifest.index_!(key), notFound).asInstanceOf[AnyRef]
   final def valAt (key: Any): AnyRef = valAt(key, null)
 
   // Iterable
@@ -188,7 +191,7 @@ trait ClojureMapSupport extends IPersistentMap
       
       override def contains(obj : Any) = obj match {
         case e : Map.Entry[_,_] =>
-          val index = voManifest.index(e.getKey);
+          val index = voManifest.index_!(e.getKey);
           index != -1 && Util.equals(nth(index), e.getValue())
 
         case _ => false;
@@ -200,8 +203,8 @@ trait ClojureMapSupport extends IPersistentMap
     def size       = ClojureMapSupport.this.count;
     def iterator() = new VOIterator[Keyword]() {
       def next = {
-        val v = voManifest(index).keyword;
-        nextIndex();
+        val v = field.keyword;
+        nextField();
         v
       }
     }
@@ -213,8 +216,8 @@ trait ClojureMapSupport extends IPersistentMap
   // ---
   // IFn: VO as function from key to value
   // ---
-  override final def invoke  (key: AnyRef) : AnyRef = nth(voManifest.index(key))
-  override final def invoke  (key: AnyRef, notFound: AnyRef) : AnyRef = nth(voManifest.index(key), notFound.asInstanceOf[AnyRef])
+  override final def invoke  (key: AnyRef) : AnyRef = nth(voManifest.index_!(key))
+  override final def invoke  (key: AnyRef, notFound: AnyRef) : AnyRef = nth(voManifest.index_!(key), notFound.asInstanceOf[AnyRef])
 
   final def applyTo (arglist: ISeq) = RT.boundedLength(arglist, 20) match {
     case 1 => invoke(arglist.first);

@@ -165,7 +165,7 @@ abstract class ValueObjectField[-VO <: ValueObject] protected(
   def apply(src : ValueSource, orElse : Any) : Any = src.anyAt(name, id, orElse);
 
   def get(vo : ValueObject) : Any =  vo match { case vo : VO => this(vo); case _ => null; }
-  def in (vo : VO)                = (vo.lazyIndexSet & vo.voManifest.asInstanceOf[ValueObjectManifest[VO]].index(this)) != 0;
+  def in (vo : VO)                = (vo.lazyIndexSet & (1 << vo.voManifest.asInstanceOf[ValueObjectManifest[VO]].index(this))) != 0;
 
   def isLazy = valueType isLazy;
 }

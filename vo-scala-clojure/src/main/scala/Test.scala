@@ -41,9 +41,9 @@ object Box extends ValueObjectCompanion[Box] {
   def apply(w : Int = empty.w): Box = empty.copy(w);
 
   object manifest extends {
-    val ID = 12;
+    val ID = 1;
 
-    val w = new ValueObjectField[Box](0, 'w, ValueTypes.Tinteger(), Box.empty.w    ) { def apply(vo: Box) = vo.w }
+    val w = new ValueObjectField[Box](0x0100, 'w, ValueTypes.Tinteger(), Box.empty.w    ) { def apply(vo: Box) = vo.w }
     val first = w;
 
     /*def apply(name : String) = name match {
@@ -102,11 +102,11 @@ object Spread extends ValueObjectCompanion[Spread] {
   object manifest extends {
     val ID = 3;
 
-    val x = new ValueObjectField[Spread](0, 'x, ValueTypes.Tinteger(), Spread.empty.x) {
+    val x = new ValueObjectField[Spread](0x0300, 'x, ValueTypes.Tinteger(), Spread.empty.x) {
       //TODO: bench null vs Option
       def apply(vo: Spread) = vo.x
     } 
-    val frame = new VOValueObjectField[Spread, Box](1, 'frame, Spread.empty.frame, false) {
+    val frame = new VOValueObjectField[Spread, Box](0x0301, 'frame, Spread.empty.frame, false) {
       def apply(vo: Spread) = vo.frame
     }
 

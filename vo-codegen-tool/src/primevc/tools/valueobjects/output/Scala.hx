@@ -1439,7 +1439,7 @@ file.writeString("
 				{
 					nilChecked = true;
 					a("if (");
-					if (p.type == Tstring) a("!v.isEmpty");
+					if (p.type == Tstring) a("v != null && !v.isEmpty");
 					else {
 						a("v != "); a(nilValue(p.type));
 					}

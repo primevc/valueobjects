@@ -6,6 +6,10 @@ package prime.vo.mutable;
 
 trait ValueObject extends java.io.Externalizable
 {
+  override def toString = getClass.getSimpleName + "(" + (voCompanion.fields.filter(f => this.fieldIsSet_?(f.name)).map {
+    f => f.name.name + " = " + voCompanion.getValue(this, f.name.name)
+  } mkString(", ")) + ")";
+
   protected[prime] def updateFieldsSet_!() { }
 
   protected[prime] def voCompanion : VOCompanion[_] with VOMessagePacker[_]

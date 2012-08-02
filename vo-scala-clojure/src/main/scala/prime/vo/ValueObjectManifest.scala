@@ -21,10 +21,11 @@ trait ValueObjectManifest[VOType <: ValueObject]
   /** Find the ValueObjectField with the given name, or throw NoSuchFieldException. */
   def apply(name : String) : ValueObjectField[VOType];
 
-  val first : ValueObjectField[VOType];
   def index(idx   : Int) : Int;
+  def index(name  : String) : Int;
   def index(field : ValueObjectField[VOType]) : Int;
 
+  val first : ValueObjectField[VOType];
   def firstFieldSet(data : VOType)                   : ValueObjectField[VOType];
   def  nextFieldSet(data : VOType, startIndex : Int) : ValueObjectField[VOType];
 
@@ -40,28 +41,29 @@ trait ValueObjectManifest[VOType <: ValueObject]
     else throw ValueObjectManifest.NoSuchFieldException;// new java.lang.NoSuchFieldException("n=" + n + ", index=" + index)
   }
 */
-
-  final def index_!(key : Any) : Int = key match {
+  final def index  (key : Keyword) : Int = index(key.sym.getName)
+  final def index  (key : Symbol)  : Int = index(key.name)
+  final def index_!(key : Any)     : Int = key match {
     case key:Int     => index(key)
     case key:Long    => index(key.toInt)
     case key:Number  => index(key.intValue)
-    case key:Keyword => index(apply(key.sym.getName))
-    case key:Symbol  => index(apply(key.name))
-    case key:String  => index(apply(key))
-    case _           => index(apply(key.toString))
+    case key:Keyword => index(key)
+    case key:Symbol  => index(key)
+    case key:String  => index(key)
+    case _           => index(key.toString)
   }
 
-  final def symbol (idx:  Int) = apply(idx).symbol;
-  final def keyword(idx:  Int) = apply(idx).keyword;
-
-  final def keyword(key: String) : Keyword = apply(key).keyword
-  final def keyword(key: Symbol) : Keyword = apply(key.name).keyword
-  final def keyword_!(key: Any)  : Keyword = key match {
+  final def keyword  (idx : Int)    : Keyword = apply(idx).keyword;
+  final def keyword  (key : String) : Keyword = apply(key).keyword
+  final def keyword  (key : Symbol) : Keyword = apply(key.name).keyword
+  final def keyword_!(key : Any)    : Keyword = key match {
     case key:Keyword => key
     case key:Symbol  => keyword(key.name)
     case key:Int     => keyword(key)
     case _           => keyword(key.toString)
   }
+
+  final def symbol   (idx : Int) = apply(idx).symbol;
 }
 
 object ValueObjectManifest {
@@ -80,6 +82,7 @@ abstract class ValueObjectManifest_1[VOType <: ValueObject : Manifest] extends V
   final def apply(name: String) = if (first.name == name)           first else throw ValueObjectManifest.NoSuchFieldException;
 
   final def index(idx   : Int)                      : Int = if (idx == 0 || idx == first.id) 0 else -1;
+  final def index(name  : String)                   : Int = if (name == first.name) 0 else -1;
   final def index(field : ValueObjectField[VOType]) : Int = if (field == first) 0 else -1;
 
   final def firstFieldSet(data : VOType)              = if (first in data)          first               else null;
@@ -109,6 +112,12 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
     throw ValueObjectManifest.NoSuchFieldException;
   }
 
+  final def index(name : String) : Int = {
+    var i = 0;
+    for (f <- fields) if (f != null && (f.name == name)) return i; else i += 1;
+    -1;
+  }
+
   final def index(field : ValueObjectField[VOType]) : Int = {
     var i = 0;
     for (f <- fields) if (f != null && (f eq field)) return i; else i += 1;
@@ -136,7 +145,7 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
 }
 
 
-abstract class ValueObjectField[-VO <: ValueObject](
+abstract class ValueObjectField[-VO <: ValueObject] protected(
   val id           : Int,
   val name         : String,
   val symbol       : Symbol,
@@ -144,6 +153,8 @@ abstract class ValueObjectField[-VO <: ValueObject](
   val valueType    : ValueType,
   val defaultValue : Any
 ){
+  require(valueType != null, "Field needs a valueType");
+
   /* TODO *
     - Implement clojure's KeywordThunk optimization thingy
   */
@@ -159,7 +170,7 @@ abstract class ValueObjectField[-VO <: ValueObject](
   def isLazy = valueType isLazy;
 }
 
-abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject](
+abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protected(
   id           : Int,
   symbol       : Symbol,
   override val defaultValue : T, // Must always refer to the `empty` instance.

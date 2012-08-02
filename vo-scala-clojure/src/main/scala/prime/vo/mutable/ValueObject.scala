@@ -2,7 +2,7 @@ package prime.vo.mutable;
  import prime.types._
  import scala.collection.JavaConversions
  import org.msgpack.Unpacker
- import prime.utils.msgpack.{MutableVOPacker, VOUnpacker, VOInstanceUnpacker}
+ import prime.utils.msgpack.{MutableVOPacker, MutableVOUnpacker, VOInstanceUnpacker}
 
 trait ValueObject extends java.io.Externalizable
 {
@@ -40,7 +40,7 @@ trait ValueObject extends java.io.Externalizable
     val map = obj.voCompanion.defaultVOCompanionMap;
     assert(map != null, this.getClass+"::readExternal map == null, obj = " + obj)
 
-    val helper = new VOUnpacker(map)
+    val helper = new MutableVOUnpacker(map)
     {
       var first = true;
       override def newObject = if (!first) super.newObject else {

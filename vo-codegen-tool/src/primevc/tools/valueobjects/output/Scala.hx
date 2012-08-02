@@ -141,7 +141,7 @@ class Scala extends ScalaBase, implements CodeGenerator
 
 import prime.vo._;
 import prime.vo.source._;
-import prime.types.{Enum, EnumValue, Conversion, Colors};
+import prime.types.{Enum, EnumValue, Conversion, Colors, FileRef};
 import prime.types.Conversion._;
 import prime.types.ValueTypes._;
 
@@ -722,7 +722,7 @@ class MutableScala extends ScalaBase, implements CodeGenerator
 
 import scala.collection.JavaConversions
 import scala.xml.NodeSeq
-import prime.types.{Type, Field, Ref, Enum, EnumValue}
+import prime.types.{Type, Field, Ref, Enum, EnumValue, FileRef}
 import prime.types.Conversion._;
 import prime.utils._
 import prime.utils.msgpack._
@@ -735,7 +735,7 @@ import prime.vo.mutable._
 			var map = new ScalaTypeMap();
 			m.generateWith(map);
 			file.writeString("
-package "+ m.fullName +".mutable\n{\n
+package "+ m.mutableFullName +"\n{\n
   object VO { val typeMap : scala.collection.immutable.IntMap[prime.vo.mutable.VOCompanion[_]] = scala.collection.immutable.IntMap(");
 			var first = true;
 			for (index in map.map.keys()) {

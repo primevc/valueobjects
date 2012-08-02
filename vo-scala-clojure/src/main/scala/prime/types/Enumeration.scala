@@ -20,7 +20,7 @@ abstract class EnumValue
 abstract class Enum extends ClojureFn
 {
   type Value <: EnumValue;
-  def  Null   :     Value = null.asInstanceOf[Value];
+  val  Null   :     Value = null.asInstanceOf[Value];
 
   val values : Set[Value];
 

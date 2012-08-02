@@ -7,7 +7,7 @@ package primevc.core.traits;
 
 package mutable
 {
-  trait ObjectId {
+  trait ObjectId extends prime.vo.mutable.ValueObjectWithID {
     type IDType = prime.types.ObjectId;
 
     protected[this] var __id: org.bson.types.ObjectId = null

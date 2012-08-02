@@ -12,10 +12,10 @@ import org.bson.types.ObjectId
  * Time: 11:21
  * To change this template use File | Settings | File Templates.
  */
-class VOUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends UnpackerImpl.VOHelper {
+class MutableVOUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends UnpackerImpl.VOHelper {
   def newObject = new VOInstanceUnpacker(voCompanionMap)
 }
-object VOUnpacker {
+object MutableVOUnpacker {
   var defaultVOCompanionMap : IntMap[VOCompanion[_]] = _
   val zerobitsLookupTable = Array(0,1,28,2,29,14,24,3,30,22,20,15,25,17,4,8,31,27,13,23,21,19,16,7,26,12,18,6,11,5,10,9)
 }
@@ -54,7 +54,7 @@ class VOInstanceUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends Unpack
 
   final def putValue(value: AnyRef) {
     // Thanks to http://graphics.stanford.edu/~seander/bithacks.html  and  https://gist.github.com/1319739
-    var i = VOUnpacker.zerobitsLookupTable( (fields & -fields) * 0x077CB531 >>> 27 );
+    var i = MutableVOUnpacker.zerobitsLookupTable( (fields & -fields) * 0x077CB531 >>> 27 );
     
     val field = fieldOffset + i
     //assert(vo != null, "Cannot write field:" + field + " = '" + value + "'' to null VO type:" + currentType)

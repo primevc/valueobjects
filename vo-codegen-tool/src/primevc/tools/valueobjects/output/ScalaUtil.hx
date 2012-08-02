@@ -25,7 +25,7 @@ class ScalaUtil
 		var res = {name:null, defaultValue: null};
 		res.name = (surroundWithType != null? surroundWithType + "[" : "") +
 		  (switch(t) {
-			case Tarray(innerT,_,_):	"IndexedSeq["+ typeNameInMutablePkg(innerT).name +"]";
+			case Tarray(innerT,_,_):	"Array["+ typeNameInMutablePkg(innerT).name +"]";
 			case Turi, Turl:			"prime.types.URI";
 			case TuniqueID:				"prime.types.ObjectId";
 			case TfileRef:				"prime.types.FileRef";

@@ -40,7 +40,7 @@ object Conversion
     case value         => val v = if (format != null) string.invoke(value, format) else string.invoke(value); if (v != null) v.asInstanceOf[String] else throw FailureException;
   }
 
-  implicit def String(value:Any) : String = String(value, null);
+  def String(value:Any) : String = String(value, null);
 
   //  -------
 
@@ -55,7 +55,7 @@ object Conversion
   def Boolean   (value:Number)      : Boolean = if (value != null) value.intValue > 0 else throw FailureException;
   def Boolean   (value:BooleanType) : Boolean = value.asBoolean;
 
-  implicit def Boolean(value:Any) : Boolean = unpack(value) match {
+  def Boolean(value:Any) : Boolean = unpack(value) match {
     case v:Boolean     => v
     case v:String      => Boolean(v)
     case v:Number      => Boolean(v)
@@ -72,7 +72,7 @@ object Conversion
   def Integer   (value:IntegerType) : Int = value.asInt;
   def Integer   (value:Long)        : Int = value.toInt;
 
-  implicit def Integer(value:Any) : Int = unpack(value) match {
+  def Integer(value:Any) : Int = unpack(value) match {
     case v:Int         => v
     case v:Long        => Integer(v)
     case v:Number      => Integer(v)
@@ -108,7 +108,7 @@ object Conversion
           Decimal(value)
     }
 
-  implicit def Decimal(value:Any) : Double = Decimal(value, null);
+  def Decimal(value:Any) : Double = Decimal(value, null);
 
   protected def decimalFormatter(format:String) =
   {
@@ -154,7 +154,7 @@ object Conversion
   def RGBA      (rgb:Int, a:Int)                 : RGBA = RGBA((rgb << 8) | a);
   def RGBA      (rgb:Int, alphaPercentage:Float) : RGBA = RGBA(rgb, (255 * alphaPercentage).toInt);
 
-  implicit def RGBA(value:Any) : RGBA = unpack(value) match {
+  def RGBA(value:Any) : RGBA = unpack(value) match {
     case v:RGBA        => v
     case v:Int         => RGBA(v)
     case v:Long        => RGBA(v)
@@ -187,7 +187,7 @@ object Conversion
     case value            => val v = if (formatter != null) date.invoke(value, formatter) else date.invoke(value); if (v != null) v.asInstanceOf[Date] else throw FailureException;
   }
 
-  implicit def Date(value:Any) : Date = Date(value, ISODateTimeFormat.dateParser);
+  def Date(value:Any) : Date = Date(value, ISODateTimeFormat.dateParser);
 
   //  -------
 
@@ -211,7 +211,7 @@ object Conversion
     case value            => val v = if (formatter != null) datetime.invoke(value, formatter) else datetime.invoke(value); if (v != null) v.asInstanceOf[DateTime] else throw FailureException;
   }
 
-  implicit def DateTime(value:Any) : DateTime = DateTime(value, ISODateTimeFormat.dateParser);
+  def DateTime(value:Any) : DateTime = DateTime(value, ISODateTimeFormat.dateParser);
 
   //  -------
 
@@ -219,7 +219,7 @@ object Conversion
   def Interval  (start:DateTime, end:DateTime) : Interval = new Interval(start, end);
   def Interval  (value:(_,_))                  : Interval = Interval(DateTime(value._1), DateTime(value._2));
 
-  implicit def Interval(value:Any) : Interval = unpack(value) match {
+  def Interval(value:Any) : Interval = unpack(value) match {
     case v:Interval => v
     case v:Array[_] => Interval(DateTime(v(0)), DateTime(v(1)))
     case v:(_,_)    => Interval(v)
@@ -236,7 +236,7 @@ object Conversion
   def EmailAddr (value:java.net.URI) : EmailAddr = EmailAddr(value.getPath);
   def EmailAddr (value:java.net.URL) : EmailAddr = EmailAddr(value.getFile);
 
-  implicit def EmailAddr(value:Any) : EmailAddr = unpack(value) match {
+  def EmailAddr(value:Any) : EmailAddr = unpack(value) match {
     case v:EmailAddr                                   => v
     case v:String                                      => EmailAddr(v)
     case v:URI          if ("mailto" == v.getScheme)   => EmailAddr(v)
@@ -255,7 +255,7 @@ object Conversion
   def URI       (value:java.net.URI) : URI = URI(value.toString);
   def URI       (value:java.net.URL) : URI = URI(value.toString);
 
-  implicit def URI(value:Any) : URI = unpack(value) match {
+  def URI(value:Any) : URI = unpack(value) match {
     case v:URI          => v
     case v:String       => URI(v)
     case v:java.net.URI => URI(v)
@@ -264,6 +264,8 @@ object Conversion
     case None           => throw NoInputException;
     case value          => val v = uri.invoke(value); if (v != null) v.asInstanceOf[URI] else throw FailureException;
   }
+
+  implicit def URI(ref : FileRef)(implicit repository:FileRepository) : URI = repository.toURI(ref);
 
   def URL (value:URI) = if (value.getHost != null) value else throw FailureException;
 
@@ -275,7 +277,7 @@ object Conversion
   def Vector[T] (value:Traversable[T])                                  : IndexedSeq[T] = value.toIndexedSeq
   def Vector[T] (value:Traversable[_])  (implicit converter : Any => T) : IndexedSeq[T] = value.map(converter).toIndexedSeq
 
-  implicit def Vector[T](value:Any)(implicit converter : Any => T) : IndexedSeq[T] = unpack(value) match {
+  def Vector[T](value:Any)(implicit converter : Any => T) : IndexedSeq[T] = unpack(value) match {
     case v:Array[_]       => v.map(converter)
     case v:ArrayType      => Vector(v)
     case v:Traversable[_] => Vector(v)
@@ -288,35 +290,13 @@ object Conversion
 
   //  -------
 
-  def FileRef   (value:FileRef)      : FileRef = value;
-  def FileRef   (value:Array[Byte])  : FileRef = new FileRef(null, value);
-  def FileRef   (value:String)       : FileRef = new FileRef(String(value), null);
-  def FileRef   (value:RawType)      : FileRef = FileRef(value.asString);
-  def FileRef   (value:URI)          : FileRef = FileRef(value.toString);
-  def FileRef   (value:java.net.URI) : FileRef = FileRef(value.toString);
-  def FileRef   (value:java.net.URL) : FileRef = FileRef(value.toString);
-
-  def FileRef   (value:Any) : FileRef = unpack(value) match {
-    case v:FileRef      => v
-    case v:Array[Byte]  => FileRef(v)
-    case v:String       => FileRef(v)
-    case v:URI          => FileRef(v)
-    case v:java.net.URI => FileRef(v)
-    case v:java.net.URL => FileRef(v)
-    case v:RawType      => FileRef(v)
-    case None           => throw NoInputException;
-    case value          => val v = file_ref.invoke(value); if (v != null) v.asInstanceOf[FileRef] else throw FailureException;
-  }
-
-  //  -------
-
   implicit def vo2ref[V <: ValueObject with ID](vo : V)                              : VORef[V] = new VORefImpl(vo._id, vo);
   implicit def id2ref[V <: ValueObject with ID](id : V#IDType)(implicit V : IVOC[V]) : VORef[V] = new VORefImpl(id, V.empty);
 
-  implicit def VORef [V <: ValueObject with ID](value : Any)  (implicit V : IVOC[V], vo_IDType_converter : Any => V#IDType) : VORef[V] = unpack(value) match {
+  def VORef [V <: ValueObject with ID](value : Any)  (implicit V : IVOC[V], vo_IDType_converter : Any => V#IDType) : VORef[V] = unpack(value) match {
     case V(value) => vo2ref(value)
     case None     => throw NoInputException;
-    case value    => try id2ref(vo_IDType_converter(value))(V) catch { case FailureException => vo_ref.invoke(value, V); }
+    case value    => try id2ref(vo_IDType_converter(value))(V) catch { case FailureException => vo_ref.invoke(value, V).asInstanceOf[VORef[V]]; }
   }
 
   //  -------
@@ -326,7 +306,7 @@ object Conversion
   def ObjectId  (value:String)              : ObjectId = new ObjectId(value);
   def ObjectId  (value:Array[Byte])         : ObjectId = new ObjectId(value);
 
-  implicit def ObjectId  (value:Any) : ObjectId = unpack(value) match {
+  def ObjectId  (value:Any) : ObjectId = unpack(value) match {
     case v:ObjectId            => ObjectId(v)
     case v:MessagePackObjectId => ObjectId(v)
     case v:String              => ObjectId(v)

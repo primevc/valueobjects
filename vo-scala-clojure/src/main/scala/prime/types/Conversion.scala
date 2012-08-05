@@ -168,10 +168,12 @@ object Conversion
   //  -------
 
   def Date      (value:Date)                                : Date = value;
+  def Date      (value:DateTime)                            : Date = value toDateMidnight;
   def Date      (value:java.util.Date)                      : Date = new Date(value);
   def Date      (value:Long)                                : Date = new Date(value);
   def Date      (value:Number)                              : Date = new Date(value.longValue);
   def Date      (value:String, formatter:DateTimeFormatter) : Date = formatter.parseDateTime(String(value)).toDateMidnight;
+  def Date      (value:String)                              : Date = Date(value, ISODateTimeFormat.dateParser);
   def Date      (value:IntegerType)                         : Date = new Date(value.asLong);
   def Date      (value:FloatType)                           : Date = new Date(value.asLong);
   def Date      (value:RawType)                             : Date = Date(value.asString);
@@ -180,14 +182,15 @@ object Conversion
     case v:java.util.Date => Date(v)
     case v:Long           => Date(v)
     case v:Number         => Date(v)
-    case v:String         => Date(v, formatter)
+    case v:String         => if (formatter == null) Date(v) else Date(v,  formatter)
     case v:IntegerType    => Date(v)
     case v:FloatType      => Date(v)
     case None             => throw NoInputException;
-    case value            => val v = if (formatter != null) date.invoke(value, formatter) else date.invoke(value); if (v != null) v.asInstanceOf[Date] else throw FailureException;
+    case value            => val v = if (formatter == null) date.invoke(value) else date.invoke(value, formatter);
+    ;                        if (v != null) v.asInstanceOf[Date] else throw FailureException;
   }
 
-  def Date(value:Any) : Date = Date(value, ISODateTimeFormat.dateParser);
+  def Date(value:Any) : Date = Date(value, null);
 
   //  -------
 
@@ -196,6 +199,7 @@ object Conversion
   def DateTime  (value:Long)                                : DateTime = new DateTime(value);
   def DateTime  (value:Number)                              : DateTime = new DateTime(value.longValue);
   def DateTime  (value:String, formatter:DateTimeFormatter) : DateTime = formatter.parseDateTime(String(value));
+  def DateTime  (value:String)                              : DateTime = DateTime(value, ISODateTimeFormat.dateTime);
   def DateTime  (value:IntegerType)                         : DateTime = new DateTime(value.asLong);
   def DateTime  (value:FloatType)                           : DateTime = new DateTime(value.asLong);
   def DateTime  (value:RawType)                             : DateTime = DateTime(value.asString);
@@ -204,14 +208,15 @@ object Conversion
     case v:java.util.Date => DateTime(v)
     case v:Long           => DateTime(v)
     case v:Number         => DateTime(v)
-    case v:String         => DateTime(v, formatter)
+    case v:String         => if (formatter == null) DateTime(v) else DateTime(v, formatter)
     case v:IntegerType    => DateTime(v)
     case v:FloatType      => DateTime(v)
     case None             => throw NoInputException;
-    case value            => val v = if (formatter != null) datetime.invoke(value, formatter) else datetime.invoke(value); if (v != null) v.asInstanceOf[DateTime] else throw FailureException;
+    case value            => val v = if (formatter == null) datetime.invoke(value) else datetime.invoke(value, formatter);
+    ;                        if (v != null) v.asInstanceOf[DateTime] else throw FailureException;
   }
 
-  def DateTime(value:Any) : DateTime = DateTime(value, ISODateTimeFormat.dateParser);
+  def DateTime(value:Any) : DateTime = DateTime(value, null);
 
   //  -------
 

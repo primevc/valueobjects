@@ -32,15 +32,7 @@ trait ValueObjectManifest[VOType <: ValueObject]
   // ----------------
   // Concrete members
   // ----------------
-  @inline final def isFull(data : VOType) = data.voIndexSet == fieldIndexMask;
 
-/*
-  @inline final def index(n : Int) : Int = {
-    val index = if (n <= 32) n else (n & 0xFF) + supertype(n >>> 8).;
-    if ((fieldIndexMask & (1 << index)) != 0) index
-    else throw ValueObjectManifest.NoSuchFieldException;// new java.lang.NoSuchFieldException("n=" + n + ", index=" + index)
-  }
-*/
   final def index  (key : Keyword) : Int = index(key.sym.getName)
   final def index  (key : Symbol)  : Int = index(key.name)
   final def index_!(key : Any)     : Int = key match {
@@ -175,7 +167,7 @@ abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protecte
   symbol       : Symbol,
   override val defaultValue : T, // Must always refer to the `empty` instance.
   ref          : Boolean
-) extends ValueObjectField[VO](id, symbol.name, symbol, Keyword.intern(null, symbol.name), ValueTypes.Tdef(defaultValue.voCompanion, ref), defaultValue) {
+) extends ValueObjectField[VO](id, symbol.name, symbol, Keyword.intern(null, symbol.name), ValueTypes.Tdef(defaultValue, ref), defaultValue) {
 
   val voCompanion : ValueObjectCompanion[T] = defaultValue.voCompanion.asInstanceOf[ValueObjectCompanion[T]];
 

@@ -47,10 +47,10 @@ class Module
 	
 	// ---
 	
-	public function mkdir() : String
+	public function mkdir(mutable = false) : String
 	{
 		var dir:String;
-		var fullName = this.fullName;
+		var fullName = mutable? this.mutableFullName : this.fullName;
 		
 		if (fullName.indexOf(".") > 1)
 		{

@@ -41,9 +41,13 @@ trait ObjectId extends ValueObject with ID {
 object ObjectId {
 	object manifest extends ValueObjectManifest_1[ObjectId] {
     val ID = 0x1D;
-    object id extends ValueObjectField[ObjectId](0x1D00,'id,TuniqueID,null) {
+    object id extends ValueObjectField[ObjectId](0x1D00,'id,TobjectId,null) {
       def apply(vo : ObjectId) = vo.id;
     }
     val first = id;
+  }
+
+  object field {
+    val id = manifest.id;
   }
 }

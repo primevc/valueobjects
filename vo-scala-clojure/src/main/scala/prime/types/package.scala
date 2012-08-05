@@ -42,17 +42,22 @@ package object types
     import prime.types.Conversion._
     import clojure.lang.Keyword.{intern => k};
 
-    case class Tdef       (vo:ValueObjectCompanion[_ <: ValueObject], ref:Boolean) extends ValueType {
-      val keyword          = k(vo.getClass.getPackage.getName, vo.manifest.VOType.erasure.getSimpleName);
+    case class Tdef       (empty:ValueObject, ref:Boolean) extends ValueType {
+      require(empty != null, "empty ValueObject needed")
+      //require(empty.voManifest != null, "ValueObject needs a manifest")
+      //require(empty.voManifest.VOType != null, "ValueObject needs a manifest.VOType")
+      //require(empty.voManifest.VOType.erasure != null, "ValueObject needs a manifest.VOType.erasure")
+
+      val keyword          = k(empty.getClass.getPackage.getName, empty.getClass.getSimpleName.dropRight(2).intern);
       override def isLazy  = true;
-      def convert(any:Any) = vo.valueOf(any);
+      def convert(any:Any) = empty.voCompanion.valueOf(any);
     }
     case class Tenum      (t: Enum) extends ValueType {
       val keyword          = k(t.getClass.getPackage.getName, t.getClass.getSimpleName);
       def convert(any:Any) = t.valueOf(any);
     }
     case class Tarray     (innerType:ValueType, min:Int=0, max:Int=Int.MaxValue) extends ValueType {
-      val keyword          = k("prime.types", "Vector-of-" + innerType.keyword.sym.getName);
+      val keyword          = k("prime.types", "Vector-of-" + innerType.keyword.sym.getName intern);
       override def isLazy  = true;
       def convert(any:Any) = Vector(any)(innerType.convert);
     }
@@ -72,7 +77,7 @@ package object types
     case object Turl       extends ValueType { val keyword = k("prime.types", "URL");       def convert(any:Any) = URL(URI(any)); }
     case object Temail     extends ValueType { val keyword = k("prime.types", "E-mail");    def convert(any:Any) = EmailAddr(any); }
 
-    case object TuniqueID  extends ValueType { val keyword = k("prime.types", "ID");        def convert(any:Any) = ObjectId(any); }
+    case object TobjectId  extends ValueType { val keyword = k("prime.types", "ObjectId");  def convert(any:Any) = ObjectId(any); }
     case object TfileRef   extends ValueType { val keyword = k("prime.types", "FileRef");   def convert(any:Any) = FileRef(any); }
   }
 }

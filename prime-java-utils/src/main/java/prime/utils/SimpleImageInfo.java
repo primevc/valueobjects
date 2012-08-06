@@ -1,4 +1,4 @@
-package primevc.utils;
+package prime.utils;
 
 /*
  *	SimpleImageInfo.java

@@ -260,7 +260,7 @@ object Conversion
   //  -------
 
   def URI       (value:URI)          : URI = value;
-  def URI       (value:String)       : URI = new URI(String(value));
+  def URI       (value:String)       : URI = try { new URI(value, true) } catch { case e:org.apache.commons.httpclient.URIException => new URI(value, false) }
   def URI       (value:RawType)      : URI = URI(value.asString);
   def URI       (value:java.net.URI) : URI = URI(value.toString);
   def URI       (value:java.net.URL) : URI = URI(value.toString);

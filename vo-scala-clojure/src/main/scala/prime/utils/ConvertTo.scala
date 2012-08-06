@@ -44,6 +44,7 @@ object ConvertTo
     else if (t == classOf[Integer])  integer(value)
     else if (t == classOf[URI]    )  uri    (value)
     else if (t == classOf[ObjectId]) uniqueID(value)
+    else if (t == classOf[FileRef])  FileRef(value)
     else
       throw new MatchError("ConvertTo[" + manifest[T].erasure.getName + "] not implemented; value = " + value)
   }.asInstanceOf[T]

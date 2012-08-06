@@ -101,10 +101,10 @@ trait ClojureMapSupport extends IPersistentMap
       case vo : VOType =>
         println("Comparing equal typed VOs")
         // Uses lazyIndexSet to prevent unneccesary realizing of sub VOs.
-        if ((this.lazyIndexSet & vo.lazyIndexSet) != vo.lazyIndexSet)
+        if (vo.getClass == this.getClass && (this.lazyIndexSet ^ vo.lazyIndexSet) != 0) {
           false;
+        }
         else {
-          println(" - Comparing all properties")
           foreach { (field, value) => if (!Util.equiv(value, field(vo))) return false; }
           true;
         }

@@ -220,5 +220,5 @@ trait ValueObjectCompanion[T <: ValueObject] {
 
   def   apply(src : ValueSource) : T  = empty.copy(src, root = src)
   def valueOf(any : Any)         : T  = any match { case vo:T => vo; case _ => apply(ValueSource(any, this)); }
-  def unapply(any : Any)  : Option[T] = Option(valueOf(any))
+  def unapply(any : Any)  : Option[T] = try Option(valueOf(any)) catch { case _ => None }
 }

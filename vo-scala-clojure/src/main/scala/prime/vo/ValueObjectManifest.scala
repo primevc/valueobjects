@@ -180,8 +180,6 @@ abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protecte
     case ValueSource(vo) =>
       if (root != src) /*eager convert to T*/ voCompanion(vo);
       else /*lazy convert*/ if (self.voSource == EmptyVO) null.asInstanceOf[T] else lazyVar;
-    
-    case voCompanion(vo) => vo
 
     case _ => if (root != self.voSource) /*eager*/ apply(self) else /*lazy*/ lazyVar;
   }

@@ -142,8 +142,10 @@ private class ScalaBase
 				a(")");
 			}
 
+		case TuniqueID:
+			if (val == null) a("prime.types.emptyObjectId"); else throw val;
 
-		case TuniqueID, Tdef(_), TclassRef(_):
+		case Tdef(_), TclassRef(_):
 			if (val == null) a("null"); else throw val;
 	}
 }
@@ -246,11 +248,11 @@ import prime.types.ValueTypes._;
 			}
 		}
 		function fieldDefinition(p : Property, protectedOnly = false) {
-			if ((!p.type.isArray() && p.type.isSingleValue()) || !protectedOnly) {
-				a(!p.type.isArray() && p.type.isSingleValue()? "  val " : "  def "); a(p.name.quote());
+			if (!p.type.lazyInit() || !protectedOnly) {
+				a(!p.type.lazyInit()? "  val " : "  def "); a(p.name.quote());
 				spaces(longestFieldNameLength - p.name.quote().length); a(" : "); a(p.type.scalaType().name);
 			}
-			if (p.type.isArray() || !p.type.isSingleValue()) {
+			if (p.type.lazyInit()) {
 				if (!protectedOnly) a(";"); a("  protected var "); a(p.name.quote('0')); a(": "); a(p.type.scalaType().name);
 			}
 		}
@@ -386,7 +388,7 @@ trait ")); a(def.name); a(" extends ");
 			a("  def voManifest  = "); a(def.name); a(".manifest\n\n");
 
 			// Lazy getters
-			for (p in fields) if (p.type.isArray() || !p.type.isSingleValue())
+			for (p in fields) if (p.type.lazyInit())
 			{
 				function p0() { a(p.name); ac("0".code); }
 
@@ -404,7 +406,7 @@ trait ")); a(def.name); a(" extends ");
 				if (!leafNode) { a("    val empty = "); a(def.name); a(".empty;\n"); }
 				for (p in fields)
 				{
-					if (p.type.isSingleValue()) {
+					if (!p.type.lazyInit()) {
 						a("    if ((voIndexSet"); if (!leafNode) spaces(longestSubFieldNameLength - 6); a(" & 0x"); a(StringTools.hex(1 << p.bitIndex(), 8)); a(") > 0)"); if (!leafNode) spaces(longestSubFieldNameLength - 8);
 					} else {
 						a("    if (this."); a(p.name.quote()); spaces(IntMath.max(6, longestSubFieldNameLength) - p.name.quote().length); a(" != empty."); a(p.name.quote()); a(")");  spaces(IntMath.max(8, longestSubFieldNameLength) - p.name.quote().length);
@@ -428,8 +430,8 @@ trait ")); a(def.name); a(" extends ");
 				a(";\n");
 
 				a("  def realized   = { ");
-				for (p in fields) if (!p.type.isSingleValue()) {
-					a("this."); a(p.name.quote()); a(p.type.isArray()? ".foreach(_.realized);" : ".realized; ");
+				for (p in fields) if (p.type.lazyInit()) {
+					a("this."); a(p.name.quote()); a(!p.type.isSingleValue()? (p.type.isArray()? ".foreach(_.realized); " : ".realized; ") : "; ");
 				}
 				a("self }\n\n");
 			}
@@ -471,13 +473,15 @@ trait ")); a(def.name); a(" extends ");
 					var objCheckWidth = fields.length == 1? 0 : leafNode? 0 : longestSubFieldNameLength + 5 + longestSubFieldNameLength + 4 + 5 + longestSubFieldNameLength;
 
 					a("    if ("); a(p.name.quote());
-					if (!nanCheck)
+					if (isObj)
 					{
-						spaces(s); a(" != "); a(obj); a(".");
-						if (!isObj) a(p.name.quote()); else {
-						a(p.name.quote("0")); spaces(os); a(" && "); a(p.name.quote()); spaces(os); a(" != "); a(obj); a("."); a(p.name.quote());
-						}
-						spaces(isObj? os : IntMath.max(objCheckWidth - p.name.quote().length, s));
+						spaces(s);  a(" != null "); spaces(os + p.name.quote().length); a(" && "); a(p.name.quote()); spaces(os); a(" != "); a(obj); a("."); a(p.name.quote());
+						spaces(os + 1);
+					}
+					else if (!nanCheck)
+					{
+						spaces(s); a(" != "); a(obj); a("."); a(p.name.quote());
+						spaces(IntMath.max(objCheckWidth - p.name.quote().length, s));
 					} else {
 						spaces(s + 1); a(".compare("); a(obj); a("."); a(p.name.quote()); a(") != 0"); spaces(objCheckWidth - p.name.quote().length - (10 - obj.length) - 6);
 					}
@@ -493,7 +497,7 @@ trait ")); a(def.name); a(" extends ");
 					for (p in fields)
 					{
 						var bitFlag  = StringTools.hex(1 << p.bitIndex(), 8);
-						var isObj    = p.type.isArray() || !p.type.isSingleValue();
+						var isObj    = p.type.lazyInit();
 						var s        = longestFieldNameLength    - p.name.quote().length;
 						var os       = longestSubFieldNameLength - p.name.quote().length;
 						var nanCheck = switch (p.type) {
@@ -521,7 +525,7 @@ trait ")); a(def.name); a(" extends ");
 		  		else // fields.length == 1
 		  		{
 		  			var p = fields[0];
-		  			var isObj = p.type.isArray() || !p.type.isSingleValue();
+		  			var isObj = p.type.lazyInit();
 		  			ifFieldDiff(p,0,0,isObj); a(" {\n      val empty = "); a(def.name); a(".empty;\n  ");
 		  			ifFieldDiff(p,0,0,isObj, "empty"); a(" new "); a(def.name); a("VO(voRoot, "); copyPrototype(false,false); a(").asInstanceOf[this.type]
       else empty.asInstanceOf[this.type];\n    }\n    else this;\n  }\n");

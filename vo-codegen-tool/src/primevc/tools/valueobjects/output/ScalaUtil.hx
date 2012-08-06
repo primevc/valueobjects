@@ -113,4 +113,14 @@ class ScalaUtil
 		  else
 			converterFn + "(" + inputExpr + ")";
 	}
+
+	static public function lazyInit(t:PType) return switch(t)
+	{
+		case Tarray(_,_,_): true;
+		case Tdef(innerT): switch(innerT) {
+			case Tclass(_): true;
+			case Tenum(_): false;
+		}
+		default: false;
+	}
 }

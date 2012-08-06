@@ -37,7 +37,12 @@ object Conversion
     case v:Double      => String(v, format)
     case v:URI         => String(v)
     case None          => throw NoInputException; //TODO: or emptyString?
-    case value         => val v = if (format != null) string.invoke(value, format) else string.invoke(value); if (v != null) v.asInstanceOf[String] else throw FailureException;
+    case value         => try {
+      val v = if (format != null) string.invoke(value, format) else string.invoke(value);
+      if (v != null) v.asInstanceOf[String] else throw FailureException;
+    } catch {
+      case _ => value toString;
+    }
   }
 
   def String(value:Any) : String = String(value, null);
@@ -316,7 +321,7 @@ object Conversion
     case v:MessagePackObjectId => ObjectId(v)
     case v:String              => ObjectId(v)
     case v:Array[Byte]         => ObjectId(v)
-    case None                  => new ObjectId(); //TODO: check if this is expected behaviour
+    case None                  => throw NoInputException;
     case value                 => val v = unique_id.invoke(value); if (v != null) v.asInstanceOf[ObjectId] else throw FailureException;
   }
 }

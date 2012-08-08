@@ -86,20 +86,20 @@ class ScalaUtil
 		var converterFn = switch(t)
 		{
 			case Tarray(innerT,_,_):	arrayType = innerT; "Vector";
-			case Turi, Turl:			"URI";
-			case TuniqueID:				"ObjectId";
-			case TfileRef:				"FileRef";
-			case Tstring:				"String";
-			case Tinteger(_,_,_):		"Int";
-			case Tdecimal(_,_,_):		"Double";
-			case Tbool(v):				"Boolean";
-			case TenumConverter(t):		throw t;
+			case Turi, Turl:			"      URI";
+			case TuniqueID:				" ObjectId";
+			case TfileRef:				"  FileRef";
+			case Tstring:				"   String";
+			case Tinteger(_,_,_):		"      Int";
+			case Tdecimal(_,_,_):		"   Double";
+			case Tbool(v):				"  Boolean";
 			case Temail:				"EmailAddr";
-			case Tdate:					"Date";
-			case Tdatetime:				"DateTime";
-			case Tinterval:				"Interval";
-			case Tcolor:				"RGBA";
+			case Tdate:					"     Date";
+			case Tdatetime:				" DateTime";
+			case Tinterval:				" Interval";
+			case Tcolor:				"     RGBA";
 			case TclassRef(className):	className + ".valueOf";
+			case TenumConverter(t):		throw t;
 
 			case Tdef(ptypedef): switch (ptypedef) {
 				case Tclass		(def):	def.fullName + ".valueOf";
@@ -116,7 +116,7 @@ class ScalaUtil
 
 	static public function lazyInit(t:PType) return switch(t)
 	{
-		case Tarray(_,_,_): true;
+		case Tarray(innerT,_,_): lazyInit(innerT);
 		case Tdef(innerT): switch(innerT) {
 			case Tclass(_): true;
 			case Tenum(_): false;

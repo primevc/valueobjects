@@ -99,18 +99,17 @@ trait ClojureMapSupport extends IPersistentMap
     else obj match
     {
       case vo : VOType =>
-        println("Comparing equal typed VOs")
-        // Uses lazyIndexSet to prevent unneccesary realizing of sub VOs.
-        if (vo.getClass == this.getClass && (this.lazyIndexSet ^ vo.lazyIndexSet) != 0) {
+        // Uses initIndexSet to prevent unneccesary realizing of sub VOs.
+        if (vo.getClass == this.getClass && (this.initIndexSet & voManifest.eagerIndexMask) != (vo.initIndexSet & voManifest.eagerIndexMask)) {
           false;
         }
         else {
           foreach { (field, value) => if (!Util.equiv(value, field(vo))) return false; }
-          true;
+          vo.count == this.count;
         }
 
-      case m : java.util.Map[_,_] if m.size == this.count =>
-        m match {
+      case m : java.util.Map[_,_] =>
+        (m match {
           case vo : ValueObject =>
             println("Comparing different types VOs: "+this.getClass+ " and "+ m.getClass)
             foreach { (field, value) =>
@@ -126,7 +125,8 @@ trait ClojureMapSupport extends IPersistentMap
           case _ =>
             println("Comparing VO to Map")
             hasSameKeysAndValues(m)
-        }
+
+        }) && m.size == this.count;
 
       case _ => false
     }

@@ -207,6 +207,9 @@ import prime.types.ValueTypes._;
 
 ")
 
+	function propFlag(p:Property) return '0x' + StringTools.hex(1 << p.bitIndex(), 8)
+	function propHex (p:Property) return '0x' + StringTools.hex((p.propertyID() << 8) | p.bitIndex(), 6)
+
 	public function genClass(def : ClassDef)
 	{
 		shouldWrite = true;
@@ -343,12 +346,11 @@ trait ")); a(def.name); a(" extends ");
 
 		// -----
 		// Class definition
-
-		function voSourceAt(p:Property, localEmpty = false) return 'At("'+ p.name +'", 0x'+ StringTools.hex((p.propertyID() << 8) | p.bitIndex(), 6) +', '+ (localEmpty? 'empty' : def.fullName +'.empty') + ((p.type.isTclass() && p.type.getPTypedef().unpackPTypedef() == def)? '' : '.' + p.name.quote()) +')';
-		function intAt     (p:Property, localEmpty = false) return 'voSource.int'    + voSourceAt(p, localEmpty);
+		function voSourceAt(p:Property, localEmpty = false) return 'At("'+ p.name +'", '+ propHex(p) +', '+ (localEmpty? 'this' : def.fullName +'.empty') + ((p.type.isTclass() && p.type.getPTypedef().unpackPTypedef() == def)? '' : '.' + p.name.quote()) +')';
 		function anyAt     (p:Property, localEmpty = false) return 'voSource.any'    + voSourceAt(p, localEmpty);
-		function boolAt    (p:Property, localEmpty = false) return 'voSource.bool'   + voSourceAt(p, localEmpty);
-		function doubleAt  (p:Property, localEmpty = false) return 'voSource.double' + voSourceAt(p, localEmpty);
+		function intAt     (p:Property, localEmpty = false) return '          voSource.int' + voSourceAt(p, localEmpty);
+		function boolAt    (p:Property, localEmpty = false) return '         voSource.bool' + voSourceAt(p, localEmpty);
+		function doubleAt  (p:Property, localEmpty = false) return '       voSource.double' + voSourceAt(p, localEmpty);
 
 		if (!def.isMixin)
 		{
@@ -409,7 +411,9 @@ trait ")); a(def.name); a(" extends ");
 					if (!p.type.lazyInit()) {
 						a("    if ((voIndexSet"); if (!leafNode) spaces(longestSubFieldNameLength - 6); a(" & 0x"); a(StringTools.hex(1 << p.bitIndex(), 8)); a(") > 0)"); if (!leafNode) spaces(longestSubFieldNameLength - 8);
 					} else {
-						a("    if (this."); a(p.name.quote()); spaces(IntMath.max(6, longestSubFieldNameLength) - p.name.quote().length); a(" != empty."); a(p.name.quote()); a(")");  spaces(IntMath.max(8, longestSubFieldNameLength) - p.name.quote().length);
+						a("    if ("); if (p.isArray()) a("!"); a("this."); a(p.name.quote()); spaces(IntMath.max(6, longestSubFieldNameLength) - p.name.quote().length);
+						if (!p.isArray()){ a(" != empty."); a(p.name.quote()); ac(")".code); } else { a(".isEmpty)  "); }
+						spaces(IntMath.max(8, longestSubFieldNameLength) - p.name.quote().length);
 					}
 					a(" f(voField."); a(p.name.quote()); ac(",".code); spaces(longestFieldNameLength - p.name.quote().length); a(" this.");
 					a(p.name.quote(p.type.isSingleValue()? null : "0"));
@@ -488,15 +492,15 @@ trait ")); a(def.name); a(" extends ");
 					ac(")".code);
 				}
 
-				a("\n  protected def copy("); copyPrototype(false); a(", voRoot : ValueSource) : this.type = {\n");
+				a("\n  protected def copy("); copyPrototype(false); a(", voRoot : ValueSource"); if (!leafNode) a(", voLazyDiff : Int"); a(") : this.type = {\n");
 				if (fields.length > 1)
 				{
 					a("    val empty     = "); a(def.name); a(".empty;\n");
-					a("    var voDiff    = 0;\n");
+					a("    var voDiff    = "); a(leafNode? "0" : "voLazyDiff"); a(";\n");
 					a("    var voEmptied = 0;\n");
 					for (p in fields)
 					{
-						var bitFlag  = StringTools.hex(1 << p.bitIndex(), 8);
+						var bitFlag  = propFlag(p);
 						var isObj    = p.type.lazyInit();
 						var s        = longestFieldNameLength    - p.name.quote().length;
 						var os       = longestSubFieldNameLength - p.name.quote().length;
@@ -505,22 +509,25 @@ trait ")); a(def.name); a(" extends ");
 							default: false;
 						}
 
-						ifFieldDiff(p,s,os,isObj,nanCheck); a(" { voDiff |= 0x"); a(bitFlag);
-						a("; if ("); a(p.name.quote());
+						ifFieldDiff(p,s,os,isObj,nanCheck); a(" { voDiff |= "); a(bitFlag);
+						a("; if ("); a(p.name.quote()); spaces(s);
 						if (nanCheck) {
-							a(".isNaN"); spaces(s * 2 + 5);
+							a("    isNaN"); spaces(p.name.quote().length + 1);
+						} else if (p.isArray()) {
+							a("  isEmpty"); spaces(p.name.quote().length + 1);
 						} else {
-							spaces(s); a(" == empty."); a(p.name.quote()); spaces(s);
+							a(" == empty."); a(p.name.quote());
 						}
-						a(") voEmptied |= 0x"); a(bitFlag); a("; }\n");
+						spaces(s);
+						a(") voEmptied |= "); a(bitFlag); a("; }\n");
 					}
 					a("
-		    if (voDiff != 0) {
-		      val voNewIndexSet = (this._voIndexSet | voDiff) ^ voEmptied;
-		      if (voNewIndexSet != 0) new "); a(def.name); a("VO(voNewIndexSet, voDiff, voRoot, "); copyPrototype(false,false); a(").asInstanceOf[this.type]
-		      else                    empty.asInstanceOf[this.type];
-		    }
-		    else this;\n  }\n");
+    if (voDiff != 0) {
+      val voNewIndexSet = (this._voIndexSet | voDiff) ^ voEmptied;
+      if (voNewIndexSet != 0) new "); a(def.name); a("VO(voNewIndexSet, voDiff, voRoot, "); copyPrototype(false,false); a(").asInstanceOf[this.type]
+      else                    empty.asInstanceOf[this.type];
+    }
+    else this;\n  }\n");
 		  		}
 		  		else // fields.length == 1
 		  		{
@@ -531,41 +538,60 @@ trait ")); a(def.name); a(" extends ");
       else empty.asInstanceOf[this.type];\n    }\n    else this;\n  }\n");
 		  		}
 
-				a("  override def copy(voSource : ValueSource, newRoot : ValueSource) : this.type = { val voField = "); a(def.name); a(".field; val empty = "); a(def.name); a(".empty; this.copy(\n");
+				a("  override def conj(voSource : ValueSource, newRoot : ValueSource) : this.type = { val voField = "); a(def.name); a(".field; val empty = "); a(def.name); a(".empty;");
+
+				if (!leafNode) for (p in fields) if (p.type.lazyInit())
+	      		{
+	      			a("\n    val "); a(p.name.quote()); a(" = ");
+	      			if (p.type.isArray() && p.type.lazyInit()) {
+						a("try (if (voSource != newRoot) "); a(p.type.scalaConversionExpr(anyAt(p, true))); a(" else if (this.voSource == ValueSource.empty) null else "); a(p.name); a("0)");
+						a(" catch { case NoInputException => empty."); a(p.name.quote()); a(" };");
+					}
+					else {
+						a("voField."); a(p.name.quote()); a("(this, voSource, newRoot, "); a(p.name); a("0);");
+					}
+				}
+
+				a("\n    this.copy(\n");
 	      		for (p in fields)
 	      		{
-	      			a("    "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" = ");
+	      			a("      "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" = "); if (!p.type.lazyInit()) a("try ");
 	      			switch (p.type) {
-	      				case Tinteger(_,_,_): a("try "); a(   intAt(p, true)); a(" catch { case Conversion.NoInputException => empty."); a(p.name.quote()); a(" },\n");
-						case Tdecimal(_,_,_): a("try "); a(doubleAt(p, true)); a(" catch { case Conversion.NoInputException => empty."); a(p.name.quote()); a(" },\n");
-						case Tbool(_):        a("try "); a(  boolAt(p, true)); a(" catch { case Conversion.NoInputException => empty."); a(p.name.quote()); a(" },\n");
+	      				case Tinteger(_,_,_): a(   intAt(p, true));
+						case Tdecimal(_,_,_): a(doubleAt(p, true));
+						case Tbool(_):        a(  boolAt(p, true));
 						default:
-							if (p.type.isArray()) {
-								a("(if (voSource != newRoot) "); a(p.type.scalaConversionExpr(anyAt(p, true))); a(" else if (this.voSource == EmptyVO) null else "); a(p.name); a("0)");
-							}
-							else if (p.type.isSingleValue()) {
+							if (!p.type.lazyInit()) {
 								a(p.type.scalaConversionExpr(anyAt(p, true)));
 							}
 							else {
-								a("voField."); a(p.name.quote()); a("(this, voSource, newRoot, "); a(p.name); a("0)");
+								a(p.name.quote()); a(",\n");
 							}
-						    a(",\n");
+	      			}
+	      			if (!p.type.lazyInit()) {
+	      				a(" catch { case NoInputException => empty."); a(p.name.quote()); a(" },\n");
 	      			}
 	      		}
-				a("    voRoot = newRoot\n  ); }\n  def copy("); copyPrototype(); a(") : this.type = this.copy(");
+				a("      voRoot = newRoot");
+				if (!leafNode)
+				{
+					var first = true;
+					a(",\n      voLazyDiff = "); for (p in fields) if (p.type.lazyInit()) { if (!first) a(" | "); else first = false; a("(if ("); a(p.name.quote()); a(" == null) "); a(propFlag(p)); a(" else 0)"); }
+				}
+				a("\n    );\n  }\n  def copy("); copyPrototype(); a(") : this.type = this.copy(");
 				var first = true;
 				for (p in def.propertiesSorted) {
 					if (!first) a(", "); else first = false;
 					switch(p.type) {
 						case TenumConverter(_), Temail, Tdatetime, Tdate, Tcolor, TclassRef(_), TfileRef, Turl, Turi, TuniqueID, Tinterval, Tstring, Tdef(_), Tarray(_):
 							var name = p.name.quote();
-							a("(if ("); a(name); a(" != null) "); a(name); a(" else this."); a(name); a(p.type.isArray() || p.type.isTclass()? "0)" : ")");
+							a("(if ("); a(name); a(" != null) "); a(name); a(" else this."); a(p.name.quote(p.type.lazyInit()? "0" : null)); ac(")".code);
 
 						case Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_):
 							a(p.name.quote());
 					}
 				}
-				a(", voRoot = this.voSource);\n");
+				a(", voRoot = this.voSource"); if (!leafNode) a(", voLazyDiff = 0"); a(");\n");
 
 				// -- end copy(...)
 			}
@@ -582,7 +608,7 @@ trait ")); a(def.name); a(" extends ");
 			a(" extends ValueObjectCompanion["); a(def.name); a("] {\n");
 
 			// val empty
-			a("  val empty : "); a(def.name); a("VO = new "); a(def.name); a("VO("); if (fields.length > 1) a("0,0,"); a("EmptyVO");
+			a("  val empty : "); a(def.name); a("VO = new "); a(def.name); a("VO("); if (fields.length > 1) a("0,0,"); a("ValueSource.empty");
 			for (p in fields)
 			{
 				a(", ");
@@ -635,15 +661,34 @@ trait ")); a(def.name); a(" extends ");
 			a(p.definedIn.fullName); a(".field."); a(p.name.quote()); a(";\n");
 		}
 		a("  }\n");// end object field
-		var first = true;
-		a("  val fields = { import field._; Array("); for (p in fields) { if (!first) a(", "); else first = false; a(p.name.quote()); } a("); }\n\n");
+
+		// val fields : Array
+		{
+			var first = true;
+			var bit   = 0;
+			a("  val fields = { import field._; Array(");
+			for (p in fields) if (!p.isTransient()) {
+				if (!first) a(", "); else first = false;
+				while(bit++ < p.bitIndex()) {
+					trace((bit - 1) +" != "+ p.bitIndex());
+					a("null, ");
+				}
+				a(p.name.quote());
+			}
+			for (p in fields) if (p.isTransient()) {
+				if (!first) a(", "); else first = false;
+				a(p.name.quote());
+			}
+			a("); }\n\n");
+		}
 
 		a("  object manifest extends {\n");
 		a("    val ID     = "); a(def.index + ";\n");
 		if (fields.length > 1) {
 			a("    val fields = "); a(def.name); a(".fields");
 		} else if (fields.length == 1) {
-			a("    val first = ");  a(def.name); a(".field."); a(fields[0].name.quote());
+			a("    val first          = "); a(def.name); a(".field."); a(fields[0].name.quote()); a(";\n  ");
+			a("    val lastFieldIndex = "); a(Std.string(fields[0].bitIndex()));
 		}
 		a(";\n  } with ValueObjectManifest_"); a(fields.length == 0? "0[" : fields.length == 1? "1[" : "N["); a(def.name); a("];\n");
 		a("}\n");

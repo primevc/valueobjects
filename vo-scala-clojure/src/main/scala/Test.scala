@@ -30,11 +30,11 @@ final class BoxVO protected[vo](val voSource : ValueSource, val w : Int) extends
   def intAt(name:String, idx:Int, notFound:Int) = if (name == "w" || Box.manifest.index(idx) == 0) w else notFound;
 
   def copy(w : Int = this.w) = new BoxVO(this.voSource, w).asInstanceOf[this.type];
-  def copy(src: ValueSource, root: ValueSource) = new BoxVO(w = src.intAt("w",0,Box.empty.w), voSource = root).asInstanceOf[this.type]
+  def conj(src: ValueSource, root: ValueSource) = new BoxVO(w = src.intAt("w",0,Box.empty.w), voSource = root).asInstanceOf[this.type]
 }
 
 object Box extends ValueObjectCompanion[Box] {
-  val empty = new BoxVO(EmptyVO, w = -1)
+  val empty = new BoxVO(ValueSource.empty, w = -1)
 
   //BoxVO een package case class maken? Of zoiets?
   def apply(vo : Box): Box = vo;
@@ -50,7 +50,7 @@ object Box extends ValueObjectCompanion[Box] {
       case "w"     => w;
     }*/
 
-    //val lastFieldIndex = 0;
+    val lastFieldIndex = 0;
     //final def apply(idx : Int) = { index(idx); w }
   } with ValueObjectManifest_1[Box];
 }
@@ -92,7 +92,7 @@ trait Spread extends ValueObject {
 
 
 object Spread extends ValueObjectCompanion[Spread] {
-  val empty = new SpreadVO(0, 0, EmptyVO, 123, Box.empty);
+  val empty = new SpreadVO(0, 0, ValueSource.empty, 123, Box.empty);
 
   def apply(x : Int = 123, frame : Box = empty.frame) = {
     assert(empty != null);
@@ -188,7 +188,7 @@ extends ValueObject_4(voIndexSet,srcDiff) with Spread with BranchNode
   }
 
   /** protected because vo.conj(voSource) or Companion(voSource) are friendlier interfaces. */
-  override def copy(src : ValueSource, root : ValueSource) : this.type = this.copy(
+  override def conj(src : ValueSource, root : ValueSource) : this.type = this.copy(
     x     = try src.intAt("x",0, this.x) catch { case Conversion.NoInputException => Spread.empty.x },
     frame = Spread.manifest.frame(this, src, root, frame0),
   /*  frame = voManifest.frame(src, None) match {

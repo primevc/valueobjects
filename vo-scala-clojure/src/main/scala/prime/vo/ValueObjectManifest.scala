@@ -11,6 +11,8 @@ trait ValueObjectManifest[VOType <: ValueObject]
 
   /** Mask of which fields are lazily initialized. 0 means all fields are eager. */
   val lazyIndexMask  : Int;
+  /** Mask of which fields are directly initialized on construction. 0 means all fields are lazy. */
+  val eagerIndexMask : Int;
   /** Mask of which fields bit indexes are used. */
   val fieldIndexMask : Int;
   /** Number of the last bit index used. */
@@ -66,9 +68,9 @@ abstract class ValueObjectManifest_1[VOType <: ValueObject : Manifest] extends V
 {
   val VOType : Manifest[VOType] = manifest[VOType];
 
-  val lastFieldIndex = index(first);
   val fieldIndexMask = 1 << lastFieldIndex;
-  val lazyIndexMask  = if (first isLazy) lastFieldIndex else 0;
+  val lazyIndexMask  = if (first isLazy) fieldIndexMask else 0;
+  val eagerIndexMask = if (first isLazy) 0 else fieldIndexMask;
 
   final def apply(idx : Int)    = if (index(idx) == lastFieldIndex) first else throw ValueObjectManifest.NoSuchFieldException;
   final def apply(name: String) = if (first.name == name)           first else throw ValueObjectManifest.NoSuchFieldException;
@@ -89,6 +91,7 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
   val first          = fields(0);
   val lazyIndexMask  = fields.foldLeft(0) { (mask,field) => mask | (if (field isLazy) 1 << index(field) else 0) }
   val fieldIndexMask = fields.foldLeft(0) { (mask,field) => mask | (1 << index(field))                          }
+  val eagerIndexMask = fieldIndexMask ^ lazyIndexMask;
   val lastFieldIndex = index(fields.last);
 
   final def apply(idx : Int)    : ValueObjectField[VOType] = fields(index(idx));
@@ -112,7 +115,7 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
 
   final def index(field : ValueObjectField[VOType]) : Int = {
     var i = 0;
-    for (f <- fields) if (f != null && (f eq field)) return i; else i += 1;
+    for (f <- fields) if (f eq field) return i; else i += 1;
     -1;
   }
 
@@ -157,7 +160,9 @@ abstract class ValueObjectField[-VO <: ValueObject] protected(
   def apply(src : ValueSource, orElse : Any) : Any = src.anyAt(name, id, orElse);
 
   def get(vo : ValueObject) : Any =  vo match { case vo : VO => this(vo); case _ => null; }
-  def in (vo : VO)                = (vo.lazyIndexSet & (1 << vo.voManifest.asInstanceOf[ValueObjectManifest[VO]].index(this))) != 0;
+  final def in (vo : VO) = {
+    ((vo.initIndexSet & (1 << vo.voManifest.index(this.asInstanceOf[ValueObjectField[vo.VOType]]))) != 0) || (isLazy && apply(vo) != defaultValue);
+  }
 
   def isLazy = valueType isLazy;
 }
@@ -174,17 +179,14 @@ abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protecte
   override def apply(vo : VO) : T;
 
   def apply(self:VO, src:ValueSource, root:ValueSource, lazyVar:T): T = apply(src, None) match {
+    case None => if (root != self.voSource) /*eager*/ apply(self) else /*lazy*/ lazyVar;
     case null => defaultValue;
     case v: T => v;
 
     case ValueSource(vo) =>
       if (root != src) /*eager convert to T*/ voCompanion(vo);
-      else /*lazy convert*/ if (self.voSource == EmptyVO) null.asInstanceOf[T] else lazyVar;
-
-    case _ => if (root != self.voSource) /*eager*/ apply(self) else /*lazy*/ lazyVar;
+      else /*lazy convert*/ if (self.voSource == ValueSource.empty) null.asInstanceOf[T] else lazyVar;
   }
-
-  override def in(vo : VO) = apply(vo) != defaultValue;
 }
 
 trait IntValueObjectField {

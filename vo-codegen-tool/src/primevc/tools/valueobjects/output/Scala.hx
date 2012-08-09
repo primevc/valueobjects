@@ -424,6 +424,19 @@ trait ")); a(def.name); a(" extends ");
 
 			if (!leafNode)
 			{
+				if (fields.length > 1) {
+					// def voIndexSet
+					a("\n  override def voIndexSet = initIndexSet");
+					for (p in fields) if (!p.type.isSingleValue()) {
+						a(" | (if (this."); a(p.name.quote());
+						if (p.type.isArray()) a(" isEmpty"); else {
+							a(" == "); a(def.name); a(".empty."); a(p.name.quote());
+						}
+						a(") 0 else "); a(propFlag(p)); a(")");
+					}
+					a(";\n");
+				}
+
 				// def realized, isRealized
 				a("\n  def isRealized =   ");
 				var first = true;
@@ -492,11 +505,14 @@ trait ")); a(def.name); a(" extends ");
 					ac(")".code);
 				}
 
-				a("\n  protected def copy("); copyPrototype(false); a(", voRoot : ValueSource"); if (!leafNode) a(", voLazyDiff : Int"); a(") : this.type = {\n");
+				a("\n  protected def copy("); copyPrototype(false); a(", voRoot : ValueSource) : this.type = {\n");
 				if (fields.length > 1)
 				{
 					a("    val empty     = "); a(def.name); a(".empty;\n");
-					a("    var voDiff    = "); a(leafNode? "0" : "voLazyDiff"); a(";\n");
+					a("    var voDiff    = 0;\n");
+					if (!leafNode) {
+						a("    var voLazy    = 0;\n");
+					}
 					a("    var voEmptied = 0;\n");
 					for (p in fields)
 					{
@@ -519,12 +535,17 @@ trait ")); a(def.name); a(" extends ");
 							a(" == empty."); a(p.name.quote());
 						}
 						spaces(s);
-						a(") voEmptied |= "); a(bitFlag); a("; }\n");
+						a(") voEmptied |= "); a(bitFlag); a("; }");
+
+						if (p.type.lazyInit()) {
+							a(" else if ("); a(p.name.quote()); a(" == null)"); a(" voLazy |= "); a(bitFlag);
+						}
+						a(";\n");
 					}
 					a("
-    if (voDiff != 0) {
+    if ("); a(leafNode? "voDiff" : "!(voRoot eq this.voSource) || voDiff"); a(" != 0) {
       val voNewIndexSet = (this._voIndexSet | voDiff) ^ voEmptied;
-      if (voNewIndexSet != 0) new "); a(def.name); a("VO(voNewIndexSet, voDiff, voRoot, "); copyPrototype(false,false); a(").asInstanceOf[this.type]
+      if (voNewIndexSet != 0"); if (!leafNode) a(" || voLazy != 0"); a(")\n        new "); a(def.name); a("VO(voNewIndexSet, voDiff, voRoot, "); copyPrototype(false,false); a(").asInstanceOf[this.type]
       else                    empty.asInstanceOf[this.type];
     }
     else this;\n  }\n");
@@ -572,13 +593,7 @@ trait ")); a(def.name); a(" extends ");
 	      				a(" catch { case NoInputException => empty."); a(p.name.quote()); a(" },\n");
 	      			}
 	      		}
-				a("      voRoot = newRoot");
-				if (!leafNode)
-				{
-					var first = true;
-					a(",\n      voLazyDiff = "); for (p in fields) if (p.type.lazyInit()) { if (!first) a(" | "); else first = false; a("(if ("); a(p.name.quote()); a(" == null) "); a(propFlag(p)); a(" else 0)"); }
-				}
-				a("\n    );\n  }\n  def copy("); copyPrototype(); a(") : this.type = this.copy(");
+				a("      voRoot = newRoot\n    );\n  }\n  def copy("); copyPrototype(); a(") : this.type = this.copy(");
 				var first = true;
 				for (p in def.propertiesSorted) {
 					if (!first) a(", "); else first = false;
@@ -591,7 +606,7 @@ trait ")); a(def.name); a(" extends ");
 							a(p.name.quote());
 					}
 				}
-				a(", voRoot = this.voSource"); if (!leafNode) a(", voLazyDiff = 0"); a(");\n");
+				a(", voRoot = this.voSource);\n");
 
 				// -- end copy(...)
 			}

@@ -201,7 +201,7 @@ abstract class ValueObject_16(protected val _voIndexSet : Short, protected val _
 }
 
 abstract class ValueObject_32(protected val _voIndexSet : Int, protected val _srcDiff : Int) extends ValueObjectBase {
-  def voIndexSet : Int = initIndexSet;
+  def voIndexSet : Int = _voIndexSet;
   def srcDiff    : Int = _srcDiff;
 
   def initIndexSet = _voIndexSet;

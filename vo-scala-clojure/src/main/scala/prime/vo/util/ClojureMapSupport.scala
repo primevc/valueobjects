@@ -134,27 +134,38 @@ trait ClojureMapSupport extends IPersistentMap
   def equiv(obj: AnyRef) : Boolean = if (obj eq this) true else obj match {
     case m : java.util.Map[_,_] if (!(m.isInstanceOf[IPersistentMap] && !m.isInstanceOf[MapEquivalence])) =>
       println("Comparing VO to MapEquivalence")
-      this.equals(obj)
+      this == obj;
 
     case _ => false
   }
-  
+
   // Seqable
-  final class Seq(field : ValueObjectField[VOType], meta: IPersistentMap = null) extends ASeq(meta) with Counted
+  final class Seq(bits : Int, index : Int, meta: IPersistentMap = null) extends ASeq(meta) with Counted
   {
+    import java.lang.Integer._
+
+    def field = voManifest(index);
     def first = new MapEntry(field.keyword, field(self));
-    def next  = {
-      val nextField = voManifest.nextFieldSet(self, voManifest.index(field));
-      if (nextField != null) new Seq(nextField) else null;
-    }
+    def next  = if (bits != 0) {
+      val nextOffset = 1 + numberOfTrailingZeros(bits);
+      val newBits = bits >>> nextOffset;
+      assert(bits != newBits, bits + " should != " + newBits);
+      assert(index != (index + nextOffset), nextOffset + " should != " + index +" + "+ nextOffset);
+      new Seq(newBits, index + nextOffset);
+
+    } else null;
     
-    override def count = java.lang.Integer.bitCount( voIndexSet & (0x7FFFFFFF << (voManifest.index(field) + 1)) );
+    override def count = 1 + bitCount(bits);
     
-    def withMeta(meta : IPersistentMap) = new Seq(field, meta);
+    def withMeta(meta : IPersistentMap) = new Seq(bits, index, meta);
   }
   def seq = {
-    val f = voManifest.firstFieldSet(self);
-    if (f != null) new Seq(f) else null;
+    val bits = voIndexSet;
+    if (bits != 0) {
+      val index = java.lang.Integer.numberOfTrailingZeros(bits);
+      new Seq(bits >>> (1 + index), index)
+    }
+    else null;
   }
 
   // ---
@@ -192,7 +203,7 @@ trait ClojureMapSupport extends IPersistentMap
       override def contains(obj : Any) = obj match {
         case e : Map.Entry[_,_] =>
           val index = voManifest.index_!(e.getKey);
-          index != -1 && Util.equals(nth(index), e.getValue())
+          index != -1 && nth(index) == e.getValue()
 
         case _ => false;
       }

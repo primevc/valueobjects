@@ -151,8 +151,8 @@ case class SingleValueSource[@specialized(Int,Double) T](key : String, value : T
   def contains (name: String): Boolean         = key == name;
 
   def contains (name: String, i: Int)                    : Boolean = contains(name);
-  def anyAt    (name: String, i: Int, notFound: Any)     : Any     = if                  (name == key) value          else notFound;
-  def intAt    (name: String, i: Int, notFound: Int)     : Int     = if (value != null && name == key) Integer(value) else notFound;
-  def doubleAt (name: String, i: Int, notFound: Double)  : Double  = if (value != null && name == key) Decimal(value) else notFound;
-  def boolAt   (name: String, i: Int, notFound: Boolean) : Boolean = if (value != null && name == key) Boolean(value) else notFound;
+  def anyAt    (name: String, i: Int, notFound: Any)     : Any     = if (name == key) value          else notFound;
+  def intAt    (name: String, i: Int, notFound: Int)     : Int     = if (name == key) Integer(value) else notFound;
+  def doubleAt (name: String, i: Int, notFound: Double)  : Double  = if (name == key) Decimal(value) else notFound;
+  def boolAt   (name: String, i: Int, notFound: Boolean) : Boolean = if (name == key) Boolean(value) else notFound;
 }

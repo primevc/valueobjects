@@ -39,10 +39,12 @@ trait ClojureMapSupport extends IPersistentMap
     assoc(k, value)
   }
   
-  final def entryAt(key: Any) = {
-    val k = voManifest.index_!(key);
-    if (k >= 0) new MapEntry(voManifest.keyword(k), nth(k))
-    else null
+  final def entryAt(key: Any) = try {
+    val i = voManifest.index_!(key);
+    val f = voManifest(i);
+    new MapEntry(f.keyword, f.get(self));
+  } catch {
+    case ValueObjectManifest.NoSuchFieldException => null
   }
 
   // IPersistentCollection
@@ -104,7 +106,7 @@ trait ClojureMapSupport extends IPersistentMap
           false;
         }
         else {
-          foreach { (field, value) => if (!Util.equiv(value, field(vo))) return false; }
+          foreach { (field, value) => if (value != field(vo)) return false; }
           vo.count == this.count;
         }
 
@@ -112,14 +114,7 @@ trait ClojureMapSupport extends IPersistentMap
         (m match {
           case vo : ValueObject =>
             println("Comparing different types VOs: "+this.getClass+ " and "+ m.getClass)
-            foreach { (field, value) =>
-              // assert(field != null, "field");
-              // assert(field.name != null, "fieldname");
-              // assert(vo(field.name) != null, "vo(field.name)");
-              if (!Util.equiv(value, field.get(vo))) return false;
-              //TODO: Bench
-              //vo(field.index) != value) return false;
-            }
+            foreach { (field, value) => if (value != field.get(vo)) return false; }
             true;
 
           case _ =>

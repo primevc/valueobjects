@@ -170,9 +170,8 @@ abstract class ValueObjectField[-VO <: ValueObject] protected(
 abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protected(
   id           : Int,
   symbol       : Symbol,
-  override val defaultValue : T, // Must always refer to the `empty` instance.
-  ref          : Boolean
-) extends ValueObjectField[VO](id, symbol.name, symbol, Keyword.intern(null, symbol.name), ValueTypes.Tdef(defaultValue, ref), defaultValue) {
+  override val defaultValue : T // Must always refer to the `empty` instance.
+) extends ValueObjectField[VO](id, symbol.name, symbol, Keyword.intern(null, symbol.name), ValueTypes.Tdef(defaultValue, false), defaultValue) {
 
   val voCompanion : ValueObjectCompanion[T] = defaultValue.voCompanion.asInstanceOf[ValueObjectCompanion[T]];
 

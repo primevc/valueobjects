@@ -20,6 +20,7 @@ trait ValueObject extends java.io.Externalizable
     fieldIsSet_?(voCompanion.field(field.name.name))
   }
   def fieldIsSet_?(name:Symbol): Boolean = fieldIsSet_?(voCompanion.field(name))
+  def fieldIsSet_?(name:String): Boolean = fieldIsSet_?(voCompanion.fieldNamed(name))
   
   /** Which field (as defined by the companion object fields Vector indices) is set? */
   def fieldIsSet_?(index:Int): Boolean = ($fieldsSet & (1 << index)) != 0
@@ -28,14 +29,9 @@ trait ValueObject extends java.io.Externalizable
   def partial_? : Boolean = numFieldsSet_? != voCompanion.numFields
   def validationErrors_? : List[(Symbol, String)] = Nil
 
-  // Courtesy of: http://graphics.stanford.edu/%7Eseander/bithacks.html#CountBitsSetParallel
   def numFieldsSet_? : Int = {
     updateFieldsSet_!
-    var v = $fieldsSet
-    v = v - ((v >> 1) & 0x55555555);                    // reuse input as temporary
-    v = (v & 0x33333333) + ((v >> 2) & 0x33333333);     // temp
-    v = ((v + (v >> 4) & 0xF0F0F0F) * 0x1010101) >> 24; // count
-    v
+    java.lang.Integer.bitCount($fieldsSet)
   }
 
   def readExternal(in : java.io.ObjectInput)

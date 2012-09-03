@@ -1,5 +1,6 @@
 package prime.types
  import org.apache.commons.codec.binary.Base64
+ import prime.vo.util.ClojureFn;
 
 case class FileRef private[prime](uri:String, hash:Array[Byte], originalName : String = null)
 {
@@ -11,7 +12,7 @@ case class FileRef private[prime](uri:String, hash:Array[Byte], originalName : S
   }
 }
 
-object FileRef extends Function1[Any,FileRef]
+object FileRef extends Function1[Any,FileRef] with ClojureFn
 {
   import Conversion._
   import ClojureProtocolVars._
@@ -35,5 +36,16 @@ object FileRef extends Function1[Any,FileRef]
     case v:RawType      => FileRef(v)
     case None           => throw NoInputException;
     case value          => val v = file_ref.invoke(value); if (v != null) v.asInstanceOf[FileRef] else throw FailureException;
+  }
+
+
+  //
+  // Clojure IFn
+  //
+  override def invoke(any : AnyRef) : AnyRef = apply(any)
+
+  final def applyTo (arglist: clojure.lang.ISeq) = clojure.lang.RT.boundedLength(arglist, 20) match {
+    case 1 => invoke(arglist.first);
+    case n => throwArity(n);
   }
 }

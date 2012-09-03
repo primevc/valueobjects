@@ -2,6 +2,21 @@ package primevc.tools.valueobjects.output;
  import primevc.tools.valueobjects.VODefinition;
   using primevc.tools.valueobjects.VODefinition;
 
+class ScalaPropUtil {
+	static public function scalaType(p:Property) return p.isReference()? "VORef["+ ScalaUtil.scalaType(p.type).name +"]" : ScalaUtil.scalaType(p.type).name
+	static public function lazyInit(p:Property) return !p.isReference() && lazyInitType(p.type)
+
+	static public function lazyInitType(t:PType) return switch(t)
+	{
+		case Tarray(innerT,_,_): lazyInitType(innerT);
+		case Tdef(innerT): switch(innerT) {
+			case Tclass(_): true;
+			case Tenum(_): false;
+		}
+		default: false;
+	}
+}
+
 class ScalaUtil
 {
 	static public function bitmask(numBits:Int, offset:Int=0)
@@ -112,15 +127,5 @@ class ScalaUtil
 			converterFn + "(" + inputExpr + ")(" + scalaConversionExpr(arrayType) + ")";
 		  else
 			converterFn + "(" + inputExpr + ")";
-	}
-
-	static public function lazyInit(t:PType) return switch(t)
-	{
-		case Tarray(innerT,_,_): lazyInit(innerT);
-		case Tdef(innerT): switch(innerT) {
-			case Tclass(_): true;
-			case Tenum(_): false;
-		}
-		default: false;
 	}
 }

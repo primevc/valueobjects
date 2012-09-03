@@ -106,7 +106,7 @@ object Spread extends ValueObjectCompanion[Spread] {
       //TODO: bench null vs Option
       def apply(vo: Spread) = vo.x
     } 
-    val frame = new VOValueObjectField[Spread, Box](0x0301, 'frame, Spread.empty.frame, false) {
+    val frame = new VOValueObjectField[Spread, Box](0x0301, 'frame, Spread.empty.frame) {
       def apply(vo: Spread) = vo.frame
     }
 

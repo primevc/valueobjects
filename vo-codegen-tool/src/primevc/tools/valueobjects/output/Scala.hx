@@ -201,7 +201,7 @@ file.writeString("
 
 import prime.vo._;
 import prime.vo.source._;
-import prime.types.{Enum, EnumValue, Conversion, Colors, FileRef};
+import prime.types.{Enum, EnumValue, Conversion, Colors, FileRef, VORef};
 import prime.types.Conversion._;
 import prime.types.ValueTypes._;
 
@@ -240,23 +240,23 @@ import prime.types.ValueTypes._;
 				if (first) first = false; else a(", ");
 				a(p.name.quote());
 				if (types) {
-					a(": "); a(p.type.scalaType().name);
+					a(": "); a(p.scalaType());
 				}
 				if (defaultParams) {
 					a(" = ");
-					if      (defaultFromEmpty)      { a("empty."); a(p.name.quote());    }
-					else if (p.type.isSingleValue()){ a("this.");  a(p.name.quote());    }
-					else                            { a("this.");  a(p.name.quote("0")); }
+					if      (defaultFromEmpty) { a("empty."); a(p.name.quote());    }
+					else if (p.lazyInit())     { a("this.");  a(p.name.quote("0")); }
+					else                       { a("this.");  a(p.name.quote());    }
 				}
 			}
 		}
 		function fieldDefinition(p : Property, protectedOnly = false) {
-			if (!p.type.lazyInit() || !protectedOnly) {
-				a(!p.type.lazyInit()? "  val " : "  def "); a(p.name.quote());
-				spaces(longestFieldNameLength - p.name.quote().length); a(" : "); a(p.type.scalaType().name);
+			if (!p.lazyInit() || !protectedOnly) {
+				a(!p.lazyInit()? "  val " : "  def "); a(p.name.quote());
+				spaces(longestFieldNameLength - p.name.quote().length); a(" : "); a(p.scalaType());
 			}
-			if (p.type.lazyInit()) {
-				if (!protectedOnly) a(";"); a("  protected var "); a(p.name.quote('0')); a(": "); a(p.type.scalaType().name);
+			if (p.lazyInit()) {
+				if (!protectedOnly) a(";"); a("  protected var "); a(p.name.quote('0')); a(": "); a(p.scalaType());
 			}
 		}
 
@@ -282,11 +282,11 @@ import prime.types.ValueTypes._;
 			}
 			switch(p.type)
 			{
-				case Tdef(p):
+				case Tdef(pt):
 					onlyBooleans = onlyDoubles = onlyIntegers = false;
-					switch(p) {
+					switch(pt) {
 						case Tenum (_):
-						case Tclass(_): leafNode = false;
+						case Tclass(_): if (!p.isReference()) leafNode = false;
 					}
 
 				case Tarray(t,_,_):
@@ -390,7 +390,7 @@ trait ")); a(def.name); a(" extends ");
 			a("  def voManifest  = "); a(def.name); a(".manifest\n\n");
 
 			// Lazy getters
-			for (p in fields) if (p.type.lazyInit())
+			for (p in fields) if (p.lazyInit())
 			{
 				function p0() { a(p.name); ac("0".code); }
 
@@ -408,7 +408,7 @@ trait ")); a(def.name); a(" extends ");
 				if (!leafNode) { a("    val empty = "); a(def.name); a(".empty;\n"); }
 				for (p in fields)
 				{
-					if (!p.type.lazyInit()) {
+					if (!p.lazyInit()) {
 						a("    if ((voIndexSet"); if (!leafNode) spaces(longestSubFieldNameLength - 6); a(" & 0x"); a(StringTools.hex(1 << p.bitIndex(), 8)); a(") > 0)"); if (!leafNode) spaces(longestSubFieldNameLength - 8);
 					} else {
 						a("    if ("); if (p.isArray()) a("!"); a("this."); a(p.name.quote()); spaces(IntMath.max(6, longestSubFieldNameLength) - p.name.quote().length);
@@ -416,7 +416,7 @@ trait ")); a(def.name); a(" extends ");
 						spaces(IntMath.max(8, longestSubFieldNameLength) - p.name.quote().length);
 					}
 					a(" f(voField."); a(p.name.quote()); ac(",".code); spaces(longestFieldNameLength - p.name.quote().length); a(" this.");
-					a(p.name.quote(p.type.isSingleValue()? null : "0"));
+					a(p.name.quote(p.lazyInit()? "0" : null));
 					a(");\n");
 				}
 				a("  }\n");
@@ -427,7 +427,7 @@ trait ")); a(def.name); a(" extends ");
 				if (fields.length > 1) {
 					// def voIndexSet
 					a("\n  override def voIndexSet = initIndexSet");
-					for (p in fields) if (!p.type.isSingleValue()) {
+					for (p in fields) if (p.lazyInit()) {
 						a(" | (if (this."); a(p.name.quote());
 						if (p.type.isArray()) a(" isEmpty"); else {
 							a(" == "); a(def.name); a(".empty."); a(p.name.quote());
@@ -440,14 +440,14 @@ trait ")); a(def.name); a(" extends ");
 				// def realized, isRealized
 				a("\n  def isRealized =   ");
 				var first = true;
-				for (p in fields) if (!p.type.isSingleValue()) {
+				for (p in fields) if (p.lazyInit()) {
 					if (!first) a(" && "); else first = false;
 					a("this."); a(p.name); a("0 != null");
 				}
 				a(";\n");
 
 				a("  def realized   = { ");
-				for (p in fields) if (p.type.lazyInit()) {
+				for (p in fields) if (p.lazyInit()) {
 					a("this."); a(p.name.quote()); a(!p.type.isSingleValue()? (p.type.isArray()? ".foreach(_.realized); " : ".realized; ") : "; ");
 				}
 				a("self }\n\n");
@@ -517,7 +517,7 @@ trait ")); a(def.name); a(" extends ");
 					for (p in fields)
 					{
 						var bitFlag  = propFlag(p);
-						var isObj    = p.type.lazyInit();
+						var isObj    = p.lazyInit();
 						var s        = longestFieldNameLength    - p.name.quote().length;
 						var os       = longestSubFieldNameLength - p.name.quote().length;
 						var nanCheck = switch (p.type) {
@@ -537,7 +537,7 @@ trait ")); a(def.name); a(" extends ");
 						spaces(s);
 						a(") voEmptied |= "); a(bitFlag); a("; }");
 
-						if (p.type.lazyInit()) {
+						if (p.lazyInit()) {
 							a(" else if ("); a(p.name.quote()); a(" == null)"); a(" voLazy |= "); a(bitFlag);
 						}
 						a(";\n");
@@ -553,7 +553,7 @@ trait ")); a(def.name); a(" extends ");
 		  		else // fields.length == 1
 		  		{
 		  			var p = fields[0];
-		  			var isObj = p.type.lazyInit();
+		  			var isObj = p.lazyInit();
 		  			ifFieldDiff(p,0,0,isObj); a(" {\n      val empty = "); a(def.name); a(".empty;\n  ");
 		  			ifFieldDiff(p,0,0,isObj, "empty"); a(" new "); a(def.name); a("VO(voRoot, "); copyPrototype(false,false); a(").asInstanceOf[this.type]
       else empty.asInstanceOf[this.type];\n    }\n    else this;\n  }\n");
@@ -561,10 +561,10 @@ trait ")); a(def.name); a(" extends ");
 
 				a("  override def conj(voSource : ValueSource, newRoot : ValueSource) : this.type = { val voField = "); a(def.name); a(".field; val empty = "); a(def.name); a(".empty;");
 
-				if (!leafNode) for (p in fields) if (p.type.lazyInit())
+				if (!leafNode) for (p in fields) if (p.lazyInit())
 	      		{
 	      			a("\n    val "); a(p.name.quote()); a(" = ");
-	      			if (p.type.isArray() && p.type.lazyInit()) {
+	      			if (p.type.isArray() && p.lazyInit()) {
 						a("try (if (voSource != newRoot) "); a(p.type.scalaConversionExpr(anyAt(p, true))); a(" else if (this.voSource == ValueSource.empty) null else "); a(p.name); a("0)");
 						a(" catch { case NoInputException => empty."); a(p.name.quote()); a(" };");
 					}
@@ -576,20 +576,24 @@ trait ")); a(def.name); a(" extends ");
 				a("\n    this.copy(\n");
 	      		for (p in fields)
 	      		{
-	      			a("      "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" = "); if (!p.type.lazyInit()) a("try ");
+	      			a("      "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" = "); if (!p.lazyInit()) a("try ");
 	      			switch (p.type) {
 	      				case Tinteger(_,_,_): a(   intAt(p, true));
 						case Tdecimal(_,_,_): a(doubleAt(p, true));
 						case Tbool(_):        a(  boolAt(p, true));
 						default:
-							if (!p.type.lazyInit()) {
+							if (p.isReference()) {
+								var idType = p.type.getPTypedef().unpackPTypedef().as(ClassDef).getIDPropertyFromTWithProperties().type;
+								a("    VORef("); a(anyAt(p, true)); a(")("); a(p.type.scalaType().name); a(", "); a(idType.scalaConversionExpr()); a(")");
+							}
+							else if (!p.lazyInit()) {
 								a(p.type.scalaConversionExpr(anyAt(p, true)));
 							}
 							else {
 								a(p.name.quote()); a(",\n");
 							}
 	      			}
-	      			if (!p.type.lazyInit()) {
+	      			if (!p.lazyInit()) {
 	      				a(" catch { case NoInputException => empty."); a(p.name.quote()); a(" },\n");
 	      			}
 	      		}
@@ -600,7 +604,7 @@ trait ")); a(def.name); a(" extends ");
 					switch(p.type) {
 						case TenumConverter(_), Temail, Tdatetime, Tdate, Tcolor, TclassRef(_), TfileRef, Turl, Turi, TuniqueID, Tinterval, Tstring, Tdef(_), Tarray(_):
 							var name = p.name.quote();
-							a("(if ("); a(name); a(" != null) "); a(name); a(" else this."); a(p.name.quote(p.type.lazyInit()? "0" : null)); ac(")".code);
+							a("(if ("); a(name); a(" != null) "); a(name); a(" else this."); a(p.name.quote(p.lazyInit()? "0" : null)); ac(")".code);
 
 						case Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_):
 							a(p.name.quote());
@@ -627,7 +631,9 @@ trait ")); a(def.name); a(" extends ");
 			for (p in fields)
 			{
 				a(", ");
-				if (!p.type.isTclass())
+				if (p.isReference())
+					a("null");
+				else if (!p.type.isTclass())
 					writeValueLiteral(p.type, p.defaultValue);
 				else {
 					a(p.type.scalaType().name); a(".empty");
@@ -643,23 +649,26 @@ trait ")); a(def.name); a(" extends ");
 		}
 		// object manifest
 		function manifestFieldType(p:Property) {
-			a(!p.type.isTclass()? "ValueObjectField[" : "VOValueObjectField["); a(def.name);
-			if (p.type.isTclass()) { a(", "); a(p.type.scalaType().name); }
+			var voField = !p.isReference() && p.type.isTclass();
+			a(!voField? "ValueObjectField[" : "VOValueObjectField["); a(def.name);
+			if (voField) { a(", "); a(p.type.scalaType().name); }
 			a("]");
 		}
 		a("  object field {\n");// type ID
 		for (p in fields) if (p.definedIn == def)
 		{
+			var voField = !p.isReference() && p.type.isTclass();
+
 			a("    object "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" extends "); manifestFieldType(p);
 			a("(0x"); a(StringTools.hex(p.propertyID())); a(", '"); a(p.name); a(", ");
 
-			if (!p.type.isTclass()) {
+			if (p.isReference() || !p.type.isTclass()) {
 				addFieldTypeConstructor(p.type, p.isReference());
 				a(", ");
 			}
 
 			if (def.isMixin) {
-				if (!p.type.isTclass())
+				if (!voField)
 					writeValueLiteral(p.type, p.defaultValue);
 				else {
 					a(p.type.scalaType().name); a(".empty");
@@ -668,9 +677,8 @@ trait ")); a(def.name); a(" extends ");
 			else {
 				a("empty");  if (p.type.getPTypedef().unpackPTypedef() != def){ ac('.'.code); a(p.name.quote()); }
 			}
-			if (p.type.isTclass()) a(", " + p.isReference());
 
-			a(") { def apply(vo: "); a(def.name); a("): "); a(!p.type.isTclass()? "Any" : p.type.scalaType().name); a(" = vo."); a(p.name.quote()); a("; }\n");
+			a(") { def apply(vo: "); a(def.name); a("): "); a(!voField? "Any" : p.type.scalaType().name); a(" = vo."); a(p.name.quote()); a("; }\n");
 		} else {
 			a("    val    "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" = ");
 			a(p.definedIn.fullName); a(".field."); a(p.name.quote()); a(";\n");

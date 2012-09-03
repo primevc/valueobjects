@@ -1,6 +1,5 @@
 package prime.types;
  import prime.vo._;
- import prime.vo.{ValueObjectCompanion => IVOC};
  import org.joda.time.format.{DateTimeFormatter, ISODateTimeFormat}
  import org.msgpack.`object`._
  import prime.utils.msgpack.MessagePackObjectId;
@@ -288,7 +287,7 @@ object Conversion
   def Vector[T] (value:Traversable[_])  (implicit converter : Any => T) : IndexedSeq[T] = value.map(converter).toIndexedSeq
 
   def Vector[T](value:Any)(implicit converter : Any => T) : IndexedSeq[T] = unpack(value) match {
-    case v:Array[_]       => v.map(converter)
+    case v:Array[_]       => v.map(converter).toIndexedSeq
     case v:ArrayType      => Vector(v)
     case v:Traversable[_] => Vector(v)
     case None             => throw NoInputException;
@@ -300,14 +299,7 @@ object Conversion
 
   //  -------
 
-  implicit def vo2ref[V <: ValueObject with ID](vo : V)                              : VORef[V] = new VORefImpl(vo._id, vo);
-  implicit def id2ref[V <: ValueObject with ID](id : V#IDType)(implicit V : IVOC[V]) : VORef[V] = new VORefImpl(id, V.empty);
-
-  def VORef [V <: ValueObject with ID](value : Any)  (implicit V : IVOC[V], vo_IDType_converter : Any => V#IDType) : VORef[V] = unpack(value) match {
-    case V(value) => vo2ref(value)
-    case None     => throw NoInputException;
-    case value    => try id2ref(vo_IDType_converter(value))(V) catch { case FailureException => vo_ref.invoke(value, V).asInstanceOf[VORef[V]]; }
-  }
+  implicit def vo2ref[V <: ValueObject with ID](vo : V) : VORef[V] = if (vo._id != vo.voCompanion.empty.asInstanceOf[V]._id) new VORefImpl(vo._id, vo) else null;
 
   //  -------
 
@@ -329,7 +321,7 @@ object Conversion
 object ClojureProtocolVars
 {
   import clojure.lang.{RT, IFn}
-  RT.loadResourceScript("prime/vo/valuetype.clj");
+  RT.loadResourceScript("prime/types.clj");
 
   val unique_id = RT.`var`("prime.types", "to-UniqueID" );
   val string    = RT.`var`("prime.types", "to-String"   );

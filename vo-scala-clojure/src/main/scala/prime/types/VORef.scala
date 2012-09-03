@@ -3,6 +3,7 @@ package prime.types;
  import prime.types._
  import prime.vo.util.ClojureFn
  import clojure.lang.{IDeref, IBlockingDeref, IPending, IFn, ISeq, RT};
+ import prime.vo.{ValueObjectCompanion => IVOC};
 
 
 trait VORef[V <: ValueObject with ID] {
@@ -12,6 +13,21 @@ trait VORef[V <: ValueObject with ID] {
   def apply (vo : V);
   def     ? (implicit voProxy : V#IDType => Option[V]) : Option[V];
   def   get : V;
+}
+
+object VORef {
+  import Conversion._
+  import ClojureProtocolVars._
+
+  def apply [V <: ValueObject with ID, IDType <: V#IDType](value : Any)(implicit V : IVOC[V], IDType : Any => IDType) : VORef[V] = unpack(value) match {
+    case r:VORefImpl[V] => assert(r._cached.getClass eq V.empty.getClass); r
+    case r:  Ref[_] => new VORefImpl(r.ref, V.valueOf(r.vo_!));
+    case V(value)   => vo2ref(value)
+    case None       => throw NoInputException;
+    case value      => try VORef(V, IDType(value)) catch { case FailureException => vo_ref.invoke(value, V).asInstanceOf[VORef[V]]; }
+  }
+
+  def apply [V <: ValueObject with ID, IDType <: V#IDType](V : IVOC[V], id : IDType) : VORef[V] = if (id != V.empty._id) new VORefImpl(id, V.empty) else null;
 }
 
 protected[prime] object VORefImpl {
@@ -65,4 +81,10 @@ protected[prime] final class VORefImpl[V <: ValueObject with ID](val _id:V#IDTyp
     case 1 => invoke(arglist.first);
     case n => throwArity(n);
   }
+
+  override def equals (other : Any) = (other.asInstanceOf[AnyRef] eq this) || (other match {
+    case o : VORefImpl[V] => o._id == this._id;
+    case o : VORef[V]     => try { o.get._id == this.get._id } catch { case _ => false; }
+    case _ => false;
+  })
 }

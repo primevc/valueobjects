@@ -10,8 +10,8 @@ class MutableVOValueSource(vo : MutableValueObject) extends ValueSource with NoP
     try voc.field(if (idx < 32) idx else if (idx > 0x010000) idx & 0xFF else -1) catch { case _ => 
     null }}
   }
-  def contains (name: String, idx: Int)                : Boolean = field(name,idx) match { case null => false;    case f:Field => vo.fieldIsSet_?(f.name) }
-  def anyAt    (name: String, idx: Int, notFound: Any) : Any     = field(name,idx) match { case null => notFound; case f:Field => vo.voCompanion.getValue(vo, f.name.name) }
+  def contains (name: String, idx: Int)                : Boolean = field(name,idx) match { case f:Field => vo.fieldIsSet_?(f.name);                                             case null => false; }
+  def anyAt    (name: String, idx: Int, notFound: Any) : Any     = field(name,idx) match { case f:Field if vo.fieldIsSet_?(f.name) => vo.voCompanion.getValue(vo, f.name.name); case _ => notFound; }
 }
 
 object MutableVOValueSource {

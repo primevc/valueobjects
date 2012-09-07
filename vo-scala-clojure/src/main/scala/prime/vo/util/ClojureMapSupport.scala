@@ -105,8 +105,17 @@ trait ClojureMapSupport extends IPersistentMap
         if (vo.getClass == this.getClass && (this.initIndexSet & voManifest.eagerIndexMask) != (vo.initIndexSet & voManifest.eagerIndexMask)) {
           false;
         }
-        else {
-          foreach { (field, value) => if (value != field(vo)) return false; }
+        else
+        {
+          val selfT = this.voManifest.VOType.erasure;
+          val   voT = vo  .voManifest.VOType.erasure;
+          if      (selfT.isAssignableFrom(voT))
+            this.foreach { (field, value) => if (value != field(vo)                          ) return false; }
+          else if (voT.isAssignableFrom(selfT))
+            vo  .foreach { (field, value) => if (value != field(this.asInstanceOf[vo.VOType])) return false; }
+          else
+            return false;
+
           vo.count == this.count;
         }
 

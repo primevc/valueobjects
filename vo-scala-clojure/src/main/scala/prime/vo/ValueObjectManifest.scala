@@ -88,9 +88,9 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
   val VOType : Manifest[VOType] = implicitly[Manifest[VOType]];
 
   protected val fields : Array[_ <: ValueObjectField[VOType]];
-  val first          = fields(0);
-  val lazyIndexMask  = fields.foldLeft(0) { (mask,field) => mask | (if (field isLazy) 1 << index(field) else 0) }
-  val fieldIndexMask = fields.foldLeft(0) { (mask,field) => mask | (1 << index(field))                          }
+  val first          = fields  .find(_ != null).get;
+  val lazyIndexMask  = fields.filter(_ != null).foldLeft(0) { (mask,field) => mask | (if (field isLazy) 1 << index(field) else 0) }
+  val fieldIndexMask = fields.filter(_ != null).foldLeft(0) { (mask,field) => mask | (1 << index(field))                          }
   val eagerIndexMask = fieldIndexMask ^ lazyIndexMask;
   val lastFieldIndex = index(fields.last);
 
@@ -178,9 +178,9 @@ abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protecte
   override def apply(vo : VO) : T;
 
   def apply(self:VO, src:ValueSource, root:ValueSource, lazyVar:T): T = apply(src, None) match {
-    case None => if (root != self.voSource) /*eager*/ apply(self) else /*lazy*/ lazyVar;
     case null => defaultValue;
     case v: T => v;
+    case None => if (root != self.voSource) /*eager*/ apply(self) else /*lazy*/ lazyVar;
 
     case ValueSource(vo) =>
       if (root != src) /*eager convert to T*/ voCompanion(vo);

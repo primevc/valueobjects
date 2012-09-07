@@ -13,6 +13,7 @@ trait VORef[V <: ValueObject with ID] {
   def apply (vo : V);
   def     ? (implicit voProxy : V#IDType => Option[V]) : Option[V];
   def   get : V;
+  val   _id : V#IDType;
 }
 
 object VORef {

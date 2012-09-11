@@ -10,12 +10,15 @@
 (defn companion-object-symbol [^Class votrait]
   (symbol (str (.getName votrait) "$") "MODULE$"))
 
-(defmacro default-value [votrait prop]
+(defmacro field-object [votrait prop]
   (let [field-obj (symbol (str (.getName votrait) "$field$"))]
     (if (empty? (filter #(= (name prop) (.getName %)) (.getDeclaredFields (eval field-obj))))
-      `(.. ~(symbol (str field-obj prop "$") "MODULE$") ~'defaultValue)
+      `~(symbol (str field-obj prop "$") "MODULE$")
     #_else
-      `(.. ~(symbol (str field-obj) "MODULE$") ~prop ~'defaultValue))))
+      `(.. ~(symbol (str field-obj) "MODULE$") ~prop))))
+
+(defmacro default-value [votrait prop]
+  `(. (field-object ~votrait ~prop) ~'defaultValue))
 
 (defn vo-converterfn-expr [^Class votrait fn-name]
   `(defn ~fn-name 
@@ -51,7 +54,11 @@
       value-expr)))
 
 (defn vo-constructor-arglist-from-map [^Class votrait props]
-  (map #(macroexpand `(let [~'v (~% ~'value-map)] (if ~'v ~'v '~(default-value-expr votrait %)))) props))
+  (map #(macroexpand
+    `(let [~'v (~% ~'value-map)]
+      (if  ~'v (macroexpand `(.. ~(macroexpand `(field-object ~~votrait ~(symbol (name ~%)))) valueType (convert ~~'v)))
+        #_else '~(default-value-expr votrait %)
+      ))) props))
 
 (defn eval? [expr]
   "Returns the result of `(eval expr)` or false if any Exception is thrown."

@@ -10,36 +10,48 @@
 (defn companion-object-symbol [^Class votrait]
   (symbol (str (.getName votrait) "$") "MODULE$"))
 
-(defn manifest-object-symbol [^Class votrait]
-  (symbol (.. (eval (companion-object-symbol votrait)) manifest getClass getName) "MODULE$"))
-
 (defmacro default-value [votrait prop]
-  `(.. ~(manifest-object-symbol (eval votrait)) ~prop ~'defaultValue))
-
-(defn vo-constructor-expr [^Class votrait values]
-  `(.apply ~(companion-object-symbol votrait) ~@values))
+  (let [field-obj (symbol (str (.getName votrait) "$field$"))]
+    (if (empty? (filter #(= (name prop) (.getName %)) (.getDeclaredFields (eval field-obj))))
+      `(.. ~(symbol (str field-obj prop "$") "MODULE$") ~'defaultValue)
+    #_else
+      `(.. ~(symbol (str field-obj) "MODULE$") ~prop ~'defaultValue))))
 
 (defn vo-converterfn-expr [^Class votrait fn-name]
   `(defn ~fn-name 
-    ([value#] (.apply ~(companion-object-symbol votrait) value#))))
+    ([value#] (.valueOf ~(companion-object-symbol votrait) value#))))
 
 (defn literal-value?
   "Returns true  for literal values like booleans, strings and numbers.
-           false for ValueObjects and vectors."
+           false for ValueObjects and vectors.
+  Literals:
+    Strings - Enclosed in \"double quotes\". May span multiple lines. Standard Java escape characters are supported.
+    Numbers - as per Java, plus indefinitely long integers are supported, as well as ratios, e.g. 22/7. Floating point numbers with an M suffix are read as BigDecimals. Integers can be specified in any base supported by Integer.parseInt(), that is any radix from 2 to 36; for example 2r101010, 8r52, 36r16, and 42 are all the same Integer.
+    Characters - preceded by a backslash: \\c. \\newline, \\space and \\tab yield the corresponding characters.
+    nil Means 'nothing/no-value'- represents Java null and tests logical false
+    Booleans - true and false
+    Keywords"
   [value]
-  (not (or (instance? java.lang.Iterable   value)
-           (instance? ValueObject value))))
+  (or (nil?     value)
+      (string?  value)
+      (number?  value)
+      (char?    value)
+      (true?    value)
+      (false?   value)
+      (symbol?  value)
+      (keyword? value)
+  ))
 
 (defn default-value-expr [^Class votrait ^clojure.lang.Keyword prop]
-  (let [value-expr `(default-value ~votrait ~(.sym prop))
-        value       (eval value-expr)]
+  (let [value-expr (macroexpand `(default-value ~votrait ~(.sym prop)))
+        value      (eval value-expr)]
     (if (literal-value? value)
       value
     ; literal, return the path to the default value to prevent garbage objects
       value-expr)))
 
-(defn vo-constructor-arglist-from-map [^Class votrait value-map & props]
-  (map #(if-let [v (% value-map)] v (default-value-expr votrait %)) props))
+(defn vo-constructor-arglist-from-map [^Class votrait props]
+  (map #(macroexpand `(let [~'v (~% ~'value-map)] (if ~'v ~'v '~(default-value-expr votrait %)))) props))
 
 (defn eval? [expr]
   "Returns the result of `(eval expr)` or false if any Exception is thrown."
@@ -52,25 +64,20 @@
   ([expr then]      `(when (eval? ~expr) ~then))
   ([expr then else] `(if   (eval? ~expr) ~then ~else)))
 
-(defconstrainedfn defvo-body
-  [^Class votrait runtime-constructor props] [(class? votrait) (symbol? runtime-constructor)
-                                              (sequential? props) (every? keyword? props)
-                                              =>
-                                              list?]
-  (let [value-map (gensym "value-map")]
-    (list [value-map]
-        (list `if-evals value-map
-          `;(do (println "compile time constructor")
-            (vo-constructor-expr ~votrait (vo-constructor-arglist-from-map ~votrait ~value-map ~@props));)
-          ; Runtime map: return fn instead
-          `;(do (println "runtime constructor")
-            `(~~runtime-constructor ~~value-map);)
-        ))))
-
 
 ;
 ; VO definition macro
 ;
+
+(defconstrainedfn defvo-body
+  [^Class votrait runtime-constructor props] [(class? votrait) (symbol? runtime-constructor)
+                                              (sequential? props) (every? keyword? props)]
+  (let [args (vo-constructor-arglist-from-map votrait props)]
+    `(if-evals ~'value-map
+      (list '.apply '~(companion-object-symbol votrait) ~@args);)
+    ;else: Runtime argument; return fn instead
+      (~runtime-constructor ~'value-map);)
+    )))
 
 (defmacro defvo
   "Defines a VO-literal macro and converter fn inside the namespace of the given trait's package.
@@ -86,11 +93,12 @@
   (let [votrait             (eval votrait-expr)
         macroname           (symbol (.getSimpleName votrait))
         converterfn-name    (symbol (str "to-" (.getSimpleName votrait)))
-        runtime-constructor (vo-converterfn-expr votrait converterfn-name)]
+        runtime-constructor (vo-converterfn-expr votrait converterfn-name)
+        macro-body          (defvo-body votrait converterfn-name props)]
     (assert (class? votrait) "votrait must be a VO trait/interface")
     `(binding [*ns* (create-ns '~(symbol (.. votrait getPackage getName)))]
       (eval '~runtime-constructor)
       (eval '(defmacro ~macroname
         ([] ~converterfn-name)
-        ~(defvo-body votrait converterfn-name props)))
+        ([~'value-map] ~macro-body)))
   )))

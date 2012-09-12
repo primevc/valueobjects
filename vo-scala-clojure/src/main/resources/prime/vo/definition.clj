@@ -67,10 +67,6 @@
       ;(do (println "evals=false" e#)
           false)));)
 
-(defmacro if-evals 
-  ([expr then]      `(when (eval? ~expr) ~then))
-  ([expr then else] `(if   (eval? ~expr) ~then ~else)))
-
 
 ;
 ; VO definition macro
@@ -80,10 +76,10 @@
   [^Class votrait runtime-constructor props] [(class? votrait) (symbol? runtime-constructor)
                                               (sequential? props) (every? keyword? props)]
   (let [args (vo-constructor-arglist-from-map votrait props)]
-    `(if-evals ~'value-map
+    `(if (or (eval? ~'value-map) (map? ~'value-map))
       (list '.apply '~(companion-object-symbol votrait) ~@args);)
     ;else: Runtime argument; return fn instead
-      (~runtime-constructor ~'value-map);)
+      `(~~runtime-constructor ~~'value-map);)
     )))
 
 (defmacro defvo

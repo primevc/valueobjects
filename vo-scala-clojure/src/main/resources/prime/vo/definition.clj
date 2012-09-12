@@ -7,12 +7,16 @@
   (:import (prime.vo ValueObject)))
 
 
-(defn companion-object-symbol [^Class votrait]
-  (symbol (str (.getName votrait) "$") "MODULE$"))
+(defn companion-object-symbol [votrait]
+  (if (class? votrait)
+    (symbol (str (.getName ^Class votrait) "$") "MODULE$")
+  #_else
+    (symbol (.getName (class (.voCompanion ^ValueObject votrait))) "MODULE$")))
 
 (defmacro field-object [votrait prop]
-  (let [field-obj (symbol (str (.getName votrait) "$field$"))]
-    (if (empty? (filter #(= (name prop) (.getName %)) (.getDeclaredFields (eval field-obj))))
+  (let [field-obj (symbol (str (.getName ^Class votrait) "$field$"))]
+    ;(println "Searching for field-object" votrait prop "in" field-obj)
+    (if (empty? (filter #(= (name prop) (.getName ^java.lang.reflect.Field %)) (.getDeclaredFields ^Class (eval field-obj))))
       `~(symbol (str field-obj prop "$") "MODULE$")
     #_else
       `(.. ~(symbol (str field-obj) "MODULE$") ~prop))))
@@ -54,9 +58,9 @@
       value-expr)))
 
 (defn vo-constructor-arglist-from-map [^Class votrait props]
-  (map #(macroexpand
+  (map #(do
     `(let [~'v (~% ~'value-map)]
-      (if  ~'v (macroexpand `(.. ~(macroexpand `(field-object ~~votrait ~(symbol (name ~%)))) valueType (convert ~~'v)))
+      (if  ~'v `(.. ~(macroexpand `(field-object ~~votrait ~(symbol (name ~%)))) ~'~'valueType (convert ~~'v))
         #_else '~(default-value-expr votrait %)
       ))) props))
 
@@ -72,12 +76,29 @@
 ; VO definition macro
 ;
 
+(defn intern-vo-expr "Creates a var using (intern ..) and returns the symbol of it" [^ValueObject vo]
+  (if (empty? vo)
+    (list '.empty (companion-object-symbol vo))
+  #_else
+    (let [obj-ns-sym  (.getName ^clojure.lang.Namespace (create-ns (symbol (str (.. vo getClass getPackage getName) ".-interned"))))
+          intern-name (str (.. vo getClass getSimpleName) (.hashCode vo))
+          ^clojure.lang.Var
+          interned    (or
+            (resolve (symbol (.getName obj-ns-sym) intern-name))
+            (do ;(println "interning" obj-ns-sym intern-name)
+              (intern obj-ns-sym (symbol intern-name) vo)))]
+      (symbol (str (.ns interned)) (str (.sym interned))))))
+
 (defconstrainedfn defvo-body
   [^Class votrait runtime-constructor props] [(class? votrait) (symbol? runtime-constructor)
                                               (sequential? props) (every? keyword? props)]
   (let [args (vo-constructor-arglist-from-map votrait props)]
-    `(if (or (eval? ~'value-map) (map? ~'value-map))
-      (list '.apply '~(companion-object-symbol votrait) ~@args);)
+    `(if (or (map? ~'value-map) (eval? ~'value-map))
+      (let [~'construct-expr# (list '.apply '~(companion-object-symbol votrait) ~@args)
+            ~'instance# (eval? ~'construct-expr#)]
+        (if ~'instance#
+          (intern-vo-expr ~'instance#)
+          ~'construct-expr#))
     ;else: Runtime argument; return fn instead
       `(~~runtime-constructor ~~'value-map);)
     )))
@@ -93,12 +114,14 @@
     (defvo vo.Point :x :y)  ; Creates the macro Point and conversion fn to-Point.
     (Point{:x 1 :y 2})      ; Instantiates a PointVO."
     [votrait-expr & props]
-  (let [votrait             (eval votrait-expr)
+  (assert (class? (eval votrait-expr)) "votrait must be a VO trait/interface")
+  (let [^Class votrait      (eval votrait-expr)
+        empty-vo-instance   (eval (list '.empty (companion-object-symbol votrait)))
         macroname           (symbol (.getSimpleName votrait))
         converterfn-name    (symbol (str "to-" (.getSimpleName votrait)))
         runtime-constructor (vo-converterfn-expr votrait converterfn-name)
         macro-body          (defvo-body votrait converterfn-name props)]
-    (assert (class? votrait) "votrait must be a VO trait/interface")
+    (assert (not (nil? empty-vo-instance)))
     `(binding [*ns* (create-ns '~(symbol (.. votrait getPackage getName)))]
       (eval '~runtime-constructor)
       (eval '(defmacro ~macroname

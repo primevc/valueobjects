@@ -2098,6 +2098,8 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		{
 			var opt:Dynamic = Reflect.field(obj, name);
 			switch (name) {
+				case "desc":
+					this.description = Std.string(opt);
 				case "mongo_proxied":
 					if (!Std.is(opt, MongoProxyType)) throw "'"+ opt +"' is not a MongoProxyType.\n[!] mongo_proxied requires MongoProxyType configuration value: none, singleType or typeCast.";
 					this.settings.mongo_proxied = opt;

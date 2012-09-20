@@ -1,5 +1,4 @@
 package primevc.core.traits;
- import com.mongodb.casbah.Imports._
  import prime.types._
  import prime.types.ValueTypes._
  import prime.utils.msgpack.MutableVOPacker

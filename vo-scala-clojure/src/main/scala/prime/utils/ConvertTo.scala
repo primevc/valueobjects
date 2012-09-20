@@ -5,7 +5,6 @@ import prime.types._
 import prime.vo.mutable._
 import _root_.org.joda.time.format.{DateTimeFormatter, ISODateTimeFormat}
 import javax.mail.internet.InternetAddress
-import com.mongodb.casbah.Imports._
 import org.joda.time.{DateMidnight, DateTime, Interval}
 import java.util.{Locale, Date}
 import java.lang.Integer.parseInt
@@ -81,13 +80,6 @@ object ConvertTo
     case v:ArrayType      => array[T](v.asArray)
     case v:String         => toArray[T](v.split(splitStringOn))
     case v:Traversable[_] => toArray[T](v)
-
-    case v:BasicDBList =>
-      val s = JavaConversions.asScalaSet(v.keySet).iterator.map({ k =>
-        val x = v.get(k.asInstanceOf[String]);
-      }).toTraversable
-      toArray[T](s)
-
     case _ => throw new Exception("Don't know what to do with: " + value.toString)
   }
 
@@ -139,7 +131,6 @@ object ConvertTo
   def interval      (value:Any) : Interval = unpack(value) match {
     case v:Interval => v
     case v:Array[_] => new Interval(datetime(v(0)), datetime(v(1)));
-    case v:DBObject if (v.get("s") != null && v.get("e") != null) => new Interval(datetime(v.get("s")), datetime(v.get("e")));
     case None => null
   }
 

@@ -18,6 +18,15 @@
 (defprotocol To-FileRef   (to-FileRef   [in]))
 (defprotocol To-VORef     (to-VORef     [in ref-target--companion]))
 
+(defprotocol FileRepository
+  (^FileRefOutputStream create [this])
+  (^Boolean             exists [this ^FileRef ref  ])
+  (^URI                 toURI  [this ^FileRef ref  ])
+  (^FileRef             absorb [this ^File    file ])
+  (^InputStream         stream [this ^FileRef ref  ])
+
+  (^FileRef             store  [this writer]))
+
 (comment
 ;
 ;  Many composite types like URI, FileRef, UniqueID and Date could become VOs eventually.

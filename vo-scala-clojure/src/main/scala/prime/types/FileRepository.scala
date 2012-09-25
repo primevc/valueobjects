@@ -15,7 +15,7 @@ trait FileRefOutputStream extends OutputStream {
 
 trait FileRepository {
   def exists (ref : FileRef): Boolean
-  def toURI(instance : FileRef): URI
+  def toURI  (ref : FileRef): URI
   def create (): FileRefOutputStream
   def absorb (file : File): FileRef
   def stream (ref : FileRef): InputStream

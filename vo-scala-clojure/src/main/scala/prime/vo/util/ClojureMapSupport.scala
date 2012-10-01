@@ -4,6 +4,14 @@ package prime.vo.util
  import clojure.lang.{Var, RT, Util, Keyword, MapEntry, MapEquivalence}
  import clojure.lang.{ASeq, ISeq, Counted, IPersistentCollection, IPersistentMap, IPersistentVector, IPending, Indexed}
 
+object ClojureSupport {
+  /** Executes field.get and wraps the result if it is a Scala Seq type */
+  def get[T <: ValueObject](field : ValueObjectField[T], obj : T): AnyRef = field(obj) match {
+    case v:scala.collection.Seq[Any] => ScalaSeqWrapper(v)(field.valueType.convert);
+    case v:AnyRef => v;
+  }
+}
+
 trait ClojureMapSupport extends IPersistentMap
  with MapEquivalence
  with ClojureFn
@@ -42,7 +50,7 @@ trait ClojureMapSupport extends IPersistentMap
   final def entryAt(key: Any) = try {
     val i = voManifest.index_!(key);
     val f = voManifest(i);
-    new MapEntry(f.keyword, f.get(self));
+    new MapEntry(f.keyword, ClojureSupport.get(f,self));
   } catch {
     case ValueObjectManifest.NoSuchFieldException => null
   }
@@ -89,7 +97,7 @@ trait ClojureMapSupport extends IPersistentMap
                   else null;
                 }
       
-      if(foundKey == null || !Util.equiv(value, m.get(foundKey)))
+      if(foundKey == null || value != m.get(foundKey))
         return false;
     }
    
@@ -149,7 +157,7 @@ trait ClojureMapSupport extends IPersistentMap
     import java.lang.Integer._
 
     def field = voManifest(index);
-    def first = new MapEntry(field.keyword, field(self));
+    def first = new MapEntry(field.keyword, ClojureSupport.get(field,self));
     def next  = if (bits != 0) {
       val nextOffset = 1 + numberOfTrailingZeros(bits);
       val newBits = bits >>> nextOffset;
@@ -243,6 +251,6 @@ trait ClojureMapSupport extends IPersistentMap
   // ---
   // Indexed
   // ---
-  final def nth(index : Int) = voManifest(index).get(self).asInstanceOf[AnyRef];
+  final def nth(index : Int) = ClojureSupport.get(voManifest(index), self);
   final def nth(index : Int, notFound:AnyRef) = if (this.contains(index)) this.nth(index) else notFound;
 }

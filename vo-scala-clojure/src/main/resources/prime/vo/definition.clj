@@ -14,7 +14,8 @@
     (symbol (.getName (class (.voCompanion ^ValueObject votrait))) "MODULE$")))
 
 (defmacro field-object [votrait prop]
-  (let [field-obj (symbol (str (.getName ^Class votrait) "$field$"))]
+  (let [field-obj (symbol (str (.getName ^Class votrait) "$field$"))
+        prop      (if (= prop 'values) '_values prop)]
     ;(println "Searching for field-object" votrait prop "in" field-obj)
     (if (empty? (filter #(= (name prop) (.getName ^java.lang.reflect.Field %)) (.getDeclaredFields ^Class (eval field-obj))))
       `~(symbol (str field-obj prop "$") "MODULE$")

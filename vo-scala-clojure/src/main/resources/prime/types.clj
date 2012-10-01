@@ -27,6 +27,8 @@
 
   (^FileRef             store  [this writer]))
 
+(def FileRef prime.types.FileRef$/MODULE$)
+
 (comment
 ;
 ;  Many composite types like URI, FileRef, UniqueID and Date could become VOs eventually.

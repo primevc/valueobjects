@@ -5,7 +5,31 @@
 (ns prime.vo.printer
   "Extends the Clojure printer with formatted printing of ValueObject instances."
   (:import java.io.Writer
+           [prime.types EnumValue FileRef]
            prime.vo.ValueObject))
+
+;
+; Value type printing
+;
+
+(defmethod print-method EnumValue [^EnumValue v, ^Writer w]
+  (let [str (.. v getClass getName (split "\\$"))]
+    (.write w "(")
+    (.write w (get str 0))
+    (.write w "/")
+    (.write w (.substring (get str 1) 1))
+    (when (.isAssignableFrom scala.Product (class v))
+      ; It's a case class with a String parameter
+      (.write w " \"")
+      (.write w (clojure.string/replace (.toString v) "\"" "\\\""))
+      (.write w "\""))
+    (.write w ")")))
+
+(defmethod print-method FileRef   [^FileRef   v, ^Writer w]
+  (.write w "(prime.types/FileRef \"")
+  (.write w (.toString v))
+  (.write w "\")"))
+
 
 ;
 ; VO Printing

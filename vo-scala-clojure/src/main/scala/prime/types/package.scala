@@ -51,7 +51,10 @@ package object types
 
       val keyword          = k(empty.getClass.getPackage.getName, empty.getClass.getSimpleName.dropRight(2).intern);
       override def isLazy  = true;
-      def convert(any:Any) = empty.voCompanion.valueOf(any);
+      def convert(any:Any) = {
+        val vo = empty.voCompanion.valueOf(any);
+        if (ref) vo2ref(vo.asInstanceOf[ValueObject with ID]) else vo;
+      }
     }
     case class Tenum      (t: Enum) extends ValueType {
       val keyword          = k(t.getClass.getPackage.getName, t.getClass.getSimpleName);

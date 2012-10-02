@@ -21,7 +21,7 @@ object VORef {
   import ClojureProtocolVars._
 
   def apply [V <: ValueObject with ID, IDType <: V#IDType](value : Any)(implicit V : IVOC[V], IDType : Any => IDType) : VORef[V] = unpack(value) match {
-    case r:VORefImpl[V] => assert(r._cached.getClass eq V.empty.getClass); r
+    case r:VORefImpl[V] => assert(V.manifest.VOType.erasure.isAssignableFrom(r._cached.getClass), V.empty.getClass+" incompatible with "+r._cached.getClass); r
     case r:  Ref[_] => new VORefImpl(r.ref, V.valueOf(r.vo_!));
     case V(value)   => vo2ref(value)
     case None       => throw NoInputException;

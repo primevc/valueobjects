@@ -2,7 +2,8 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-(ns prime.types)
+(ns prime.types
+  (:use [clojure.lang]))
 
 (defprotocol To-UniqueID  (to-UniqueID  [in]))
 (defprotocol To-String    (to-String    [in] [in format]))
@@ -17,6 +18,18 @@
 (defprotocol To-URI       (to-URI       [in]))
 (defprotocol To-FileRef   (to-FileRef   [in]))
 (defprotocol To-VORef     (to-VORef     [in ref-target--companion]))
+(defprotocol To-Vector    (to-Vector    [in converter]))
+
+(extend-type scala.runtime.AbstractFunction1
+  IFn
+    (invoke [f a] (.apply f a)))
+
+(extend-type clojure.lang.ISeq
+  To-Vector (to-Vector [in converter]
+    (if (empty? in)
+      (scala.collection.immutable.Vector/empty)
+    #_else (.toIndexedSeq (scala.collection.JavaConversions/asScalaIterator
+      (clojure.lang.SeqIterator. (map #(invoke converter %) in)))))))
 
 (defprotocol FileRepository
   (^FileRefOutputStream create [this])

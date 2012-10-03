@@ -294,7 +294,7 @@ object Conversion
 
     case value =>
       val v = vector.invoke(value, converter);
-      if (v != null) v.asInstanceOf[Vector[T]] else throw FailureException;
+      if (v != null) v.asInstanceOf[IndexedSeq[T]] else throw FailureException;
   }
 
   //  -------

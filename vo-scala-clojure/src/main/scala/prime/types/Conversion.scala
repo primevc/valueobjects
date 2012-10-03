@@ -280,6 +280,8 @@ object Conversion
 
   //  -------
 
+  import clojure.lang.{IPersistentVector => CljIPVector}
+
   def Vector[T] (value:IndexedSeq[T])                                   : IndexedSeq[T] = value
   def Vector[T] (value:Array[T])                                        : IndexedSeq[T] = value
   def Vector[T] (value:ArrayType)       (implicit converter : Any => T) : IndexedSeq[T] = Vector(value.asArray)
@@ -290,6 +292,7 @@ object Conversion
     case v:Array[_]       => v.map(converter).toIndexedSeq
     case v:ArrayType      => Vector(v)
     case v:Traversable[_] => Vector(v)
+    case v:CljIPVector    => prime.vo.util.ClojureVectorSupport.asScala(v)
     case None             => throw NoInputException;
 
     case value =>

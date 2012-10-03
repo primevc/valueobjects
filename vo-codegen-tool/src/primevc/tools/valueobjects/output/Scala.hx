@@ -675,7 +675,7 @@ trait ")); a(def.name); a(" extends ");
 				}
 			}
 			else {
-				a("empty");  if (p.type.getPTypedef().unpackPTypedef() != def){ ac('.'.code); a(p.name.quote()); }
+				a("empty");  if (p.type.isArray() || p.type.getPTypedef().unpackPTypedef() != def){ ac('.'.code); a(p.name.quote()); }
 			}
 
 			a(") { def apply(vo: "); a(def.name); a("): "); a(!voField? "Any" : p.type.scalaType().name); a(" = vo."); a(p.name.quote()); a("; }\n");

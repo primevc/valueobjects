@@ -162,12 +162,12 @@ case class ClojureVectorWrapper[A](underlying : IPersistentVector)(implicit val 
 object ClojureVectorSupport {
   final def emptyCljVector = ScalaSeqWrapper(IndexedSeq.empty)
 
-  implicit def asScala[A]( v : IPersistentVector )(implicit to_A : Any => A) = v match {
-    case ScalaSeqWrapper(wrapped) => wrapped
+  implicit def asScala[A]( v : IPersistentVector )(implicit to_A : Any => A) : IndexedSeq[A] = v match {
+    case ScalaSeqWrapper(wrapped : Seq[A]) => wrapped.toIndexedSeq
     case _ => ClojureVectorWrapper(v)
   }
 
-  implicit def asClojure[A]( v : Seq[A] )(implicit to_A : Any => A) = v match {
+  implicit def asClojure[A]( v : Seq[A] )(implicit to_A : Any => A) : IPersistentVector = v match {
     case ClojureVectorWrapper(wrapped) => wrapped
     case _ => ScalaSeqWrapper(v)
   }

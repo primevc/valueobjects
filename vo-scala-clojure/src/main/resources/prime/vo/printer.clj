@@ -5,7 +5,7 @@
 (ns prime.vo.printer
   "Extends the Clojure printer with formatted printing of ValueObject instances."
   (:import java.io.Writer
-           [prime.types EnumValue FileRef]
+           [prime.types EnumValue FileRef RGBA]
            prime.vo.ValueObject))
 
 ;
@@ -15,9 +15,9 @@
 (defmethod print-method EnumValue [^EnumValue v, ^Writer w]
   (let [str (.. v getClass getName (split "\\$"))]
     (.write w "(")
-    (.write w (get str 0))
+    (.write w ^String (get str 0))
     (.write w "/")
-    (.write w (.substring (get str 1) 1))
+    (.write w (.substring ^String (get str 1) 1))
     (when (.isAssignableFrom scala.Product (class v))
       ; It's a case class with a String parameter
       (.write w " \"")
@@ -29,6 +29,13 @@
   (.write w "(prime.types/FileRef \"")
   (.write w (.toString v))
   (.write w "\")"))
+
+(defmethod print-method RGBA      [^RGBA      v, ^Writer w]
+  (.write w "(prime.types/RGBA 0x")
+  (.write w (.substring (.toRGBString v) 1))
+  (.write w " ")
+  (.write w (Float/toString (.alphaPercent v)))
+  (.write w ")"))
 
 
 ;

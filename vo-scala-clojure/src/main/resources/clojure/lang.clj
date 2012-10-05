@@ -25,3 +25,11 @@
           [ifn a b c d e f g h i j k l m n o p]
           [ifn a b c d e f g h i j k l m n o p q]
           [ifn a b c d e f g h i j k l m n o p q & r]))
+
+
+;
+; Scala implementation
+;
+(extend-type scala.runtime.AbstractFunction1
+  IFn
+    (invoke [f a] (.apply f a)))

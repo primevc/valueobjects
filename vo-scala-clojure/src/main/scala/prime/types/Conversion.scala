@@ -1,5 +1,6 @@
 package prime.types;
  import prime.vo._;
+ import org.joda.time.{ReadableInstant}
  import org.joda.time.format.{DateTimeFormatter, ISODateTimeFormat}
  import org.msgpack.`object`._
  import prime.utils.msgpack.MessagePackObjectId;
@@ -28,12 +29,17 @@ object Conversion
 
   def String    (value:String)                : String = if (value == null || value.isEmpty) emptyString else value;
   def String    (value:RawType)               : String = value.asString;
+  def String    (value:Number)                : String = value.toString;
+  def String    (value:Integer)               : String = value.toString;
+  def String    (value:Long)                  : String = value.toString;
+  def String    (value:Double)                : String = value.toString;
   def String    (value:Double, format:String) : String = if (format == null) value.toString else decimalFormatter(format).format(value);
   def String    (value:URI)                   : String = value.getEscapedURIReference;
   def String    (value:Any, format:String)    : String = unpack(value) match {
     case v:String      => String(v)
     case v:RawType     => String(v)
     case v:Double      => String(v, format)
+    case v:Number      => String(v)
     case v:URI         => String(v)
     case None          => throw NoInputException; //TODO: or emptyString?
     case value         => try {
@@ -172,7 +178,7 @@ object Conversion
   //  -------
 
   def Date      (value:Date)                                : Date = value;
-  def Date      (value:DateTime)                            : Date = value toDateMidnight;
+  def Date      (value:ReadableInstant)                     : Date = new Date(value);
   def Date      (value:java.util.Date)                      : Date = new Date(value);
   def Date      (value:Long)                                : Date = new Date(value);
   def Date      (value:Number)                              : Date = new Date(value.longValue);
@@ -182,16 +188,17 @@ object Conversion
   def Date      (value:FloatType)                           : Date = new Date(value.asLong);
   def Date      (value:RawType)                             : Date = Date(value.asString);
   def Date      (value:Any, formatter:DateTimeFormatter)    : Date = unpack(value) match {
-    case v:Date           => v
-    case v:java.util.Date => Date(v)
-    case v:Long           => Date(v)
-    case v:Number         => Date(v)
-    case v:String         => if (formatter == null) Date(v) else Date(v,  formatter)
-    case v:IntegerType    => Date(v)
-    case v:FloatType      => Date(v)
-    case None             => throw NoInputException;
-    case value            => val v = if (formatter == null) date.invoke(value) else date.invoke(value, formatter);
-    ;                        if (v != null) v.asInstanceOf[Date] else throw FailureException;
+    case v:Date            => v
+    case v:java.util.Date  => Date(v)
+    case v:ReadableInstant => Date(v)
+    case v:Long            => Date(v)
+    case v:Number          => Date(v)
+    case v:String          => if (formatter == null) Date(v) else Date(v,  formatter)
+    case v:IntegerType     => Date(v)
+    case v:FloatType       => Date(v)
+    case None              => throw NoInputException;
+    case value             => val v = if (formatter == null) date.invoke(value) else date.invoke(value, formatter);
+    ;                         if (v != null) v.asInstanceOf[Date] else throw FailureException;
   }
 
   def Date(value:Any) : Date = Date(value, null);
@@ -199,6 +206,7 @@ object Conversion
   //  -------
 
   def DateTime  (value:DateTime)                            : DateTime = value;
+  def DateTime  (value:ReadableInstant)                     : DateTime = new DateTime(value);
   def DateTime  (value:java.util.Date)                      : DateTime = new DateTime(value);
   def DateTime  (value:Long)                                : DateTime = new DateTime(value);
   def DateTime  (value:Number)                              : DateTime = new DateTime(value.longValue);
@@ -208,25 +216,26 @@ object Conversion
   def DateTime  (value:FloatType)                           : DateTime = new DateTime(value.asLong);
   def DateTime  (value:RawType)                             : DateTime = DateTime(value.asString);
   def DateTime  (value:Any, formatter:DateTimeFormatter)    : DateTime = unpack(value) match {
-    case v:DateTime       => v
-    case v:java.util.Date => DateTime(v)
-    case v:Long           => DateTime(v)
-    case v:Number         => DateTime(v)
-    case v:String         => if (formatter == null) DateTime(v) else DateTime(v, formatter)
-    case v:IntegerType    => DateTime(v)
-    case v:FloatType      => DateTime(v)
-    case None             => throw NoInputException;
-    case value            => val v = if (formatter == null) datetime.invoke(value) else datetime.invoke(value, formatter);
-    ;                        if (v != null) v.asInstanceOf[DateTime] else throw FailureException;
+    case v:DateTime        => v
+    case v:java.util.Date  => DateTime(v)
+    case v:ReadableInstant => DateTime(v)
+    case v:Long            => DateTime(v)
+    case v:Number          => DateTime(v)
+    case v:String          => if (formatter == null) DateTime(v) else DateTime(v, formatter)
+    case v:IntegerType     => DateTime(v)
+    case v:FloatType       => DateTime(v)
+    case None              => throw NoInputException;
+    case value             => val v = if (formatter == null) datetime.invoke(value) else datetime.invoke(value, formatter);
+    ;                         if (v != null) v.asInstanceOf[DateTime] else throw FailureException;
   }
 
   def DateTime(value:Any) : DateTime = DateTime(value, null);
 
   //  -------
 
-  def Interval  (value:Interval)               : Interval = value;
-  def Interval  (start:DateTime, end:DateTime) : Interval = new Interval(start, end);
-  def Interval  (value:(_,_))                  : Interval = Interval(DateTime(value._1), DateTime(value._2));
+  def Interval  (value:Interval)                             : Interval = value;
+  def Interval  (start:ReadableInstant, end:ReadableInstant) : Interval = new Interval(start, end);
+  def Interval  (value:(_,_))                                : Interval = Interval(DateTime(value._1), DateTime(value._2));
 
   def Interval(value:Any) : Interval = unpack(value) match {
     case v:Interval => v
@@ -317,7 +326,7 @@ object Conversion
     case v:String              => ObjectId(v)
     case v:Array[Byte]         => ObjectId(v)
     case None                  => throw NoInputException;
-    case value                 => val v = unique_id.invoke(value); if (v != null) v.asInstanceOf[ObjectId] else throw FailureException;
+    case value                 => val v = object_id.invoke(value); if (v != null) v.asInstanceOf[ObjectId] else throw FailureException;
   }
 }
 
@@ -326,7 +335,7 @@ object ClojureProtocolVars
   import clojure.lang.{RT, IFn}
   RT.loadResourceScript("prime/types.clj");
 
-  val unique_id = RT.`var`("prime.types", "to-UniqueID" );
+  val object_id = RT.`var`("prime.types", "to-ObjectID" );
   val string    = RT.`var`("prime.types", "to-String"   );
   val boolean   = RT.`var`("prime.types", "to-Boolean"  );
   val integer   = RT.`var`("prime.types", "to-Integer"  );

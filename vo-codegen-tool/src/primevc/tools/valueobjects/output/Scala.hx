@@ -168,7 +168,7 @@ class Scala extends ScalaBase, implements CodeGenerator
 			m.generateWith(map);
 			file.writeString("
 package "+ m.fullName +" {
-  object VO { val typeMap : scala.collection.immutable.IntMap[prime.vo.ValueObjectCompanion[_]] = scala.collection.immutable.IntMap(");
+  object VO { final val typeMap : scala.collection.immutable.IntMap[prime.vo.ValueObjectCompanion[_]] = scala.collection.immutable.IntMap(");
 			var first = true;
 			for (index in map.map.keys()) {
 				if (first) first = false;
@@ -356,7 +356,7 @@ trait ")); a(def.name); a(" extends ");
 		{
 
 			a("\nfinal class "); a(def.name); a("VO protected["); a(def.module.getPackageRoot().name != ""? def.module.getPackageRoot().name : def.module.name);
-			a("](\n  "); if (fields.length > 1) a("voIndexSet : Int, srcDiff : Int, "); a("val voSource : ValueSource,\n\n");
+			a("](\n  "); if (fields.length > 1) a("voIndexSet : Int, srcDiff : Int, "); a("final val voSource : ValueSource,\n\n");
 
 			for (p in fields)
 			{
@@ -627,7 +627,7 @@ trait ")); a(def.name); a(" extends ");
 			a(" extends ValueObjectCompanion["); a(def.name); a("] {\n");
 
 			// val empty
-			a("  val empty : "); a(def.name); a("VO = new "); a(def.name); a("VO("); if (fields.length > 1) a("0,0,"); a("ValueSource.empty");
+			a("  final val empty : "); a(def.name); a("VO = new "); a(def.name); a("VO("); if (fields.length > 1) a("0,0,"); a("ValueSource.empty");
 			for (p in fields)
 			{
 				a(", ");
@@ -659,7 +659,7 @@ trait ")); a(def.name); a(" extends ");
 		{
 			var voField = !p.isReference() && p.type.isTclass();
 
-			a("    object "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" extends "); manifestFieldType(p);
+			a("    object    "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" extends "); manifestFieldType(p);
 			a("(0x"); a(StringTools.hex(p.propertyID())); a(", '"); a(p.name); a(", ");
 
 			if (p.isReference() || !p.type.isTclass()) {
@@ -674,13 +674,20 @@ trait ")); a(def.name); a(" extends ");
 					a(p.type.scalaType().name); a(".empty");
 				}
 			}
+			else if (p.isReference()) {
+				a("null");
+			}
 			else {
-				a("empty");  if (p.type.getPTypedef().unpackPTypedef() != def){ ac('.'.code); a(p.name.quote()); }
+				a("empty");
+				// Check for the special case of referring to itself
+				if (p.type.isArray() || p.type.getPTypedef().unpackPTypedef() != def){
+					ac('.'.code); a(p.name.quote());
+				}
 			}
 
 			a(") { def apply(vo: "); a(def.name); a("): "); a(!voField? "Any" : p.type.scalaType().name); a(" = vo."); a(p.name.quote()); a("; }\n");
 		} else {
-			a("    val    "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" = ");
+			a("    final val "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" = ");
 			a(p.definedIn.fullName); a(".field."); a(p.name.quote()); a(";\n");
 		}
 		a("  }\n");// end object field
@@ -689,7 +696,7 @@ trait ")); a(def.name); a(" extends ");
 		{
 			var first = true;
 			var bit   = 0;
-			a("  val fields = { import field._; Array(");
+			a("  final val fields = { import field._; Array(");
 			for (p in fields) if (!p.isTransient()) {
 				if (!first) a(", "); else first = false;
 				while(bit++ < p.bitIndex()) {
@@ -706,12 +713,12 @@ trait ")); a(def.name); a(" extends ");
 		}
 
 		a("  object manifest extends {\n");
-		a("    val ID     = "); a(def.index + ";\n");
+		a("    final val ID  = "); a(def.index + ";\n");
 		if (fields.length > 1) {
 			a("    val fields = "); a(def.name); a(".fields");
 		} else if (fields.length == 1) {
-			a("    val first          = "); a(def.name); a(".field."); a(fields[0].name.quote()); a(";\n  ");
-			a("    val lastFieldIndex = "); a(Std.string(fields[0].bitIndex()));
+			a("    final val first          = "); a(def.name); a(".field."); a(fields[0].name.quote()); a(";\n  ");
+			a("    final val lastFieldIndex = "); a(Std.string(fields[0].bitIndex()));
 		}
 		a(";\n  } with ValueObjectManifest_"); a(fields.length == 0? "0[" : fields.length == 1? "1[" : "N["); a(def.name); a("];\n");
 		a("}\n");
@@ -779,7 +786,7 @@ sealed abstract class ${def.name}(val value:Int, override val toString:String"))
 
 		addConversionParams(true);
 
-		a(Std.format(") extends EnumValue;
+		a(Std.format(") extends EnumValue;\n
 object ${def.name} extends Enum {
   type Value = ${def.name};\n"));
 
@@ -789,31 +796,31 @@ object ${def.name} extends Enum {
 		{
 			if (e.type != null)
 			{
-				a("\n  override protected def stringCatchAll(value : String) = "); a(e.name); a('(value);\n  case class  ');
-				a(e.name); a('(override val toString : '); a(e.type.typeNameInMutablePkg().name); a(') extends Value(toString = toString, value = '); a(Std.string(e.intValue));
+				a("\n  override protected def stringCatchAll(value : String) = "); a(e.name); a("(value);");
+				a("\n  case class  _"); a(e.name); a('(override val toString : '); a(e.type.typeNameInMutablePkg().name); a(') extends Value(toString = toString, value = '); a(Std.string(e.intValue));
 				for (key in e.conversions.keys()) if (key != "toString") {
 					var conv = e.conversions.get(key);
 					a(', "'); a(conv); ac('"'.code);
 				}
-				a(");\n");
+				a(");  def "); a(e.name); a("(value : String) = _"); a(e.name); a("(value);\n");
 
 				overrideValueOf = e;
 			}
 			else {
-				a("  case object "); a(e.name); a(' extends Value('); a(e.intValue + ', "'); a(e.name); ac('"'.code);
+				a("  final val "); a(e.name); a(' = _'); a(e.name); a(";  protected object _"); a(e.name); a(' extends Value('); a(e.intValue + ', "'); a(e.name); ac('"'.code);
 				for (prop in def.conversions) if (prop.name != "toString") {
 					var conv = e.conversions.get(prop.name);
 					a(', "'); a(conv != null? conv : e.name); ac('"'.code);
 				}
-				a(")\n");
+				a(");\n");
 			}
 		}
 
 		var first = true;
 
-		a("\n  val values : Set[Value] = Set(");
+		a("\n  final val values : Set[Value] = Set(_");
 		for (e in def.enumerations) if (e.type == null) {
-			if (first) first = false; else a(", ");
+			if (first) first = false; else a(", _");
 			a(e.name);
 		}
 		a(");\n\n");
@@ -850,7 +857,7 @@ class MutableScala extends ScalaBase, implements CodeGenerator
 			m.generateWith(map);
 			file.writeString("
 package "+ m.mutableFullName +"\n{\n
-  object VO { val typeMap : scala.collection.immutable.IntMap[prime.vo.mutable.VOCompanion[_]] = scala.collection.immutable.IntMap(");
+  object VO { final val typeMap : scala.collection.immutable.IntMap[prime.vo.mutable.VOCompanion[_]] = scala.collection.immutable.IntMap(");
 			var first = true;
 			for (index in map.map.keys()) {
 				if (first) first = false;
@@ -1151,7 +1158,7 @@ import prime.vo.mutable._
 			for (i in 0 ... def.propertiesSorted.length)
 			{
 				var p = def.propertiesSorted[i];
-				a("\n  val "); a(p.name.quote());
+				a("\n  final val "); a(p.name.quote());
 				if (p.parent == def)
 				{
 				 	a(" = Field('"); a(p.name); a(", ");
@@ -1167,7 +1174,7 @@ import prime.vo.mutable._
 			}
 			
 			// fields : Array
-			a("\n\n  override val fields = Array[Field](");
+			a("\n\n  final override val fields = Array[Field](");
 			for (i in 0 ... def.propertiesSorted.length)
 			{
 				var p = def.propertiesSorted[i];

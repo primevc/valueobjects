@@ -5,7 +5,7 @@
 (ns prime.vo.source)
 
 (defprotocol ValueSource
-  (containsKey [this, name, idx])
+  (contains [this, name, idx])
 
   (boolAt   [this, name, idx] [this, name, idx, notFound])
   (intAt    [this, name, idx] [this, name, idx, notFound])
@@ -14,3 +14,31 @@
 
 (defprotocol ValueSourceable
   (as-source [this] [this valueobject-definition]))
+
+;
+; PersistentMap implementation
+;
+
+(deftype Map-ValueSource [^clojure.lang.IPersistentMap map]
+  prime.vo.source.ValueSource
+    (contains [map name idx]
+      "check contains? documentation at: \n
+       http://clojure.github.com/clojure/clojure.core-api.html#clojure.core/contains?"
+      (or (contains? map name) (contains? map idx)))
+
+    (anyAt    [this, name idx notFound] (or (map name) (map (keyword name)) (map idx) notFound))
+    (boolAt   [this, name idx notFound] (prime.types/to-Boolean (.anyAt this name idx notFound)))
+    (intAt    [this, name idx notFound] (prime.types/to-Integer (.anyAt this name idx notFound)))
+    (doubleAt [this, name idx notFound] (prime.types/to-Decimal (.anyAt this name idx notFound)))
+
+    (anyAt    [this, name idx]          (.anyAt    this name idx nil))
+    (boolAt   [this, name idx]          (.boolAt   this name idx false))
+    (intAt    [this, name idx]          (.intAt    this name idx Integer/MIN_VALUE))
+    (doubleAt [this, name idx]          (.doubleAt this name idx Double/NaN))
+)
+
+(extend-type clojure.lang.IPersistentMap
+  ValueSourceable
+  (as-source
+    ([this] (->Map-ValueSource this))
+    ([this valueobject-definition] (->Map-ValueSource this))))

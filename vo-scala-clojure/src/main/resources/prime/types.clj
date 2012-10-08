@@ -2,25 +2,137 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-(ns prime.types)
+(set! *warn-on-reflection* true)
 
-(defprotocol To-UniqueID  (to-UniqueID  [in]))
-(defprotocol To-String    (to-String    [in] [in format]))
-(defprotocol To-Boolean   (to-Boolean   [in]))
-(defprotocol To-Integer   (to-Integer   [in]))
-(defprotocol To-Decimal   (to-Decimal   [in] [in format]))
-(defprotocol To-RGBA      (to-RGBA      [in]))
-(defprotocol To-Date      (to-Date      [in] [in formatter]))
-(defprotocol To-DateTime  (to-DateTime  [in] [in formatter]))
-(defprotocol To-Interval  (to-Interval  [in]))
-(defprotocol To-EmailAddr (to-EmailAddr [in]))
-(defprotocol To-URI       (to-URI       [in]))
-(defprotocol To-FileRef   (to-FileRef   [in]))
-(defprotocol To-VORef     (to-VORef     [in ref-target--companion]))
+(ns prime.types
+  (:import org.bson.types.ObjectId
+           org.apache.commons.httpclient.URI
+           javax.mail.internet.InternetAddress
+           scala.collection.immutable.IndexedSeq
+          [prime.types Conversion VORef]
+          [org.joda.time DateMidnight DateTime Interval ReadableInstant]
+          [org.joda.time.format DateTimeFormatter])
+  (:use [clojure.lang]))
+
+(defprotocol To-ObjectId  (^ObjectId        to-ObjectId  [in]))
+(defprotocol To-String    (^String          to-String    [in] [in format]))
+(defprotocol To-Boolean   (^Boolean         to-Boolean   [in]))
+(defprotocol To-Integer   (^Integer         to-Integer   [in]))
+(defprotocol To-Decimal   (^Double          to-Decimal   [in] [in format]))
+(defprotocol To-RGBA      (^RGBA            to-RGBA      [in] [rgb a]))
+(defprotocol To-Date      (^DateMidnight    to-Date      [in] [in formatter]))
+(defprotocol To-DateTime  (^DateTime        to-DateTime  [in] [in formatter]))
+(defprotocol To-Interval  (^Interval        to-Interval  [in] [start end]))
+(defprotocol To-EmailAddr (^InternetAddress to-EmailAddr [in]))
+(defprotocol To-URI       (^URI             to-URI       [in]))
+(defprotocol To-FileRef   (^FileRef         to-FileRef   [in]))
+(defprotocol To-VORef     (^VORef           to-VORef     [in ref-target--companion]))
+(defprotocol To-Vector    (^IndexedSeq      to-Vector    [in converter]))
+
+(defn to-URL [uri] (Conversion/URL (to-URI uri)))
+
+(extend-type prime.vo.ID To-VORef
+  (^VORef to-VORef [in] (prime.types.Conversion/vo2ref in)))
+
+;
+; Default dispatch to scala prime.types.Conversion.* methods
+;
+
+(defmacro def-default-converter [target-type => & types]
+  ; We help the Clojure compiler by tagging everything, also prevents stack-overflows.
+  (let [tag       {:tag (eval (first types))}
+        converter (with-meta (symbol (.getName Conversion) (name target-type)) tag)
+        fn-sym    (with-meta (symbol (str "to-" target-type))                  tag)]
+  `(extend-protocol
+    ~(symbol "prime.types" (str "To-" target-type))
+    ~@(mapcat #(let [class (eval %) in (with-meta 'in {:tag class})]
+        (list class
+          `(~fn-sym
+            ([~in]           (~converter ~in))
+            ([~in ~'ignored] (~converter ~in)))))
+        types))))
+
+(def ByteArray (Class/forName "[B"))
+
+(def-default-converter Boolean    =>  Boolean          String          Number                    )
+(def-default-converter String     =>  String           URI             Number Double Long Integer)
+(def-default-converter Integer    =>  Integer          String          Number Double Long        )
+(def-default-converter Decimal    =>  Double                           Number Double Long Integer)
+(def-default-converter RGBA       =>  prime.types.RGBA String)
+(def-default-converter Date       =>  DateMidnight     DateTime        Number        Long Integer java.util.Date)
+(def-default-converter DateTime   =>  DateTime         ReadableInstant Number        Long Integer java.util.Date)
+(def-default-converter Interval   =>  Interval)
+(def-default-converter EmailAddr  =>  InternetAddress  String  URI  java.net.URI  java.net.URL)
+(def-default-converter URI        =>  URI              String       java.net.URI  java.net.URL)
+(def-default-converter ObjectId   =>  ObjectId         String       ByteArray)
+
+
+; Default formatted String converters
+(extend-type Double To-String
+  (^String to-String
+    ([in]                           (Conversion/String   in nil))
+    ([in ^String format]            (Conversion/String   in format))))
+
+(extend-type String To-Decimal
+ (^Double to-Decimal
+    ([in]                           (Conversion/Decimal  in))
+    ([in ^String format]            (Conversion/Decimal  in format))))
+
+(extend-type String To-Date
+    (^DateMidnight to-Date
+    ([in]                           (Conversion/Date     in))
+    ([in ^DateTimeFormatter format] (Conversion/Date     in format))))
+
+(extend-type String To-DateTime
+  (^DateMidnight to-DateTime
+    ([in]                           (Conversion/DateTime in))
+    ([in ^DateTimeFormatter format] (Conversion/DateTime in format))))
+
+
+; Default Interval constructor
+(extend-type ReadableInstant To-Interval
+  (^Interval to-Interval
+    ([start ^ReadableInstant end]   (Conversion/Interval start end))))
+
+; Default `RGB with alpha` constructors
+(let [impl `( ([in#]                (Conversion/RGBA in#))
+              ([rgb# alpha#]        (if (integer? alpha#)
+                                      (Conversion/RGBA rgb# (int    alpha#))
+                                    #_else
+                                      (Conversion/RGBA rgb# (double alpha#)))))]
+  (eval `(extend-protocol To-RGBA
+    Integer (^prime.types.RGBA to-RGBA ~@impl)
+    Long    (^prime.types.RGBA to-RGBA ~@impl))))
+
+
+; Clojure types to Vector
+(extend-type clojure.lang.ISeq
+  To-Vector (to-Vector [in converter]
+    (if (empty? in)
+      (scala.collection.immutable.Vector/empty)
+    #_else (.toIndexedSeq (scala.collection.JavaConversions/asScalaIterator
+      (clojure.lang.SeqIterator. (map #(invoke converter %) in)))))))
+
+;
+; Additional types and abstractions
+;
+
+(def FileRef prime.types.FileRef$/MODULE$)
+(def RGBA    to-RGBA)
+
+(defprotocol FileRepository
+  (^FileRefOutputStream create [this])
+  (^Boolean             exists [this ^FileRef ref  ])
+  (^URI                 toURI  [this ^FileRef ref  ])
+  (^FileRef             absorb [this ^File    file ])
+  (^InputStream         stream [this ^FileRef ref  ])
+
+  (^FileRef             store  [this writer]))
+
 
 (comment
 ;
-;  Many composite types like URI, FileRef, UniqueID and Date could become VOs eventually.
+;  Many composite types like URI, FileRef, ObjectId and Date could become VOs eventually.
 ;
 ;  Converting Strings directly to these types requires something like this:
 

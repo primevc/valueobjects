@@ -3,7 +3,7 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.vo.definition
-  (:use prime.vo.printer, trammel.core)
+  (:use prime.vo.printer, trammel.core, [taoensso.timbre :as timbre :only (trace debug info warn error fatal spy)])
   (:import (prime.vo ValueObject)))
 
 
@@ -14,8 +14,9 @@
     (symbol (.getName (class (.voCompanion ^ValueObject votrait))) "MODULE$")))
 
 (defmacro field-object [votrait prop]
-  (let [field-obj (symbol (str (.getName ^Class votrait) "$field$"))]
-    ;(println "Searching for field-object" votrait prop "in" field-obj)
+  (let [field-obj (symbol (str (.getName ^Class (eval votrait)) "$field$"))
+        prop      (if (= prop 'values) '_values prop)]
+    (trace "Searching for field-object" votrait prop "in" field-obj)
     (if (empty? (filter #(= (name prop) (.getName ^java.lang.reflect.Field %)) (.getDeclaredFields ^Class (eval field-obj))))
       `~(symbol (str field-obj prop "$") "MODULE$")
     #_else
@@ -68,8 +69,8 @@
   "Returns the result of `(eval expr)` or false if any Exception is thrown."
   (try (eval expr)
     (catch Exception e#
-      ;(do (println "evals=false" e#)
-          false)));)
+      (trace e# "Tried to eval:" (let [w (java.io.StringWriter.)] (clojure.pprint/pprint expr w) (.toString w)))
+      false)))
 
 
 ;
@@ -85,7 +86,7 @@
           ^clojure.lang.Var
           interned    (or
             (resolve (symbol (.getName obj-ns-sym) intern-name))
-            (do ;(println "interning" obj-ns-sym intern-name)
+            (do (debug "interning:" vo "in:" (str obj-ns-sym "/" intern-name))
               (intern obj-ns-sym (symbol intern-name) vo)))]
       (symbol (str (.ns interned)) (str (.sym interned))))))
 

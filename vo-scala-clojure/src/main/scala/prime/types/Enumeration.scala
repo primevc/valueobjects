@@ -24,7 +24,7 @@ abstract class Enum extends ClojureFn
 
   val values : Set[Value];
 
-  protected def stringCatchAll(value : String) = Null;
+  protected def stringCatchAll(value : String): Value = throw new java.lang.NoSuchFieldException(value);
   protected def customValueOf (value : Any)    = try apply(Conversion.Integer(value)) catch { case _:Conversion.ConversionException => apply(Conversion.String(value)) }
 
   def       apply(value : Int)         : Value = values.find(_.value    == value) getOrElse(Null);

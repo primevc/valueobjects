@@ -216,6 +216,6 @@ trait ValueObjectCompanion[T <: ValueObject] {
   val manifest : ValueObjectManifest[T];
 
   def   apply(src : ValueSource) : T  = empty.conj(src, root = src)
-  def valueOf(any : Any)         : T  = any match { case vo:T if (vo.getClass eq empty.getClass) => vo; case _ => apply(ValueSource(any, this)); }
+  def valueOf(any : Any)         : T  = any match { case vo:T => vo; case _ => apply(ValueSource(any, this)); }
   def unapply(any : Any)  : Option[T] = try Option(valueOf(any)) catch { case _ => None }
 }

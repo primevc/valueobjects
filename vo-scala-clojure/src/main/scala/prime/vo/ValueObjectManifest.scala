@@ -160,6 +160,7 @@ abstract class ValueObjectField[-VO <: ValueObject] protected(
   def apply(src : ValueSource, orElse : Any) : Any = src.anyAt(name, id, orElse);
 
   def get(vo : ValueObject) : Any =  vo match { case vo : VO => this(vo); case _ => null; }
+
   final def in (vo : VO) = {
     ((vo.initIndexSet & (1 << vo.voManifest.index(this.asInstanceOf[ValueObjectField[vo.VOType]]))) != 0) || (isLazy && apply(vo) != defaultValue);
   }

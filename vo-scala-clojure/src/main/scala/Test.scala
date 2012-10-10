@@ -1,3 +1,4 @@
+/*
 package vo.spread;
  import prime.vo._;
  import prime.vo.source._;
@@ -267,3 +268,4 @@ extends ValueObject_4(voIndexSet,srcDiff) with Spread with BranchNode
   }
 */
 }
+*/

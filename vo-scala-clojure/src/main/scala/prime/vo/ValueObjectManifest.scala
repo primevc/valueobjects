@@ -34,7 +34,6 @@ trait ValueObjectManifest[VOType <: ValueObject]
   // ----------------
   // Concrete members
   // ----------------
-
   final def index  (key : Keyword) : Int = index(key.sym.getName)
   final def index  (key : Symbol)  : Int = index(key.name)
   final def index_!(key : Any)     : Int = key match {
@@ -58,10 +57,21 @@ trait ValueObjectManifest[VOType <: ValueObject]
   }
 
   final def symbol   (idx : Int) = apply(idx).symbol;
+
+  final def fieldMask(mask:Int, field : ValueObjectField[VOType]) = mask | (1 << index(field));
 }
+
+case class ValueObjectMixin(fieldIndexMask : Int, manifest : ValueObjectManifest[_ <: ValueObject]);
 
 object ValueObjectManifest {
   object NoSuchFieldException extends java.lang.IllegalArgumentException("The given name or index is not part of this ValueObject.");
+
+  def valueObjectTraits(cl : Class[_]) : Array[Class[_]] = cl.getInterfaces
+    .filter(cl => cl != classOf[ValueObject] && classOf[ValueObject].isAssignableFrom(cl))
+       .map(cl => valueObjectTraits(cl) :+ cl)
+       .flatten;
+
+  def getMixinManifests(cl : Class[_]) = valueObjectTraits(cl).map(c => Class.forName(c.getName + "$manifest$").getField("MODULE$").get().asInstanceOf[ValueObjectManifest[_ <: ValueObject]]);
 }
 
 abstract class ValueObjectManifest_1[VOType <: ValueObject : Manifest] extends ValueObjectManifest[VOType]
@@ -71,13 +81,16 @@ abstract class ValueObjectManifest_1[VOType <: ValueObject : Manifest] extends V
   val fieldIndexMask = 1 << lastFieldIndex;
   val lazyIndexMask  = if (first isLazy) fieldIndexMask else 0;
   val eagerIndexMask = if (first isLazy) 0 else fieldIndexMask;
+  val mixins         = ValueObjectManifest.getMixinManifests(VOType.erasure).map(m => ValueObjectMixin(
+    if (first != null && first.ownerID == m.ID) fieldIndexMask else 0, m
+  ));
 
   final def apply(idx : Int)    = if (index(idx) == lastFieldIndex) first else throw ValueObjectManifest.NoSuchFieldException;
   final def apply(name: String) = if (first.name == name)           first else throw ValueObjectManifest.NoSuchFieldException;
 
-  final def index(idx   : Int)                      : Int = if (idx == 0 || idx == first.id) 0 else -1;
-  final def index(name  : String)                   : Int = if (name == first.name) 0 else -1;
-  final def index(field : ValueObjectField[VOType]) : Int = if (field == first) 0 else -1;
+  final def index(idx   : Int)                      : Int = if (idx == lastFieldIndex || idx == first.id) lastFieldIndex else -1;
+  final def index(name  : String)                   : Int = if (name == first.name) lastFieldIndex else -1;
+  final def index(field : ValueObjectField[VOType]) : Int = if (field == first) lastFieldIndex else -1;
 
   final def firstFieldSet(data : VOType)              = if (first in data)          first               else null;
   final def  nextFieldSet(data : VOType, index : Int) = if (index < lastFieldIndex) firstFieldSet(data) else null;
@@ -89,10 +102,13 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
 
   protected val fields : Array[_ <: ValueObjectField[VOType]];
   val first          = fields  .find(_ != null).get;
-  val lazyIndexMask  = fields.filter(_ != null).foldLeft(0) { (mask,field) => mask | (if (field isLazy) 1 << index(field) else 0) }
-  val fieldIndexMask = fields.filter(_ != null).foldLeft(0) { (mask,field) => mask | (1 << index(field))                          }
+  val lazyIndexMask  = fields.filter(f => f != null && f.isLazy).foldLeft(0)(fieldMask);
+  val fieldIndexMask = fields.filter(f => f != null            ).foldLeft(0)(fieldMask);
   val eagerIndexMask = fieldIndexMask ^ lazyIndexMask;
   val lastFieldIndex = index(fields.last);
+  val mixins         = ValueObjectManifest.getMixinManifests(VOType.erasure).map(m => ValueObjectMixin(
+    fields.filter(f => f != null && f.ownerID == m.ID).foldLeft(0)(fieldMask), m
+  ));
 
   final def apply(idx : Int)    : ValueObjectField[VOType] = fields(index(idx));
   final def apply(name: String) : ValueObjectField[VOType] = { for (f <- fields) if (f != null && f.name == name) return f; throw ValueObjectManifest.NoSuchFieldException; }
@@ -166,6 +182,8 @@ abstract class ValueObjectField[-VO <: ValueObject] protected(
   }
 
   def isLazy = valueType isLazy;
+
+  final def ownerID = id >>> 8;
 }
 
 abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protected(

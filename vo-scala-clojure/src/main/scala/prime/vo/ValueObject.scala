@@ -213,6 +213,7 @@ abstract class ValueObject_32(protected val _voIndexSet : Int, protected val _sr
 // ------------
 trait ValueObjectCompanion[T <: ValueObject] {
   val empty    : T;
+  val fields   : Array[_ <: ValueObjectField[T]];
   val manifest : ValueObjectManifest[T];
 
   def   apply(src : ValueSource) : T  = empty.conj(src, root = src)

@@ -45,10 +45,10 @@ object ObjectId
     }
   }
 
-  object manifest extends ValueObjectManifest_1[ObjectId] {
+  object manifest extends {
     val ID     =      0x1D;
     val id     =  field.id;
     val first  =  field.id;
     val lastFieldIndex = 0;
-  }
+  } with ValueObjectManifest_1[ObjectId];
 }

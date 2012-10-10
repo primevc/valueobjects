@@ -27,11 +27,11 @@ class MessagePacking
 		this.def  = def;
 	}
 	
-	private function definePackerFunction()		Assert.abstract()
-	private function defineUnPackerFunction()	Assert.abstract()
+	private function definePackerFunction()		Assert.abstractMethod()
+	private function defineUnPackerFunction()	Assert.abstractMethod()
 	
-	private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)	Assert.abstract()
-	private function a_unpackProperty(p:Property) 									Assert.abstract()
+	private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)	Assert.abstractMethod()
+	private function a_unpackProperty(p:Property) 									Assert.abstractMethod()
 	
 	private function expr_incrementMixinCount()		return "++mixin"
 	private function expr_decrementPropertyBytes()	return 

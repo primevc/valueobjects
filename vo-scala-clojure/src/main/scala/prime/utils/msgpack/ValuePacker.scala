@@ -4,7 +4,8 @@ import org.msgpack.Packer
 import java.lang.Math
 import java.io.OutputStream
 import org.bson.types.ObjectId
-import prime.types.{Ref, RefArray, Enum, RGBA, FileRef, URI}
+import prime.types.{Ref, RefArray, EmailAddr, Enum, RGBA, FileRef, URI, DateTime, Date}
+import prime.vo._
 import Util._
 
 /**
@@ -15,9 +16,28 @@ import Util._
  * To change this template use File | Settings | File Templates.
  */
 
-trait ValuePacker
+abstract class ValuePacker(out:OutputStream) extends Packer(out)
 {
-  this: Packer =>
+  def pack(vo : ValueObject);
+  def pack(vo : mutable.ValueObject);
+
+  final def pack(ref: Ref[_ <: ValueObject]) {
+    if (ref.vo_! != null) pack(ref.vo_!)
+    else ref.ref match {
+      case id:ObjectId => pack(id)
+      case ref:AnyRef  => pack(ref)
+    }
+  }
+
+  final def pack(refArray: RefArray[_ <: ValueObject]) {
+    pack(refArray.voArray)
+  }
+
+  final def pack[V <: ValueObject](voArray:Array[V]) {
+    packArray(voArray.length)
+    for (item <- voArray) pack(item);
+  }
+
 
   final def writeByte(v : Int) {
     out.write(v.asInstanceOf[Byte]);
@@ -30,21 +50,42 @@ trait ValuePacker
     out.write(id.toByteArray);
   }
 
-  final def pack(fileRef  : FileRef) : Unit = pack(fileRef.toString);
-  final def pack(uri      : URI)     : Unit = pack(uri.getEscapedURIReference);
-  final def pack(rgba     : RGBA)    : Unit = pack(rgba.rgba);
-
-  final def pack(date : org.joda.time.DateTime): Unit = pack( date.toInstant )
-  final def pack(date : org.joda.time.DateMidnight): Unit = pack( date.toInstant )
-
-  final def pack(date : org.joda.time.Instant) {
-    pack( date.getMillis )
+  final def pack(v : IndexedSeq[_]) {
+    packArray(v.length)
+    for (item <- v) pack(item);
   }
+
+  final def pack(fileRef : FileRef)                 { super.pack(fileRef.toString);           }
+  final def pack(uri     : URI)                     { super.pack(uri.getEscapedURIReference); }
+  final def pack(email   : EmailAddr)               { super.pack(email.toString);             }
+  final def pack(rgba    : RGBA)                    { super.pack(rgba.rgba);                  }
+
+  final def pack(date : org.joda.time.DateTime)     { pack( date.toInstant );       }
+  final def pack(date : org.joda.time.DateMidnight) { pack( date.toInstant );       }
+  final def pack(date : org.joda.time.Instant)      { super.pack( date.getMillis ); }
 
   final def pack(fileRefArray: Array[FileRef]) {
     packArray(fileRefArray.length)
     for (item <- fileRefArray) pack(item);
   }
+
+  override final def pack(any : Any) : this.type = { any match {
+    case v : String                   => super.pack(v);
+    case v : Number                   => super.pack(v);
+    case v : ObjectId                 => pack(v);
+    case v : DateTime                 => pack(v);
+    case v : Date                     => pack(v);
+    case v : URI                      => pack(v);
+    case v : FileRef                  => pack(v);
+    case v : RGBA                     => pack(v);
+    case v : EmailAddr                => pack(v);
+    case v : ValueObject              => pack(v);
+    case v if v.isInstanceOf[Ref[_]]  => pack(v);
+    case v : mutable.ValueObject      => pack(v);
+    case v : Vector[_]                => pack(v);
+    case null                         => packNil();
+    case v                            => println("Fallback: " + v.getClass); super.pack(v);
+  }; this }
 
   final def packValueObjectHeader(voType : Int, mixins : Int, fieldFlagBytes : Int)
   {

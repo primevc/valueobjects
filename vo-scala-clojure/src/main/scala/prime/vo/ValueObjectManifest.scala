@@ -42,7 +42,7 @@ trait ValueObjectManifest[VOType <: ValueObject]
 
   /** The number of lower field-index bits reserved for fields defined in a mixin (trait). */
   @inline
-  final def mixinIndexBitsReserved = Integer.numberOfTrailingZeros(Integer.highestOneBit(mixinIndexMask << 1));
+  final def mixinIndexBitsReserved = if (mixinIndexMask == 0) 0 else Integer.numberOfTrailingZeros(Integer.highestOneBit(mixinIndexMask << 1));
 
   final def index  (key : Keyword) : Int = index(key.sym.getName)
   final def index  (key : Symbol)  : Int = index(key.name)
@@ -72,9 +72,9 @@ trait ValueObjectManifest[VOType <: ValueObject]
 }
 
 case class ValueObjectMixin(fieldIndexMask : Int, manifest : ValueObjectManifest[_ <: ValueObject]) {
-  /** The number of lower field-index bits reserved for fields defined in a mixin (trait). */
+  /** The number of bits this mixin's voIndexSet is shifted to the left inside the subtype's voIndexSet. */
   @inline
-  final def indexBitsReserved = Integer.numberOfTrailingZeros(Integer.highestOneBit(fieldIndexMask << 1));
+  final def indexBitsShifted = Integer.numberOfTrailingZeros( /*Integer.lowestOneBit(*/fieldIndexMask/*)*/ );
 }
 
 object ValueObjectManifest {

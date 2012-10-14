@@ -15,9 +15,13 @@ import Util._
  * To change this template use File | Settings | File Templates.
  */
 
-class VOPacker (out:OutputStream) extends Packer(out) with ValuePacker
+class VOPacker (out:OutputStream) extends ValuePacker(out)
 {
   import prime.vo.{ValueObjectCompanion, ValueObjectManifest, ValueObject}
+
+  final def pack(vo: prime.vo.mutable.ValueObject) {
+    assert(false);
+  }
 
   /** Packs a full ValueObject: Uses the VO fields-set bits. */
   final def pack(vo : ValueObject)
@@ -30,24 +34,6 @@ class VOPacker (out:OutputStream) extends Packer(out) with ValuePacker
     else packNil();
   }
 
-  final def pack(ref: Ref[_ <: ValueObject]) {
-    if (ref.vo_! != null) pack(ref.vo_!)
-    else ref.ref match {
-      case id:ObjectId => pack(id)
-      case ref         => pack(ref)
-    }
-  }
-
-  final def pack(refArray: RefArray[_ <: ValueObject]) {
-    pack(refArray.voArray)
-  }
-
-  final def pack[V <: ValueObject](voArray:Array[V]) {
-    packArray(voArray.length)
-    for (item <- voArray) pack(item);
-  }
-
-
   /** Packs specific valueobject fields as set in the fields bitmask.  */
   final def packValueObject(vo : ValueObject, manifest : ValueObjectManifest[_], fields : Int)
   {
@@ -55,28 +41,41 @@ class VOPacker (out:OutputStream) extends Packer(out) with ValuePacker
     for (m <- manifest.mixins) if ((fields & m.fieldIndexMask) != 0) mixin += 1;
     assert(mixin <= 7, "Packing ValueObjects with more than 7 mixins is currently not supported.");
 
-    var fieldBits = fields >>> manifest.mixinIndexBitsReserved;
+    println("manifest = %s, vo = %s, fields = %x, fieldBits = %x, mixin = %d, mixinIndexBitsReserved = %d".format(manifest,  vo,fields,fields >>> manifest.mixinIndexBitsReserved,mixin,manifest.mixinIndexBitsReserved));
 
+    val fieldBits = fields >>> manifest.mixinIndexBitsReserved
     packValueObjectHeader(manifest.ID, mixin, fieldBits);
+    if (fieldBits != 0) packValueObjectFields(vo, manifest, fieldBits);
 
-    var i = 0;
-    while (fieldBits != 0 && i < manifest.lastFieldIndex)
+    if (mixin > 0) for (m <- manifest.mixins)
     {
-      // values are packed in groups of 8
-      if (i % 8 == 0) {
-        if (i > 0) fieldBits >>>= 8;
-        writeByte( fieldBits );
+      mixin = (fields & m.fieldIndexMask) >>> m.indexBitsShifted;
+      if (mixin != 0) {
+          packValueObjectHeader(m.manifest.ID, 0, mixin);
+          packValueObjectFields(vo, m.manifest, mixin);
       }
-      if ((fields & (1 << i)) != 0)
-        pack( manifest(i).get(vo) );
-
-      i += 1;
     }
+  }
 
-    if (mixin != 0) for (m <- manifest.mixins) {
-      mixin = fields & m.fieldIndexMask;
-      if (mixin != 0)
-        packValueObject(vo, m.manifest, mixin >>> m.indexBitsReserved);
+  final def packValueObjectFields(vo : ValueObject, manifest : ValueObjectManifest[_], fields : Int)
+  {
+    var i = manifest.mixinIndexBitsReserved;
+    var fieldBits = fields;
+    do {
+      writeByte( fieldBits );
+
+      if ((fieldBits & 0x01) != 0){ val v = manifest(i    ).get(vo); println("%s[%s] bit %x = %s".format(manifest.getClass, i + 0, fieldBits & 0x01, v)); pack(v); };
+      if ((fieldBits & 0x02) != 0){ val v = manifest(i + 1).get(vo); println("%s[%s] bit %x = %s".format(manifest.getClass, i + 1, fieldBits & 0x02, v)); pack(v); };
+      if ((fieldBits & 0x04) != 0){ val v = manifest(i + 2).get(vo); println("%s[%s] bit %x = %s".format(manifest.getClass, i + 2, fieldBits & 0x04, v)); pack(v); };
+      if ((fieldBits & 0x08) != 0){ val v = manifest(i + 3).get(vo); println("%s[%s] bit %x = %s".format(manifest.getClass, i + 3, fieldBits & 0x08, v)); pack(v); };
+      if ((fieldBits & 0x10) != 0){ val v = manifest(i + 4).get(vo); println("%s[%s] bit %x = %s".format(manifest.getClass, i + 4, fieldBits & 0x10, v)); pack(v); };
+      if ((fieldBits & 0x20) != 0){ val v = manifest(i + 5).get(vo); println("%s[%s] bit %x = %s".format(manifest.getClass, i + 5, fieldBits & 0x20, v)); pack(v); };
+      if ((fieldBits & 0x40) != 0){ val v = manifest(i + 6).get(vo); println("%s[%s] bit %x = %s".format(manifest.getClass, i + 6, fieldBits & 0x40, v)); pack(v); };
+      if ((fieldBits & 0x80) != 0){ val v = manifest(i + 7).get(vo); println("%s[%s] bit %x = %s".format(manifest.getClass, i + 7, fieldBits & 0x80, v)); pack(v); };
+
+      fieldBits >>>= 8;
+      i += 8;
     }
+    while (fieldBits != 0 && i < manifest.lastFieldIndex);
   }
 }

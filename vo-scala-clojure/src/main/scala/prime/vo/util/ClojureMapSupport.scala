@@ -17,7 +17,7 @@ trait ClojureMapSupport extends IPersistentMap
  with ClojureFn
  with Indexed
  with IPending
- with JavaMapSupport[clojure.lang.Keyword] {
+ with JavaMapSupport[String] {
   this: ValueObject =>
 
   protected var _hash : Int = -1;
@@ -198,43 +198,7 @@ trait ClojureMapSupport extends IPersistentMap
     ClassCastException clojure.lang.PersistentArrayMap cannot be cast to clojure.lang.PersistentHashMap  user/eval1540 (NO_SOURCE_FILE:1)
    */
   override def iterator = null;// : java.util.Iterator[AnyRef] = null;
-
-  // ---
-  // Map
-  // ---
-  final def entrySet =
-  {
-    import java.util._
-
-    new AbstractSet[Map.Entry[Keyword,Any]]() {
-      def size       = ClojureMapSupport.this.count;
-      def iterator() = ClojureMapSupport.this.iterator().asInstanceOf[java.util.Iterator[java.util.Map.Entry[clojure.lang.Keyword,Any]]]
-      
-      override def hashCode = ClojureMapSupport.this.hashCode;
-      
-      override def contains(obj : Any) = obj match {
-        case e : Map.Entry[_,_] =>
-          val index = voManifest.index_!(e.getKey);
-          index != -1 && nth(index) == e.getValue()
-
-        case _ => false;
-      }
-    }
-  }
-
-  final def keySet = new java.util.AbstractSet[Keyword]() {
-    def size       = ClojureMapSupport.this.count;
-    def iterator() = new VOIterator[Keyword]() {
-      def next = {
-        val v = field.keyword;
-        nextField();
-        v
-      }
-    }
-
-    def contains(obj : Keyword) = ClojureMapSupport.this.containsKey(obj);
-  }
-
+  final protected def keySet(field : ValueObjectField[_]) = field.name;
 
   // ---
   // IFn: VO as function from key to value

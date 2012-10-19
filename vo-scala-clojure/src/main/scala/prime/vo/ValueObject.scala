@@ -71,8 +71,10 @@ trait ValueObject extends ValueSource
   */
   final def    conj(src : ValueSource)         : this.type = conj(src, this.voSource);
 
-  def         assoc(idx : Int,    value : Any) : this.type = conj(new SingleValueSource(voManifest(idx).name, value));
-  def         assoc(key : String, value : Any) : this.type = conj(new SingleValueSource(voManifest(key).name, value));
+  def         assoc(field : ValueObjectField[VOType], value : Any) : this.type = conj(new SingleValueSource(field.name, value));
+
+  def         assoc(idx : Int,    value : Any) : this.type = assoc(voManifest(idx), value);
+  def         assoc(key : String, value : Any) : this.type = assoc(voManifest(key), value);
   final def   assoc(key : Symbol, value : Any) : this.type = assoc(key.name, value);
   final def without(idx : Int)                 : this.type = assoc(idx, null);
   final def without(key : String)              : this.type = assoc(key, null);
@@ -120,15 +122,15 @@ trait BranchNode {
 // ---------------
 
 abstract class ValueObjectBase extends ValueObject with ClojureMapSupport {
-  def contains(name: String)             : Boolean = try voManifest(name) in self catch { case ValueObjectManifest.NoSuchFieldException => false }
+  def contains(name: String)             : Boolean = voManifest.findOrNull(name) match { case null => false; case f => f in self }
   def contains(name: String, orIdx: Int) : Boolean = contains(name) || contains(voManifest.index(orIdx));
 
 //  final def apply(idx:  Int,    notFound: Any) : Any = apply(null, idx, notFound)
 //  final def apply(name: String, notFound: Any) : Any = apply(name,  -1, notFound)
   def anyAt(name: String, idx: Int, notFound: Any) : Any = {
-    val field = try voManifest(name) catch {
-      case e:NoSuchFieldException =>
-        try voManifest(idx) catch { case e:NoSuchFieldException => null }
+    val field   =  voManifest.findOrNull(name) match {
+      case null => voManifest.findOrNull(idx);
+      case f    => f;
     }
     if (field != null && (field in self)) field(self);
     else notFound;

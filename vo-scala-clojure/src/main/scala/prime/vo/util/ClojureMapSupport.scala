@@ -30,9 +30,9 @@ trait ClojureMapSupport extends IPersistentMap
   // Associative
   // ---
   final def assoc       (key: Any, value: Any) : IPersistentMap = {
-    val k = voManifest.index_!(key);
-    if (k >= 0)
-      assoc(k, value)
+    val f = voManifest.findOrNull(key);
+    if (f != null)
+      assoc(f, value)
     else {
       // http://grepcode.com/file/repo1.maven.org/maven2/org.clojure/clojure/1.3.0/clojure/lang/PersistentArrayMap.java#37
       // Create map from VO + new value
@@ -48,11 +48,11 @@ trait ClojureMapSupport extends IPersistentMap
   }
   
   final def entryAt(key: Any) = try {
-    val i = voManifest.index_!(key);
-    val f = voManifest(i);
-    new MapEntry(f.keyword, ClojureSupport.get(f,self));
-  } catch {
-    case ValueObjectManifest.NoSuchFieldException => null
+    val f = voManifest.findOrNull(key);
+    if (f != null)
+      new MapEntry(f.keyword, ClojureSupport.get(f,self));
+    else
+      null;
   }
 
   // IPersistentCollection

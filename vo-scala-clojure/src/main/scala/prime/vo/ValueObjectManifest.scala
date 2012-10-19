@@ -6,6 +6,8 @@ package prime.vo;
 
 trait ValueObjectManifest[VOType <: ValueObject]
 {
+  import ValueObjectManifest._
+
   val VOType         : Manifest[VOType];
   val ID             : Int;
 
@@ -22,13 +24,15 @@ trait ValueObjectManifest[VOType <: ValueObject]
 
   /** The number of fields defined in the ValueObject */
   def numFields      : Int;
-  /** Find the ValueObjectField with the given id or field-index, or throw NoSuchFieldException. */
-  def apply(idx  : Int)    : ValueObjectField[VOType];
-  /** Find the ValueObjectField with the given name, or throw NoSuchFieldException. */
-  def apply(name : String) : ValueObjectField[VOType];
+  /** Find the ValueObjectField with the given key, or return null if none found. */
+  def findOrNull(key : Int)    : ValueObjectField[VOType];
+  def findOrNull(key : String) : ValueObjectField[VOType];
 
+  /** Returns the index of the ValueObjectField for the given `idx`,   or -1 if not found. */
   def index(idx   : Int) : Int;
+  /** Returns the index of the ValueObjectField for the given `name`,  or -1 if not found. */
   def index(name  : String) : Int;
+  /** Returns the index of the ValueObjectField for the given `field`, or -1 if not found. */
   def index(field : ValueObjectField[VOType]) : Int;
 
   val mixins : Array[ValueObjectMixin];
@@ -39,6 +43,11 @@ trait ValueObjectManifest[VOType <: ValueObject]
   // ----------------
   // Concrete members
   // ----------------
+
+  /** Find the ValueObjectField with the given id or field-index, or throw NoSuchFieldException. */
+  final def apply(idx  : Int)    : ValueObjectField[VOType] = findOrNull(idx)  match { case null => throw new NoSuchFieldException(this, idx);  case f => f }
+  /** Find the ValueObjectField with the given name, or throw NoSuchFieldException. */
+  final def apply(name : String) : ValueObjectField[VOType] = findOrNull(name) match { case null => throw new NoSuchFieldException(this, name); case f => f }
 
   /** The number of lower field-index bits reserved for fields defined in a mixin (trait). */
   @inline
@@ -54,6 +63,16 @@ trait ValueObjectManifest[VOType <: ValueObject]
     case key:Symbol  => index(key)
     case key:String  => index(key)
     case _           => index(key.toString)
+  }
+
+  def findOrNull(key : Any) : ValueObjectField[VOType] = key match {
+    case key:Int     => findOrNull(key)
+    case key:String  => findOrNull(key)
+    case key:Long    => findOrNull(key.toInt)
+    case key:Number  => findOrNull(key.intValue)
+    case key:Keyword => findOrNull(key.sym.getName)
+    case key:Symbol  => findOrNull(key.name)
+    case _           => findOrNull(key.toString)
   }
 
   final def keyword  (idx : Int)    : Keyword = apply(idx).keyword;
@@ -78,7 +97,9 @@ case class ValueObjectMixin(fieldIndexMask : Int, manifest : ValueObjectManifest
 }
 
 object ValueObjectManifest {
-  object NoSuchFieldException extends java.lang.IllegalArgumentException("The given name or index is not part of this ValueObject.");
+  class NoSuchFieldException(vo : ValueObjectManifest[_], field : String) extends java.lang.IllegalArgumentException("The given name or index `"+ field +"` is not part of "+ vo.VOType.erasure.getName) {
+    def this(vo : ValueObjectManifest[_], idx : Int) = this(vo, idx.toString)
+  }
 
   def valueObjectTraits(cl : Class[_]) : Array[Class[_]] = cl.getInterfaces
     .filter(cl => cl != classOf[ValueObject] && classOf[ValueObject].isAssignableFrom(cl))
@@ -102,8 +123,8 @@ abstract class ValueObjectManifest_1[VOType <: ValueObject : Manifest] extends V
   val mixinIndexMask = mixins.headOption.map(_.fieldIndexMask).getOrElse(0);
 
 
-  final def apply(idx : Int)    = if (index(idx) == lastFieldIndex) first else throw ValueObjectManifest.NoSuchFieldException;
-  final def apply(name: String) = if (first.name == name)           first else throw ValueObjectManifest.NoSuchFieldException;
+  final def findOrNull(idx : Int)    = if (index(idx) == lastFieldIndex) first else null;
+  final def findOrNull(name: String) = if (first.name == name)           first else null;
 
   final def index(idx   : Int)                      : Int = if (idx == lastFieldIndex || idx == first.id) lastFieldIndex else -1;
   final def index(name  : String)                   : Int = if (name == first.name) lastFieldIndex else -1;
@@ -130,8 +151,8 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
   val mixinIndexMask = mixins.foldLeft(0) { (mask,mixin) => mask | mixin.fieldIndexMask }
 
 
-  final def apply(idx : Int)    : ValueObjectField[VOType] = fields(index(idx));
-  final def apply(name: String) : ValueObjectField[VOType] = { for (f <- fields) if (f != null && f.name == name) return f; throw ValueObjectManifest.NoSuchFieldException; }
+  final def findOrNull(idx : Int)    : ValueObjectField[VOType] = index(idx) match { case -1 => null; case i => fields(i); }
+  final def findOrNull(name: String) : ValueObjectField[VOType] = { for (f <- fields) if (f != null && f.name == name) return f; null }
 
   final def index(n : Int) : Int = {
     if (n <= 32) {
@@ -140,7 +161,7 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
       var i = 0;
       for (f <- fields) if (f != null && f.id == n) return i; else i += 1;
     }
-    throw ValueObjectManifest.NoSuchFieldException;
+    -1;
   }
 
   final def index(name : String) : Int = {
@@ -159,12 +180,9 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
     var k = startIndex;
     do {
       k += 1;
-      try {
+      if ((fieldIndexMask & (1 << k)) != 0) {
         val field = apply(k);
         if (field in data) return field;
-      }
-      catch {
-        case ValueObjectManifest.NoSuchFieldException =>
       }
     }
     while (k < this.lastFieldIndex);

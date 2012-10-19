@@ -7,6 +7,8 @@ trait JavaMapSupport[KeyType] extends java.util.Map[KeyType,Any]
   
   import java.util._
 
+  protected def keySet(field : ValueObjectField[_]) : KeyType;
+
   // ---
   // Map
   // ---
@@ -41,6 +43,47 @@ trait JavaMapSupport[KeyType] extends java.util.Map[KeyType,Any]
       }
     }
   }
+
+  final def keySet = new java.util.AbstractSet[KeyType]() {
+    def size       = JavaMapSupport.this.count;
+    def iterator() = new VOIterator[KeyType]() {
+      def next = {
+        val v = keySet(field);
+        nextField();
+        v
+      }
+    }
+
+    def contains(obj : KeyType) = JavaMapSupport.this.containsKey(obj);
+  }
+
+  final def entrySet =
+  {
+    import java.util._
+
+    new AbstractSet[Map.Entry[KeyType,Any]]() {
+      def size       = JavaMapSupport.this.count;
+      def iterator() = new VOIterator[Map.Entry[KeyType,Any]]() {
+        def next = {
+          val k = keySet(field);
+          val v = field(self);
+          nextField();
+          new AbstractMap.SimpleImmutableEntry(k,v)
+        }
+      }
+
+      override def hashCode = JavaMapSupport.this.hashCode;
+
+      override def contains(obj : Any) = obj match {
+        case e : Map.Entry[_,_] =>
+          val index = voManifest.index_!(e.getKey);
+          index != -1 && voManifest(index)(self) == e.getValue()
+
+        case _ => false;
+      }
+    }
+  }
+
 
   // Unsupported operations
   final def put(key:KeyType, value:Any)             = throw new UnsupportedOperationException();

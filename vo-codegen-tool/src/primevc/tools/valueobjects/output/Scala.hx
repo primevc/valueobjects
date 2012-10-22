@@ -168,7 +168,7 @@ class Scala extends ScalaBase, implements CodeGenerator
 			m.generateWith(map);
 			file.writeString("
 package "+ m.fullName +" {
-  object VO { final val typeMap : scala.collection.immutable.IntMap[prime.vo.ValueObjectCompanion[_]] = scala.collection.immutable.IntMap(");
+  object VO { final val typeMap = scala.collection.immutable.IntMap(");
 			var first = true;
 			for (index in map.map.keys()) {
 				if (first) first = false;
@@ -395,7 +395,7 @@ trait ")); a(def.name); a(" extends ");
 				function p0() { a(p.name); ac("0".code); }
 
 				a("  final def "); spaces(4 - p.name.quote().length); a(p.name.quote()); a(" = if ("); p0(); a(" != null) "); p0(); a(" else {\n");
-				a("    synchronized"); spaces(p.name.quote().length - 4); a(" { if ("); p0(); a(" == null) "); p0(); a(' = '); a(p.type.scalaConversionExpr(anyAt(p))); a('; }\n');
+				a("    synchronized"); spaces(p.name.quote().length - 4); a(" { if ("); p0(); a(" == null) "); p0(); a(' = try '); a(p.type.scalaConversionExpr(anyAt(p))); a(" catch { case NoInputException => "); a(def.name); a(".empty."); a(p.name.quote()); a(' }; }\n');
 				a("    "); p0();
 				a("\n  }\n");
 			}
@@ -857,7 +857,7 @@ class MutableScala extends ScalaBase, implements CodeGenerator
 			m.generateWith(map);
 			file.writeString("
 package "+ m.mutableFullName +"\n{\n
-  object VO { final val typeMap : scala.collection.immutable.IntMap[prime.vo.mutable.VOCompanion[_]] = scala.collection.immutable.IntMap(");
+  object VO { final val typeMap = scala.collection.immutable.IntMap(");
 			var first = true;
 			for (index in map.map.keys()) {
 				if (first) first = false;

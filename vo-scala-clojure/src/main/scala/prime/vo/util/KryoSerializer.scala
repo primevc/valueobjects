@@ -1,6 +1,7 @@
 package prime.vo.util;
  import prime.vo._
  import scala.collection.immutable.IntMap;
+ import com.esotericsoftware.kryo._
 
 object KryoSerializer
 {
@@ -21,11 +22,34 @@ final class KryoSerializer[VOType <: ValueObject](voCompanion : ValueObjectCompa
     
   }
 
-  def create(kryo:com.esotericsoftware.kryo.Kryo, in: com.esotericsoftware.kryo.io.Input, clz:Class[VOType]): VOType = {
-    
+  def create(kryo:Kryo, in: io.Input, clz:Class[VOType]): VOType = {
+    voCompanion.empty
   }
 
-  def read  (kryo:com.esotericsoftware.kryo.Kryo, in: com.esotericsoftware.kryo.io.Input, clz:Class[VOType]): VOType = {
-    
+  def read  (kryo:Kryo, in: io.Input, clz:Class[VOType]): VOType = {
+    val fieldSet = in.readInt();
+    if (fieldSet != 0)
+    {
+      val data = new Array[Any](numberOfTrailingZeros(highestOneBit(fieldSet)) + 1);
+      //println("data.length = "+ data.length);
+      var i    = numberOfTrailingZeros(fieldSet);
+      var bits = fieldSet >>> i;
+      do {
+        val value = kryo.readClassAndObject(in);
+        data(i) = value;
+        //println("data["+i+"] = " + value);
+        bits >>>= 1;
+        val inc = numberOfTrailingZeros(bits);
+        bits >>>= inc;
+        i      += 1 + inc;
+      }
+      while (bits != 0);
+
+      val src = new source.AnonymousValueSource(data :_*);
+      //println(src);
+      voCompanion(src);
+    }
+    else
+      voCompanion.empty;
   }
 }

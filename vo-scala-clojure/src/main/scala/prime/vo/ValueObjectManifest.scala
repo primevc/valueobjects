@@ -33,9 +33,9 @@ trait ValueObjectManifest[VOType <: ValueObject]
   /** Returns the index of the ValueObjectField for the given `name`,  or -1 if not found. */
   def index(name  : String) : Int;
   /** Returns the index of the ValueObjectField for the given `field`, or -1 if not found. */
-  def index(field : ValueObjectField[VOType]) : Int;
+  def index(field : ValueObjectField[_]) : Int;
 
-  val mixins : Array[ValueObjectMixin];
+  val mixins : Array[ValueObjectMixin[_ >: VOType <: ValueObject]];
   val first  : ValueObjectField[VOType];
   def firstFieldSet(data : VOType)                   : ValueObjectField[VOType];
   def  nextFieldSet(data : VOType, startIndex : Int) : ValueObjectField[VOType];
@@ -90,7 +90,7 @@ trait ValueObjectManifest[VOType <: ValueObject]
   final def fieldMask(mask:Int, field : ValueObjectField[VOType]) = mask | (1 << index(field));
 }
 
-case class ValueObjectMixin(fieldIndexMask : Int, manifest : ValueObjectManifest[_ <: ValueObject]) {
+case class ValueObjectMixin[VOType <: ValueObject](fieldIndexMask : Int, manifest : ValueObjectManifest[_ >: VOType <: ValueObject]) {
   /** The number of bits this mixin's voIndexSet is shifted to the left inside the subtype's voIndexSet. */
   @inline
   final def indexBitsShifted = Integer.numberOfTrailingZeros( /*Integer.lowestOneBit(*/fieldIndexMask/*)*/ );
@@ -106,7 +106,7 @@ object ValueObjectManifest {
        .map(cl => valueObjectTraits(cl) :+ cl)
        .flatten;
 
-  def getMixinManifests(cl : Class[_]) = valueObjectTraits(cl).map(c => Class.forName(c.getName + "$manifest$").getField("MODULE$").get().asInstanceOf[ValueObjectManifest[_ <: ValueObject]]);
+  def getMixinManifests[T <: ValueObject](cl : Class[_]) = valueObjectTraits(cl).map(c => Class.forName(c.getName + "$manifest$").getField("MODULE$").get().asInstanceOf[ValueObjectManifest[_ >: T <: ValueObject]]);
 }
 
 abstract class ValueObjectManifest_1[VOType <: ValueObject : Manifest] extends ValueObjectManifest[VOType]
@@ -117,8 +117,8 @@ abstract class ValueObjectManifest_1[VOType <: ValueObject : Manifest] extends V
   val fieldIndexMask = 1 << lastFieldIndex;
   val lazyIndexMask  = if (first isLazy) fieldIndexMask else 0;
   val eagerIndexMask = if (first isLazy) 0 else fieldIndexMask;
-  val mixins         = ValueObjectManifest.getMixinManifests(VOType.erasure).map(m => ValueObjectMixin(
-    if (first != null && first.ownerID == m.ID) fieldIndexMask else 0, m
+  val mixins         = ValueObjectManifest.getMixinManifests[VOType](VOType.erasure).map(m => ValueObjectMixin(
+    if (first != null && first.VOTypeID == m.ID) fieldIndexMask else 0, m
   ));
   val mixinIndexMask = mixins.headOption.map(_.fieldIndexMask).getOrElse(0);
 
@@ -126,9 +126,9 @@ abstract class ValueObjectManifest_1[VOType <: ValueObject : Manifest] extends V
   final def findOrNull(idx : Int)    = if (index(idx) == lastFieldIndex) first else null;
   final def findOrNull(name: String) = if (first.name == name)           first else null;
 
-  final def index(idx   : Int)                      : Int = if (idx == lastFieldIndex || idx == first.id) lastFieldIndex else -1;
-  final def index(name  : String)                   : Int = if (name == first.name) lastFieldIndex else -1;
-  final def index(field : ValueObjectField[VOType]) : Int = if (field == first) lastFieldIndex else -1;
+  final def index(idx   : Int)                 : Int = if (idx == lastFieldIndex || idx == first.id) lastFieldIndex else -1;
+  final def index(name  : String)              : Int = if (name == first.name) lastFieldIndex else -1;
+  final def index(field : ValueObjectField[_]) : Int = if (field == first) lastFieldIndex else -1;
 
   final def firstFieldSet(data : VOType)              = if (first in data)          first               else null;
   final def  nextFieldSet(data : VOType, index : Int) = if (index < lastFieldIndex) firstFieldSet(data) else null;
@@ -145,8 +145,8 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
   val fieldIndexMask = fields.filter(f => f != null            ).foldLeft(0)(fieldMask);
   val eagerIndexMask = fieldIndexMask ^ lazyIndexMask;
   val lastFieldIndex = index(fields.last);
-  val mixins         = ValueObjectManifest.getMixinManifests(VOType.erasure).map(m => ValueObjectMixin(
-    fields.filter(f => f != null && f.ownerID == m.ID).foldLeft(0)(fieldMask), m
+  val mixins         = ValueObjectManifest.getMixinManifests[VOType](VOType.erasure).map(m => ValueObjectMixin(
+    fields.filter(f => f != null && f.VOTypeID == m.ID).foldLeft(0)(fieldMask), m
   ));
   val mixinIndexMask = mixins.foldLeft(0) { (mask,mixin) => mask | mixin.fieldIndexMask }
 
@@ -170,7 +170,7 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
     -1;
   }
 
-  final def index(field : ValueObjectField[VOType]) : Int = {
+  final def index(field : ValueObjectField[_]) : Int = {
     var i = 0;
     for (f <- fields) if (f eq field) return i; else i += 1;
     -1;

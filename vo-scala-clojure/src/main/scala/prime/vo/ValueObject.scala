@@ -6,7 +6,7 @@ trait ValueObject extends ValueSource
 // with IndexedValueSource[Any]
 // with NamedValueSource[Any]
 {
-  type VOType <: ValueObject;
+  type VOType >: this.type with ValueObject <: ValueObject;
 
   /** Hints which fields are likely different from the `voSource`.
       Could return a false positive, but _not_ a false negative. */

@@ -1,6 +1,6 @@
 package primevc.tools.valueobjects.output;
 
-class Util
+class SUtil
 {
 	static public inline function addCapitalized(b:StringBuf, s:String):StringBuf
 	{

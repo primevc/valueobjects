@@ -234,14 +234,16 @@ abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protecte
 
   override def apply(vo : VO) : T;
 
-  def apply(self:VO, src:ValueSource, root:ValueSource, lazyVar:T): T = apply(src, None) match {
+  final def apply(src : ValueSource, bitIndex:Int, orElse : Any) : Any = src.anyAt(name, (id << 8) | bitIndex, orElse);
+
+  def apply(self:VO, src:ValueSource, root:ValueSource, lazyVar:T): T = apply(src, self.voManifest.index(this), None) match {
     case null => defaultValue;
     case v: T => v;
-    case None => if (root != self.voSource) /*eager*/ apply(self) else /*lazy*/ lazyVar;
+    case None => if (root eq self.voSource) /*lazy*/ lazyVar else /*eager*/ apply(self);
 
     case ValueSource(vo) =>
       if (root != src) /*eager convert to T*/ voCompanion(vo);
-      else /*lazy convert*/ if (self.voSource == ValueSource.empty) null.asInstanceOf[T] else lazyVar;
+      else /*lazy convert*/ if (self.voSource eq ValueSource.empty) null.asInstanceOf[T] else lazyVar;
   }
 }
 

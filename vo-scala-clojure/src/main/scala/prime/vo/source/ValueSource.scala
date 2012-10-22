@@ -137,13 +137,15 @@ object ValueSource
   }
 }
 
-class AnonymousValueSource(values : Any*) extends ValueSource {
-  def contains (idx: Int): Boolean                                    = values.length < idx;
+class AnonymousValueSource(val values : Any*) extends ValueSource {
+  def contains (index: Int): Boolean                                  = (index & 0xFF) < values.length;
   def contains (ignored: String, i: Int): Boolean                     = contains(i);
-  def anyAt    (ignored: String, i: Int, notFound: Any)     : Any     = if (i < values.length)         values(i)  else notFound;
-  def intAt    (ignored: String, i: Int, notFound: Int)     : Int     = if (i < values.length) Integer(values(i)) else notFound;
-  def doubleAt (ignored: String, i: Int, notFound: Double)  : Double  = if (i < values.length) Decimal(values(i)) else notFound;
-  def boolAt   (ignored: String, i: Int, notFound: Boolean) : Boolean = if (i < values.length) Boolean(values(i)) else notFound;
+  def anyAt    (ignored: String, i: Int, notFound: Any)     : Any     = { val idx = (i & 0xFF); if (idx < values.length)         values(idx)  else notFound; }
+  def intAt    (ignored: String, i: Int, notFound: Int)     : Int     = { val idx = (i & 0xFF); if (idx < values.length) Integer(values(idx)) else notFound; }
+  def doubleAt (ignored: String, i: Int, notFound: Double)  : Double  = { val idx = (i & 0xFF); if (idx < values.length) Decimal(values(idx)) else notFound; }
+  def boolAt   (ignored: String, i: Int, notFound: Boolean) : Boolean = { val idx = (i & 0xFF); if (idx < values.length) Boolean(values(idx)) else notFound; }
+
+  override def toString(): String = getClass.getName +"("+ values.mkString(",") +")";
 }
 
 case class SingleValueSource[@specialized(Int,Double) T](key : String, value : T) extends ValueSource with NamedValueSource[T] {

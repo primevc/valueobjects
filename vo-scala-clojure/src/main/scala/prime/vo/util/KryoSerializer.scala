@@ -5,21 +5,25 @@ package prime.vo.util;
 
 object KryoSerializer
 {
-	def decorate(kryo : Kryo, typeMap : IntMap[ValueObjectCompanion[_]]) {
-		kryo.addDefaultSerializer(classOf[ValueObject], this);
-		val serializer = new KryoSerializer(typeMap);
-
-    typeMap.foreachValue { voCompanion =>
+	def decorate(kryo : Kryo, typeMap : IntMap[ValueObjectCompanion[_ <: ValueObject]]) {
+		typeMap.foreachValue { voCompanion =>
       val voClass = voCompanion.empty.getClass;
       kryo.register(voClass, new KryoSerializer(voCompanion), voCompanion.manifest.ID + 100);
     }
 	}
 }
 
-final class KryoSerializer[VOType <: ValueObject](voCompanion : ValueObjectCompanion[VOType])
+final class KryoSerializer[VOType <: ValueObject](voCompanion : ValueObjectCompanion[VOType]) extends Serializer[VOType](true, true)
 {
-  def write (kryo:com.esotericsoftware.kryo.Kryo, out:com.esotericsoftware.kryo.io.Output, vo:VOType) {
-    
+  import java.lang.Integer._
+
+  def write (kryo:Kryo, out:io.Output, vo:VOType) {
+    out.writeInt(vo.voIndexSet);
+    //println("write vo `" + voCompanion.manifest.VOType.erasure.getName + "` voIndexSet = " + vo.voIndexSet);
+    vo.foreach { (f: ValueObjectField[vo.VOType], value: Any) =>
+      //println("write field `" + f.name + "` = " + value);
+      kryo.writeClassAndObject(out, value);
+    }
   }
 
   def create(kryo:Kryo, in: io.Input, clz:Class[VOType]): VOType = {

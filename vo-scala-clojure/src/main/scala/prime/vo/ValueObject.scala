@@ -42,14 +42,18 @@ trait ValueObject extends ValueSource
   /** The data-source this ValueObject wraps. */
   val voSource    : ValueSource;
 
-  /** Iterates over all set-fields and their values. */
-  def foreach (b : (ValueObjectField[VOType],Any) => Unit) : Unit;
+  /** Iterates over all set-fields and values for the indices in the given fieldIndexMask. */
+  def foreach (fieldIndexMask : Int)(b : (ValueObjectField[VOType],Any) => Unit) : Unit;
   /** True if given property ID, or field index has a value. */
   def contains(idx : Int)    : Boolean;
   /** True if given property name has a value. */
   def contains(key : String) : Boolean;
   /** Number of fields' with a non-default value. */
   def count : Int;
+  /** True if all Vectors and sub-ValueObjects recursively have been initialized from their ValueSources. */
+  def isRealized : Boolean;
+  /** Returns itself with all fields realized. */
+  def realized   : VOType;
 
   //
   // Default implementations
@@ -58,11 +62,8 @@ trait ValueObject extends ValueSource
 
   @inline final def contains(key : Symbol) : Boolean = this.contains(key.name);
 
-  /** True if all Vectors and sub-ValueObjects recursively have been initialized from their ValueSources. */
-  def isRealized : Boolean;
-  /** Returns itself with all fields realized. */
-  def realized   : VOType;
-
+  /** Iterates over all set-fields and their values. */
+  def foreach (b : (ValueObjectField[VOType],Any) => Unit) : Unit = foreach(voManifest.fieldIndexMask)(b);
   /**
     Conjoin `src` and `this`.
 
@@ -158,7 +159,8 @@ abstract class ValueObject_0 extends ValueObjectBase {
   protected[prime] def copy(src : ValueSource, root : ValueSource) : this.type = this;
   def copy() : this.type = this;
 
-  def foreach (f: (ValueObjectField[VOType], Any) => Unit) {}
+  override def foreach    (f: (ValueObjectField[VOType],Any) => Unit) {}
+  def foreach (zero : Int)(f: (ValueObjectField[VOType],Any) => Unit) {}
 }
 
 abstract class ValueObject_1 extends ValueObjectBase {
@@ -172,9 +174,13 @@ abstract class ValueObject_1 extends ValueObjectBase {
     if (voManifest.first(voSource,None) != mine) 1 << voManifest.lastFieldIndex else 0;
   }
 
-  def foreach (f: (ValueObjectField[VOType], Any) => Unit) {
+  override def foreach (f: (ValueObjectField[VOType], Any) => Unit) {
     val field = voManifest.first;
     if (count == 1) f(field, field(self));
+  }
+  def foreach (one : Int)(f: (ValueObjectField[VOType],Any) => Unit) {
+    val field = voManifest.first;
+    if (one == voIndexSet) f(field, field(self));
   }
 }
 

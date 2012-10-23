@@ -4,16 +4,23 @@ package prime.vo.source;
 class ScalaMapValueSource_String(map : scala.collection.Map[String,_]) extends ValueSource with NoPrimitives {
   def contains (name: String, ignored: Int)                : Boolean = map contains name;
   def anyAt    (name: String, ignored: Int, notFound: Any) : Any     = map get name getOrElse notFound;
+
+  override def toString = getClass.getSimpleName +"("+ map +")";
 }
 
 class ScalaMapValueSource_Symbol(map : scala.collection.Map[Symbol,_]) extends ValueSource with NoPrimitives {
   def contains (name: String, ignored: Int)                : Boolean = map contains Symbol(name);
   def anyAt    (name: String, ignored: Int, notFound: Any) : Any     = map get Symbol(name) getOrElse notFound;
+
+  override def toString = getClass.getSimpleName +"("+ map +")";
 }
 
 class ScalaMapValueSource_Int(map : scala.collection.Map[Int,_]) extends ValueSource with NoPrimitives {
-  def contains (ignored: String, idx : Int)                : Boolean = map.contains(idx) || map.contains(idx & 0xFF) || map.contains(idx >>> 8);
-  def anyAt    (ignored: String, idx : Int, notFound: Any) : Any     = map.get(idx) orElse map.get(idx & 0xFF) orElse map.get(idx  >>> 8) getOrElse notFound;
+  def contains (ignored: String, idx : Int)                : Boolean = map.contains(idx) || map.contains(idx >>> 8) || map.contains(idx & 0xFF);
+  def anyAt    (ignored: String, idx : Int, notFound: Any) : Any     = /* FIXME: Disallow TypeID 0, following commented block gives key collisions when VO has TypeID 0: *//* map.get(idx) orElse */
+                                                                       map.get(idx >>> 8) orElse map.get(idx & 0xFF) getOrElse notFound;
+
+  override def toString = getClass.getSimpleName +"("+ map +")";
 }
 
 class ScalaMapValueSource[K, V](map : scala.collection.Map[K,V]) extends ValueSource with NoPrimitives {
@@ -25,6 +32,8 @@ class ScalaMapValueSource[K, V](map : scala.collection.Map[K,V]) extends ValueSo
   def findKey  (name: String, orIdx: Int)                : Option[V] = find(name) orElse find(Symbol(name)) orElse find(orIdx) orElse find(orIdx & 0xFF) orElse find(orIdx >>> 8);
   def contains (name: String, orIdx: Int)                : Boolean   = findKey(name, orIdx) isDefined;
   def anyAt    (name: String, orIdx: Int, notFound: Any) : Any       = findKey(name, orIdx) getOrElse(notFound);
+
+  override def toString = getClass.getSimpleName +"("+ map +")";
 }
 
 object Map {

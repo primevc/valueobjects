@@ -7,15 +7,20 @@ package primevc.tools.valueobjects.output;
 
 class ScalaTypeMap implements CodeGenerator
 {
+	public var list : List<String>;
 	public var map : IntHash<String>;
 
 	public function new() {
 		map = new IntHash();
+		list = new List();
 	}
 
 	public function genClass(def : ClassDef) {
-		if (!def.isMixin)
-			map.set(def.index, def.fullName.substr(def.module.getPackageRoot().fullName.length + 1));
+		if (!def.isMixin && !map.exists(def.index)) {
+			var name = def.fullName.substr(def.module.getPackageRoot().fullName.length + 1);
+			list.add(name);
+			map.set(def.index, name);
+		}
 	}
 
 	public function genEnum(def:EnumDef) {}
@@ -168,7 +173,12 @@ class Scala extends ScalaBase, implements CodeGenerator
 			m.generateWith(map);
 			file.writeString("
 package "+ m.fullName +" {
-  object VO { final val typeMap = scala.collection.immutable.IntMap(");
+  object VO {
+  // Force correct initialization of ValueObject meta objects:\n  ");
+			for (type in map.list) {
+				file.writeString(type); file.writeString(";\n  ");
+			}
+			file.writeString("\n  final val typeMap = scala.collection.immutable.IntMap(");
 			var first = true;
 			for (index in map.map.keys()) {
 				if (first) first = false;
@@ -403,15 +413,16 @@ trait ")); a(def.name); a(" extends ");
 			// foreach
 			if (fields.length > 1)
 			{
-				a("\n  def foreach (f: (ValueObjectField["); a(def.name); a("], Any) => Unit) {\n");
-				a("    val voIndexSet = this._voIndexSet;\n    val voField = "); a(def.name); a(".field;\n");
+				a("\n  def foreach (fieldIndexMask : Int)(f: (ValueObjectField["); a(def.name); a("], Any) => Unit) {\n");
+				a("    val voIndexSet = this._voIndexSet & fieldIndexMask;\n    val voField = "); a(def.name); a(".field;\n");
 				if (!leafNode) { a("    val empty = "); a(def.name); a(".empty;\n"); }
 				for (p in fields)
 				{
 					if (!p.lazyInit()) {
-						a("    if ((voIndexSet"); if (!leafNode) spaces(longestSubFieldNameLength - 6); a(" & 0x"); a(StringTools.hex(1 << p.bitIndex(), 8)); a(") > 0)"); if (!leafNode) spaces(longestSubFieldNameLength - 8);
+						a("    if ((voIndexSet   "); if (!leafNode) spaces(longestSubFieldNameLength - 6); a(" & 0x"); a(StringTools.hex(1 << p.bitIndex(), 8)); a(") != 0)"); if (!leafNode) spaces(longestSubFieldNameLength - 8);
 					} else {
-						a("    if ("); if (p.isArray()) a("!"); a("this."); a(p.name.quote()); spaces(IntMath.max(6, longestSubFieldNameLength) - p.name.quote().length);
+						a("    if ((fieldIndexMask"); a(" & 0x"); a(StringTools.hex(1 << p.bitIndex(), 8)); a(") != 0 && ");
+						if (p.isArray()) a("!"); a("this."); a(p.name.quote()); spaces(IntMath.max(6, longestSubFieldNameLength) - p.name.quote().length);
 						if (!p.isArray()){ a(" != empty."); a(p.name.quote()); ac(")".code); } else { a(".isEmpty)  "); }
 						spaces(IntMath.max(8, longestSubFieldNameLength) - p.name.quote().length);
 					}

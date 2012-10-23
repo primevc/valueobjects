@@ -37,19 +37,18 @@ class VOPacker (out:OutputStream) extends ValuePacker(out)
   /** Packs specific valueobject fields as set in the fields bitmask.  */
   final def packValueObject(vo : ValueObject, manifest : ValueObjectManifest[_], fields : Int)
   {
-    var mixin = 0;
-    for (m <- manifest.mixins) if ((fields & m.fieldIndexMask) != 0) mixin += 1;
-    assert(mixin <= 7, "Packing ValueObjects with more than 7 mixins is currently not supported.");
+    val mixinCount = manifest.mixinCount(fields);
+    assert(mixinCount <= 7, "Packing ValueObjects with more than 7 mixins is currently not supported.");
 
-    println("manifest = %s, vo = %s, fields = %x, fieldBits = %x, mixin = %d, mixinIndexBitsReserved = %d".format(manifest,  vo,fields,fields >>> manifest.mixinIndexBitsReserved,mixin,manifest.mixinIndexBitsReserved));
+    println("manifest = %s, vo = %s, fields = %x, fieldBits = %x, mixinCount = %d, mixinIndexBitsReserved = %d".format(manifest,  vo,fields,fields >>> manifest.mixinIndexBitsReserved,mixinCount,manifest.mixinIndexBitsReserved));
 
     val fieldBits = fields >>> manifest.mixinIndexBitsReserved
-    packValueObjectHeader(manifest.ID, mixin, fieldBits);
+    packValueObjectHeader(manifest.ID, mixinCount, fieldBits);
     if (fieldBits != 0) packValueObjectFields(vo, manifest, fieldBits);
 
-    if (mixin > 0) for (m <- manifest.mixins)
+    if (mixinCount > 0) for (m <- manifest.mixins)
     {
-      mixin = (fields & m.fieldIndexMask) >>> m.indexBitsShifted;
+      val mixin = m.indexBitsShifted(fields);
       if (mixin != 0) {
           packValueObjectHeader(m.manifest.ID, 0, mixin);
           packValueObjectFields(vo, m.manifest, mixin);

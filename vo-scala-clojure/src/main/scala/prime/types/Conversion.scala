@@ -312,7 +312,7 @@ object Conversion
 
   //  -------
 
-  implicit def vo2ref[V <: ValueObject with ID](vo : V) : VORef[V] = if (vo._id != vo.voCompanion.empty.asInstanceOf[V]._id) new VORefImpl(vo._id, vo) else null;
+  implicit def vo2ref[V <: ValueObject with ID](vo : V) : VORef[V] = VORef(vo)
 
   //  -------
 

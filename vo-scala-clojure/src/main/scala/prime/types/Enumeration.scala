@@ -4,6 +4,7 @@ package prime.types;
 
 abstract class EnumValue
 {
+  def owner : Enum;
   val value : Int;
 
   /** The name of this enumeration. */
@@ -20,9 +21,9 @@ abstract class EnumValue
 abstract class Enum extends ClojureFn
 {
   type Value <: EnumValue;
-  val  Null   :     Value = null.asInstanceOf[Value];
-
-  val values : Set[Value];
+  def  Null   :     Value = null.asInstanceOf[Value];
+  val  ID     : Int;
+  val  values : Set[Value];
 
   protected def stringCatchAll(value : String): Value = throw new java.lang.NoSuchFieldException(value);
   protected def customValueOf (value : Any)    = try apply(Conversion.Integer(value)) catch { case _:Conversion.ConversionException => apply(Conversion.String(value)) }

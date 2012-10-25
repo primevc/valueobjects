@@ -7,23 +7,30 @@ package primevc.tools.valueobjects.output;
 
 class ScalaTypeMap implements CodeGenerator
 {
-	public var list : List<String>;
-	public var map : IntHash<String>;
+	public var list    : List   <String>;
+	public var map     : IntHash<String>;
+	public var enumMap : IntHash<String>;
 
 	public function new() {
-		map = new IntHash();
-		list = new List();
+		list    = new List();
+		map     = new IntHash();
+		enumMap = new IntHash();
 	}
+
+	function strippedName(def : TypeDefinition) return def.fullName.substr(def.module.getPackageRoot().fullName.length + 1)
 
 	public function genClass(def : ClassDef) {
 		if (!def.isMixin && !map.exists(def.index)) {
-			var name = def.fullName.substr(def.module.getPackageRoot().fullName.length + 1);
+			var name = strippedName(def);
 			list.add(name);
 			map.set(def.index, name);
 		}
 	}
 
-	public function genEnum(def:EnumDef) {}
+	public function genEnum(def:EnumDef) {
+		if (!enumMap.exists(def.index))
+			enumMap.set(def.index, strippedName(def));
+	}
 
 	public function newModule(module:Module) : CodeGenerator {
 		module.generateWith(this);
@@ -175,19 +182,24 @@ class Scala extends ScalaBase, implements CodeGenerator
 package "+ m.fullName +" {
   object VO {
   // Force correct initialization of ValueObject meta objects:\n  ");
+			var i = 0;
 			for (type in map.list) {
-				file.writeString(type); file.writeString(";\n  ");
+				file.writeString("implicit val voCompanion" + (i++) + " = "); file.writeString(type); file.writeString(";\n  ");
 			}
-			file.writeString("\n  final val typeMap = scala.collection.immutable.IntMap(");
-			var first = true;
-			for (index in map.map.keys()) {
-				if (first) first = false;
-				else file.writeString(",");
-				file.writeString("\n    " + index + " -> " + map.map.get(index));
+			for (thing in [{m:map.enumMap, n:"enumMap"}, {m:map.map, n:"typeMap"}]) {
+				file.writeString("\n  final val "+ thing.n +" = scala.collection.immutable.IntMap(");
+				var first = true;
+				for (index in thing.m.keys()) {
+					if (first) first = false;
+					else file.writeString(",");
+					file.writeString("\n    " + index + " -> " + thing.m.get(index));
+				}
+				file.writeString("
+  )");
+
 			}
 
-file.writeString("
-  )}
+file.writeString("}
 }
 ");
 		}
@@ -797,9 +809,9 @@ sealed abstract class ${def.name}(val value:Int, override val toString:String"))
 
 		addConversionParams(true);
 
-		a(Std.format(") extends EnumValue;\n
+		a(Std.format(") extends EnumValue { final def owner = ${def.name} };\n
 object ${def.name} extends Enum {
-  type Value = ${def.name};\n"));
+  type Value = ${def.name};\n  val  ID    = ${def.index};\n"));
 
 		var overrideValueOf = null;
 

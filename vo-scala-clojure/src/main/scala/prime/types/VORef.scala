@@ -20,15 +20,18 @@ object VORef {
   import Conversion._
   import ClojureProtocolVars._
 
-  def apply [V <: ValueObject with ID, IDType <: V#IDType](value : Any)(implicit V : IVOC[V], IDType : Any => IDType) : VORef[V] = unpack(value) match {
-    case r:VORefImpl[V] => assert(V.manifest.VOType.erasure.isAssignableFrom(r._cached.getClass), V.empty.getClass+" incompatible with "+r._cached.getClass); r
-    case r:  Ref[_] => new VORefImpl(r.ref, V.valueOf(r.vo_!));
+  def apply [V <: ValueObject with ID](vo : V)                              : VORef[V] = if (vo._id != vo.voCompanion.empty.asInstanceOf[V]._id) new VORefImpl(vo._id, vo) else null;
+  def apply [V <: ValueObject with ID](id : V#IDType)(implicit V : IVOC[V]) : VORef[V] = if (id != V.empty._id) new VORefImpl(id, V.empty) else null;
+
+  def apply [V <: ValueObject with ID, IDType <: V#IDType](value : Any)(V : IVOC[V], IDType : Any => IDType) : VORef[V] = unpack(value) match {
+    case r:VORefImpl[_] =>
+      require(V.manifest.VOType.erasure.isInstance(r._cached), V.empty.getClass+" incompatible with "+r._cached.getClass);
+      r.asInstanceOf[VORef[V]]
+    case r:  Ref[_] => new VORefImpl(IDType(r.ref), V.valueOf(r.vo_!));
     case V(value)   => vo2ref(value)
     case None       => throw NoInputException;
-    case value      => try VORef(V, IDType(value)) catch { case FailureException => vo_ref.invoke(value, V).asInstanceOf[VORef[V]]; }
+    case value      => try VORef(IDType(value))(V) catch { case FailureException => vo_ref.invoke(value, V).asInstanceOf[VORef[V]]; }
   }
-
-  def apply [V <: ValueObject with ID, IDType <: V#IDType](V : IVOC[V], id : IDType) : VORef[V] = if (id != V.empty._id) new VORefImpl(id, V.empty) else null;
 }
 
 protected[prime] object VORefImpl {
@@ -42,6 +45,7 @@ protected[prime] final class VORefImpl[V <: ValueObject with ID](val _id:V#IDTyp
  with IPending
  with ClojureFn
 {
+  assert(_cached != null, "VORefImpl requires _cached to be at least the empty ValueObject.");
   if (isDefined) require(_id != null, toString + "._id should be non-null when _cached is set.");
   
   @inline def isEmpty   = _cached.voCompanion.empty == _cached;

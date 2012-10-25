@@ -82,7 +82,7 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
     case v : ValueObject              => pack(v);
     case v if v.isInstanceOf[Ref[_]]  => pack(v);
     case v : mutable.ValueObject      => pack(v);
-    case v : Vector[_]                => pack(v);
+    case v : IndexedSeq[_]            => pack(v);
     case null                         => packNil();
     case v                            => println("Fallback: " + v.getClass); super.pack(v);
   }; this }

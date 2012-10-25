@@ -66,10 +66,10 @@ object VectorSerializer extends Serializer[IndexedSeq[_]](true,true)
       // All items have are of the same class
       val typeID = in.readInt(true);
       val registration = kryo.getClassResolver.getRegistration(typeID);
-      (0 until (header >> 1).toInt) map {i => kryo.readObject(in, registration.getType, registration.getSerializer) } toIndexedSeq
+      (0 until (header >>> 1).toInt) map {i => kryo.readObject(in, registration.getType, registration.getSerializer) } toIndexedSeq
     }
     else {
-      (0 until (header >> 1).toInt) map {i => kryo.readClassAndObject(in) } toIndexedSeq
+      (0 until (header >>> 1).toInt) map {i => kryo.readClassAndObject(in) } toIndexedSeq
     }
   }
 }
@@ -156,7 +156,7 @@ object FileRefSerializer extends Serializer[FileRef](true,true) {
 
 object VORefSerializer extends Serializer[VORefImpl[ValueObject with ID]](true,true) {
   def write (kryo:Kryo, out:io.Output, value:VORefImpl[ValueObject with ID]) {
-    ValueObjectSerializer.write(kryo,out,value._cached);
+    ValueObjectSerializer.write(kryo, out, value._cached);
     if (value.isEmpty) kryo.writeClassAndObject(out, value._id);
   }
   def read  (kryo:Kryo, in: io.Input, clz:Class[VORefImpl[ValueObject with ID]]): VORefImpl[ValueObject with ID] = {

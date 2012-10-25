@@ -154,16 +154,20 @@ object FileRefSerializer extends Serializer[FileRef](true,true) {
   }
 }
 
-object VORefSerializer extends Serializer[VORef[_]](true,true) {
-  def write (kryo:Kryo, out:io.Output, value:VORef[_]) {
-    kryo.writeClassAndObject(out, value._id);
-    if (value.isDefined) kryo.writeClassAndObject(out, value.get);
-    else                 kryo.writeClass(out, null);
+object VORefSerializer extends Serializer[VORefImpl[ValueObject with ID]](true,true) {
+  def write (kryo:Kryo, out:io.Output, value:VORefImpl[ValueObject with ID]) {
+    ValueObjectSerializer.write(kryo,out,value._cached);
+    if (value.isEmpty) kryo.writeClassAndObject(out, value._id);
   }
-  def read  (kryo:Kryo, in: io.Input, clz:Class[VORef[_]]): VORef[_] = {
-    val _id = kryo.readClassAndObject(in).asInstanceOf[(ValueObject with ID)#IDType];
-    val vo  = kryo.readClassAndObject(in).asInstanceOf[ ValueObject with ID        ];
-    new VORefImpl(_id, vo);
+  def read  (kryo:Kryo, in: io.Input, clz:Class[VORefImpl[ValueObject with ID]]): VORefImpl[ValueObject with ID] = {
+    val vo = ValueObjectSerializer.read(kryo, in, null).asInstanceOf[ValueObject with ID];
+    val id = {
+      if (vo eq vo.voCompanion.empty) // ValueObjectSerializer returns the empty object when no bits are read: now we're sure an ID will follow
+        kryo.readClassAndObject(in);
+      else
+        vo._id;
+    }
+    new VORefImpl(id.asInstanceOf[vo.IDType], vo);
   }
 }
 

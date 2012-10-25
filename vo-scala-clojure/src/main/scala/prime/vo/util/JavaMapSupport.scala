@@ -18,7 +18,7 @@ trait JavaMapSupport[KeyType] extends java.util.Map[KeyType,Any]
   def containsValue(value : Any) : Boolean = { foreach { (key, value2) => if (value == value2) return true; }; false; }
 
   final def get(key: Any)     = try voManifest(voManifest.index_!(key))(self) catch { case e:NoSuchFieldException => null };
-  final def isEmpty           = voIndexSet == 0;
+  final def isEmpty           = initIndexSet == 0 && voIndexSet == 0;
   final def size              = JavaMapSupport.this.count;
 
   abstract class VOIterator[T] extends java.util.Iterator[T]()

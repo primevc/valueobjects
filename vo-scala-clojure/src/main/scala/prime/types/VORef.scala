@@ -23,7 +23,8 @@ object VORef {
   def apply [V <: ValueObject with ID](vo : V)                              : VORef[V] = if (vo._id != vo.voCompanion.empty.asInstanceOf[V]._id) new VORefImpl(vo._id, vo) else null;
   def apply [V <: ValueObject with ID](id : V#IDType)(implicit V : IVOC[V]) : VORef[V] = if (id != V.empty._id) new VORefImpl(id, V.empty) else null;
 
-  def apply [V <: ValueObject with ID, IDType <: V#IDType](value : Any)(V : IVOC[V], IDType : Any => IDType) : VORef[V] = unpack(value) match {
+  def apply [V <: ValueObject with ID, IDType <: V#IDType](V  : IVOC[V], id : IDType) : VORef[V] = if (id != V.empty._id) new VORefImpl(id, V.empty) else null;
+  def apply [V <: ValueObject with ID, IDType <: V#IDType](value : Any)(implicit V : IVOC[V], IDType : Any => IDType) : VORef[V] = unpack(value) match {
     case r:VORefImpl[_] =>
       require(V.manifest.VOType.erasure.isInstance(r._cached), V.empty.getClass+" incompatible with "+r._cached.getClass);
       r.asInstanceOf[VORef[V]]

@@ -50,6 +50,8 @@ trait ValueObject extends ValueSource
   def contains(key : String) : Boolean;
   /** Number of fields' with a non-default value. */
   def count : Int;
+  /** True if all fields are empty or their default value. Tries not to realize the ValueObject. */
+  def isEmpty : Boolean;
   /** True if all Vectors and sub-ValueObjects recursively have been initialized from their ValueSources. */
   def isRealized : Boolean;
   /** Returns itself with all fields realized. */

@@ -23,10 +23,10 @@ class ScalaMapValueSource_Int(map : scala.collection.Map[Int,_]) extends ValueSo
   override def toString = getClass.getSimpleName +"("+ map +")";
 }
 
-class ScalaMapValueSource[K, V](map : scala.collection.Map[K,V]) extends ValueSource with NoPrimitives {
-  def find[T : Manifest](key : T) : Option[V] = key match {
-    case key : K => map.get(key)
-    case _       => None
+class ScalaMapValueSource[K : Manifest, V](map : scala.collection.Map[K,V]) extends ValueSource with NoPrimitives {
+  def find(key : Any) : Option[V] = key match {
+    case key if manifest[K].erasure.isInstance(key) => map.get(key.asInstanceOf[K])
+    case _                                          => None
   }
 
   def findKey  (name: String, orIdx: Int)                : Option[V] = find(name) orElse find(Symbol(name)) orElse find(orIdx) orElse find(orIdx & 0xFF) orElse find(orIdx >>> 8);
@@ -37,7 +37,7 @@ class ScalaMapValueSource[K, V](map : scala.collection.Map[K,V]) extends ValueSo
 }
 
 object Map {
-  def apply[K,V](keytype:Class[_], map : scala.collection.Map[K,V]) : ValueSource =
+  def apply[K : Manifest,V](keytype:Class[_], map : scala.collection.Map[K,V]) : ValueSource =
          if (keytype == classOf[String]) new ScalaMapValueSource_String(map.asInstanceOf[Map[String,_]]);
     else if (keytype == classOf[Symbol]) new ScalaMapValueSource_Symbol(map.asInstanceOf[Map[Symbol,_]]);
     else if (keytype == classOf[Int])    new ScalaMapValueSource_Int   (map.asInstanceOf[Map[Int,   _]]);

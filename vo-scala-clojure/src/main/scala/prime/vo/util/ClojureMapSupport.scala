@@ -7,7 +7,7 @@ package prime.vo.util
 object ClojureSupport {
   /** Executes field.get and wraps the result if it is a Scala Seq type */
   def get[T <: ValueObject](field : ValueObjectField[T], obj : T): AnyRef = field(obj) match {
-    case v:scala.collection.Seq[Any] => ScalaSeqWrapper(v)(field.valueType.convert);
+    case v:scala.collection.Seq[Any] => ScalaSeqWrapper(v)(field.valueType.convert,null);
     case v:AnyRef => v;
   }
 }
@@ -108,7 +108,7 @@ trait ClojureMapSupport extends IPersistentMap
     if (obj.asInstanceOf[AnyRef] eq this) true
     else obj match
     {
-      case vo : VOType =>
+      case vo : ValueObject =>
         // Uses initIndexSet to prevent unneccesary realizing of sub VOs.
         if (vo.getClass == this.getClass && (this.initIndexSet & voManifest.eagerIndexMask) != (vo.initIndexSet & voManifest.eagerIndexMask)) {
           false;
@@ -117,8 +117,9 @@ trait ClojureMapSupport extends IPersistentMap
         {
           val selfT = this.voManifest.VOType.erasure;
           val   voT = vo  .voManifest.VOType.erasure;
-          if      (selfT.isAssignableFrom(voT))
-            this.foreach { (field, value) => if (value != field(vo)                          ) return false; }
+          if      (selfT.isAssignableFrom(voT)) {
+            this.foreach { (field, value) => if (value != field(vo.asInstanceOf[VOType])     ) return false; }
+          }
           else if (voT.isAssignableFrom(selfT))
             vo  .foreach { (field, value) => if (value != field(this.asInstanceOf[vo.VOType])) return false; }
           else
@@ -128,17 +129,7 @@ trait ClojureMapSupport extends IPersistentMap
         }
 
       case m : java.util.Map[_,_] =>
-        (m match {
-          case vo : ValueObject =>
-            println("Comparing different types VOs: "+this.getClass+ " and "+ m.getClass)
-            foreach { (field, value) => if (value != field.get(vo)) return false; }
-            true;
-
-          case _ =>
-            println("Comparing VO to Map")
-            hasSameKeysAndValues(m)
-
-        }) && m.size == this.count;
+        hasSameKeysAndValues(m) && m.size == this.count;
 
       case _ => false
     }

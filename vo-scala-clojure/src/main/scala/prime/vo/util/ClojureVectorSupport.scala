@@ -11,7 +11,7 @@ package prime.vo.util
   This way we can have Scala and Clojure interop and in the (hopefully) near future
   use Scala's concatenation optimized Vectors.
 */
-case class ScalaSeqWrapper[A](underlying : Seq[A])(implicit val to_A : Any => A) extends java.util.AbstractList[A]
+case class ScalaSeqWrapper[A](underlying : Seq[A])(implicit val to_A : Any => A, val itemType : Manifest[A]) extends java.util.AbstractList[A]
  with IPersistentVector
  with ClojureFn
  with java.util.List[A]
@@ -35,9 +35,9 @@ case class ScalaSeqWrapper[A](underlying : Seq[A])(implicit val to_A : Any => A)
   def get(i : Int) = underlying(i)
 
   override def equals(any : Any) = any match {
-    case s:ScalaSeqWrapper[A] => s.underlying == underlying;
+    case s:ScalaSeqWrapper[_] => s.underlying == underlying;
     case v:IPersistentVector  => v.equals(this);
-    case s:Seq[A]             => s == underlying;
+    case s:Seq[_]             => s == underlying;
     case _                    => false;
   }
 
@@ -45,10 +45,10 @@ case class ScalaSeqWrapper[A](underlying : Seq[A])(implicit val to_A : Any => A)
   def empty = ClojureVectorSupport.emptyCljVector;
 
   def equiv(any : Any): Boolean = {
-    val s:Seq[A] = any match {
-      case s : ScalaSeqWrapper[A] => s.underlying;
-      case s :             Seq[A] => s;
-      case s :  java.util.List[A] => s;
+    val s:Seq[_] = any match {
+      case s : ScalaSeqWrapper[_] => s.underlying;
+      case s :             Seq[_] => s;
+      case s :  java.util.List[_] => s;
     }
     if (s.length != underlying.length) return false;
 
@@ -152,9 +152,9 @@ case class ClojureVectorWrapper[A](underlying : IPersistentVector)(implicit val 
   override def isEmpty = underlying.count == 0
 
   override def equals(any : Any) = any match {
-    case s:ClojureVectorWrapper[A] => s.underlying == underlying;
+    case s:ClojureVectorWrapper[_] => s.underlying == underlying;
     case v:IPersistentVector       => v.equals(underlying);
-    case s:Seq[A]                  => underlying.equals(s);
+    case s:Seq[_]                  => underlying.equals(s);
     case _                         => false;
   }
 }
@@ -162,12 +162,12 @@ case class ClojureVectorWrapper[A](underlying : IPersistentVector)(implicit val 
 object ClojureVectorSupport {
   final def emptyCljVector = ScalaSeqWrapper(IndexedSeq.empty)
 
-  implicit def asScala[A]( v : IPersistentVector )(implicit to_A : Any => A) : IndexedSeq[A] = v match {
-    case ScalaSeqWrapper(wrapped : Seq[A]) => wrapped.toIndexedSeq
+  implicit def asScala[A]( v : IPersistentVector )(implicit to_A : Any => A, typeA : Manifest[A]) : IndexedSeq[A] = v match {
+    case s @ ScalaSeqWrapper(wrapped) => if (typeA != null && s.itemType == typeA) wrapped.asInstanceOf[Seq[A]].toIndexedSeq else wrapped.map(to_A).toIndexedSeq
     case _ => ClojureVectorWrapper(v)
   }
 
-  implicit def asClojure[A]( v : Seq[A] )(implicit to_A : Any => A) : IPersistentVector = v match {
+  implicit def asClojure[A]( v : Seq[A] )(implicit to_A : Any => A, typeA : Manifest[A]) : IPersistentVector = v match {
     case ClojureVectorWrapper(wrapped) => wrapped
     case _ => ScalaSeqWrapper(v)
   }

@@ -84,8 +84,8 @@ protected[prime] final class VORefImpl[V <: ValueObject with ID](val _id:V#IDTyp
   }
 
   override def equals (other : Any) = (other.asInstanceOf[AnyRef] eq this) || (other match {
-    case o : VORefImpl[V] => o._id == this._id;
-    case o : VORef[V]     => try { o.get._id == this.get._id } catch { case _ => false; }
+    case o : VORefImpl[_] => o._id == this._id && _cached.voManifest.VOType.erasure.isInstance(o._cached);
+    case o : VORef[_]     => try { o._id == this._id && _cached.voManifest.VOType.erasure.isInstance(o.get) } catch { case _ => false; }
     case _ => false;
   })
 }

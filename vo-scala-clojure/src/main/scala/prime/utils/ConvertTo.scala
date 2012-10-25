@@ -49,19 +49,19 @@ object ConvertTo
   }.asInstanceOf[T]
 
   def vo[T <: ValueObject](value:AnyRef) : T = unpack(value) match {
-    case v:T => v
+    case v:ValueObject => v.asInstanceOf[T]
     case v:MessagePackValueObject => v.vo.asInstanceOf[T]
   }
   def voRef[T <: ValueObjectWithID](value:AnyRef)(implicit voType:Manifest[T], idType:Manifest[T#IDType]) : Ref[T] = unpack(value) match {
     case None => null
-    case v:Ref[T] => v
+    case v:Ref[_] => v.asInstanceOf[Ref[T]]
     case v:T => new Ref[T](v.voCompanion.asInstanceOf[IDAccessor[T]].idValue(v), v)
-    case v:MessagePackValueObject if (voType.erasure.isAssignableFrom(v.vo.getClass)) => voRef[T](v.vo.asInstanceOf[T])
+    case v:MessagePackValueObject if (voType.erasure.isInstance(v.vo)) => voRef[T](v.vo.asInstanceOf[T])
     case v:String if (classOf[String] == idType.erasure) => new Ref[T](string(v).asInstanceOf[T#IDType]) 
-//    case v:AnyRef if (voType.erasure.isAssignableFrom(v.getClass)) =>
+//    case v:AnyRef if (voType.erasure.isInstance(v)) =>
 //      val vo = v.asInstanceOf[T]
 //      new Ref[T](vo.voCompanion.asInstanceOf[IDAccessor[T]].idValue(vo), vo)
-    case v:AnyRef if (idType.erasure.isAssignableFrom(v.getClass)) => new Ref[T](v.asInstanceOf[T#IDType])
+    case v:AnyRef if (idType.erasure.isInstance(v)) => new Ref[T](v.asInstanceOf[T#IDType])
     case v:AnyRef => new Ref[T](ConvertTo[T#IDType](v))
 //    case _ => null.asInstanceOf[T]
   }

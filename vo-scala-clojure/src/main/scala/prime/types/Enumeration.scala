@@ -36,7 +36,7 @@ abstract class Enum extends ClojureFn
   final def apply(value : Symbol)      : Value = apply(value.name);
 
   def valueOf(value : Any): Value = Conversion.unpack(value) match {
-    case v : Value       => v
+    case v : EnumValue   => if (values(v.asInstanceOf[Value])) v.asInstanceOf[Value] else apply(v.toString)
     case v : String      => apply(v)
     case v : clojure.lang.Keyword     => apply(v)
     case v : Int         => apply(v)

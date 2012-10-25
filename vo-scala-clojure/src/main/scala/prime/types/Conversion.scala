@@ -6,6 +6,7 @@ package prime.types;
  import prime.utils.msgpack.MessagePackObjectId;
  import java.text.{ParseException, DecimalFormatSymbols, DecimalFormat}
  import java.util.{Locale}
+ import java.lang.Integer
  import scala.util.matching.Regex
 
 object Conversion
@@ -301,7 +302,7 @@ object Conversion
     case v:Array[_]       => v.map(converter).toIndexedSeq
     case v:ArrayType      => Vector(v)
     case v:Traversable[_] => Vector(v)
-    case v:CljIPVector    => prime.vo.util.ClojureVectorSupport.asScala(v)
+    case v:CljIPVector    => prime.vo.util.ClojureVectorSupport.asScala(v)(converter,null)
     case None             => throw NoInputException;
 
     case value =>

@@ -23,7 +23,7 @@ package object types
   type Interval = org.joda.time.Interval
   
   val emptyString    = "";
-  val emptyURI       = new URI("");
+  val emptyURI       = new URI("", true);
   val emptyEmailAddr = new EmailAddr("",null);
   val emptyFileRef   = new FileRef("",null);
   val emptyObjectId  = new ObjectId(Array[Byte](0,0,0,0,0,0,0,0,0,0,0,0));

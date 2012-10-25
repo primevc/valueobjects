@@ -18,7 +18,7 @@
     (.write w ^String (get str 0))
     (.write w "/")
     (.write w (.substring ^String (get str 1) 1))
-    (when (.isAssignableFrom scala.Product (class v))
+    (when (.isInstance scala.Product v)
       ; It's a case class with a String parameter
       (.write w " \"")
       (.write w (clojure.string/replace (.toString v) "\"" "\\\""))

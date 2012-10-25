@@ -108,10 +108,10 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
 
 object Util {
   final def bytesUsedInInt (n:Int) : Byte = {
-         if (n ==      0x000000 ) 0
-    else if (n == (n & 0x0000FF)) 1
-    else if (n == (n & 0x00FFFF)) 2
-    else if (n == (n & 0xFFFFFF)) 3
-    else                          4
+         if ( n         == 0) 0
+    else if ((n >>>  8) == 0) 1
+    else if ((n >>> 16) == 0) 2
+    else if ((n >>> 24) == 0) 3
+    else                      4
   }
 }

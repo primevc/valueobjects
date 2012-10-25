@@ -62,7 +62,7 @@ object RefArray
   def apply[V <: ValueObjectWithID](refs : java.util.List[V#IDType])
       (implicit manifest_IDType : Manifest[V#IDType], voManifest : Manifest[V]): RefArray[V] =
   {
-    val arr = scala.collection.JavaConversions.asScalaIterable(refs).toArray
+    val arr = scala.collection.JavaConversions.collectionAsScalaIterable(refs).toArray
     new RefArray(arr, new Array[V](arr.length))
   }
 }

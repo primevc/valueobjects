@@ -74,28 +74,25 @@ object VectorSerializer extends Serializer[IndexedSeq[_]](true,true)
   }
 }
 
+/** Does not retain the Chronology or Timezone. However, the instant is still the same point in time. */
 object DateSerializer extends Serializer[Date](true,true) {
-  def write (kryo:Kryo, out:io.Output, value:Date) {
-  }
-  def read  (kryo:Kryo, in: io.Input, clz:Class[Date]): Date = {
-    null;
-  }
+  def write (kryo:Kryo, out:io.Output, value :   Date)        { out.writeLong(value.getMillis, true); }
+  def read  (kryo:Kryo, in: io.Input,  clz:Class[Date]): Date = new Date( in.readLong(true) );
 }
 
+/** Does not retain the Chronology or Timezone. However, the instant is still the same point in time. */
 object DateTimeSerializer extends Serializer[DateTime](true,true) {
-  def write (kryo:Kryo, out:io.Output, value:DateTime) {
-  }
-  def read  (kryo:Kryo, in: io.Input, clz:Class[DateTime]): DateTime = {
-    null;
-  }
+  def write (kryo:Kryo, out:io.Output, value :   DateTime)            { out.writeLong(value.getMillis, true); }
+  def read  (kryo:Kryo, in: io.Input,  clz:Class[DateTime]): DateTime = new DateTime( in.readLong(true) );
 }
 
+/** Does not retain the Chronology or Timezone. However, it is still the same period in time. */
 object IntervalSerializer extends Serializer[Interval](true,true) {
   def write (kryo:Kryo, out:io.Output, value:Interval) {
+    out.writeLong(value.getStartMillis, true);
+    out.writeLong(value.getEndMillis  , true);
   }
-  def read  (kryo:Kryo, in: io.Input, clz:Class[Interval]): Interval = {
-    null;
-  }
+  def read  (kryo:Kryo, in: io.Input, clz:Class[Interval]): Interval = new Interval(in.readLong(true), in.readLong(true));
 }
 
 object EnumSerializer extends Serializer[EnumValue](true,true) {

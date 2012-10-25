@@ -7,8 +7,8 @@ package prime.utils.kryo;
 
 class VOKryo(val enumMap : IntMap[_ <: Enum], val typeMap : IntMap[ValueObjectCompanion[_ <: ValueObject]]) extends Kryo
 {
-  setRegistrationRequired(true);
-  setReferences(false);
+  setRegistrationRequired(true);  //[!] ValueObjectSerializer assumes this is true
+  setReferences(false);           //[!] ValueObjectSerializer assumes this is false
 
   val       vectorRegistration =   register(classOf[ Vector[_]    ],      VectorSerializer, 0x0A) // a: array
 /*val         dateRegistration =*/ register(classOf[ Date         ],        DateSerializer, 0x0B) // b: birthday, or d mirrored

@@ -45,6 +45,16 @@ final class KryoSerializer[VOType <: ValueObject](voCompanion : ValueObjectCompa
     case 4 => val bits = in.readInt()
               print("Read 4: "+ toBinaryString(bits) +"; "); bits;
   }
+  def writeFields(kryo:Kryo, out:io.Output, vo:VOType, mixin: ValueObjectMixin[_]) = vo.foreach(mixin.fieldIndexMask) { 
+    (f: ValueObjectField[vo.VOType], value: Any) =>
+      print("write value: " + value + "; ");
+      kryo.writeClassAndObject(out, value match {
+        case v : URI       => v.getEscapedURIReference
+        case v : EmailAddr => v.toString
+        case e : EnumValue => if (!classOf[scala.Product].isInstance(e)) e.value else e.toString;
+        case v => v
+      });
+  }
 
   def write (kryo:Kryo, out:io.Output, vo:VOType) {
     val fieldSet  = vo.voIndexSet;
@@ -60,7 +70,7 @@ final class KryoSerializer[VOType <: ValueObject](voCompanion : ValueObjectCompa
         // Self field index
         writeBytes(mixinBits, bits8 & 7, out);
         // Self data
-        vo.foreach(mixin.fieldIndexMask) { (f: ValueObjectField[vo.VOType], value: Any) => print("write value: " + value + "; "); kryo.writeClassAndObject(out,value); }
+        writeFields(kryo, out, vo, mixin);
       }
 
       // Per mixin header + typeID + data
@@ -79,7 +89,7 @@ final class KryoSerializer[VOType <: ValueObject](voCompanion : ValueObjectCompa
           // field index
           if ((bits8 & 0x40) != 0) writeBytes(mixinBits, bits8 & 7, out);
           // data
-          vo.foreach(mixin.fieldIndexMask) { (f: ValueObjectField[vo.VOType], value: Any) => print("write value: " + value + "; "); kryo.writeClassAndObject(out,value); }
+          writeFields(kryo, out, vo, mixin);
         }
       }
       println(".");

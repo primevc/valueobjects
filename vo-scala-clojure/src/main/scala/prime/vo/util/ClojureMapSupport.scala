@@ -49,7 +49,7 @@ trait ClojureMapSupport extends IPersistentMap
   
   final def entryAt(key: Any) = try {
     val f = voManifest.findOrNull(key);
-    if (f != null)
+    if (f != null && (f in self))
       new MapEntry(f.keyword, ClojureSupport.get(f,self));
     else
       null;
@@ -178,8 +178,14 @@ trait ClojureMapSupport extends IPersistentMap
   
   // IPersistentMap interfaces
   // ILookup
-  final def valAt (key: Any, notFound: AnyRef): AnyRef = nth(voManifest.index_!(key), notFound).asInstanceOf[AnyRef]
-  final def valAt (key: Any): AnyRef = valAt(key, null)
+  final def valAt (key: Any, notFound: AnyRef): AnyRef = {
+    val f  = voManifest.findOrNull(key);
+    if (f != null && (f in self))
+      ClojureSupport.get(f,self);
+    else
+      notFound;
+  }
+  final def valAt (key: Any) : AnyRef = valAt(key, null);
 
   // Iterable
   /**
@@ -194,8 +200,11 @@ trait ClojureMapSupport extends IPersistentMap
   // ---
   // IFn: VO as function from key to value
   // ---
-  override final def invoke  (key: AnyRef) : AnyRef = nth(voManifest.index_!(key))
-  override final def invoke  (key: AnyRef, notFound: AnyRef) : AnyRef = nth(voManifest.index_!(key), notFound.asInstanceOf[AnyRef])
+  override final def invoke  (key: AnyRef)                   : AnyRef = invoke(key, null)
+  override final def invoke  (key: AnyRef, notFound: AnyRef) : AnyRef = voManifest.findOrNull(key) match {
+    case null => throw new ValueObjectManifest.NoSuchFieldException(voManifest, key.toString);
+    case f    => if (f in self) ClojureSupport.get(f, self) else notFound;
+  }
 
   final def applyTo (arglist: ISeq) = RT.boundedLength(arglist, 20) match {
     case 1 => invoke(arglist.first);
@@ -207,5 +216,11 @@ trait ClojureMapSupport extends IPersistentMap
   // Indexed
   // ---
   final def nth(index : Int) = ClojureSupport.get(voManifest(index), self);
-  final def nth(index : Int, notFound:AnyRef) = if (this.contains(index)) this.nth(index) else notFound;
+  final def nth(index : Int, notFound:AnyRef) = {
+    val f  = voManifest.findOrNull(index);
+    if (f != null && (f in self))
+      ClojureSupport.get(f,self);
+    else
+      notFound;
+  }
 }

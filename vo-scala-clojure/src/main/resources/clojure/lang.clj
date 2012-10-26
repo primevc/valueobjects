@@ -5,6 +5,7 @@
 (ns clojure.lang)
 
 (defprotocol IFn
+  (applyTo [^clojure.lang.ISeq arglist])
   (invoke
           [ifn]
           [ifn a]

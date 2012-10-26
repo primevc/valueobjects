@@ -94,7 +94,7 @@
   [^Class votrait runtime-constructor props] [(class? votrait) (symbol? runtime-constructor)
                                               (sequential? props) (every? keyword? props)]
   (let [args (vo-constructor-arglist-from-map votrait props)]
-    `(if (or (map? ~'value-map) (eval? ~'value-map))
+    `(if (or (map? ~'value-map) (map? (eval? ~'value-map)))
       (let [~'construct-expr# (list '.apply '~(companion-object-symbol votrait) ~@args)
             ~'instance# (eval? ~'construct-expr#)]
         (if ~'instance#

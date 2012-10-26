@@ -26,7 +26,8 @@ final class VOInstanceUnpacker extends UnpackerImpl.VOInstance
 
   // ---
   // Value Objects
-  protected var values      : scala.collection.mutable.Builder[(Int, Any),scala.collection.immutable.Map[Int,Any]] = _
+  protected var indices     : collection.mutable.ArrayBuilder.ofInt = _
+  protected var values      : scala.collection.mutable.ArrayBuilder[Any] = _
   protected var mainType    : Int = -1;
   protected var typeID_sl8  : Int =  0;
   protected var bits8       : Int =  0;
@@ -35,7 +36,8 @@ final class VOInstanceUnpacker extends UnpackerImpl.VOInstance
   final def prepareValueObject(typeID: Int) {
     if (values == null) {
       //println("\n - New VO: " + typeID);
-      values   = scala.collection.immutable.Map.newBuilder[Int,Any];
+      indices  = new collection.mutable.ArrayBuilder.ofInt(); indices.sizeHint(32);
+      values   = collection.mutable.ArrayBuilder.make();       values.sizeHint(32);
       mainType = typeID;
     }
 
@@ -44,9 +46,10 @@ final class VOInstanceUnpacker extends UnpackerImpl.VOInstance
   }
 
   final def putValue(value: AnyRef) {
-    val i   = numberOfTrailingZeros(bits8);
-    values += ((typeID_sl8 | (fieldOffset + i), value));  //println(v._1.formatted("0x%x"), v._2);
-    bits8  ^= 1 << i;
+    val i    = numberOfTrailingZeros(bits8);
+    indices += typeID_sl8 | (fieldOffset + i);
+    values  += value;
+    bits8   ^= 1 << i;
     if (bits8 == 0) fieldOffset += 8;
   }
 
@@ -59,18 +62,18 @@ final class VOInstanceUnpacker extends UnpackerImpl.VOInstance
   final def getData = {
     val d = if (data != null) data else {
       //println("  -  Finished VO: " + mainType + "\n");
-      new MessagePackValueSource(mainType, values.result);
+      new MessagePackValueSource(mainType, indices.result, values.result);
     }
-    data = null; values = null; mainType = -1;
+    data = null; indices = null; values = null; mainType = -1;
     d
   }
 }
 
-class MessagePackValueSource(val typeID : Int, val map : scala.collection.Map[Int,_]) extends MessagePackObject with ValueSource with NoPrimitives {
-  def contains (ignored: String, idx : Int)                : Boolean = map.contains(idx >>> 8);
-  def anyAt    (ignored: String, idx : Int, notFound: Any) : Any     = map.get(idx >>> 8) getOrElse notFound;
+class MessagePackValueSource(val typeID : Int, val ids : Array[Int], val values : Array[Any]) extends MessagePackObject with ValueSource with NoPrimitives {
+  def contains (ignored: String, idx : Int)                : Boolean = { val id = idx >>> 8; for (i <- ids){ if (i == id) return true }; false }
+  def anyAt    (ignored: String, idx : Int, notFound: Any) : Any     = { val id = idx >>> 8; var i = 0; while (i < ids.length){ if (ids(i) == id) return values(i); i += 1; }; notFound }
 
-  override def toString = getClass.getSimpleName +"("+ map +")";
+  override def toString = getClass.getSimpleName +"("+ ids +", "+ values +")";
   override def typeID(baseTypeID:Int) = typeID;
   def messagePack(packer : Packer) = throw new UnsupportedOperationException("why would I?");
 }

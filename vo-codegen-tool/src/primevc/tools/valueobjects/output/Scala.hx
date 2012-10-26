@@ -664,6 +664,14 @@ trait ")); a(def.name); a(" extends ");
 			}
 			a(");\n");
 
+			if (def.implementedBy.iterator().hasNext()) {
+				// def subtype(...)
+				a("  override def subtype(typeID:Int) = typeID match {\n");
+					a("    case "); a(def.index + " => this;\n");
+					addSubtypeCases(def.implementedBy);
+				a("  }\n\n");
+			}
+
 			// def apply(...)
 			a("  def apply("); copyPrototype(true,true,true); a(") = empty.copy("); copyPrototype(false,false); a(");\n\n");
 		}
@@ -747,6 +755,13 @@ trait ")); a(def.name); a(" extends ");
 		a("}\n");
 
 		write(def.module.fullName, def);
+	}
+
+	function addSubtypeCases(types : Hash<BaseTypeDefinition>) {
+		for (subType in types) {
+			addSubtypeCases(subType.implementedBy);
+			a("    case "); a(subType.index + " => "); a(subType.fullName); a(";\n");
+		}
 	}
 
 	function addFieldTypeConstructor(t:PType, isRef:Bool) : Void

@@ -6,8 +6,9 @@
   (:require prime.types))
 
 (defprotocol ValueSource
-  (contains [this, name, idx])
+  (typeID   [this, ^int baseTypeID])
 
+  (contains [this, name, idx])
   (boolAt   [this, name, idx] [this, name, idx, notFound])
   (intAt    [this, name, idx] [this, name, idx, notFound])
   (doubleAt [this, name, idx] [this, name, idx, notFound])
@@ -43,3 +44,9 @@
   (as-source
     ([this] (->Map-ValueSource this))
     ([this valueobject-definition] (->Map-ValueSource this))))
+
+(extend-type org.msgpack.UnpackResult
+  ValueSourceable
+  (as-source
+    ([this] (.getData this))
+    ([this valueobject-definition] (.getData this))))

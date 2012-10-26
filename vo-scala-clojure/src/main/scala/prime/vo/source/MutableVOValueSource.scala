@@ -4,6 +4,8 @@ package prime.vo.source;
  import prime.types.Field;
 
 class MutableVOValueSource(vo : MutableValueObject) extends ValueSource with NoPrimitives {
+  override def typeID (baseTypeID : Int) : Int = vo.voCompanion.TypeID;
+
   def field    (name: String, idx: Int) : Field   = {
     val voc = vo.voCompanion;
     try voc.fieldNamed(name) catch { case _ => 

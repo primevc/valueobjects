@@ -146,6 +146,8 @@ abstract class ValueObjectBase extends ValueObject with ClojureMapSupport {
   override def toString = voManifest.VOType.erasure.getSimpleName + "(" +
     TraversableValueObject(this).map({ case (f, v) => f.symbol.name + " = " + v }).mkString(", ") +
   ")";
+
+  final override def typeID(baseTypeID:Int) = this.voManifest.ID;
 }
 
 abstract class ValueObject_0 extends ValueObjectBase {
@@ -226,7 +228,15 @@ trait ValueObjectCompanion[T <: ValueObject] {
   val fields   : Array[_ <: ValueObjectField[T]];
   val manifest : ValueObjectManifest[T];
 
-  def   apply(src : ValueSource) : T  = empty.conj(src, root = src)
-  def valueOf(any : Any)         : T  = any match { case vo if manifest.VOType.erasure.isInstance(vo) => vo.asInstanceOf[T]; case _ => apply(ValueSource(any, this)); }
+  def valueOf(any : Any)         : T  = any match {
+    case null => empty;
+    case vo if manifest.VOType.erasure.isInstance(vo) => vo.asInstanceOf[T];
+    case _ => apply(ValueSource(any, this));
+  }
+
+  /** Override to find a subtype ValueObjectCompanion of T, with the given typeID. */
+  def subtype(typeID : Int) : ValueObjectCompanion[_ <: T] = this;
+
+  def   apply(src : ValueSource) : T  = this.subtype(src.typeID(manifest.ID)).empty.conj(src, root = src)
   def unapply(any : Any)  : Option[T] = try Option(valueOf(any)) catch { case _ => None }
 }

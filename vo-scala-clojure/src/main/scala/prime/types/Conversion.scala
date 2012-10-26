@@ -336,7 +336,7 @@ object ClojureProtocolVars
   import clojure.lang.{RT, IFn}
   RT.loadResourceScript("prime/types.clj");
 
-  val object_id = RT.`var`("prime.types", "to-ObjectID" );
+  val object_id = RT.`var`("prime.types", "to-ObjectId" );
   val string    = RT.`var`("prime.types", "to-String"   );
   val boolean   = RT.`var`("prime.types", "to-Boolean"  );
   val integer   = RT.`var`("prime.types", "to-Integer"  );

@@ -13,14 +13,13 @@ import org.bson.types.ObjectId
  * To change this template use File | Settings | File Templates.
  */
 class MutableVOUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends UnpackerImpl.VOHelper {
-  def newObject = new VOInstanceUnpacker(voCompanionMap)
+  def newObject = new MutableVOInstanceUnpacker(voCompanionMap)
 }
 object MutableVOUnpacker {
   var defaultVOCompanionMap : IntMap[VOCompanion[_]] = _
-  val zerobitsLookupTable = Array(0,1,28,2,29,14,24,3,30,22,20,15,25,17,4,8,31,27,13,23,21,19,16,7,26,12,18,6,11,5,10,9)
 }
 
-class VOInstanceUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends UnpackerImpl.VOInstance
+class MutableVOInstanceUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends UnpackerImpl.VOInstance
 {
   var data : MessagePackObject = _
 
@@ -53,16 +52,14 @@ class VOInstanceUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends Unpack
   }
 
   final def putValue(value: AnyRef) {
-    // Thanks to http://graphics.stanford.edu/~seander/bithacks.html  and  https://gist.github.com/1319739
-    var i = MutableVOUnpacker.zerobitsLookupTable( (fields & -fields) * 0x077CB531 >>> 27 );
-    
+    val i = java.lang.Integer.numberOfTrailingZeros(fields);
     val field = fieldOffset + i
     //assert(vo != null, "Cannot write field:" + field + " = '" + value + "'' to null VO type:" + currentType)
     //println("putValue: %50s @ %2s in %s; i = %s, fieldOffset = %2s, fields = %6$s ".format(value,field,vo,i,fieldOffset,fields))
-    vo.voCompanion.putValue(vo, field, value)
+    vo.voCompanion.putValue(vo, field, value);
 
-    fields ^= (1 << i);
-    if (fields == 0) fieldOffset += 8 - i; // index fixup for last bit
+    fields ^= 1 << i;
+    if (fields == 0) fieldOffset += 8;// - i; // index fixup for last bit
   }
 
   final def fieldgroupRequiresMoreValues = fields != 0

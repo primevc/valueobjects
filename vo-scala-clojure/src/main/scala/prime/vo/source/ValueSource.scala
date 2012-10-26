@@ -14,8 +14,10 @@ trait ValueSourceable {
 */
 
 trait ValueSource extends ValueSourceable {
-  def contains(name:String, orIdx:Int): Boolean;
+  /** Returns baseTypeID, or if known: the type-id this ValueSource represents. */
+  def typeID  (baseTypeID : Int)      : Int     = baseTypeID;;
 
+  def contains(name:String, orIdx:Int): Boolean;
   /**
     Tries to lookup the value for the given name. 
     If that fails: tries to lookup the value by index.
@@ -129,11 +131,11 @@ object ValueSource
   def unapply(any : Any) : Option[ValueSource] = try Option(apply(any)) catch { case _ => None }
 
   object empty extends ValueSource {
-    def contains (name: String, i: Int)                                      = false;
-    def anyAt    (name: String, i: Int, notFound: Any)         : Any         = notFound;
-    def intAt    (name: String, i: Int, notFound: Int)         : Int         = notFound;
-    def doubleAt (name: String, i: Int, notFound: Double)      : Double      = notFound;
-    def boolAt   (name: String, i: Int, notFound: Boolean)     : Boolean     = notFound;
+    def contains (name: String, i: Int)                               = false;
+    def anyAt    (name: String, i: Int, notFound: Any)     : Any      = notFound;
+    def intAt    (name: String, i: Int, notFound: Int)     : Int      = notFound;
+    def doubleAt (name: String, i: Int, notFound: Double)  : Double   = notFound;
+    def boolAt   (name: String, i: Int, notFound: Boolean) : Boolean  = notFound;
   }
 }
 

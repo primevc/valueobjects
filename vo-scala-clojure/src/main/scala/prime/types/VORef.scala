@@ -31,7 +31,14 @@ object VORef {
     case r:  Ref[_] => new VORefImpl(IDType(r.ref), V.valueOf(r.vo_!));
     case V(value)   => vo2ref(value)
     case None       => throw NoInputException;
-    case value      => try VORef(IDType(value))(V) catch { case FailureException => vo_ref.invoke(value, V).asInstanceOf[VORef[V]]; }
+    case value      =>
+      value match {
+        case src:source.ValueSource => try { return VORef(V(src)); } catch { case FailureException => }
+        case _ =>
+      }
+      try VORef(IDType(value))(V) catch {
+        case FailureException => vo_ref.invoke(value, V).asInstanceOf[VORef[V]];
+      }
   }
 }
 
@@ -89,8 +96,8 @@ protected[prime] final class VORefImpl[V <: ValueObject with ID](val _id:V#IDTyp
   }
 
   override def equals (other : Any) = (other.asInstanceOf[AnyRef] eq this) || (other match {
-    case o : VORefImpl[_] => o._id == this._id && _cached.voManifest.VOType.erasure.isInstance(o._cached);
-    case o : VORef[_]     => try { o._id == this._id && _cached.voManifest.VOType.erasure.isInstance(o.get) } catch { case _ => false; }
+    case o : VORefImpl[_] => o._id == this._id && (_cached.voManifest.VOType.erasure.isInstance(o._cached)   /* Needed?: *//* || o._cached.voManifest.VOType.erasure.isInstance(_cached)*/);
+    case o : VORef[_]     => try { o._id == this._id && (_cached.voManifest.VOType.erasure.isInstance(o.get) /* Needed?: *//* ||     o.get.voManifest.VOType.erasure.isInstance(_cached)*/) } catch { case _ => false; }
     case _ => false;
   })
 }

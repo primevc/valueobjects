@@ -45,7 +45,7 @@ object VectorSerializer extends Serializer[IndexedSeq[_]](true,true)
       if (value.forall(_.getClass eq firstClass))
       {
         // All items are of the same class
-        val registration = kryo.getClassResolver.getRegistration(value.head.getClass);
+        val registration = kryo.getRegistration(value.head.getClass);
         val serializer   = registration.getSerializer;
         out.writeLong(value.size << 1L | 1, true);
         out.writeInt (registration.getId , true);
@@ -180,6 +180,9 @@ object ObjectIdSerializer extends Serializer[ObjectId](true,true) {
   }
 }
 
+
+case class KryoValueSource(val typeID : Int, val ids : Array[Int], val values : Array[Any]) extends source.IntAnyArrayValueSource
+
 /**
   Format pseudocode:
     0. [kryo ID: ValueObjectSerializer]
@@ -195,7 +198,7 @@ object ValueObjectSerializer extends Serializer[ValueObject](true,true)
 {
   import java.lang.Integer._
 
-  def writeFields(kryo:Kryo, out:io.Output, vo:ValueObject, mixin: ValueObjectMixin[_]) = vo.foreach(mixin.fieldIndexMask) {
+  def writeFields(kryo:Kryo, out:io.Output, vo:ValueObject, mixin: ValueObjectMixin) = vo.foreach(mixin.fieldIndexMask) {
     (f: ValueObjectField[vo.VOType], value: Any) => kryo.writeClassAndObject(out, value);
   }
 
@@ -208,7 +211,7 @@ object ValueObjectSerializer extends Serializer[ValueObject](true,true)
     {
       val mixin         = voManifest.metaMixin;
       var fieldsToWrite = fieldSet & ~mixin.fieldIndexMask;
-      val mixinBits     = mixin.indexBitsShifted(fieldSet) << 1L | (if (fieldsToWrite != 0) 1 /* Lowest bit 1: mixin follows after this. */ else 0);
+      val mixinBits     = (mixin.indexBitsShifted(fieldSet) << 1L) | (if (fieldsToWrite != 0) 1 /* Lowest bit 1: mixin follows after this. */ else 0);
       // Write fields header
       out.writeLong(mixinBits, true);
       // Write data if header isn't just a "mixin follows" bit.
@@ -218,11 +221,11 @@ object ValueObjectSerializer extends Serializer[ValueObject](true,true)
       var i = 0; while(fieldsToWrite != 0)
       {
         val mixin      = voManifest.mixins(i);
-        val mixinBits  = mixin.indexBitsShifted(fieldsToWrite);
+        val mixinBits  = mixin.indexBitsShifted(fieldSet);
         if (mixinBits != 0)
         {
           fieldsToWrite &= ~mixin.fieldIndexMask;
-          val header = mixinBits << 1L | (if (fieldsToWrite != 0) 1 /* Lowest bit 1: mixin follows after this. */ else 0);
+          val header = (mixinBits << 1L) | (if (fieldsToWrite != 0) 1 /* Lowest bit 1: mixin follows after this. */ else 0);
           out.writeInt (mixin.manifest.ID, true);
           out.writeLong(header           , true);
           writeFields(kryo, out, vo, mixin);
@@ -234,27 +237,22 @@ object ValueObjectSerializer extends Serializer[ValueObject](true,true)
   }
 
 
-  def readFields(kryo:Kryo, in: io.Input, typeID:Int, fieldSet:Int, data:scala.collection.mutable.Builder[(Int, Any),scala.collection.immutable.Map[Int,Any]]) {
-    assert(fieldSet != 0);
-
+  def readFields(kryo:Kryo, in: io.Input, typeID:Int, fieldSet:Int, indices:collection.mutable.ArrayBuilder.ofInt, values:collection.mutable.ArrayBuilder[Any]) {
     val typeID_sl8 = typeID << 8;
-    var i    = numberOfTrailingZeros(fieldSet);
-    var bits = fieldSet >>> i;
-    do {
+    var bits = fieldSet;
+    while (bits != 0)
+    {
       val classID = in.readInt(true);
       val value   = if (classID == 0x12 /* 0x10 + 2, bypass registration lookup and read directly as ValueSource */) readAsSource(kryo, in); else {
         val reg = kryo.getClassResolver.getRegistration(classID - 2);
         reg.getSerializer.asInstanceOf[Serializer[AnyRef]].read(kryo, in, reg.getType.asInstanceOf[Class[AnyRef]]);
       }
+      val i = numberOfTrailingZeros(bits);
 
-      data += ((typeID_sl8 | i, value));
-      // calc next field ID
-      bits >>>= 1;
-      val inc = numberOfTrailingZeros(bits);
-      bits >>>= inc;
-      i      += 1 + inc;
+      indices += typeID_sl8 | i
+      values  += value;
+      bits    ^= 1 << i;
     }
-    while (bits != 0);
   }
 
   def readAsSource(kryo:Kryo, in: io.Input)              : source.ValueSource = readAsSource(kryo, in, in.readInt(true));
@@ -262,19 +260,21 @@ object ValueObjectSerializer extends Serializer[ValueObject](true,true)
       var mixinHeader = in.readLong(true);
       if (mixinHeader != 0)
       {
-        val data = scala.collection.immutable.Map.newBuilder[Int,Any];
+        val indices = new collection.mutable.ArrayBuilder.ofInt(); indices.sizeHint(32);
+        val  values = collection.mutable.ArrayBuilder.make[Any]();  values.sizeHint(32);
+
         // Self-data
         if (mixinHeader != 1) // Header isn't just a 'mixin follows' marker byte
-          readFields(kryo, in, voType, (mixinHeader >>> 1) toInt, data);
+          readFields(kryo, in, voType,  (mixinHeader >>> 1) toInt, indices, values);
 
         // Mixins
         while ((mixinHeader & 1) != 0) {
           val mixinID = in.readInt (true);
           mixinHeader = in.readLong(true);
-          readFields(kryo, in, mixinID, (mixinHeader >>> 1) toInt, data);
+          readFields(kryo, in, mixinID, (mixinHeader >>> 1) toInt, indices, values);
         }
 
-        new source.ScalaMapValueSource_Int(data.result);
+        KryoValueSource(voType, indices.result, values.result);
       }
       else source.ValueSource.empty;
   }

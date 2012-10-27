@@ -731,7 +731,7 @@ trait ")); a(def.name); a(" extends ");
 			for (p in fields) if (!p.isTransient()) {
 				if (!first) a(", "); else first = false;
 				while(bit++ < p.bitIndex()) {
-					trace((bit - 1) +" != "+ p.bitIndex());
+					//trace((bit - 1) +" != "+ p.bitIndex());
 					a("null, ");
 				}
 				a(p.name.quote());
@@ -745,13 +745,17 @@ trait ")); a(def.name); a(" extends ");
 
 		a("  object manifest extends {\n");
 		a("    final val ID  = "); a(def.index + ";\n");
+		// Fields
 		if (fields.length > 1) {
 			a("    val fields = "); a(def.name); a(".fields");
 		} else if (fields.length == 1) {
 			a("    final val first          = "); a(def.name); a(".field."); a(fields[0].name.quote()); a(";\n  ");
 			a("    final val lastFieldIndex = "); a(Std.string(fields[0].bitIndex()));
 		}
-		a(";\n  } with ValueObjectManifest_"); a(fields.length == 0? "0[" : fields.length == 1? "1[" : "N["); a(def.name); a("];\n");
+		// Mixins
+		a("\n    val mixins = Array[ValueObjectMixin](");
+		addMixinManifests(def, def.supertypes);
+		a(");\n  } with ValueObjectManifest_"); a(fields.length == 0? "0[" : fields.length == 1? "1[" : "N["); a(def.name); a("];\n");
 		a("}\n");
 
 		write(def.module.fullName, def);
@@ -761,6 +765,19 @@ trait ")); a(def.name); a(" extends ");
 		for (subType in types) {
 			addSubtypeCases(subType.implementedBy);
 			a("    case "); a(subType.index + " => "); a(subType.fullName); a(";\n");
+		}
+	}
+
+	function addMixinManifests(owner : BaseTypeDefinition, types : List<BaseTypeDefinition>, first = true) {
+		for (mixin in types) {
+			addMixinManifests(owner, mixin.supertypes, first);
+			if (!mixin.supertypes.isEmpty()) first = false;
+			if (first) first = false; else a(", ");
+			var mask = 0; for (p in mixin.propertiesDefined) mask |= 1 << owner.bitIndex(p);
+
+			var lastProp = null;
+			var offset = 0; for (p in owner.propertiesSorted) if (p.definedIn == mixin) { if (lastProp != null) offset = lastProp.bitIndex() + 1; break; } else if (!p.hasOption(transient)) lastProp = p;
+			a("ValueObjectMixin("); a(offset + ", 0x"); a(StringTools.hex(mask)); a(", "); a(mixin.fullName); a(".manifest)");
 		}
 	}
 

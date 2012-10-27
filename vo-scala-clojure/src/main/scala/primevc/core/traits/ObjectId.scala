@@ -50,5 +50,6 @@ object ObjectId
     val id     =  field.id;
     val first  =  field.id;
     val lastFieldIndex = 0;
+    val mixins = Array[ValueObjectMixin]();
   } with ValueObjectManifest_1[ObjectId];
 }

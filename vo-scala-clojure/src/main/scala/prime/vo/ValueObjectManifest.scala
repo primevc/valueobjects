@@ -35,9 +35,9 @@ trait ValueObjectManifest[VOType <: ValueObject]
   /** Returns the index of the ValueObjectField for the given `field`, or -1 if not found. */
   def index(field : ValueObjectField[_]) : Int;
 
-  val mixins : Array[ValueObjectMixin[_ >: VOType <: ValueObject]];
+  val mixins : Array[ValueObjectMixin];
   /** The fields defined in this ValueObject, not in any super types. */
-  val metaMixin : ValueObjectMixin[VOType];
+  val metaMixin : ValueObjectMixin;
 
   val first  : ValueObjectField[VOType];
   def firstFieldSet(data : VOType)                   : ValueObjectField[VOType];
@@ -61,7 +61,7 @@ trait ValueObjectManifest[VOType <: ValueObject]
     for (m <- mixins) if ((fields & m.fieldIndexMask) != 0) count += 1;
     count;
   }
-  final def mixinManifest(id : Int): ValueObjectMixin[_ >: VOType] = if (id == this.ID) metaMixin else { for (m <- mixins) if (m.manifest.ID == id) return m; null; }
+  final def mixinManifest(id : Int): ValueObjectMixin = if (id == this.ID) metaMixin else { for (m <- mixins) if (m.manifest.ID == id) return m; null; }
 
   final def index  (key : Keyword) : Int = index(key.sym.getName)
   final def index  (key : Symbol)  : Int = index(key.name)
@@ -98,13 +98,12 @@ trait ValueObjectManifest[VOType <: ValueObject]
   final def symbol   (idx : Int) = apply(idx).symbol;
 
   final def fieldMask(mask:Int, field : ValueObjectField[VOType]) = mask | (1 << index(field));
+
+  protected def makeMetaMixin = ValueObjectMixin(if (mixins.isEmpty) 0 else java.lang.Integer.numberOfTrailingZeros(java.lang.Integer.highestOneBit(mixins.last.fieldIndexMask)) + 1, this.fieldIndexMask ^ mixinIndexMask, this);
 }
 
-case class ValueObjectMixin[VOType <: ValueObject](fieldIndexMask : Int, manifest : ValueObjectManifest[_ >: VOType <: ValueObject]) {
+case class ValueObjectMixin(numberOfIndexBitsShifted : Int, fieldIndexMask : Int, manifest : ValueObjectManifest[_ <: ValueObject]) {
   import Integer._
-  /** The number of bits this mixin's voIndexSet is shifted to the left inside the subtype's voIndexSet. */
-  @inline
-  final def numberOfIndexBitsShifted = numberOfTrailingZeros( /*Integer.lowestOneBit(*/fieldIndexMask/*)*/ );
   /** Returns the field-set masked and left-shifted to 0-position, so that bit 0 is the mixin's field-set 0. */
   @inline
   final def indexBitsShifted(fieldSet : Int) = (fieldSet & fieldIndexMask) >>> numberOfIndexBitsShifted;
@@ -130,12 +129,12 @@ abstract class ValueObjectManifest_1[VOType <: ValueObject : Manifest] extends V
   def numFields      = 1;
   val fieldIndexMask = 1 << lastFieldIndex;
   val lazyIndexMask  = if (first isLazy) fieldIndexMask else 0;
-  val eagerIndexMask = if (first isLazy) 0 else fieldIndexMask;
+  val eagerIndexMask = if (first isLazy) 0 else fieldIndexMask;/*
   val mixins         = ValueObjectManifest.getMixinManifests[VOType](VOType.erasure).map(m => ValueObjectMixin(
     if (first != null && first.VOTypeID == m.ID) fieldIndexMask else 0, m
-  ));
+  ));*/
   val mixinIndexMask = mixins.headOption.map(_.fieldIndexMask).getOrElse(0);
-  val metaMixin      = ValueObjectMixin(this.fieldIndexMask ^ mixinIndexMask, this);
+  val metaMixin      = makeMetaMixin;
 
 
   final def findOrNull(idx : Int)    = if (index(idx) == lastFieldIndex) first else null;
@@ -159,12 +158,12 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
   val lazyIndexMask  = fields.filter(f => f != null && f.isLazy).foldLeft(0)(fieldMask);
   val fieldIndexMask = fields.filter(f => f != null            ).foldLeft(0)(fieldMask);
   val eagerIndexMask = fieldIndexMask ^ lazyIndexMask;
-  val lastFieldIndex = index(fields.last);
+  val lastFieldIndex = index(fields.last);/*
   val mixins         = ValueObjectManifest.getMixinManifests[VOType](VOType.erasure).map(m => ValueObjectMixin(
     fields.filter(f => f != null && f.VOTypeID == m.ID).foldLeft(0)(fieldMask), m
-  ));
+  ));*/
   val mixinIndexMask = mixins.foldLeft(0) { (mask,mixin) => mask | mixin.fieldIndexMask }
-  val metaMixin      = ValueObjectMixin(this.fieldIndexMask ^ mixinIndexMask, this);
+  val metaMixin      = makeMetaMixin;
 
 
   final def findOrNull(idx : Int)    : ValueObjectField[VOType] = index(idx) match { case -1 => null; case i => fields(i); }

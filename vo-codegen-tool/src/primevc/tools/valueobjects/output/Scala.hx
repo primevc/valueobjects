@@ -240,10 +240,8 @@ import prime.types.ValueTypes._;
 		// Inferred Class metadata
 
 		var leafNode                  = true;
-		var onlyBooleans              = true;
 		var onlyDoubles               = true;
 		var onlyIntegers              = true;
-		var hasBooleans               = false;
 		var hasDoubles                = false;
 		var hasIntegers               = false;
 		var lastField                 = null;
@@ -305,23 +303,22 @@ import prime.types.ValueTypes._;
 			switch(p.type)
 			{
 				case Tdef(pt):
-					onlyBooleans = onlyDoubles = onlyIntegers = false;
+					onlyDoubles = onlyIntegers = false;
 					switch(pt) {
 						case Tenum (_):
 						case Tclass(_): if (!p.isReference()) leafNode = false;
 					}
 
 				case Tarray(t,_,_):
-					onlyBooleans = onlyDoubles = onlyIntegers = false;
+					onlyDoubles = onlyIntegers = false;
 					if (leafNode) leafNode = t.isSingleValue();
 
-				case Tinteger(_,_,_): onlyBooleans = onlyDoubles  = false; hasIntegers = true;
-				case Tdecimal(_,_,_): onlyBooleans = onlyIntegers = false; hasDoubles  = true;
-				case Tbool(_):        onlyDoubles  = onlyIntegers = false; hasBooleans = true;
+				case Tinteger(_,_,_): onlyDoubles  = false; hasIntegers = true;
+				case Tdecimal(_,_,_): onlyIntegers = false; hasDoubles  = true;
 
-				case Turi, Turl, TuniqueID, Tstring, TfileRef, Temail, Tcolor, Tdate, Tdatetime, Tinterval,
+				case Tbool(_), Turi, Turl, TuniqueID, Tstring, TfileRef, Temail, Tcolor, Tdate, Tdatetime, Tinterval,
 				     TenumConverter(_), TclassRef(_):
-				    onlyBooleans = onlyDoubles = onlyIntegers = false;
+				    onlyDoubles = onlyIntegers = false;
 			}
 		}
 
@@ -371,7 +368,6 @@ trait ")); a(def.name); a(" extends ");
 		function voSourceAt(p:Property, localEmpty = false) return 'At("'+ p.name +'", '+ propHex(p) +', '+ (localEmpty? 'this' : def.fullName +'.empty') + ((p.type.isTclass() && p.type.getPTypedef().unpackPTypedef() == def)? '' : '.' + p.name.quote()) +')';
 		function anyAt     (p:Property, localEmpty = false) return 'voSource.any'    + voSourceAt(p, localEmpty);
 		function intAt     (p:Property, localEmpty = false) return '          voSource.int' + voSourceAt(p, localEmpty);
-		function boolAt    (p:Property, localEmpty = false) return '         voSource.bool' + voSourceAt(p, localEmpty);
 		function doubleAt  (p:Property, localEmpty = false) return '       voSource.double' + voSourceAt(p, localEmpty);
 
 		if (!def.isMixin)
@@ -400,10 +396,9 @@ trait ")); a(def.name); a(" extends ");
 			if (leafNode) { if (fields.length > 0) a(" with LeafNode"); }
 			else          a(" with BranchNode");
 
-			if      (onlyBooleans) a(" with Booleans");
-			else if (onlyDoubles)  a(" with Doubles");
+			if      (onlyDoubles)  a(" with Doubles");
 			else if (onlyIntegers) a(" with Integers");
-			else if (!(hasBooleans || hasDoubles || hasIntegers)) a(" with NoPrimitives");
+			else if (!(hasDoubles || hasIntegers)) a(" with NoPrimitives");
 
 			a(" {\n");
 			// VOType, voCompanion, voManifest
@@ -496,13 +491,11 @@ trait ")); a(def.name); a(" extends ");
 				}
 			}
 
-			if (hasBooleans || hasDoubles || hasIntegers)
+			if (hasDoubles || hasIntegers)
 			{
-				if (!(onlyIntegers || onlyDoubles))
-					unboxedAt("bool",  "Boolean", "Boolean", hasBooleans, function (p) return switch (p.type) { default: false; case Tbool(_): true; });
-				if (!(onlyBooleans || onlyIntegers))
+				if (!onlyIntegers)
 					unboxedAt("double", "Double", "Decimal", hasDoubles,  function (p) return switch (p.type) { default: false; case Tdecimal(_,_,_): true; });
-				if (!(onlyBooleans || onlyDoubles))
+				if (!onlyDoubles)
 					unboxedAt("int",    "Int",    "Integer", hasIntegers, function (p) return switch (p.type) { default: false; case Tinteger(_,_,_): true; });
 			}
 
@@ -603,7 +596,6 @@ trait ")); a(def.name); a(" extends ");
 	      			switch (p.type) {
 	      				case Tinteger(_,_,_): a(   intAt(p, true));
 						case Tdecimal(_,_,_): a(doubleAt(p, true));
-						case Tbool(_):        a(  boolAt(p, true));
 						default:
 							if (p.isReference()) {
 								var idType = p.type.getPTypedef().unpackPTypedef().as(ClassDef).getIDPropertyFromTWithProperties().type;

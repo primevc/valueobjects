@@ -29,31 +29,20 @@ trait ValueSource extends ValueSourceable {
     Returns 'notFound if both name and index are empty/missing/unknown/undefined.
   */
   def anyAt   (name: String, idx: Int, notFound: Any     ): Any;
-  def boolAt  (name: String, idx: Int, notFound: Boolean ): Boolean;
   def doubleAt(name: String, idx: Int, notFound: Double  ): Double;
   def intAt   (name: String, idx: Int, notFound: Int     ): Int;
 
   def anyAt   (name: String, idx: Int): Any     =    anyAt(name, idx, null);
-  def boolAt  (name: String, idx: Int): Boolean =   boolAt(name, idx, false);
   def doubleAt(name: String, idx: Int): Double  = doubleAt(name, idx, Double.NaN);
   def intAt   (name: String, idx: Int): Int     =    intAt(name, idx, Int.MinValue);
 
   final def as_source = this;
 }
 
-trait Booleans {
-  this : ValueSource =>
-
-  final override def anyAt   (name: String, idx: Int, notFound: Any   ): Any      = if (contains(name,idx)) boolAt(name, idx) else notFound;
-  final override def intAt   (name: String, idx: Int, notFound: Int   ): Int      = if (contains(name,idx)) (if (boolAt(name, idx)) 1   else 0)   else notFound;
-  final override def doubleAt(name: String, idx: Int, notFound: Double): Double   = if (contains(name,idx)) (if (boolAt(name, idx)) 1.0 else 0.0) else notFound;
-}
-
 trait Integers {
   this : ValueSource =>
 
   final override def anyAt   (name: String, idx: Int, notFound: Any    ): Any     = if (contains(name,idx)) intAt(name, idx) else notFound;
-  final override def boolAt  (name: String, idx: Int, notFound: Boolean): Boolean = 0 < intAt(name, idx, if (notFound) 1 else 0);
   final override def doubleAt(name: String, idx: Int, notFound: Double ): Double  = intAt(name, idx, notFound.toInt) toDouble
 }
 
@@ -61,14 +50,12 @@ trait Doubles {
   this : ValueSource =>
 
   final override def anyAt   (name: String, idx: Int, notFound: Any    ): Any     = if (contains(name,idx)) doubleAt(name, idx) else notFound;
-  final override def boolAt  (name: String, idx: Int, notFound: Boolean): Boolean = 0.0 < doubleAt(name, idx, if (notFound) 1.0 else 0.0);
   final override def intAt   (name: String, idx: Int, notFound: Int    ): Int     = doubleAt(name, idx, notFound.toDouble) toInt
 }
 
 trait NoPrimitives {
   this : ValueSource =>
 
-  final override def boolAt  (name: String, idx: Int, notFound: Boolean): Boolean = if (contains(name,idx)) Boolean(anyAt(name,idx)) else notFound;
   final override def intAt   (name: String, idx: Int, notFound: Int    ): Int     = if (contains(name,idx)) Integer(anyAt(name,idx)) else notFound;
   final override def doubleAt(name: String, idx: Int, notFound: Double ): Double  = if (contains(name,idx)) Decimal(anyAt(name,idx)) else notFound;
 }
@@ -135,7 +122,6 @@ object ValueSource
     def anyAt    (name: String, i: Int, notFound: Any)     : Any      = notFound;
     def intAt    (name: String, i: Int, notFound: Int)     : Int      = notFound;
     def doubleAt (name: String, i: Int, notFound: Double)  : Double   = notFound;
-    def boolAt   (name: String, i: Int, notFound: Boolean) : Boolean  = notFound;
   }
 }
 
@@ -145,7 +131,6 @@ class AnonymousValueSource(val values : Any*) extends ValueSource {
   def anyAt    (ignored: String, i: Int, notFound: Any)     : Any     = { val idx = (i & 0xFF); if (idx < values.length)         values(idx)  else notFound; }
   def intAt    (ignored: String, i: Int, notFound: Int)     : Int     = { val idx = (i & 0xFF); if (idx < values.length) Integer(values(idx)) else notFound; }
   def doubleAt (ignored: String, i: Int, notFound: Double)  : Double  = { val idx = (i & 0xFF); if (idx < values.length) Decimal(values(idx)) else notFound; }
-  def boolAt   (ignored: String, i: Int, notFound: Boolean) : Boolean = { val idx = (i & 0xFF); if (idx < values.length) Boolean(values(idx)) else notFound; }
 
   override def toString(): String = getClass.getName +"("+ values.mkString(",") +")";
 }
@@ -158,5 +143,4 @@ case class SingleValueSource[@specialized(Int,Double) T](key : String, value : T
   def anyAt    (name: String, i: Int, notFound: Any)     : Any     = if (name == key) value          else notFound;
   def intAt    (name: String, i: Int, notFound: Int)     : Int     = if (name == key) Integer(value) else notFound;
   def doubleAt (name: String, i: Int, notFound: Double)  : Double  = if (name == key) Decimal(value) else notFound;
-  def boolAt   (name: String, i: Int, notFound: Boolean) : Boolean = if (name == key) Boolean(value) else notFound;
 }

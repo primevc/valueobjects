@@ -9,7 +9,6 @@
   (typeID   [this, ^int baseTypeID])
 
   (contains [this, name, idx])
-  (boolAt   [this, name, idx] [this, name, idx, notFound])
   (intAt    [this, name, idx] [this, name, idx, notFound])
   (doubleAt [this, name, idx] [this, name, idx, notFound])
   (anyAt    [this, name, idx] [this, name, idx, notFound]))
@@ -29,12 +28,10 @@
       (or (contains? map name) (contains? map idx)))
 
     (anyAt    [this, name idx notFound] (or (map name) (map (keyword name)) (map idx) notFound))
-    (boolAt   [this, name idx notFound] (prime.types/to-Boolean (.anyAt this name idx notFound)))
     (intAt    [this, name idx notFound] (prime.types/to-Integer (.anyAt this name idx notFound)))
     (doubleAt [this, name idx notFound] (prime.types/to-Decimal (.anyAt this name idx notFound)))
 
     (anyAt    [this, name idx]          (.anyAt    this name idx nil))
-    (boolAt   [this, name idx]          (.boolAt   this name idx false))
     (intAt    [this, name idx]          (.intAt    this name idx Integer/MIN_VALUE))
     (doubleAt [this, name idx]          (.doubleAt this name idx Double/NaN))
 )

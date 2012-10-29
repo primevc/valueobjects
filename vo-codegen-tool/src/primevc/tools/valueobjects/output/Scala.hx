@@ -872,25 +872,13 @@ object ${def.name} extends Enum {
 				a(");\n");
 			}
 		}
-
-		var monotoneIncr = true;
-		for (i in 0 ... enumerations.length) if (enumerations[i].intValue != i) { monotoneIncr = false; break; }
-
-		if (false&&monotoneIncr) {
-			a("\n  @inline final def apply(v:Int) = values(v);\n  final val values = Array[Value](");
-			var first = true;
-			for (e in enumerations) { if (first) first = false; else a(", "); if (e.type == null){ a("_"); a(e.name); } else a("null"); }
-			a(");");
+		a("\n  final def apply(v: Int) : Value = v match {");
+		for (e in enumerations) if (e.type == null)
+		{
+        	a("\n    case " + e.intValue); a(" => _"); a(e.name);
 		}
-		else {
-			a("\n  final def apply(v: Int) : Value = v match {");
-			for (e in enumerations) if (e.type == null)
-			{
-	        	a("\n    case " + e.intValue); a(" => _"); a(e.name);
-			}
-			a("\n    case _ => this.Null");
-			a("\n  }");
-		}
+		a("\n    case _ => this.Null");
+		a("\n  }");
 
 		var first = true;
 		a("\n  final val valueSet : Set[Value] = Set(_");

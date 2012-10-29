@@ -136,7 +136,6 @@ trait ClojureMapSupport extends IPersistentMap
 
   def equiv(obj: AnyRef) : Boolean = if (obj eq this) true else obj match {
     case m : java.util.Map[_,_] if (!(m.isInstanceOf[IPersistentMap] && !m.isInstanceOf[MapEquivalence])) =>
-      println("Comparing VO to MapEquivalence")
       this == obj;
 
     case _ => false

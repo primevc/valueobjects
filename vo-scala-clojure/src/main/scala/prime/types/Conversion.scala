@@ -294,15 +294,25 @@ object Conversion
 
   def Vector[T] (value:IndexedSeq[T])                                   : IndexedSeq[T] = value
   def Vector[T] (value:Array[T])                                        : IndexedSeq[T] = value
-  def Vector[T] (value:ArrayType)       (implicit converter : Any => T) : IndexedSeq[T] = Vector(value.asArray)
   def Vector[T] (value:Traversable[T])                                  : IndexedSeq[T] = value.toIndexedSeq
-  def Vector[T] (value:Traversable[_])  (implicit converter : Any => T) : IndexedSeq[T] = value.map(converter).toIndexedSeq
+  def Vector[T] (value:ArrayType)       (implicit converter : Any => T) : IndexedSeq[T] = Vector(value.asArray.asInstanceOf[Array[AnyRef]])
+  def Vector[T] (value:Traversable[_])  (implicit converter : Any => T) : IndexedSeq[T] = value.view.map(converter).toIndexedSeq
+  def Vector[T] (value:Array[AnyRef])   (implicit converter : Any => T) : IndexedSeq[T] = {
+    val v = IndexedSeq.newBuilder[T];
+    v.sizeHint(value.length);
+    var i = 0; while (i < value.length) {
+      v += converter(value(i));
+      i += 1;
+    };
+    v.result
+  }
 
   def Vector[T](value:Any)(implicit converter : Any => T) : IndexedSeq[T] = unpack(value) match {
-    case v:Array[_]       => v.map(converter).toIndexedSeq
+    case v:Array[AnyRef]  => Vector(v)
     case v:ArrayType      => Vector(v)
-    case v:Traversable[_] => Vector(v)
     case v:CljIPVector    => prime.vo.util.ClojureVectorSupport.asScala(v)(converter,null)
+    case v:Array[_]       => v.view.map(converter).toIndexedSeq
+    case v:Traversable[_] => Vector(v)
     case None             => throw NoInputException;
 
     case value =>

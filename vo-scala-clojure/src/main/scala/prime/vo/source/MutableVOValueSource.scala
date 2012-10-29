@@ -3,7 +3,8 @@ package prime.vo.source;
  import prime.vo.mutable.{ValueObject => MutableValueObject}
  import prime.types.Field;
 
-class MutableVOValueSource(vo : MutableValueObject) extends ValueSource with NoPrimitives {
+trait MutableVOValueSourceLike extends ValueSource with NoPrimitives {
+  val vo : MutableValueObject;
   override def typeID (baseTypeID : Int) : Int = vo.voCompanion.TypeID;
 
   def field    (name: String, idx: Int) : Field   = {
@@ -15,6 +16,8 @@ class MutableVOValueSource(vo : MutableValueObject) extends ValueSource with NoP
   def contains (name: String, idx: Int)                : Boolean = field(name,idx) match { case f:Field => vo.fieldIsSet_?(f.name);                                             case null => false; }
   def anyAt    (name: String, idx: Int, notFound: Any) : Any     = field(name,idx) match { case f:Field if vo.fieldIsSet_?(f.name) => vo.voCompanion.getValue(vo, f.name.name); case _ => notFound; }
 }
+
+class MutableVOValueSource(val vo : MutableValueObject) extends MutableVOValueSourceLike
 
 object MutableVOValueSource {
   implicit def apply(vo : MutableValueObject) : ValueSource = new MutableVOValueSource(vo);

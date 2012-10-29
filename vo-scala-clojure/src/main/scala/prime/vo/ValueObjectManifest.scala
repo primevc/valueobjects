@@ -173,21 +173,21 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
     if (n <= 32) {
       if ((fieldIndexMask & (1 << n)) != 0) return n;
     } else {
-      var i = 0;
-      for (f <- fields) if (f != null && f.id == n) return i; else i += 1;
+      val fields = this.fields; var i = 0;
+      while (i < fields.length) { val f = fields(i); if (f != null && f.id == n) return i; else i += 1; }
     }
     -1;
   }
 
   final def index(name : String) : Int = {
-    var i = 0;
-    for (f <- fields) if (f != null && (f.name == name)) return i; else i += 1;
+    val fields = this.fields; var i = 0;
+    while (i < fields.length) { val f = fields(i); if (f != null && (f.name == name)) return i; else i += 1; }
     -1;
   }
 
   final def index(field : ValueObjectField[_]) : Int = {
-    var i = 0;
-    for (f <- fields) if (f eq field) return i; else i += 1;
+    val fields = this.fields; var i = 0;
+    while (i < fields.length) if (fields(i) eq field) return i; else i += 1;
     -1;
   }
 
@@ -249,15 +249,17 @@ abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protecte
 
   override def apply(vo : VO) : T;
 
+  @inline
   final def apply(src : ValueSource, bitIndex:Int, orElse : Any) : Any = src.anyAt(name, (id << 8) | bitIndex, orElse);
 
+  @inline
   def apply(self:VO, src:ValueSource, root:ValueSource, lazyVar:T): T = apply(src, self.voManifest.index(this), None) match {
     case null => defaultValue;
     case v if defaultValue.voManifest.VOType.erasure.isInstance(v) => v.asInstanceOf[T];
     case None => if (root eq self.voSource) /*lazy*/ lazyVar else /*eager*/ apply(self);
 
     case ValueSource(vo) =>
-      if (root != src) /*eager convert to T*/ voCompanion(vo);
+      if (!(root eq src)) /*eager convert to T*/ voCompanion(vo);
       else /*lazy convert*/ if (self.voSource eq ValueSource.empty) null.asInstanceOf[T] else lazyVar;
   }
 }

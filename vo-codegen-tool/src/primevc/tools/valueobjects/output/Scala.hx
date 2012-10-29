@@ -843,11 +843,13 @@ sealed abstract class ${def.name}(val value:Int, override val toString:String"))
 
 		a(Std.format(") extends EnumValue { final def owner = ${def.name} };\n
 object ${def.name} extends Enum {
-  type Value = ${def.name};\n  val  ID    = ${def.index};\n"));
+  type Value = ${def.name};\n  val  ID    = ${def.index};\n\n"));
 
 		var overrideValueOf = null;
 
-		for (e in def.enumerations)
+		var enumerations = Lambda.array(def.enumerations);
+		enumerations.sort(function(a,b){ return a.intValue - b.intValue; });
+		for (e in enumerations)
 		{
 			if (e.type != null)
 			{
@@ -871,9 +873,27 @@ object ${def.name} extends Enum {
 			}
 		}
 
-		var first = true;
+		var monotoneIncr = true;
+		for (i in 0 ... enumerations.length) if (enumerations[i].intValue != i) { monotoneIncr = false; break; }
 
-		a("\n  final val values : Set[Value] = Set(_");
+		if (false&&monotoneIncr) {
+			a("\n  @inline final def apply(v:Int) = values(v);\n  final val values = Array[Value](");
+			var first = true;
+			for (e in enumerations) { if (first) first = false; else a(", "); if (e.type == null){ a("_"); a(e.name); } else a("null"); }
+			a(");");
+		}
+		else {
+			a("\n  final def apply(v: Int) : Value = v match {");
+			for (e in enumerations) if (e.type == null)
+			{
+	        	a("\n    case " + e.intValue); a(" => _"); a(e.name);
+			}
+			a("\n    case _ => this.Null");
+			a("\n  }");
+		}
+
+		var first = true;
+		a("\n  final val valueSet : Set[Value] = Set(_");
 		for (e in def.enumerations) if (e.type == null) {
 			if (first) first = false; else a(", _");
 			a(e.name);
@@ -882,7 +902,7 @@ object ${def.name} extends Enum {
 
   		for (conv in def.conversions)
 		{
-			a("  final def from"); a(conv.name.substr(2)); a("(str:String) : Value = values.find(_."); a(conv.name); a(" == str).getOrElse(apply(str));\n");
+			a("  final def from"); a(conv.name.substr(2)); a("(str:String) : Value = valueSet.find(_."); a(conv.name); a(" == str).getOrElse(apply(str));\n");
 		}
 		a("}");
 

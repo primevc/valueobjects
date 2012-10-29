@@ -50,3 +50,9 @@
   (as-source
     ([this] (.getData this))
     ([this valueobject-definition] (.getData this))))
+
+(extend-type prime.vo.mutable.ValueObject
+  ValueSourceable
+  (as-source
+    ([this] (new prime.vo.source.MutableVOValueSource this))
+    ([this valueobject-definition] (as-source this))))

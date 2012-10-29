@@ -41,7 +41,7 @@ final class VOInstanceUnpacker extends UnpackerImpl.VOInstance
       mainType = typeID;
     }
 
-    typeID_sl8 = typeID << 8;
+    typeID_sl8  = typeID << 8;
     fieldOffset = 0;
   }
 
@@ -69,11 +69,6 @@ final class VOInstanceUnpacker extends UnpackerImpl.VOInstance
   }
 }
 
-class MessagePackValueSource(val typeID : Int, val ids : Array[Int], val values : Array[Any]) extends MessagePackObject with ValueSource with NoPrimitives {
-  def contains (ignored: String, idx : Int)                : Boolean = { val id = idx >>> 8; for (i <- ids){ if (i == id) return true }; false }
-  def anyAt    (ignored: String, idx : Int, notFound: Any) : Any     = { val id = idx >>> 8; var i = 0; while (i < ids.length){ if (ids(i) == id) return values(i); i += 1; }; notFound }
-
-  override def toString = getClass.getSimpleName +"("+ ids +", "+ values +")";
-  override def typeID(baseTypeID:Int) = typeID;
+class MessagePackValueSource(val typeID : Int, val ids : Array[Int], val values : Array[Any]) extends MessagePackObject with IntAnyArrayValueSource {
   def messagePack(packer : Packer) = throw new UnsupportedOperationException("why would I?");
 }

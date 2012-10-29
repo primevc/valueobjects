@@ -21,15 +21,15 @@ abstract class EnumValue
 abstract class Enum extends ClojureFn
 {
   type Value <: EnumValue;
-  def  Null   :     Value = null.asInstanceOf[Value];
-  val  ID     : Int;
-  val  values : Set[Value];
+  def  Null     :     Value = null.asInstanceOf[Value];
+  val  ID       : Int;
+  val  valueSet : Set[Value];
 
   protected def stringCatchAll(value : String): Value = throw new java.lang.NoSuchFieldException(value);
   protected def customValueOf (value : Any)    = try apply(Conversion.Integer(value)) catch { case _:Conversion.ConversionException => apply(Conversion.String(value)) }
 
-  def       apply(value : Int)         : Value = values.find(_.value    == value) getOrElse(Null);
-  def       apply(value : String)      : Value = values.find(_.toString == value) getOrElse(stringCatchAll(value));
+  def       apply(value : Int)         : Value;// = values.find(_.value    == value) getOrElse(Null);
+  def       apply(value : String)      : Value = valueSet.find(_.toString == value) getOrElse(stringCatchAll(value));
   final def apply(value : Long)        : Value = apply(value.toInt);
   final def apply(value : org.msgpack.`object`.RawType)     : Value = apply(value.asString);
   final def apply(value : org.msgpack.`object`.IntegerType) : Value = apply(value.asInt);
@@ -37,14 +37,14 @@ abstract class Enum extends ClojureFn
   final def apply(value : Symbol)      : Value = apply(value.name);
 
   def valueOf(value : Any): Value = Conversion.unpack(value) match {
-    case v : EnumValue   => if (values(v.asInstanceOf[Value])) v.asInstanceOf[Value] else apply(v.toString)
-    case v : String      => apply(v)
-    case v : clojure.lang.Keyword     => apply(v)
-    case v : Int         => apply(v)
-    case v : Long        => apply(v)
+    case v : clojure.lang.Keyword             => apply(v)
     case v : org.msgpack.`object`.IntegerType => apply(v)
     case v : org.msgpack.`object`.RawType     => apply(v)
+    case v : String      => apply(v)
+    case v : Int         => apply(v)
+    case v : Long        => apply(v)
     case v : Symbol      => apply(v)
+    case v : EnumValue   => if (valueSet(v.asInstanceOf[Value])) v.asInstanceOf[Value] else apply(v.toString)
     case None            => throw Conversion.NoInputException;
     case v               => customValueOf(v)
   }

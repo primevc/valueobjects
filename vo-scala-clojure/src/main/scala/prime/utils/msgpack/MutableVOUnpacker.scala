@@ -1,6 +1,7 @@
 package prime.utils.msgpack
 
 import prime.vo.mutable.{VOCompanion, ValueObject}
+import prime.vo.source._
 import collection.immutable.IntMap
 import org.msgpack.{Packer, MessagePackObject, UnpackerImpl}
 import org.bson.types.ObjectId
@@ -75,7 +76,7 @@ class MutableVOInstanceUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends
   }
 }
 
-class MessagePackValueObject(val vo  : ValueObject) extends MessagePackObject {
+class MessagePackValueObject(val vo  : ValueObject) extends MessagePackObject with MutableVOValueSourceLike {
   def messagePack(packer : Packer) = packer.asInstanceOf[MutableVOPacker].pack(vo);
 }
 class MessagePackObjectId   (val oid : ObjectId)    extends MessagePackObject {

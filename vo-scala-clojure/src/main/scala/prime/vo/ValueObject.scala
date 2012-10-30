@@ -40,7 +40,7 @@ trait ValueObject extends ValueSource
   def voManifest  : ValueObjectManifest [VOType];
   def voCompanion : ValueObjectCompanion[VOType];
   /** The data-source this ValueObject wraps. */
-  val voSource    : ValueSource;
+  @transient val voSource : ValueSource;
 
   /** Iterates over all set-fields and values for the indices in the given fieldIndexMask. */
   def foreach (fieldIndexMask : Int)(b : (ValueObjectField[VOType],Any) => Unit) : Unit;
@@ -198,21 +198,21 @@ abstract class ValueObject_4(_voIndexSet0 : Int, _srcDiff0 : Int) extends ValueO
   def initIndexSet = _voIndexSet;
 }
 
-abstract class ValueObject_8(protected val _voIndexSet : Byte, protected val _srcDiff : Byte) extends ValueObjectBase {
+abstract class ValueObject_8(protected val _voIndexSet : Byte, @transient protected val _srcDiff : Byte) extends ValueObjectBase {
   def voIndexSet : Int = _voIndexSet;
   def srcDiff    : Int = _srcDiff;
 
   def initIndexSet = _voIndexSet;
 }
 
-abstract class ValueObject_16(protected val _voIndexSet : Short, protected val _srcDiff : Short) extends ValueObjectBase {
+abstract class ValueObject_16(protected val _voIndexSet : Short, @transient protected val _srcDiff : Short) extends ValueObjectBase {
   def voIndexSet : Int = _voIndexSet;
   def srcDiff    : Int = _srcDiff;
 
   def initIndexSet = _voIndexSet;
 }
 
-abstract class ValueObject_32(protected val _voIndexSet : Int, protected val _srcDiff : Int) extends ValueObjectBase {
+abstract class ValueObject_32(protected val _voIndexSet : Int, @transient protected val _srcDiff : Int) extends ValueObjectBase {
   def voIndexSet : Int = _voIndexSet;
   def srcDiff    : Int = _srcDiff;
 
@@ -228,7 +228,7 @@ trait ValueObjectCompanion[T <: ValueObject] {
   val fields   : Array[_ <: ValueObjectField[T]];
   val manifest : ValueObjectManifest[T];
 
-  def valueOf(any : Any)         : T  = any match {
+  def valueOf(any : Any) : T  = any match {
     case null => empty;
     case vo if manifest.VOType.erasure.isInstance(vo) => vo.asInstanceOf[T];
     case _ => apply(ValueSource(any, this));

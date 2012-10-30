@@ -2,7 +2,7 @@ package prime.types;
  import prime.vo.util.ClojureFn;
  import clojure.lang.{ISeq, RT};
 
-abstract class EnumValue
+abstract class EnumValue extends java.io.Serializable
 {
   def owner : Enum;
   val value : Int;

@@ -374,7 +374,7 @@ trait ")); a(def.name); a(" extends ");
 		{
 
 			a("\nfinal class "); a(def.name); a("VO protected["); a(def.module.getPackageRoot().name != ""? def.module.getPackageRoot().name : def.module.name);
-			a("](\n  "); if (fields.length > 1) a("voIndexSet : Int, srcDiff : Int, "); a("final val voSource : ValueSource,\n\n");
+			a("](\n  "); if (fields.length > 1) a("voIndexSet : Int, srcDiff : Int, "); a("@transient final val voSource : ValueSource,\n\n");
 
 			for (p in fields)
 			{

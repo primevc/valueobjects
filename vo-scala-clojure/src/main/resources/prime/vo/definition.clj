@@ -3,7 +3,8 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.vo.definition
-  (:use prime.vo.printer, trammel.core, [taoensso.timbre :as timbre :only (trace debug info warn error fatal spy)])
+  (:use prime.vo.printer, [taoensso.timbre :as timbre :only (trace debug info warn error fatal spy)])
+  (:require clojure.pprint)
   (:import (prime.vo ValueObject)))
 
 
@@ -14,10 +15,10 @@
     (symbol (.getName (class (.voCompanion ^ValueObject votrait))) "MODULE$")))
 
 (defmacro field-object [votrait prop]
-  (let [field-obj (symbol (str (.getName ^Class (eval votrait)) "$field$"))
+  (let [field-obj (str (.getName votrait) "$field$")
         prop      (if (= prop 'values) '_values prop)]
     (trace "Searching for field-object" votrait prop "in" field-obj)
-    (if (empty? (filter #(= (name prop) (.getName ^java.lang.reflect.Field %)) (.getDeclaredFields ^Class (eval field-obj))))
+    (if (empty? (filter #(= (name prop) (.getName ^java.lang.reflect.Field %)) (.getDeclaredFields ^Class (Class/forName field-obj))))
       `~(symbol (str field-obj prop "$") "MODULE$")
     #_else
       `(.. ~(symbol (str field-obj) "MODULE$") ~prop))))
@@ -90,9 +91,12 @@
               (intern obj-ns-sym (symbol intern-name) vo)))]
       (symbol (str (.ns interned)) (str (.sym interned))))))
 
-(defconstrainedfn defvo-body
-  [^Class votrait runtime-constructor props] [(class? votrait) (symbol? runtime-constructor)
-                                              (sequential? props) (every? keyword? props)]
+(defn defvo-body
+  [^Class votrait runtime-constructor props]
+  (assert (class? votrait))
+  (assert (symbol? runtime-constructor))
+  (assert (sequential? props))
+  (assert (every? keyword? props))
   (let [args (vo-constructor-arglist-from-map votrait props)]
     `(if (or (map? ~'value-map) (map? (eval? ~'value-map)))
       (let [~'construct-expr# (list '.apply '~(companion-object-symbol votrait) ~@args)
@@ -115,8 +119,7 @@
     (defvo vo.Point :x :y)  ; Creates the macro Point and conversion fn to-Point.
     (Point{:x 1 :y 2})      ; Instantiates a PointVO."
     [votrait-expr & props]
-  (assert (class? (eval votrait-expr)) "votrait must be a VO trait/interface")
-  (let [^Class votrait      (eval votrait-expr)
+  (let [^Class votrait      (let [r (eval? votrait-expr)] (assert (class? r) "votrait must be a VO trait/interface") r)
         empty-vo-instance   (eval (list '.empty (companion-object-symbol votrait)))
         macroname           (symbol (.getSimpleName votrait))
         converterfn-name    (symbol (str "to-" (.getSimpleName votrait)))

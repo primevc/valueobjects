@@ -77,16 +77,34 @@ object VectorSerializer extends Serializer[IndexedSeq[_]](true,true)
   }
 }
 
-/** Does not retain the Chronology or Timezone. However, the instant is still the same point in time. */
+/** Does not serialize the Chronology, but keeps the Timezone. However, the instant is still the same point in time. */
 object DateSerializer extends Serializer[Date](true,true) {
-  def write (kryo:Kryo, out:io.Output, value :   Date)        { out.writeLong(value.getMillis, true); }
-  def read  (kryo:Kryo, in: io.Input,  clz:Class[Date]): Date = new Date( in.readLong(true) );
+  import org.joda.time._
+
+  def write (kryo:Kryo, out:io.Output, value :   Date) {
+    out.writeLong(value.getMillis, true);
+    out.writeString(value.getZone.getID);
+  }
+  def read  (kryo:Kryo, in: io.Input,  clz:Class[Date]): Date = {
+    val msec = in.readLong(true);
+    val zone = DateTimeZone.forID(in.readString());
+    new Date(msec, zone);
+  }
 }
 
-/** Does not retain the Chronology or Timezone. However, the instant is still the same point in time. */
+/** Does not serialize the Chronology, but keeps the Timezone. However, the instant is still the same point in time. */
 object DateTimeSerializer extends Serializer[DateTime](true,true) {
-  def write (kryo:Kryo, out:io.Output, value :   DateTime)            { out.writeLong(value.getMillis, true); }
-  def read  (kryo:Kryo, in: io.Input,  clz:Class[DateTime]): DateTime = new DateTime( in.readLong(true) );
+  import org.joda.time._
+
+  def write (kryo:Kryo, out:io.Output, value :   DateTime) {
+    out.writeLong(value.getMillis, true);
+    out.writeString(value.getZone.getID);
+  }
+  def read  (kryo:Kryo, in: io.Input,  clz:Class[DateTime]): DateTime = {
+    val msec = in.readLong(true);
+    val zone = DateTimeZone.forID(in.readString());
+    new DateTime(msec, zone);
+  }
 }
 
 /** Does not retain the Chronology or Timezone. However, it is still the same period in time. */

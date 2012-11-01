@@ -107,6 +107,8 @@
 
 ; Clojure types to Vector
 (extend-type clojure.lang.ISeq
+  ; FIXME: Fully Realizes a Seq and creates a Scala Vector, which might be unexpected behaviour for assoc.
+  ;        - Should wrap seq instead and create a vector lazily. (or should it?)
   To-Vector (to-Vector [in converter]
     (if (empty? in)
       (scala.collection.immutable.Vector/empty)
@@ -120,7 +122,7 @@
 (def FileRef prime.types.FileRef$/MODULE$)
 (def RGBA    to-RGBA)
 
-(defprotocol FileRepository
+(def-existing-protocol FileRepository
   (^FileRefOutputStream create [this])
   (^Boolean             exists [this ^FileRef ref  ])
   (^URI                 toURI  [this ^FileRef ref  ])

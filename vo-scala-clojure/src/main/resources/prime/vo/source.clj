@@ -3,9 +3,10 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.vo.source
-  (:require prime.types))
+  (:require prime.types)
+  (:use clojure.lang))
 
-(defprotocol ValueSource
+(def-existing-protocol ValueSource
   (typeID   [this, ^int baseTypeID])
 
   (contains [this, name, idx])
@@ -13,7 +14,7 @@
   (doubleAt [this, name, idx] [this, name, idx, notFound])
   (anyAt    [this, name, idx] [this, name, idx, notFound]))
 
-(defprotocol ValueSourceable
+(def-existing-protocol ValueSourceable
   (as-source [this] [this valueobject-definition]))
 
 ;
@@ -22,6 +23,7 @@
 
 (deftype Map-ValueSource [^clojure.lang.IPersistentMap map]
   prime.vo.source.ValueSource
+    (typeID [this ID] ID)
     (contains [map name idx]
       "check contains? documentation at: \n
        http://clojure.github.com/clojure/clojure.core-api.html#clojure.core/contains?"

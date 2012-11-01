@@ -17,7 +17,7 @@ trait ClojureMapSupport extends IPersistentMap
  with ClojureFn
  with Indexed
  with IPending
- with JavaMapSupport[String] {
+ with JavaMapSupport[Keyword] {
   this: ValueObject =>
 
   protected var _hash : Int = -1;
@@ -194,7 +194,8 @@ trait ClojureMapSupport extends IPersistentMap
     ClassCastException clojure.lang.PersistentArrayMap cannot be cast to clojure.lang.PersistentHashMap  user/eval1540 (NO_SOURCE_FILE:1)
    */
   override def iterator = null;// : java.util.Iterator[AnyRef] = null;
-  final protected def keySet(field : ValueObjectField[_]) = field.name;
+  final protected def   keySet(field : ValueObjectField[_]) = field.keyword;
+  final protected def entrySet(field : ValueObjectField[_]) = new MapEntry(field.keyword, field.get(ClojureMapSupport.this)).asInstanceOf[java.util.Map.Entry[Keyword,Any]];
 
   // ---
   // IFn: VO as function from key to value

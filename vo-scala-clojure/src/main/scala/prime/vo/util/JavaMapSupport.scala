@@ -7,7 +7,8 @@ trait JavaMapSupport[KeyType] extends java.util.Map[KeyType,Any]
   
   import java.util._
 
-  protected def keySet(field : ValueObjectField[_]) : KeyType;
+  protected def   keySet(field : ValueObjectField[_]) : KeyType;
+  protected def entrySet(field : ValueObjectField[_]) : Map.Entry[KeyType,Any];
 
   // ---
   // Map
@@ -65,10 +66,9 @@ trait JavaMapSupport[KeyType] extends java.util.Map[KeyType,Any]
       def size       = JavaMapSupport.this.count;
       def iterator() = new VOIterator[Map.Entry[KeyType,Any]]() {
         def next = {
-          val k = keySet(field);
-          val v = field(self);
+          val v = entrySet(field);
           nextField();
-          new AbstractMap.SimpleImmutableEntry(k,v)
+          v
         }
       }
 

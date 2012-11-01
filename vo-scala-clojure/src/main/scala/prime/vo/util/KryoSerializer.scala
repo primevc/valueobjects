@@ -4,6 +4,7 @@ package prime.utils.kryo;
  import Conversion._
  import scala.collection.immutable.IntMap;
  import com.esotericsoftware.kryo._
+ import clojure.lang.IPersistentVector
 
 class VOKryo(val enumMap : IntMap[_ <: Enum], val typeMap : IntMap[ValueObjectCompanion[_ <: ValueObject]]) extends Kryo
 {
@@ -26,9 +27,11 @@ class VOKryo(val enumMap : IntMap[_ <: Enum], val typeMap : IntMap[ValueObjectCo
   override def getRegistration(kind : Class[_]) : Registration = {
     if (kind == null) throw new IllegalArgumentException("type cannot be null.");
 
-    return if (classOf[ValueObject  ].isAssignableFrom(kind)) valueObjectRegistration
-      else if (classOf[IndexedSeq[_]].isAssignableFrom(kind))      vectorRegistration
-      else if (classOf[EnumValue    ].isAssignableFrom(kind))        enumRegistration
+    return if (classOf[ValueObject      ].isAssignableFrom(kind)) valueObjectRegistration
+      else if (classOf[IndexedSeq[_]    ].isAssignableFrom(kind))      vectorRegistration
+      else if (classOf[EnumValue        ].isAssignableFrom(kind))        enumRegistration
+      else if (classOf[clojure.lang.PersistentVector] != kind &&
+               classOf[IPersistentVector].isAssignableFrom(kind)) getRegistration(classOf[clojure.lang.PersistentVector])
       else super.getRegistration(kind);
   }
 }

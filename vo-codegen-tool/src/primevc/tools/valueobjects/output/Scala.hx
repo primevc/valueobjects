@@ -765,7 +765,7 @@ trait ")); a(def.name); a(" extends ");
 			addMixinManifests(owner, mixin.supertypes, first);
 			if (!mixin.supertypes.isEmpty()) first = false;
 			if (first) first = false; else a(", ");
-			var mask = 0; for (p in mixin.propertiesDefined) mask |= 1 << owner.bitIndex(p);
+			var mask = 0; for (p in mixin.propertiesDefined) if (!p.isTransient()) mask |= 1 << owner.bitIndex(p);
 
 			var lastProp = null;
 			var offset = 0; for (p in owner.propertiesSorted) if (p.definedIn == mixin) { if (lastProp != null) offset = lastProp.bitIndex() + 1; break; } else if (!p.hasOption(transient)) lastProp = p;

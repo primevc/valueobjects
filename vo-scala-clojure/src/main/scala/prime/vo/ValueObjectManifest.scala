@@ -19,7 +19,7 @@ trait ValueObjectManifest[VOType <: ValueObject]
   val eagerIndexMask : Int;
   /** Number of the last bit index used. */
   val lastFieldIndex : Int;
-  /** Which bits in the fieldIndexMask are part of any mixin (trait)? */
+  /** Which bits in the fieldIndexMask are part of any serializable mixins (trait) */
   val mixinIndexMask : Int;
 
   /** The number of fields defined in the ValueObject */

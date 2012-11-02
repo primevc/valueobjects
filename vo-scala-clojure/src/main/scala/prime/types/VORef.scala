@@ -105,4 +105,5 @@ protected[prime] final class VORefImpl[V <: ValueObject with ID](val _id:V#IDTyp
     case o : VORef[_]     => try { o._id == this._id && (_cached.voManifest.VOType.erasure.isInstance(o.get) /* Needed?: *//* ||     o.get.voManifest.VOType.erasure.isInstance(_cached)*/) } catch { case _ => false; }
     case _ => false;
   })
+  override def hashCode = _id.hashCode ^ _cached.hashCode;
 }

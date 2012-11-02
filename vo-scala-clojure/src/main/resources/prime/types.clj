@@ -26,7 +26,7 @@
 (defprotocol To-EmailAddr (^InternetAddress to-EmailAddr [in]))
 (defprotocol To-URI       (^URI             to-URI       [in]))
 (defprotocol To-FileRef   (^FileRef         to-FileRef   [in]))
-(defprotocol To-VORef     (^VORef           to-VORef     [in ref-target--companion]))
+(defprotocol To-VORef     (^VORef           to-VORef     [in] [in ref-target--companion]))
 (defprotocol To-Vector    (^IndexedSeq      to-Vector    [in converter]))
 
 (defn to-URL [uri] (Conversion/URL (to-URI uri)))

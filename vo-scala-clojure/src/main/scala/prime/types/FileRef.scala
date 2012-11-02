@@ -10,6 +10,11 @@ case class FileRef private[prime](uri:String, hash:Array[Byte], originalName : S
     val base64 = Base64.encodeBase64URLSafeString(hash)
     if (uri == null) base64 else uri + base64
   }
+
+  override def equals(other : Any) = other match {
+    case other@FileRef(u,h,_) => (u == uri && h == hash) || other.toString == this.toString
+    case _ => false
+  }
 }
 
 object FileRef extends Function1[Any,FileRef] with ClojureFn

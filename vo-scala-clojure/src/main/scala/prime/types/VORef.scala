@@ -89,7 +89,12 @@ protected[prime] final class VORefImpl[V <: ValueObject with ID](val _id:V#IDTyp
   def isRealized = isDefined;
 
   // Clojure's `promise` behaviour
-  override def invoke  (vo : AnyRef)   = if (isEmpty){ apply(vo.asInstanceOf[V]); this } else null;
+  override def invoke  (vo : AnyRef)   = vo match {
+    case vo if _cached.voManifest.VOType.erasure.isInstance(vo) =>
+      apply(vo.asInstanceOf[V]);
+      this;
+    case _ => null
+  }
   final    def applyTo (arglist: ISeq) = RT.boundedLength(arglist, 20) match {
     case 1 => invoke(arglist.first);
     case n => throwArity(n);

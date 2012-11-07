@@ -5,12 +5,20 @@
 (ns prime.vo.printer
   "Extends the Clojure printer with formatted printing of ValueObject instances."
   (:import java.io.Writer
-           [prime.types EnumValue FileRef RGBA]
+           [prime.types package$ValueType EnumValue FileRef RGBA]
            prime.vo.ValueObject))
+
+(def ^:private print-sequential #'clojure.core/print-sequential)
+(def ^:private print-meta       #'clojure.core/print-meta)
+(def ^:private pr-on            #'clojure.core/pr-on)
+
 
 ;
 ; Value type printing
 ;
+
+(defmethod print-method package$ValueType [^package$ValueType v, ^Writer w]
+  (pr-on (.keyword v) w))
 
 (defmethod print-method EnumValue [^EnumValue v, ^Writer w]
   (let [str (.. v getClass getName (split "\\$"))]
@@ -41,11 +49,6 @@
 ;
 ; VO Printing
 ;
-
-(def ^:private print-sequential #'clojure.core/print-sequential)
-(def ^:private print-meta       #'clojure.core/print-meta)
-(def ^:private pr-on            #'clojure.core/pr-on)
-
 
 (defn print-vo [^ValueObject vo print-one ^Writer w]
   (do

@@ -4,8 +4,9 @@ package prime.vo;
  import clojure.lang.Keyword
 
 
-trait ValueObjectManifest[VOType <: ValueObject]
+trait ValueObjectManifest[T <: ValueObject]
 {
+  type VOType = T;
   import ValueObjectManifest._
 
   val VOType         : Manifest[VOType];
@@ -107,6 +108,11 @@ case class ValueObjectMixin(numberOfIndexBitsShifted : Int, fieldIndexMask : Int
   /** Returns the field-set masked and left-shifted to 0-position, so that bit 0 is the mixin's field-set 0. */
   @inline
   final def indexBitsShifted(fieldSet : Int) = (fieldSet & fieldIndexMask) >>> numberOfIndexBitsShifted;
+}
+
+trait IDField {
+  this : ValueObjectManifest[_ <: ValueObject] =>
+  val _id : ValueObjectField[VOType];
 }
 
 object ValueObjectManifest {

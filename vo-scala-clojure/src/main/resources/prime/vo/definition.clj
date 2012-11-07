@@ -5,8 +5,9 @@
 (ns prime.vo.definition
   (:use prime.vo.printer, [taoensso.timbre :as timbre :only (trace debug info warn error fatal spy)])
   (:require clojure.pprint)
-  (:import (prime.vo ValueObject)))
+  (:import (prime.vo ValueObject) (clojure.lang Keyword)))
 
+(set! *warn-on-reflection* true)
 
 (defn companion-object-symbol [votrait]
   (if (class? votrait)
@@ -14,7 +15,7 @@
   #_else
     (symbol (.getName (class (.voCompanion ^ValueObject votrait))) "MODULE$")))
 
-(defmacro field-object [votrait prop]
+(defn field-object-expr [^Class votrait prop]
   (let [field-obj (str (.getName votrait) "$field$")
         prop      (if (= prop 'values) '_values prop)]
     (trace "Searching for field-object" votrait prop "in" field-obj)
@@ -22,6 +23,9 @@
       `~(symbol (str field-obj prop "$") "MODULE$")
     #_else
       `(.. ~(symbol (str field-obj) "MODULE$") ~prop))))
+
+(defmacro field-object [votrait prop]
+  (field-object-expr votrait prop))
 
 (defmacro default-value [votrait prop]
   `(. (field-object ~votrait ~prop) ~'defaultValue))
@@ -51,7 +55,7 @@
       (keyword? value)
   ))
 
-(defn default-value-expr [^Class votrait ^clojure.lang.Keyword prop]
+(defn default-value-expr [^Class votrait ^Keyword prop]
   (let [value-expr (macroexpand `(default-value ~votrait ~(.sym prop)))
         value      (eval value-expr)]
     (if (literal-value? value)
@@ -59,10 +63,19 @@
     ; literal, return the path to the default value to prevent garbage objects
       value-expr)))
 
+(defmacro to-field-type [votrait field value]
+  (let [valueType (eval `(.. ~(field-object-expr votrait field) valueType))]
+    (if (or (not (instance? prime.types.package$ValueTypes$Tdef valueType))
+            (. ^prime.types.package$ValueTypes$Tdef valueType ref))
+      `(.. ~(macroexpand `(field-object ~votrait ~(symbol (name field)))) ~'valueType (~'convert ~value))
+    ;else Tdef: not a ref
+      (let [valueType ^prime.types.package$ValueTypes$Tdef valueType]
+        `(~(.. valueType keyword sym) ~value)))))
+
 (defn vo-constructor-arglist-from-map [^Class votrait props]
   (map #(do
-    `(let [~'v (~% ~'value-map)]
-      (if  ~'v `(.. ~(macroexpand `(field-object ~~votrait ~(symbol (name ~%)))) ~'~'valueType (convert ~~'v))
+    `(let [~'v (~'value-map ~%)]
+      (if  ~'v `(to-field-type ~~votrait ~(.sym ^Keyword ~%) ~~'v)
         #_else '~(default-value-expr votrait %)
       ))) props))
 

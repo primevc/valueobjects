@@ -741,6 +741,11 @@ trait ")); a(def.name); a(" extends ");
 
 		a("  object manifest extends {\n");
 		a("    final val ID  = "); a(def.index + ";\n");
+		// val _id
+		if (idField != null)
+		{
+			a("    final val _id = field."); a(idField.name.quote()); a(";\n");
+		}
 		// Fields
 		if (fields.length > 1) {
 			a("    val fields = "); a(def.name); a(".fields");
@@ -751,7 +756,8 @@ trait ")); a(def.name); a(" extends ");
 		// Mixins
 		a("\n    val mixins = Array[ValueObjectMixin](");
 		addMixinManifests(def, def.supertypes);
-		a(");\n  } with ValueObjectManifest_"); a(fields.length == 0? "0[" : fields.length == 1? "1[" : "N["); a(def.name); a("];\n");
+		a(");\n  } with ValueObjectManifest_"); a(fields.length == 0? "0[" : fields.length == 1? "1[" : "N["); a(def.name);
+		if (idField != null) a("] with IDField;\n");	else a("];\n");
 		a("}\n");
 
 		write(def.module.fullName, def);

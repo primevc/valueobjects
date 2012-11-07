@@ -78,7 +78,7 @@
 ; VO definition macro
 ;
 
-(defn intern-vo-expr "Creates a var using (intern ..) and returns the symbol of it" [^ValueObject vo]
+(defn intern-vo-expr "Creates a var using (intern ..) and returns the symbol of it" [^ValueObject vo construct-expr]
   (if (empty? vo)
     (list '.empty (companion-object-symbol vo))
   #_else
@@ -87,7 +87,7 @@
           ^clojure.lang.Var
           interned    (or
             (resolve (symbol (.getName obj-ns-sym) intern-name))
-            (do (debug "interning:" vo "in:" (str obj-ns-sym "/" intern-name))
+            (do (debug "interning:" #_[construct-expr " => "] vo "in:" (str obj-ns-sym "/" intern-name))
               (intern obj-ns-sym (symbol intern-name) vo)))]
       (symbol (str (.ns interned)) (str (.sym interned))))))
 
@@ -98,11 +98,11 @@
   (assert (sequential? props))
   (assert (every? keyword? props))
   (let [args (vo-constructor-arglist-from-map votrait props)]
-    `(if (or (map? ~'value-map) (map? (eval? ~'value-map)))
+    `(if (map? ~'value-map)
       (let [~'construct-expr# (list '.apply '~(companion-object-symbol votrait) ~@args)
             ~'instance# (eval? ~'construct-expr#)]
         (if ~'instance#
-          (intern-vo-expr ~'instance#)
+          (intern-vo-expr ~'instance# ~'construct-expr#)
           ~'construct-expr#))
     ;else: Runtime argument; return fn instead
       `(~~runtime-constructor ~~'value-map);)
@@ -130,5 +130,9 @@
       (eval '~runtime-constructor)
       (eval '(defmacro ~macroname
         ([] ~converterfn-name)
-        ([~'value-map] ~macro-body)))
+        ([~'value-map-expr]
+          (let [~'value-map (or
+                              (if-let [~'value-map (eval? ~'value-map-expr)] (if (map? ~'value-map) ~'value-map ~'value-map-expr))
+                              ~'value-map-expr)]
+            ~macro-body))))
   )))

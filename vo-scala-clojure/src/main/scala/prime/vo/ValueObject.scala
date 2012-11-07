@@ -90,7 +90,8 @@ trait ValueObject extends ValueSource
 
 object TraversableValueObject {
   def apply[V <: ValueObject](vo : V) : scala.collection.immutable.Traversable[(ValueObjectField[V#VOType],Any)] =
-    new scala.collection.immutable.Traversable[(ValueObjectField[V#VOType],Any)] {
+    if (vo.isEmpty) scala.collection.immutable.Traversable.empty
+    else        new scala.collection.immutable.Traversable[(ValueObjectField[V#VOType],Any)] {
       final def foreach[U](fn: ((ValueObjectField[V#VOType], Any)) ⇒ U): Unit = vo.foreach((f,v) => fn((f.asInstanceOf[ValueObjectField[V#VOType]], v)));
     }
 }
@@ -101,7 +102,7 @@ trait ID {
 }
 
 trait LeafNode {
-  this : ValueObjectBase =>
+  this : ValueObject =>
 
   @inline override def contains(id : Int) : Boolean = (initIndexSet & (1 << voManifest.index(id))) != 0;
 
@@ -139,8 +140,6 @@ abstract class ValueObjectBase extends ValueObject with ClojureMapSupport {
     else notFound;
   }
 
-  def sourceAt(name: String, idx: Int, notFound: ValueSource) = ValueSource(anyAt(name,idx,notFound))
-
   def count = java.lang.Integer.bitCount(this.voIndexSet);
 
   override def toString = voManifest.VOType.erasure.getSimpleName + "(" +
@@ -150,21 +149,22 @@ abstract class ValueObjectBase extends ValueObject with ClojureMapSupport {
   final override def typeID(baseTypeID:Int) = this.voManifest.ID;
 }
 
-abstract class ValueObject_0 extends ValueObjectBase {
-  override def count     = 0;
+abstract class ValueObject_0 extends ValueObject with ClojureMapSupport with LeafNode with EmptyValueSource {
+  def count        : Int = 0;
   def initIndexSet : Int = 0;
   def voIndexSet   : Int = 0;
   def srcDiff      : Int = 0;
 
   @inline final override def contains(none: Int)               = false;
   @inline final override def contains(none: String)            = false;
-  @inline final override def contains(none: String, nada: Int) = false;
 
   protected[prime] def copy(src : ValueSource, root : ValueSource) : this.type = this;
   def copy() : this.type = this;
 
   override def foreach    (f: (ValueObjectField[VOType],Any) => Unit) {}
   def foreach (zero : Int)(f: (ValueObjectField[VOType],Any) => Unit) {}
+
+  override def toString = voManifest.VOType.erasure.getSimpleName + "()";
 }
 
 abstract class ValueObject_1 extends ValueObjectBase {

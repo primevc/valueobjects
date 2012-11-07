@@ -60,6 +60,12 @@ trait NoPrimitives {
   final override def doubleAt(name: String, idx: Int, notFound: Double ): Double  = if (contains(name,idx)) Decimal(anyAt(name,idx)) else notFound;
 }
 
+trait EmptyValueSource extends ValueSource {
+  @inline final def contains (name: String, i: Int)                               = false;
+  @inline final def anyAt    (name: String, i: Int, notFound: Any)     : Any      = notFound;
+  @inline final def intAt    (name: String, i: Int, notFound: Int)     : Int      = notFound;
+  @inline final def doubleAt (name: String, i: Int, notFound: Double)  : Double   = notFound;
+}
 
 trait IndexedValueSource [FieldDataType] {
   def    contains(idx: Int): Boolean;
@@ -117,12 +123,7 @@ object ValueSource
 
   def unapply(any : Any) : Option[ValueSource] = try Option(apply(any)) catch { case _ => None }
 
-  object empty extends ValueSource {
-    def contains (name: String, i: Int)                               = false;
-    def anyAt    (name: String, i: Int, notFound: Any)     : Any      = notFound;
-    def intAt    (name: String, i: Int, notFound: Int)     : Int      = notFound;
-    def doubleAt (name: String, i: Int, notFound: Double)  : Double   = notFound;
-  }
+  object empty extends EmptyValueSource {}
 }
 
 class AnonymousValueSource(val values : Any*) extends ValueSource {

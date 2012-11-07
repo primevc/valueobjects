@@ -122,6 +122,29 @@ object ValueObjectManifest {
   def getMixinManifests[T <: ValueObject](cl : Class[_]) = valueObjectTraits(cl).map(c => Class.forName(c.getName + "$manifest$").getField("MODULE$").get().asInstanceOf[ValueObjectManifest[_ >: T <: ValueObject]]);
 }
 
+abstract class ValueObjectManifest_0[VOType <: ValueObject : Manifest] extends ValueObjectManifest[VOType]
+{
+  val VOType : Manifest[VOType] = manifest[VOType];
+  def numFields      = 0;
+  val fieldIndexMask = 0;
+  val lazyIndexMask  = 0;
+  val eagerIndexMask = 0;
+  val mixinIndexMask = 0;
+  val metaMixin      = ValueObjectMixin(0,0,this);
+  val first          = null;
+  val lastFieldIndex = -1;
+
+  final def findOrNull(idx : Int)    = null;
+  final def findOrNull(name: String) = null;
+
+  final def index(idx   : Int)                 : Int = -1;
+  final def index(name  : String)              : Int = -1;
+  final def index(field : ValueObjectField[_]) : Int = -1;
+
+  final def firstFieldSet(data : VOType)              = null;
+  final def  nextFieldSet(data : VOType, index : Int) = null;
+}
+
 abstract class ValueObjectManifest_1[VOType <: ValueObject : Manifest] extends ValueObjectManifest[VOType]
 {
   val VOType : Manifest[VOType] = manifest[VOType];

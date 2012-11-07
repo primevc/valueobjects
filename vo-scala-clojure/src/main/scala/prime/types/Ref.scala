@@ -1,7 +1,7 @@
 package prime.types
  import prime.vo.mutable._
 
-class Ref[V <: ValueObjectWithID](val ref:V#IDType, var vo_! : V = null.asInstanceOf[V])
+class Ref[V <: ValueObjectWithID](val ref:V#IDType = null.asInstanceOf[V#IDType], var vo_! : V = null.asInstanceOf[V])
 {
   if (vo_! != null) require(ref != null, "ref = null, for Ref[_].vo_! => "+ vo_!);
   

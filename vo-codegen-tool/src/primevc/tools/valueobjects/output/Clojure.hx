@@ -8,14 +8,17 @@ package primevc.tools.valueobjects.output;
 class ClojureDefVO implements CodeGenerator
 {
 	var file : sys.io.FileOutput;
+	var map  : IntHash<Bool>;
 
 	public function new(file : sys.io.FileOutput) {
+		map       = new IntHash();
 		this.file = file;
 	}
 
 	public function genClass(def : ClassDef)
 	{
-		if (!def.isMixin) {
+		if (!def.isMixin && !map.exists(def.index)) {
+			map.set(def.index, true);
 			file.writeString("\n(defvo ");
 			file.writeString(def.fullName);
 			for (p in def.propertiesSorted) file.writeString(" :" + p.name);

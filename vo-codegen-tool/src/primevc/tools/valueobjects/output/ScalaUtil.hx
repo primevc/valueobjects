@@ -105,8 +105,8 @@ class ScalaUtil
 			case TuniqueID:				" ObjectId";
 			case TfileRef:				"  FileRef";
 			case Tstring:				"   String";
-			case Tinteger(_,_,_):		"      Int";
-			case Tdecimal(_,_,_):		"   Double";
+			case Tinteger(_,_,_):		"  Integer";
+			case Tdecimal(_,_,_):		"  Decimal";
 			case Tbool(v):				"  Boolean";
 			case Temail:				"EmailAddr";
 			case Tdate:					"     Date";

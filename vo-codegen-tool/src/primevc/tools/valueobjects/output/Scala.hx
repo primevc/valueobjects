@@ -374,12 +374,12 @@ trait ")); a(def.name); a(" extends ");
 		{
 
 			a("\nfinal class "); a(def.name); a("VO protected["); a(def.module.getPackageRoot().name != ""? def.module.getPackageRoot().name : def.module.name);
-			a("](\n  "); if (fields.length > 1) a("voIndexSet : Int, srcDiff : Int, "); a("@transient final val voSource : ValueSource,\n\n");
+			a("](\n  "); if (fields.length > 1) a("voIndexSet : Int, srcDiff : Int, "); a("@transient final val voSource : ValueSource");
 
 			for (p in fields)
 			{
+				a(",\n");
 				fieldDefinition(p, true);
-				if (p != lastField) a(",\n");
 			}
 
 			a("\n) extends ValueObject_");
@@ -396,10 +396,11 @@ trait ")); a(def.name); a(" extends ");
 			if (leafNode) { if (fields.length > 0) a(" with LeafNode"); }
 			else          a(" with BranchNode");
 
-			if      (onlyDoubles)  a(" with Doubles");
-			else if (onlyIntegers) a(" with Integers");
-			else if (!(hasDoubles || hasIntegers)) a(" with NoPrimitives");
-
+			if (fields.length > 0) {
+				if      (onlyDoubles)  a(" with Doubles");
+				else if (onlyIntegers) a(" with Integers");
+				else if (!(hasDoubles || hasIntegers)) a(" with NoPrimitives");
+			}
 			a(" {\n");
 			// VOType, voCompanion, voManifest
 			a("  type VOType     = "); a(def.name); a("\n");
@@ -628,6 +629,9 @@ trait ")); a(def.name); a(" extends ");
 				a(", voRoot = this.voSource);\n");
 
 				// -- end copy(...)
+			}
+			else { //fields.length = 0
+				a("  def conj(voSource : ValueSource, newRoot : ValueSource) : this.type = if (voSource == this.voSource) this else new "); a(def.name); a("VO(newRoot).asInstanceOf[this.type];\n");
 			}
 			a("}\n"); // end final class
 		} // End class definition
@@ -1575,7 +1579,7 @@ import prime.vo.mutable._
 			case Tdef(cl): switch (cl) {
 				case Tclass(cl):
 					var vo = cl.mutableFullName + "VO";
-					add_ifVarNotNull(p.name, (!p.hasOption(reference))? "new " + vo : "new Ref[" + vo +"](null)");
+					add_ifVarNotNull(p.name, (!p.hasOption(reference))? "new " + vo : "new Ref[" + vo +"]()");
 				
 				case Tenum(e):
 					add_ifVarNotNull(p.name, e.mutableFullName + ".Null");

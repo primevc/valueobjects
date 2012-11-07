@@ -139,7 +139,8 @@ class Reader implements IDisposable
 			return v;
 		}
 		catch (e:Dynamic) {
-			Assert.that(false, "Could not convert: " + value + ", to: " + typeClass);// + " - stack: " + haxe.Stack.callStack().join("\n"));
+			trace("Could not convert: " + value + ", to: " + typeClass);// + " - stack: " + haxe.Stack.callStack().join("\n"));
+			return null;
 		}
 		
 		return value;

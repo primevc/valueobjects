@@ -33,7 +33,7 @@ object VORef {
     case None       => throw NoInputException;
     case value      =>
       value match {
-        case src:source.ValueSource => try { return VORef(V(src)); } catch { case FailureException => }
+        case source.ValueSource(src) => try { return VORef(V(src)); } catch { case FailureException => }
         case _ =>
       }
       try VORef(IDType(value))(V) catch {

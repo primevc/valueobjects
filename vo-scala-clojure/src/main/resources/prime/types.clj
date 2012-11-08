@@ -14,22 +14,22 @@
           [org.joda.time.format DateTimeFormatter])
   (:use [clojure.lang]))
 
-(defprotocol To-ObjectId  (^ObjectId        to-ObjectId  [in]))
-(defprotocol To-String    (^String          to-String    [in] [in format]))
-(defprotocol To-Boolean   (^Boolean         to-Boolean   [in]))
-(defprotocol To-Integer   (^Integer         to-Integer   [in]))
-(defprotocol To-Decimal   (^Double          to-Decimal   [in] [in format]))
-(defprotocol To-RGBA      (^RGBA            to-RGBA      [in] [rgb a]))
-(defprotocol To-Date      (^DateMidnight    to-Date      [in] [in formatter]))
-(defprotocol To-DateTime  (^DateTime        to-DateTime  [in] [in formatter]))
-(defprotocol To-Interval  (^Interval        to-Interval  [in] [start end]))
-(defprotocol To-EmailAddr (^InternetAddress to-EmailAddr [in]))
-(defprotocol To-URI       (^URI             to-URI       [in]))
-(defprotocol To-FileRef   (^FileRef         to-FileRef   [in]))
-(defprotocol To-VORef     (^VORef           to-VORef     [in] [in ref-target--companion]))
-(defprotocol To-Vector    (^IndexedSeq      to-Vector    [in converter]))
+(defprotocol To-ObjectId  (^ObjectId        ^:pure  to-ObjectId  [in]                            ))
+(defprotocol To-String    (^String          ^:pure  to-String    [in] [in format]                ))
+(defprotocol To-Boolean   (^Boolean         ^:pure  to-Boolean   [in]                            ))
+(defprotocol To-Integer   (^Integer         ^:pure  to-Integer   [in]                            ))
+(defprotocol To-Decimal   (^Double          ^:pure  to-Decimal   [in] [in format]                ))
+(defprotocol To-RGBA      (^RGBA            ^:pure  to-RGBA      [in] [rgb a]                    ))
+(defprotocol To-Date      (^DateMidnight    ^:pure  to-Date      [in] [in formatter]             ))
+(defprotocol To-DateTime  (^DateTime        ^:pure  to-DateTime  [in] [in formatter]             ))
+(defprotocol To-Interval  (^Interval        ^:pure  to-Interval  [in] [start end]                ))
+(defprotocol To-EmailAddr (^InternetAddress ^:pure  to-EmailAddr [in]                            ))
+(defprotocol To-URI       (^URI             ^:pure  to-URI       [in]                            ))
+(defprotocol To-FileRef   (^FileRef         ^:pure  to-FileRef   [in]                            ))
+(defprotocol To-Vector    (^IndexedSeq      ^:pure  to-Vector    [in converter]                  ))
+(defprotocol To-VORef     (^VORef                   to-VORef     [in] [in ref-target--companion] ))
 
-(defn to-URL [uri] (Conversion/URL (to-URI uri)))
+(defn ^:pure to-URL [uri] (Conversion/URL (to-URI uri)))
 
 (extend-type prime.vo.ID To-VORef
   (^VORef to-VORef [in] (prime.types.Conversion/vo2ref in)))
@@ -119,8 +119,8 @@
 ; Additional types and abstractions
 ;
 
-(def FileRef prime.types.FileRef$/MODULE$)
-(def RGBA    to-RGBA)
+(def ^:pure FileRef prime.types.FileRef$/MODULE$)
+(def ^:pure RGBA    to-RGBA)
 
 (def-existing-protocol FileRepository
   (^FileRefOutputStream create [this])
@@ -148,3 +148,14 @@
     (as-source [string target-VO-ID] (as-source (String-ValueSource-builder target-VO-ID) string)))
 
 )
+
+;
+; Clojure standard library pure functions:
+
+(doseq [purefn [
+    #'+ #'- #'* #'/ #'+' #'-' #'*'
+    #'assoc #'dissoc
+    #'bit-and #'bit-and-not #'bit-clear #'bit-flip #'bit-not #'bit-or #'bit-set #'bit-shift-left #'bit-shift-right #'bit-test #'bit-xor
+    #'conj
+    #'dec #'dec' #'even? #'inc #'inc' #'max #'min #'odd? #'rem
+  ]] (alter-meta! purefn assoc :pure true))

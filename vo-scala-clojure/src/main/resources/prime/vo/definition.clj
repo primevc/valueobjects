@@ -4,7 +4,7 @@
 
 (ns prime.vo.definition
   (:use prime.vo.printer, [taoensso.timbre :as timbre :only (trace debug info warn error fatal spy)])
-  (:require clojure.pprint)
+  (:require clojure.pprint, prime.types)
   (:import (prime.vo ValueObject) (clojure.lang Keyword)))
 
 (set! *warn-on-reflection* true)
@@ -19,7 +19,7 @@
   (let [field-obj (str (.getName votrait) "$field$")
         prop      (if (= prop 'values) '_values prop)]
     (trace "Searching for field-object" votrait prop "in" field-obj)
-    (if (empty? (filter #(= (name prop) (.getName ^java.lang.reflect.Field %)) (.getDeclaredFields ^Class (Class/forName field-obj))))
+    (if (not-any? #(= (name prop) (.getName ^java.lang.reflect.Field %)) (.getDeclaredFields ^Class (Class/forName field-obj)))
       `~(symbol (str field-obj prop "$") "MODULE$")
     #_else
       `(.. ~(symbol (str field-obj) "MODULE$") ~prop))))
@@ -55,6 +55,24 @@
       (keyword? value)
   ))
 
+(defn stable-argument?
+  "A Stable argument means it is either a literal-value (including symbols),
+    or a pure function with only pure/literal arguments
+    or a collection with only pure/stable content"
+  [value]
+  (or
+    (literal-value?  value)
+    (if (or (vector? value) (set? value)) (every? stable-argument? value))
+    (if (map?        value) (every? stable-argument? (vals value)))
+    (if (list?       value) (and (:pure (meta (ns-resolve *ns* (first value))))
+                                 (every? stable-argument?         (rest  value))))
+
+    (do (debug "Unstable: " value) false)
+))
+
+(defn unstable-argument? [value]
+  (not (stable-argument?  value)))
+
 (defn default-value-expr [^Class votrait ^Keyword prop]
   (let [value-expr (macroexpand `(default-value ~votrait ~(.sym prop)))
         value      (eval value-expr)]
@@ -63,14 +81,15 @@
     ; literal, return the path to the default value to prevent garbage objects
       value-expr)))
 
-(defmacro to-field-type [votrait field value]
-  (let [valueType (eval `(.. ~(field-object-expr votrait field) valueType))]
+(defmacro to-field-type [votrait field value-expr]
+  (let [^Class votrait (if (class? votrait) votrait (eval votrait))
+             valueType (eval `(.. ~(field-object-expr votrait field) valueType))]
     (if (or (not (instance? prime.types.package$ValueTypes$Tdef valueType))
             (. ^prime.types.package$ValueTypes$Tdef valueType ref))
-      `(.. ~(macroexpand `(field-object ~votrait ~(symbol (name field)))) ~'valueType (~'convert ~value))
+      `(.. ~(macroexpand `(field-object ~votrait ~(symbol (name field)))) ~'valueType (~'convert ~value-expr))
     ;else Tdef: not a ref
       (let [valueType ^prime.types.package$ValueTypes$Tdef valueType]
-        `(~(.. valueType keyword sym) ~value)))))
+        `(~(.. valueType keyword sym) ~value-expr)))))
 
 (defn vo-constructor-arglist-from-map [^Class votrait props]
   (map #(do
@@ -105,6 +124,9 @@
       (symbol (str (.ns interned)) (str (.sym interned))))))
 
 (defn defvo-body
+  "The argument to the constructor macro has to be stable before interning is considered.
+   This fixes too aggressive interning, for example objects defined with (ObjectId.)
+   Purity/stability is checked via: (stable-argument? value-map)"
   [^Class votrait runtime-constructor props]
   (assert (class? votrait))
   (assert (symbol? runtime-constructor))
@@ -114,8 +136,9 @@
     `(if (map? ~'value-map)
       (let [~'construct-expr# (list '.apply '~(companion-object-symbol votrait) ~@args)
             ~'instance# (eval? ~'construct-expr#)]
-        (if ~'instance#
+        (if (and ~'instance# ~'stable-value-map)
           (intern-vo-expr ~'instance# ~'construct-expr#)
+        #_else
           ~'construct-expr#))
     ;else: Runtime argument; return fn instead
       `(~~runtime-constructor ~~'value-map);)
@@ -141,11 +164,15 @@
     (assert (not (nil? empty-vo-instance)))
     `(binding [*ns* (create-ns '~(symbol (.. votrait getPackage getName)))]
       (eval '~runtime-constructor)
-      (eval '(defmacro ~macroname
-        ([] ~converterfn-name)
-        ([~'value-map-expr]
-          (let [~'value-map (or
-                              (if-let [~'value-map (eval? ~'value-map-expr)] (if (map? ~'value-map) ~'value-map ~'value-map-expr))
+      (eval '(do
+        (defmacro ^:pure ~macroname
+          ([] ~converterfn-name)
+          ([~'value-map-expr]
+          (let [~'stable-value-map (stable-argument? ~'value-map-expr)
+                ~'value-map (or
+                              (and ~'stable-value-map (if-let [~'evald (eval? ~'value-map-expr)] (if (map? ~'evald) ~'evald ~'value-map-expr)))
                               ~'value-map-expr)]
-            ~macro-body))))
-  )))
+            ~macro-body)))
+        (alter-meta! (var ~macroname) assoc :pure true)
+      ))
+)))

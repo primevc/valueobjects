@@ -866,7 +866,7 @@ object ${def.name} extends Enum {
 				overrideValueOf = e;
 			}
 			else {
-				a("  final val "); a(e.name); a(' = _'); a(e.name); a(";  protected object _"); a(e.name); a(' extends Value('); a(e.intValue + ', "'); a(e.name); ac('"'.code);
+				a("  final val "); a(e.name); a(' = _'); a(e.name); a(";  protected object _"); a(e.name); a(' extends Value('); a(e.intValue + ', "'); a(e.conversions.get("toString")); ac('"'.code);
 				for (prop in def.conversions) if (prop.name != "toString") {
 					var conv = e.conversions.get(prop.name);
 					a(', "'); a(conv != null? conv : e.name); ac('"'.code);

@@ -1,7 +1,7 @@
 package prime.vo.util
  import prime.vo._
  import prime.vo.source._
- import clojure.lang.{Var, RT, Util, Keyword, MapEntry, MapEquivalence}
+ import clojure.lang.{Var, RT, Util, IFn, Keyword, MapEntry, MapEquivalence}
  import clojure.lang.{ASeq, ISeq, Counted, IPersistentCollection, IPersistentMap, IPersistentVector, IPending, Indexed}
 
 object ClojureSupport {
@@ -10,6 +10,9 @@ object ClojureSupport {
     case v:scala.collection.Seq[Any] => ScalaSeqWrapper(v)(field.valueType.convert,null);
     case v:AnyRef => v;
   }
+
+  RT.loadResourceScript("prime/vo.clj");
+  val seqFieldFn = RT.`var`("prime.vo", "*voseq-key-fn*");
 }
 
 trait ClojureMapSupport extends IPersistentMap
@@ -147,7 +150,11 @@ trait ClojureMapSupport extends IPersistentMap
     import java.lang.Integer._
 
     def field = voManifest(index);
-    def first = new MapEntry(field.keyword, ClojureSupport.get(field,self));
+    def first = {
+      val f = field;
+      val key = ClojureSupport.seqFieldFn.deref.asInstanceOf[IFn];
+      new MapEntry(if (key == null) f.keyword else key.invoke(f), ClojureSupport.get(f,self));
+    }
 
     def next  = if (remainingBits != 0) {
       val nextOffset = 1 + numberOfTrailingZeros(remainingBits);
@@ -162,6 +169,7 @@ trait ClojureMapSupport extends IPersistentMap
 
     def withMeta(meta : IPersistentMap) = new Seq(remainingBits, index, meta);
   }
+
   def seq = {
     val bits  = voIndexSet;
     if (bits != 0) {

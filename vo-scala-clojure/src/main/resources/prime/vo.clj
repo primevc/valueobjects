@@ -11,3 +11,12 @@
   Usage:
     (binding [*proxy-map* { MyReferencedValueObject (my-valueobject-proxy ...) }] @(:voref-field vo))
   " {})
+
+(def ^:dynamic *voseq-key-fn* "
+  A function from ValueObjectField => Any, or nil.
+  When not nil, creating a seq from ValueObject will call this function to produce the key value.
+  Initially nil.
+
+  Usage example:
+    (binding [*voseq-key-fn* #(.id ^ValueObjectField %)] (map name vo))
+  " nil)

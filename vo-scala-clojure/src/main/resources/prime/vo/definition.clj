@@ -5,7 +5,7 @@
 (ns prime.vo.definition
   (:use prime.vo.printer, [taoensso.timbre :as timbre :only (trace debug info warn error fatal spy)])
   (:require clojure.pprint, prime.types)
-  (:import (prime.vo ValueObject) (clojure.lang Keyword)))
+  (:import (prime.vo ValueObject) (clojure.lang Symbol Keyword) prime.types.Conversion$NoInputException$))
 
 (set! *warn-on-reflection* true)
 
@@ -81,12 +81,14 @@
     ; literal, return the path to the default value to prevent garbage objects
       value-expr)))
 
-(defmacro to-field-type [votrait field value-expr]
+(defmacro to-field-type [votrait prop value-expr]
   (let [^Class votrait (if (class? votrait) votrait (eval votrait))
+        ^Symbol field  (.sym ^Keyword prop)
              valueType (eval `(.. ~(field-object-expr votrait field) valueType))]
     (if (or (not (instance? prime.types.package$ValueTypes$Tdef valueType))
             (. ^prime.types.package$ValueTypes$Tdef valueType ref))
-      `(.. ~(macroexpand `(field-object ~votrait ~(symbol (name field)))) ~'valueType (~'convert ~value-expr))
+      `(try (.. ~(macroexpand `(field-object ~votrait ~(symbol (name field)))) ~'valueType (~'convert ~value-expr)) 
+        (catch Conversion$NoInputException$ e# ~(default-value-expr votrait prop)))
     ;else Tdef: not a ref
       (let [valueType ^prime.types.package$ValueTypes$Tdef valueType]
         `(~(.. valueType keyword sym) ~value-expr)))))
@@ -94,7 +96,7 @@
 (defn vo-constructor-arglist-from-map [^Class votrait props]
   (map #(do
     `(let [~'v (~'value-map ~%)]
-      (if  ~'v `(to-field-type ~~votrait ~(.sym ^Keyword ~%) ~~'v)
+      (if  ~'v `(to-field-type ~~votrait ~~% ~~'v)
         #_else '~(default-value-expr votrait %)
       ))) props))
 

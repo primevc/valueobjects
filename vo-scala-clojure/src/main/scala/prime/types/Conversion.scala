@@ -108,7 +108,8 @@ object Conversion
     case value         => val v = if (format != null) decimal.invoke(value, format) else decimal.invoke(value); if (v != null) v.asInstanceOf[Double] else throw FailureException;
   }
   def Decimal   (value:String, format:String) : Double =
-    try
+    if (format == null) value.toDouble;
+    else try
       decimalFormatter(format).parse(value).doubleValue
     catch {
       case e : ParseException =>

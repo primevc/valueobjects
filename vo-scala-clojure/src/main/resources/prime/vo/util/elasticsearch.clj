@@ -7,9 +7,7 @@
   (:require [clojure.set     :as    s]
             [clj-http.client :as http]
             [cheshire.core   :as json], cheshire.generate, cheshire.custom, cheshire.factory
-            #_[clojurewerkz.elastisch.rest]
             [clj-elasticsearch.client :as ces])
-  #_(:use [clojurewerkz.elastisch.rest.response :only [not-found?]])
   (:use [prime.vo.source :only [def-valuesource]])
   (:import [prime.types package$ValueType package$ValueTypes$Tdef package$ValueTypes$Tarray package$ValueTypes$Tenum]
            [prime.vo ValueObject ValueObjectField ValueObjectManifest_0 ValueObjectManifest_1 ValueObjectManifest_N ID]
@@ -64,21 +62,21 @@
       (cond
         (instance? package$ValueTypes$Tenum value-type)
           {:properties {:v {:type "integer"} :x {:type "string"}}} ;x = extended value, currently only String
-        
+
         (instance? package$ValueTypes$Tdef  value-type)
           (let [^package$ValueTypes$Tdef value-type value-type]
             (conj
-              (if (.. value-type ref) 
+              (if (.. value-type ref)
                 {:type (mapping-field-type-name (.. value-type empty voManifest (_id) valueType))}
               #_else
                 (vo-mapping (.. value-type empty) (or (key option-map) {})))
 
               option-map
           ))
-        
+
         (= :prime.types/Interval key)
           {:properties {:s {:type "date"} :e {:type "date"}}}
-        
+
         :else
           option-map
   ))}))
@@ -98,7 +96,7 @@
   ([^ValueObject vo, option-map]
     { :type       "object"
       :dynamic    "strict"
-      :properties 
+      :properties
       (into {}
         (map #(field-mapping (option-map (.keyword %)) %)
           (let [exclude    (set (:exclude option-map))
@@ -121,7 +119,7 @@
   [ (Integer/toHexString (.. vo voManifest ID)),
     (conj options (dissoc (vo-mapping vo options) :type)) ])
 
-(defn create-index 
+(defn create-index
   ([es index-name vo->options-map]
     (create-index es index-name vo->options-map {}))
   ([es index-name vo->options-map root-options]
@@ -165,7 +163,7 @@
 
 (def-valuesource ElasticSearch-ValueSource [^java.util.Map jmap]
   (contains [this, name idx]          (.containsKey jmap (Integer/toHexString (bit-shift-right idx 8))))
-  (anyAt    [this, name idx notFound] (or 
+  (anyAt    [this, name idx notFound] (or
     (let [item (.get jmap (Integer/toHexString (bit-shift-right idx 8)))]
       (if (instance? java.util.Map item) (ElasticSearch-ValueSource. item) #_else item))
     notFound)))
@@ -174,7 +172,7 @@
   (Integer/toHexString (.id field)))
 
 
-(defn get 
+(defn get
   "options: see clj-elasticsearch.client/get-doc"
   [es options]
   (ElasticSearch-ValueSource.

@@ -60,15 +60,15 @@
     or a pure function with only pure/literal arguments
     or a collection with only pure/stable content"
   [value]
-  (or
+  (try (or
     (literal-value?  value)
     (if (or (vector? value) (set? value)) (every? stable-argument? value))
     (if (map?        value) (every? stable-argument? (vals value)))
     (if (list?       value) (and (:pure (meta (ns-resolve *ns* (first value))))
                                  (every? stable-argument?         (rest  value))))
 
-    (do (debug "Unstable: " value) false)
-))
+    (do (debug "Unstable: " value) false))
+  (catch Exception e false)))
 
 (defn unstable-argument? [value]
   (not (stable-argument?  value)))

@@ -52,34 +52,36 @@
 
 (defn field-mapping
   ([option-map ^ValueObjectField field]
-    (field-mapping {} (. field valueType) (. field id) (. field keyword)))
+    (field-mapping (or option-map {}) (. field valueType) (. field id) (. field keyword)))
 
-  ([option-map ^package$ValueType value-type, id, key]
+  ([option-map ^package$ValueType value-type, id, field-key]
     { (Integer/toHexString id),
     (conj {:store "no"
-           :index_name (name key)
+           :index_name (name field-key)
            :type       (mapping-field-type-name value-type)}
       (cond
         (instance? package$ValueTypes$Tenum value-type)
           {:properties {:v {:type "integer"} :x {:type "string"}}} ;x = extended value, currently only String
 
         (instance? package$ValueTypes$Tdef  value-type)
-          (let [^package$ValueTypes$Tdef value-type value-type]
+          (let [^package$ValueTypes$Tdef value-type value-type
+                ^ValueObject             empty      (.. value-type empty)]
             (conj
               (if (.. value-type ref)
-                {:type (mapping-field-type-name (.. value-type empty voManifest (_id) valueType))}
+                {:type (mapping-field-type-name (.. empty voManifest (_id) valueType))}
               #_else
-                (vo-mapping (.. value-type empty) (or (key option-map) {})))
+                  (vo-mapping empty (or option-map {})))
 
               option-map
           ))
 
-        (= :prime.types/Interval key)
+        (= :prime.types/Interval field-key)
           {:properties {:s {:type "date"} :e {:type "date"}}}
 
-        :else
-          option-map
-  ))}))
+        :else nil)
+
+      option-map ;overwrites defaults
+    )}))
 
 
 (defn vo-field-set [^ValueObject vo]
@@ -117,7 +119,7 @@
 (defn vo-index-mapping-pair [[^ValueObject vo, options]]
   (assert options)
   [ (Integer/toHexString (.. vo voManifest ID)),
-    (conj options (dissoc (vo-mapping vo options) :type)) ])
+    (conj (dissoc (vo-mapping vo options) :type) options) ])
 
 (defn create-index
   ([es index-name vo->options-map]

@@ -856,7 +856,8 @@ object ${def.name} extends Enum {
 			if (e.type != null)
 			{
 				a("\n  override protected def stringCatchAll(value : String) = "); a(e.name); a("(value);");
-				a("\n  case class  _"); a(e.name); a('(override val toString : '); a(e.type.typeNameInMutablePkg().name); a(') extends Value(toString = toString, value = '); a(Std.string(e.intValue));
+				a("\n  case class  _"); a(e.name); a('(override val toString : '); a(e.type.typeNameInMutablePkg().name); a(') extends Value(');
+				a(e.intValue + ', toString');
 				for (key in e.conversions.keys()) if (key != "toString") {
 					var conv = e.conversions.get(key);
 					a(', "'); a(conv); ac('"'.code);

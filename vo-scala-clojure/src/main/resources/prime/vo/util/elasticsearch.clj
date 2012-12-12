@@ -163,11 +163,17 @@
 ; ElasticSearch querying API
 ;
 
-(def-valuesource ElasticSearch-ValueSource [^java.util.Map jmap]
+(def-valuesource ElasticSearch-ValueSource [^java.util.Map jmap, ^org.elasticsearch.action.ActionResponse response]
   (contains [this, name idx]          (.containsKey jmap (Integer/toHexString (bit-shift-right idx 8))))
   (anyAt    [this, name idx notFound] (or
-    (let [item (.get jmap (Integer/toHexString (bit-shift-right idx 8)))]
-      (if (instance? java.util.Map item) (ElasticSearch-ValueSource. item) #_else item))
+    (if jmap
+      (let [item (.get jmap (Integer/toHexString (bit-shift-right idx 8)))]
+        (if (instance? java.util.Map item)
+          (let [item ^java.util.Map item]
+            (if-let [x (.get item "x")] x
+            (if-let [v (.get item "v")] v
+            (ElasticSearch-ValueSource. item, response))))
+        #_else  item)))
     notFound)))
 
 (defn voseq-keyfn [^prime.vo.ValueObjectField field]
@@ -177,9 +183,9 @@
 (defn get
   "options: see clj-elasticsearch.client/get-doc"
   [es options]
-  (ElasticSearch-ValueSource.
-    (.sourceAsMap ^org.elasticsearch.action.get.GetResponse
-      (ces/get-doc es (assoc options :format :java)))))
+  (let [resp ^org.elasticsearch.action.get.GetResponse
+        (ces/get-doc es (assoc options :format :java))]
+    (ElasticSearch-ValueSource. (.sourceAsMap resp) resp)))
 
 (defn put
   "options: see clj-elasticsearch.client/index-doc"

@@ -29,7 +29,6 @@ class ClojureDefVO implements CodeGenerator
 	public function genEnum(def:EnumDef) {}
 
 	public function newModule(module:Module) : CodeGenerator {
-		module.generateWith(this);
 		return this;
 	}
 
@@ -44,7 +43,7 @@ class ClojureDefVO implements CodeGenerator
 			try sys.FileSystem.createDirectory(dir);
 		}
 
-		filename = dir + "/" + filename + ".clj";
+		filename = (dir == null? "" : dir + "/") + filename + ".clj";
 		trace("WRITING: "+filename);
 		
 		var file = sys.io.File.write(filename, false);

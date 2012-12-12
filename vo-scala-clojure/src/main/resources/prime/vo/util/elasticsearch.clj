@@ -191,3 +191,23 @@
     :type   (Integer/toHexString (.. vo voManifest ID))
     :source (binding [prime.vo/*voseq-key-fn* voseq-keyfn] (json/encode-smile vo))
   })))
+
+(defn search
+  "options: see clj-elasticsearch.client/search
+  example: (vo/search {:filter {:term {:name 'Henk'}}})
+  "
+  [es ^ValueObject vo & {:as options :keys [
+    ; extra-source parameters
+    query filter from size indices types sort highlighting fields script-fields preference facets named-filters index boost explain version min-score
+    ; ces/search parameters
+    format listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source extra-source]}]
+    (binding [prime.vo/*voseq-key-fn* voseq-keyfn]
+      (let [filter (if-not filter {:term vo} {:and [{:term vo} filter]})]
+        (ces/search es {
+          :format format :listener listener :ignore-indices ignore-indices :routing routing :listener-threaded? listener-threaded? :search-type search-type
+          :operation-threading operation-threading :query-hint query-hint :scroll scroll :source source
+          :extra-source
+            (json/encode-smile {:query query :filter filter :from from :size size :indices indices :types types :sort sort :highlighting highlighting
+            :fields fields :script-fields script-fields :preference preference :facets facets :named-filters named-filters :index index :boost boost
+            :explain explain :version version :min-score min-score})}))))
+

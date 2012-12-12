@@ -4,13 +4,12 @@
 
 (ns prime.vo.util.elasticsearch
   (:refer-clojure :exclude [get])
-  (:require [clojure.set     :as    s]
+  (:require [prime.vo        :as   vo]
             [clj-http.client :as http]
             [cheshire.core   :as json], cheshire.generate, cheshire.custom, cheshire.factory
             [clj-elasticsearch.client :as ces])
   (:use [prime.vo.source :only [def-valuesource]])
   (:import [prime.types package$ValueType package$ValueTypes$Tdef package$ValueTypes$Tarray package$ValueTypes$Tenum]
-           [prime.vo ValueObject ValueObjectField ValueObjectManifest_0 ValueObjectManifest_1 ValueObjectManifest_N ID]
            [com.fasterxml.jackson.core JsonGenerator]))
 
 (set! *warn-on-reflection* true)
@@ -19,12 +18,6 @@
 ; Generate ElasticSearch mapping from VO:
 ;
 
-(defn vo-fields [in]
-  (condp instance? in
-    ValueObject           (vo-fields (.. ^ValueObject in voManifest))
-    ValueObjectManifest_N (remove nil? (.. ^ValueObjectManifest_N in fields))
-    ValueObjectManifest_1 (remove nil? (cons (.. ^ValueObjectManifest_1 in first) nil))
-    ValueObjectManifest_0 nil))
 
 (defn mapping-field-type-name
   [^package$ValueType valueType]
@@ -84,9 +77,6 @@
     )}))
 
 
-(defn vo-field-set [^ValueObject vo]
-  (set (map #(.keyword ^ValueObjectField %) (vo-fields vo))))
-
 (defn vo-mapping "Create an ElasticSearch compatible mapping from an empty ValueObject.
   options are
   - :only    exclusive #{set} of fields to include in mapping
@@ -100,16 +90,9 @@
       :dynamic    "strict"
       :properties
       (into {}
-        (map #(field-mapping (option-map (.keyword %)) %)
-          (let [exclude    (set (:exclude option-map))
-                only       (set (:only    option-map))
-                vo-fields  (vo-fields    vo)
-                all-keys   (vo-field-set vo)
-                field-keys (if-not (empty? only)    (s/select     only       all-keys) all-keys)
-                field-keys (if-not (empty? exclude) (s/difference field-keys exclude)  field-keys)]
-            (assert (empty? (s/difference only    all-keys)) (str ":only    contains key not present in VO field-set: " all-keys))
-            (assert (empty? (s/difference exclude all-keys)) (str ":exclude contains key not present in VO field-set: " all-keys))
-            (filter #(field-keys (.keyword ^ValueObjectField %)) vo-fields))))
+        (map
+          #(field-mapping (option-map (.keyword %)) %)
+          (vo/field-selective-seq vo (:only option-map) (:exclude option-map))))
     }))
 
 ;

@@ -10,6 +10,7 @@
             [clj-elasticsearch.client :as ces])
   (:use [prime.vo.source :only [def-valuesource]])
   (:import [prime.types package$ValueType package$ValueTypes$Tdef package$ValueTypes$Tarray package$ValueTypes$Tenum]
+           [prime.vo ValueObject ValueObjectField ID]
            [com.fasterxml.jackson.core JsonGenerator]))
 
 (set! *warn-on-reflection* true)
@@ -54,7 +55,7 @@
            :type       (mapping-field-type-name value-type)}
       (cond
         (instance? package$ValueTypes$Tenum value-type)
-          {:properties {:v {:type "integer"} :x {:type "string"}}} ;x = extended value, currently only String
+          {:properties {:v {:type "integer"} :x {:type "string", :index "not_analyzed"}}} ;x = extended value, currently only String
 
         (instance? package$ValueTypes$Tdef  value-type)
           (let [^package$ValueTypes$Tdef value-type value-type
@@ -92,7 +93,7 @@
       (into {}
         (map
           #(field-mapping (option-map (.keyword %)) %)
-          (vo/field-selective-seq vo (:only option-map) (:exclude option-map))))
+          (vo/field-filtered-seq vo (:only option-map) (:exclude option-map))))
     }))
 
 ;
@@ -146,17 +147,22 @@
 ; ElasticSearch querying API
 ;
 
-(def-valuesource ElasticSearch-ValueSource [^java.util.Map jmap, ^org.elasticsearch.action.ActionResponse response]
+(def-valuesource ElasticSearch-ValueSource [^java.util.Map jmap, response]
   (contains [this, name idx]          (.containsKey jmap (Integer/toHexString (bit-shift-right idx 8))))
   (anyAt    [this, name idx notFound] (or
     (if jmap
       (let [item (.get jmap (Integer/toHexString (bit-shift-right idx 8)))]
-        (if (instance? java.util.Map item)
-          (let [item ^java.util.Map item]
-            (if-let [x (.get item "x")] x
-            (if-let [v (.get item "v")] v
-            (ElasticSearch-ValueSource. item, response))))
-        #_else  item)))
+        (condp instance? item
+          org.elasticsearch.search.SearchHitField
+            (.value item)
+
+          java.util.Map
+            (let [item ^java.util.Map item]
+              (if-let [x (.get item "x")] x
+              (if-let [v (.get item "v")] v
+              (ElasticSearch-ValueSource. item, response))))
+
+          item)))
     notFound)))
 
 (defn field-hexname [^prime.vo.ValueObjectField field]
@@ -184,22 +190,36 @@
 (defn search
   "options: see clj-elasticsearch.client/search
   example: (vo/search {:filter {:term {:name 'Henk'}}})
+
+  Set indices to [\"*\"] to search in all.
+
+  Returns: seq of SearchHits, with the full SearchResponse as meta-data.
   "
-  [es ^ValueObject vo & {:as options :keys [
+  [es ^ValueObject vo indices & {:as options :keys [
     ; extra-source parameters
-    query filter from size indices types sort highlighting only exclude fields script-fields preference facets named-filters index boost explain version min-score
+    query filter from size types sort highlighting only exclude script-fields preference facets named-filters boost explain version min-score
     ; ces/search parameters
-    format listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source extra-source]}]
+    listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source extra-source]}]
+  {:pre [(instance? ValueObject vo) (vector? indices) (not-empty indices)]}
     (binding [prime.vo/*voseq-key-fn* field-hexname]
       (let [
-        filter (if-not filter {:term vo} {:and [{:term vo} filter]})
-        partial-fields (if (or only exclude) {:search {:include (map field-hexname (vo/field-filtered-seq vo only exclude))}})
-        ]
-        (ces/search es {
-          :format format :listener listener :ignore-indices ignore-indices :routing routing :listener-threaded? listener-threaded? :search-type search-type
+        filter     (if-not filter (if-not (empty? vo) {:term vo}) #_else {:and [{:term vo} filter]})
+        fields     (if (or only exclude) (map field-hexname (vo/field-filtered-seq vo only exclude)))
+        es-options (into {} (clojure.core/filter val {
+          :indices indices,  :format :java
+          :listener listener :ignore-indices ignore-indices :routing routing :listener_threaded? listener-threaded? :search-type search-type
           :operation-threading operation-threading :query-hint query-hint :scroll scroll :source source
-          :extra-source
-            (json/encode-smile {:query query :filter filter :from from :size size :indices indices :types types :sort sort :highlighting highlighting
-            :partial-fields partial-fields :fields fields :script-fields script-fields :preference preference :facets facets :named-filters named-filters
-            :index index :boost boost :explain explain :version version :min-score min-score})}))))
+          :extra-source (json/encode (into {} (clojure.core/filter val {
+            :query query :filter filter :from from :size size :types types :sort sort :highlighting highlighting
+            :fields fields :script_fields script-fields :preference preference :facets facets :named_filters named-filters
+            :boost boost :explain explain :version version :min_score min-score
+          })))
+        }))
+        response ^org.elasticsearch.action.search.SearchResponse (ces/search es es-options)]
+        (println es-options)
+        (with-meta (map
+          (if fields
+            (fn [^org.elasticsearch.search.SearchHit sh] (do (ElasticSearch-ValueSource. (.fields      sh) sh)))
+            (fn [^org.elasticsearch.search.SearchHit sh] (do (ElasticSearch-ValueSource. (.sourceAsMap sh) sh))))
+          (.. response hits hits)) {:request es-options, :response response}))))
 

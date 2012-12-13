@@ -166,7 +166,7 @@ trait ClojureMapSupport extends IPersistentMap
 
     override def count = 1 + bitCount(remainingBits);
 
-    def withMeta(meta : IPersistentMap) = new Seq(remainingBits, index, meta);
+    def withMeta(meta : IPersistentMap) = new Seq(seqFieldFn, remainingBits, index, meta);
   }
 
   def seq = {

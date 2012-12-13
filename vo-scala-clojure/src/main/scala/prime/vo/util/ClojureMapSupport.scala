@@ -40,7 +40,7 @@ trait ClojureMapSupport extends IPersistentMap
       // http://grepcode.com/file/repo1.maven.org/maven2/org.clojure/clojure/1.3.0/clojure/lang/PersistentArrayMap.java#37
       // Create map from VO + new value
       //PersistentArrayMap.create()
-      null
+      this
     }
   }
   /** assoc exclusive: Only assoc when 'key is not present. */

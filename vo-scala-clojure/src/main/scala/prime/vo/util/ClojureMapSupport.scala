@@ -145,15 +145,14 @@ trait ClojureMapSupport extends IPersistentMap
   }
 
   // Seqable
-  final class Seq(remainingBits : Int, index : Int, meta: IPersistentMap = null) extends ASeq(meta) with Counted
+  final class Seq(seqFieldFn : IFn, remainingBits : Int, index : Int, meta: IPersistentMap = null) extends ASeq(meta) with Counted
   {
     import java.lang.Integer._
 
     def field = voManifest(index);
     def first = {
       val f = field;
-      val key = ClojureSupport.seqFieldFn.deref.asInstanceOf[IFn];
-      new MapEntry(if (key == null) f.keyword else key.invoke(f), ClojureSupport.get(f,self));
+      new MapEntry(if (seqFieldFn == null) f.keyword else seqFieldFn.invoke(f), ClojureSupport.get(f,self));
     }
 
     def next  = if (remainingBits != 0) {
@@ -161,7 +160,7 @@ trait ClojureMapSupport extends IPersistentMap
       val newBits = remainingBits >>> nextOffset;
       assert(remainingBits != newBits, remainingBits + " should != " + newBits);
       assert(index != (index + nextOffset), nextOffset + " should != " + index +" + "+ nextOffset);
-      new Seq(newBits, index + nextOffset);
+      new Seq(seqFieldFn, newBits, index + nextOffset);
 
     } else null;
 
@@ -174,7 +173,7 @@ trait ClojureMapSupport extends IPersistentMap
     val bits  = voIndexSet;
     if (bits != 0) {
       val index = java.lang.Integer.numberOfTrailingZeros(bits);
-      new Seq(bits >>> (1 + index), index)
+      new Seq(ClojureSupport.seqFieldFn.deref.asInstanceOf[IFn], bits >>> (1 + index), index)
     }
     else null;
   }

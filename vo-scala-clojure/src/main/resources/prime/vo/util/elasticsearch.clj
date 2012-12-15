@@ -10,7 +10,7 @@
             [clj-elasticsearch.client :as ces])
   (:use [prime.vo.source :only [def-valuesource]])
   (:import [prime.types EnumValue package$ValueType package$ValueTypes$Tdef package$ValueTypes$Tarray package$ValueTypes$Tenum]
-           [prime.vo ValueObject ValueObjectField ID]
+           [prime.vo ValueObject ValueObjectField ValueObjectCompanion ID]
            [com.fasterxml.jackson.core JsonGenerator]
 
            org.elasticsearch.action.search.SearchResponse, [org.elasticsearch.search SearchHit, SearchHitField],
@@ -48,10 +48,11 @@
 (declare vo-mapping)
 
 (defn field-mapping
-  ([option-map ^ValueObjectField field]
-    (field-mapping (or option-map {}) (. field valueType) (. field id) (. field keyword)))
+  ([option-map ^ValueObjectField field unique]
+    (field-mapping (conj (if unique {:index "not_analyzed"} #_else {}) option-map)
+                   (. field valueType) (. field id) (. field keyword)))
 
-  ([option-map ^package$ValueType value-type, id, field-key]
+  ([option-map, ^package$ValueType value-type, id, field-key]
     { (Integer/toHexString id),
     (conj {:store "no"
            :index_name (name field-key)
@@ -65,7 +66,7 @@
                 ^ValueObject             empty      (.. value-type empty)]
             (conj
               (if (.. value-type ref)
-                {:type (mapping-field-type-name (.. empty voManifest (_id) valueType))}
+                {:type (mapping-field-type-name (.valueType (._id ^prime.vo.IDField (. empty voManifest))))}
               #_else
                   (vo-mapping empty (or option-map {})))
 
@@ -90,14 +91,16 @@
   ([^ValueObject vo] (vo-mapping vo {}))
 
   ([^ValueObject vo, option-map]
+   (let [id-field (._id ^prime.vo.IDField (. vo voManifest))]
     { :type       "object"
       :dynamic    "strict"
       :properties
       (into {}
         (map
-          #(field-mapping (option-map (.keyword %)) %)
+          (fn [^ValueObjectField field] (field-mapping (option-map (.keyword field)) field (identical? id-field field)))
           (vo/field-filtered-seq vo (:only option-map) (:exclude option-map))))
     }))
+)
 
 ;
 ; ElasticSearch index management (mapping API)
@@ -150,7 +153,9 @@
 ; ElasticSearch querying API
 ;
 
-(def-valuesource ElasticSearch-ValueSource [^java.util.Map jmap, response]
+(def-valuesource ElasticSearch-ValueSource [^int type, ^java.util.Map jmap, response]
+  (typeID   [this, base] (if (not (== -1 type)) type #_else base))
+
   (contains [this, name idx]          (.containsKey jmap (Integer/toHexString (bit-shift-right idx 8))))
   (anyAt    [this, name idx notFound] (or
     (if jmap
@@ -163,7 +168,7 @@
             (let [item ^java.util.Map item]
               (if-let [x (.get item "x")] x
               (if-let [v (.get item "v")] v
-              (ElasticSearch-ValueSource. item, response))))
+              (ElasticSearch-ValueSource. (or (.get item "t") -1), item, response))))
 
           item)))
     notFound)))
@@ -192,10 +197,16 @@
 
 (defn get
   "options: see clj-elasticsearch.client/get-doc"
-  [es options]
-  (let [resp ^GetResponse
-        (ces/get-doc es (assoc options :format :java))]
-    (ElasticSearch-ValueSource. (.sourceAsMap resp) resp)))
+  ([es es-index vo]
+    (get es es-index vo {}))
+
+  ([es es-index ^ValueObject vo options]
+    ;{:pre [ ... ]} is bugged for multi arity fns
+    (assert es) (assert (string? es-index)) (assert (not (empty? vo))) (assert options)
+    (let [resp ^GetResponse
+          (ces/get-doc es (assoc options, :index es-index, :format :java, :id (.. ^ID vo _id toString)))]
+      (.apply (. vo voCompanion)
+              (ElasticSearch-ValueSource. (.. vo voManifest ID) (.sourceAsMap resp) resp)))))
 
 (defn put
   "options: see clj-elasticsearch.client/index-doc"
@@ -207,6 +218,13 @@
     :type   (Integer/toHexString (.. vo voManifest ID))
     :source (binding [prime.vo/*voseq-key-fn* field-hexname] (json/encode-smile vo))
   })))
+
+(defn SearchHit->fields [^SearchHit sh] (.fields sh)     )
+(defn SearchHit->source [^SearchHit sh] (.sourceAsMap sh))
+
+(defn SearchHit->ValueObject [source-fn, ^ValueObjectCompanion voCompanion, ^SearchHit hit]
+  (.apply voCompanion
+    (ElasticSearch-ValueSource. (Integer/parseInt (.type hit) 16) (source-fn hit) hit)))
 
 (defn search
   "options: see clj-elasticsearch.client/search
@@ -239,9 +257,9 @@
         }))
         response ^SearchResponse (ces/search es es-options)
       ]
-        (with-meta (map
-          (if fields
-            (fn [^SearchHit sh] (do (ElasticSearch-ValueSource. (.fields      sh) sh)))
-            (fn [^SearchHit sh] (do (ElasticSearch-ValueSource. (.sourceAsMap sh) sh))))
-          (.. response hits hits)) {:request es-options, :response response}))))
+        (with-meta
+          (map
+            (partial SearchHit->ValueObject (if fields SearchHit->fields #_else SearchHit->source) (. vo voCompanion))
+            (.. response hits hits))
+          {:request es-options, :response response}))))
 

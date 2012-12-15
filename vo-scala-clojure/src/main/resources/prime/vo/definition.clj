@@ -67,8 +67,8 @@
     (if (list?       value) (and (:pure (meta (ns-resolve *ns* (first value))))
                                  (every? stable-argument?      (rest  value))))
 
-    (do (debug "Unstable: " value) false))
-  (catch Exception e false)))
+    (do (trace "Unstable: " value) false))
+  (catch Exception e (do (trace e "Unstable: " value) false))))
 
 (defn unstable-argument? [value]
   (not (stable-argument?  value)))
@@ -100,9 +100,10 @@
         #_else '~(default-value-expr votrait %)
       ))) props))
 
-(defn eval? [expr]
+(defn eval?
+ [expr]
   "Returns the result of `(eval expr)` or false if any Exception is thrown."
-  (try (do (trace "About to eval:" expr) (eval expr))
+  (try (do (trace "About to eval:" (prn-str expr)) (eval expr))
     (catch Exception e#
       (trace e# "Tried to eval:" (let [w (java.io.StringWriter.)] (clojure.pprint/pprint expr w) (.toString w)))
       false)))
@@ -135,15 +136,22 @@
   (assert (sequential? props))
   (assert (every? keyword? props))
   (let [args (vo-constructor-arglist-from-map votrait props)]
-    `(if (map? ~'value-map)
-      (let [~'construct-expr# (list '.apply '~(companion-object-symbol votrait) ~@args)
-            ~'instance# (if ~'stable-value-map (eval? ~'construct-expr#))]
-        (if ~'instance#
-          (intern-vo-expr ~'instance# ~'construct-expr#)
-        #_else
-          ~'construct-expr#))
-    ;else: Runtime argument; return fn instead
-      `(~~runtime-constructor ~~'value-map);)
+    `(cond
+      (instance? ~votrait ~'value-map)
+        (intern-vo-expr ~'value-map nil)
+
+      (map? ~'value-map)
+        (let [~'construct-expr# (list '.apply '~(companion-object-symbol votrait) ~@args)
+              ~'instance#       (if ~'stable-value-map (eval? ~'construct-expr#))
+              ~'undefined       (clojure.set/difference (set (map key ~'value-map)) ~(set props))]
+          (assert (empty? ~'undefined), (str "\n  " ~votrait " defined fields,\n  are:   " (prn-str ~@props) ",\n  not! " ~'undefined))
+          (if ~'instance#
+            (intern-vo-expr ~'instance# ~'construct-expr#)
+          #_else
+            ~'construct-expr#))
+
+      :else ;Runtime argument; return fn instead
+        `(~~runtime-constructor ~~'value-map);)
     )))
 
 (defmacro defvo
@@ -171,9 +179,7 @@
           ([] ~converterfn-name)
           ([~'value-map-expr]
           (let [~'stable-value-map (stable-argument? ~'value-map-expr)
-                ~'value-map (or
-                              (and ~'stable-value-map (if-let [~'evald (eval? ~'value-map-expr)] (if (map? ~'evald) ~'evald ~'value-map-expr)))
-                              ~'value-map-expr)]
+                ~'value-map        (if (and ~'stable-value-map (list? ~'value-map-expr)) (eval ~'value-map-expr) ~'value-map-expr)]
             ~macro-body)))
         (alter-meta! (var ~macroname) assoc :pure true)
       ))

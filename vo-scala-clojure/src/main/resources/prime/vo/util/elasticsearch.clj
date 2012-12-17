@@ -133,12 +133,21 @@
     (.writeObjectField out "x", (.toString in)))
   (.writeEndObject out))
 
-(defn encode-vo [^prime.vo.ValueObject vo ^JsonGenerator out]
-  (.writeStartObject out)
-  (doseq [[k v] vo]
-    (.writeFieldName out (name k))
-    (cheshire.generate/generate out v cheshire.factory/default-date-format nil))
-  (.writeEndObject out))
+(defn encode-vo
+  ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex]
+    (encode-vo out vo date-format ex (.. vo voManifest ID)))
+
+  ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex ^Integer baseTypeID]
+    (.writeStartObject out)
+    (if (not (== baseTypeID (.. vo voManifest ID)))
+      (.writeNumberField out "t" (.. vo voManifest ID)))
+    (doseq [[^ValueObjectField k v] vo]
+      (.writeFieldName out (field-hexname k))
+      (if (instance? ValueObject v)
+        (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID))
+      #_else
+        (cheshire.generate/generate out v date-format ex)))
+    (.writeEndObject out)))
 
 (defn encode-instant [^org.joda.time.ReadableInstant in ^JsonGenerator out]
   (.writeNumber out (.getMillis in)))
@@ -147,6 +156,14 @@
   (add-encoder prime.types.EnumValue         encode-enum)
   (add-encoder prime.vo.ValueObject          encode-vo)
   (add-encoder org.joda.time.ReadableInstant encode-instant))
+
+
+(alter-var-root #'cheshire.generate/generate
+  (fn [orig-generate]
+    (fn [^JsonGenerator jg obj ^String date-format ^Exception ex]
+      (binding [prime.vo/*voseq-key-fn* identity]
+        (if (instance? ValueObject obj) (encode-vo jg obj date-format ex)
+        #_else                          (orig-generate jg obj date-format ex))))))
 
 
 ;
@@ -173,7 +190,7 @@
           item)))
     notFound)))
 
-(defn field-hexname [^ValueObjectField field]
+(defn ^String field-hexname [^ValueObjectField field]
   (Integer/toHexString (.id field)))
 
 (defn vo-term-filter
@@ -216,7 +233,7 @@
   (ces/index-doc es (conj options {
     :id     (.. ^ID vo _id toString)
     :type   (Integer/toHexString (.. vo voManifest ID))
-    :source (binding [prime.vo/*voseq-key-fn* field-hexname] (json/encode-smile vo))
+    :source (json/encode-smile vo)
   })))
 
 (defn SearchHit->fields [^SearchHit sh] (.fields sh)     )
@@ -240,26 +257,25 @@
     ; ces/search parameters
     listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source extra-source]}]
   {:pre [(instance? ValueObject vo) (or (string? indices) (vector? indices)) (not-empty indices)]}
-    (binding [prime.vo/*voseq-key-fn* field-hexname]
-      (let [
-        filter     (if-not filter (if-not (empty? vo) (vo-term-filter vo))
-                    #_else-filter (if-not (empty? vo) {:and (conj [filter] (vo-term-filter vo ""))}  #_else filter))
-        fields     (if (or only exclude) (map field-hexname (vo/field-filtered-seq vo only exclude)))
-        es-options (into {:format :java, :indices (if (vector? indices) indices [indices])}
-          (clojure.core/filter val {
-            :listener listener, :ignore-indices ignore-indices, :routing routing, :listener_threaded? listener-threaded?, :search-type search-type
-            :operation-threading operation-threading, :query-hint query-hint, :scroll scroll, :source source
-            :extra-source (json/encode (into {} (clojure.core/filter val {
-              :query query,   :filter filter,               :from from,             :size size, :types types, :sort sort, :highlighting highlighting
-              :fields fields, :script_fields script-fields, :preference preference, :facets facets, :named_filters, named-filters
-              :boost boost, :explain explain, :version version, :min_score min-score
-            })))
-        }))
-        response ^SearchResponse (ces/search es es-options)
-      ]
-        (with-meta
-          (map
-            (partial SearchHit->ValueObject (if fields SearchHit->fields #_else SearchHit->source) (. vo voCompanion))
-            (.. response hits hits))
-          {:request es-options, :response response}))))
+    (let [
+      filter     (if-not filter (if-not (empty? vo) (vo-term-filter vo))
+                  #_else-filter (if-not (empty? vo) {:and (conj [filter] (vo-term-filter vo ""))}  #_else filter))
+      fields     (if (or only exclude) (map field-hexname (vo/field-filtered-seq vo only exclude)))
+      es-options (into {:format :java, :indices (if (vector? indices) indices [indices])}
+        (clojure.core/filter val {
+          :listener listener, :ignore-indices ignore-indices, :routing routing, :listener_threaded? listener-threaded?, :search-type search-type
+          :operation-threading operation-threading, :query-hint query-hint, :scroll scroll, :source source
+          :extra-source (json/encode (into {} (clojure.core/filter val {
+            :query query,   :filter filter,               :from from,             :size size, :types types, :sort sort, :highlighting highlighting
+            :fields fields, :script_fields script-fields, :preference preference, :facets facets, :named_filters, named-filters
+            :boost boost, :explain explain, :version version, :min_score min-score
+          })))
+      }))
+      response ^SearchResponse (ces/search es es-options)
+    ]
+      (with-meta
+        (map
+          (partial SearchHit->ValueObject (if fields SearchHit->fields #_else SearchHit->source) (. vo voCompanion))
+          (.. response hits hits))
+        {:request es-options, :response response})))
 

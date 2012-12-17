@@ -223,3 +223,24 @@
             (fn [^org.elasticsearch.search.SearchHit sh] (do (ElasticSearch-ValueSource. (.sourceAsMap sh) sh))))
           (.. response hits hits)) {:request es-options, :response response}))))
 
+(defn update
+  [es ^ValueObject vo id & {:as options :keys [index]}]
+  {:pre [(instance? ValueObject vo) (not (nil? id))]}
+  (ces/update-doc (conj options {
+    :type (Integer/toHexString (.. vo voManifest ID))
+    :id (str id)
+    })))
+
+(defn insertAt "Add something to an array with a specific position" [es vo path value pos])
+
+(defn moveTo "Change position of an item in an array" [es vo path pos])
+
+(defn appendTo "Add something to the end of an array")
+
+#_(defn update-if
+  [es ^ValueObject vo id predicate &])
+
+(defn delete [es ^ValueObject vo id & {:as options :keys [index]}]
+  {:pre [(instance? ValueObject vo)]}
+  (ces/delete-doc :index index :id id))
+

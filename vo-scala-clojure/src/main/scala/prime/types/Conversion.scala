@@ -5,9 +5,10 @@ package prime.types;
  import org.msgpack.`object`._
  import prime.utils.msgpack.MessagePackObjectId;
  import java.text.{ParseException, DecimalFormatSymbols, DecimalFormat}
- import java.util.{Locale}
+ import java.util.{Locale, Collection}
  import java.lang.Integer
  import scala.util.matching.Regex
+ import scala.collection.JavaConversions
 
 object Conversion
 {
@@ -295,6 +296,8 @@ object Conversion
 
   def Vector[T] (value:IndexedSeq[T])                                   : IndexedSeq[T] = value
   def Vector[T] (value:Array[T])                                        : IndexedSeq[T] = value
+  def Vector[T] (value:java.util.List[T])                               : IndexedSeq[T] = if (value.isEmpty) IndexedSeq.empty else JavaConversions.asScalaBuffer(value).toIndexedSeq;
+  def Vector[T] (value:Collection[T])                                   : IndexedSeq[T] = if (value.isEmpty) IndexedSeq.empty else JavaConversions.collectionAsScalaIterable(value).toIndexedSeq;
   def Vector[T] (value:Traversable[T])                                  : IndexedSeq[T] = value.toIndexedSeq
   def Vector[T] (value:ArrayType)       (implicit converter : Any => T) : IndexedSeq[T] = Vector(value.asArray.asInstanceOf[Array[AnyRef]])
   def Vector[T] (value:Traversable[_])  (implicit converter : Any => T) : IndexedSeq[T] = value.view.map(converter).toIndexedSeq
@@ -313,6 +316,7 @@ object Conversion
     case v:ArrayType      => Vector(v)
     case v:CljIPVector    => prime.vo.util.ClojureVectorSupport.asScala(v)(converter,null)
     case v:Array[_]       => v.view.map(converter).toIndexedSeq
+    case v:Collection[_]  => JavaConversions.collectionAsScalaIterable(v).map(converter).toIndexedSeq
     case v:Traversable[_] => Vector(v)
     case None             => throw NoInputException;
 

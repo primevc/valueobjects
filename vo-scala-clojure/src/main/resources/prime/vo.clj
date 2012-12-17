@@ -47,3 +47,12 @@
 
 (defn id->voCompanion [^Integer id]
   (.apply (.typeMap data.vo.VO$/MODULE$) id))
+
+(defn fields-path-seq [vo [first-field-name & path]]
+  (let [field (.. vo voManifest (findOrNull first-field-name))]
+    (if field
+      (if path
+        (let [next-fields (fields-path-seq (.defaultValue field) path)]
+          (if next-fields (cons field next-fields)))
+      #_else
+        (cons field nil)))))

@@ -105,6 +105,23 @@
 (defn ^String field-hexname [^ValueObjectField field]
   (Integer/toHexString (.id field)))
 
+(defn keyword->hex-field   [^prime.vo.ValueObject vo, ^clojure.lang.Named key]
+  (let [path (prime.vo/fields-path-seq vo (clojure.string/split (name key) #"[.]"))]
+    (if path
+      (clojure.string/join "."
+        (map field-hexname path)))))
+
+(defn map-keywords->hex-fields [^prime.vo.ValueObject vo, expr]
+  (cond
+    (keyword? expr)
+      (or (keyword->hex-field vo expr) expr)
+    (vector? expr) ; Clojure wart: A MapEntry is a vector, but not a PersistentCollection :-S and does not implement (empty ..)
+      (vec (map (partial map-keywords->hex-fields vo) expr))
+    (empty expr)
+      (into (empty expr) (map (partial map-keywords->hex-fields vo) expr))
+    :else expr))
+
+
 ;
 ; ElasticSearch index management (mapping API)
 ;
@@ -192,9 +209,9 @@
           item)))
     notFound)))
 
-(defn vo-term-filter
+(defn vo->term-filter
   ([vo]
-    (let [terms (vo-term-filter vo "")]
+    (let [terms (vo->term-filter vo "")]
       (if (== 1 (count terms))
         {:term terms}
       #_else
@@ -205,7 +222,7 @@
       (into {}
         (map (fn [pair] (let [[k v] pair]
               (cond
-                (map? v)                (vo-term-filter v (str k "."))
+                (map? v)                (vo->term-filter v (str k "."))
                 (instance? EnumValue v) (if (.isInstance scala.Product v) [(str k ".x") (.toString v)] #_else [(str k ".v") (.value ^EnumValue v)])
                 :else  pair)))
         (seq vo))))))
@@ -254,20 +271,22 @@
     ; extra-source parameters
     query filter from size types sort highlighting only exclude script-fields preference facets named-filters boost explain version min-score
     ; ces/search parameters
-    listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source extra-source]}]
+    listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source]}]
   {:pre [(instance? ValueObject vo) (or (string? indices) (vector? indices)) (not-empty indices)]}
     (let [
-      filter     (if-not filter (if-not (empty? vo) (vo-term-filter vo))
-                  #_else-filter (if-not (empty? vo) {:and (conj [filter] (vo-term-filter vo ""))}  #_else filter))
+      filter     (map-keywords->hex-fields vo filter)
+      filter     (if-not filter (if-not (empty? vo) (vo->term-filter vo))
+                  #_else+filter (if-not (empty? vo) {:and (conj [filter] (vo->term-filter vo ""))}  #_else filter))
       fields     (if (or only exclude) (map field-hexname (vo/field-filtered-seq vo only exclude)))
       es-options (into {:format :java, :indices (if (vector? indices) indices [indices])}
         (clojure.core/filter val {
           :listener listener, :ignore-indices ignore-indices, :routing routing, :listener_threaded? listener-threaded?, :search-type search-type
           :operation-threading operation-threading, :query-hint query-hint, :scroll scroll, :source source
           :extra-source (json/encode (into {} (clojure.core/filter val {
-            :query query,   :filter filter,               :from from,             :size size, :types types, :sort sort, :highlighting highlighting
-            :fields fields, :script_fields script-fields, :preference preference, :facets facets, :named_filters, named-filters
-            :boost boost, :explain explain, :version version, :min_score min-score
+            :query  (map-keywords->hex-fields vo query),  :filter filter,         :from from,     :size size,    :types types,
+            :sort     sort, :highlighting   highlighting,
+            :fields fields, :script_fields script-fields, :preference preference, :facets facets, :named_filters named-filters,
+            :boost boost,   :explain explain,             :version version,       :min_score min-score
           })))
       }))
       response ^SearchResponse (ces/search es es-options)

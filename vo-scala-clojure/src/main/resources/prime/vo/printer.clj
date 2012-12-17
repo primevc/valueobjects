@@ -6,7 +6,7 @@
   "Extends the Clojure printer with formatted printing of ValueObject instances."
   (:import java.io.Writer
            [prime.types package$ValueType EnumValue FileRef RGBA]
-           prime.vo.ValueObject))
+           [prime.vo ValueObject ValueObjectField]))
 
 (def ^:private print-sequential #'clojure.core/print-sequential)
 (def ^:private print-meta       #'clojure.core/print-meta)
@@ -16,6 +16,14 @@
 ;
 ; Value type printing
 ;
+
+(defmethod print-method ValueObjectField [^ValueObjectField v, ^Writer w]
+  (pr-on (list 'ValueObjectField. {
+    :id           (Integer/toHexString (.id v))
+    :name         (.name         v)
+    :valueType    (.valueType    v)
+    :defaultValue (.defaultValue v)
+  }) w))
 
 (defmethod print-method package$ValueType [^package$ValueType v, ^Writer w]
   (pr-on (.keyword v) w))

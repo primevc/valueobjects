@@ -143,10 +143,14 @@
 (defn encode-instant [^org.joda.time.ReadableInstant in ^JsonGenerator out]
   (.writeNumber out (.getMillis in)))
 
+(defn encode-uri [^org.apache.commons.httpclient.URI in ^JsonGenerator out]
+  (.writeString out (.toString in)))
+
 (doseq [add-encoder [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
-  (add-encoder prime.types.EnumValue         encode-enum)
-  (add-encoder prime.vo.ValueObject          encode-vo)
-  (add-encoder org.joda.time.ReadableInstant encode-instant))
+  (add-encoder prime.types.EnumValue              encode-enum)
+  (add-encoder prime.vo.ValueObject               encode-vo)
+  (add-encoder org.apache.commons.httpclient.URI  encode-uri)
+  (add-encoder org.joda.time.ReadableInstant      encode-instant))
 
 
 ;
@@ -266,21 +270,39 @@
 (defn update
   [es ^ValueObject vo id & {:as options :keys [index]}]
   {:pre [(instance? ValueObject vo) (not (nil? id))]}
-  (ces/update-doc (conj options {
+  (ces/update-doc es (conj options {
     :type (Integer/toHexString (.. vo voManifest ID))
     :id (str id)
+    :doc (binding [prime.vo/*voseq-key-fn* field-hexname] (json/encode-smile vo))
     })))
 
 (defn insertAt "Add something to an array with a specific position" [es vo path value pos])
 
 (defn moveTo "Change position of an item in an array" [es vo path pos])
 
-(defn appendTo "Add something to the end of an array")
+;TODO 
+;  Convert fieldnames
+;  Put values to params
+(defn appendTo "Add something to the end of an array" [es vo id & {:as options :keys [index]}]
+  {:pre [(instance? ValueObject vo) (not (nil? id))]}
+  (ces/update-doc es (conj options {
+    :type (Integer/toHexString (.. vo voManifest ID))
+    :id (str id)
+    :script (apply str (map #(str "ctx._source." (name (key %)) " += " (val %) ";") vo))
+    })))
+
+(defn replaceAt "Replaces a value in an array at given position" [es vo pos value])
+
+(defn removeByValue "Removes an item from an array by value" [es vo val])
 
 #_(defn update-if
   [es ^ValueObject vo id predicate &])
 
-(defn delete [es ^ValueObject vo id & {:as options :keys [index]}]
+(defn delete [es ^ValueObject vo & {:as options :keys [index]}]
   {:pre [(instance? ValueObject vo)]}
-  (ces/delete-doc :index index :id id))
-
+  (assert index ":index required")
+  (assert vo    "vo required")
+  (ces/delete-doc es (conj options {
+    :id     (.. ^ID vo _id toString)
+    :type   (Integer/toHexString (.. vo voManifest ID))
+  })))

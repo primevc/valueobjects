@@ -193,7 +193,7 @@ abstract class ValueObject_4(_voIndexSet0 : Int, _srcDiff0 : Int) extends ValueO
   protected def _voIndexSet = _bits & 0xF;
   
   def voIndexSet : Int = _voIndexSet;
-  def srcDiff    : Int = (_bits & 0xF) >>> 4;
+  def srcDiff    : Int = _bits >>> 4 & 0xF;
 
   def initIndexSet = _voIndexSet;
 }

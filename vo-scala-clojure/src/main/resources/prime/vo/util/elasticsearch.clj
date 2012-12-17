@@ -102,6 +102,9 @@
     }))
 )
 
+(defn ^String field-hexname [^ValueObjectField field]
+  (Integer/toHexString (.id field)))
+
 ;
 ; ElasticSearch index management (mapping API)
 ;
@@ -154,7 +157,6 @@
 
 (doseq [add-encoder [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
   (add-encoder prime.types.EnumValue         encode-enum)
-  (add-encoder prime.vo.ValueObject          encode-vo)
   (add-encoder org.joda.time.ReadableInstant encode-instant))
 
 
@@ -189,9 +191,6 @@
 
           item)))
     notFound)))
-
-(defn ^String field-hexname [^ValueObjectField field]
-  (Integer/toHexString (.id field)))
 
 (defn vo-term-filter
   ([vo]

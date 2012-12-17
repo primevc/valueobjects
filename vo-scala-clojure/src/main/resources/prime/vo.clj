@@ -44,3 +44,6 @@
     (filter
       #(field-keys (.keyword ^ValueObjectField %))
       (fields vo))))
+
+(defn id->voCompanion [^Integer id]
+  (.apply (.typeMap data.vo.VO$/MODULE$) id))

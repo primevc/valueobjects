@@ -158,4 +158,5 @@
     #'bit-and #'bit-and-not #'bit-clear #'bit-flip #'bit-not #'bit-or #'bit-set #'bit-shift-left #'bit-shift-right #'bit-test #'bit-xor
     #'conj
     #'dec #'dec' #'even? #'inc #'inc' #'max #'min #'odd? #'rem
+    #'boolean #'short #'int #'long #'bigint #'double #'float
   ]] (alter-meta! purefn assoc :pure true))

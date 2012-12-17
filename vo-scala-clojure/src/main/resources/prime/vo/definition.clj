@@ -15,9 +15,9 @@
   #_else
     (symbol (.getName (class (.voCompanion ^ValueObject votrait))) "MODULE$")))
 
-(defn field-object-expr [^Class votrait prop]
+(defn field-object-expr [^Class votrait ^Keyword prop]
   (let [field-obj (str (.getName votrait) "$field$")
-        prop      (if (= prop 'values) '_values prop)]
+        prop      (if (= prop :values) '_values (.sym prop))]
     (trace "Searching for field-object" votrait prop "in" field-obj)
     (if (not-any? #(= (name prop) (.getName ^java.lang.reflect.Field %)) (.getDeclaredFields ^Class (Class/forName field-obj)))
       `~(symbol (str field-obj prop "$") "MODULE$")
@@ -25,10 +25,10 @@
       `(.. ~(symbol (str field-obj) "MODULE$") ~prop))))
 
 (defmacro field-object [votrait prop]
-  (field-object-expr votrait prop))
+  (field-object-expr (eval votrait) prop))
 
 (defmacro default-value [votrait prop]
-  `(. (field-object ~votrait ~prop) ~'defaultValue))
+  `(. ~(field-object-expr votrait prop) ~'defaultValue))
 
 (defn vo-converterfn-expr [^Class votrait fn-name]
   `(defn ~fn-name 
@@ -65,16 +65,16 @@
     (if (or (vector? value) (set? value)) (every? stable-argument? value))
     (if (map?        value) (every? stable-argument? (vals value)))
     (if (list?       value) (and (:pure (meta (ns-resolve *ns* (first value))))
-                                 (every? stable-argument?         (rest  value))))
+                                 (every? stable-argument?      (rest  value))))
 
-    (do (debug "Unstable: " value) false))
-  (catch Exception e false)))
+    (do (trace "Unstable: " value) false))
+  (catch Exception e (do (trace e "Unstable: " value) false))))
 
 (defn unstable-argument? [value]
   (not (stable-argument?  value)))
 
 (defn default-value-expr [^Class votrait ^Keyword prop]
-  (let [value-expr (macroexpand `(default-value ~votrait ~(.sym prop)))
+  (let [value-expr (macroexpand `(default-value ~votrait ~prop))
         value      (eval value-expr)]
     (if (literal-value? value)
       value
@@ -83,11 +83,11 @@
 
 (defmacro to-field-type [votrait prop value-expr]
   (let [^Class votrait (if (class? votrait) votrait (eval votrait))
-        ^Symbol field  (.sym ^Keyword prop)
-             valueType (eval `(.. ~(field-object-expr votrait field) valueType))]
+        valueType-expr `(. ~(field-object-expr votrait prop) ~'valueType)
+             valueType (eval valueType-expr)]
     (if (or (not (instance? prime.types.package$ValueTypes$Tdef valueType))
             (. ^prime.types.package$ValueTypes$Tdef valueType ref))
-      `(try (.. ~(macroexpand `(field-object ~votrait ~(symbol (name field)))) ~'valueType (~'convert ~value-expr)) 
+      `(try (. ~valueType-expr (~'convert ~value-expr))
         (catch Conversion$NoInputException$ e# ~(default-value-expr votrait prop)))
     ;else Tdef: not a ref
       (let [valueType ^prime.types.package$ValueTypes$Tdef valueType]
@@ -100,9 +100,10 @@
         #_else '~(default-value-expr votrait %)
       ))) props))
 
-(defn eval? [expr]
+(defn eval?
+ [expr]
   "Returns the result of `(eval expr)` or false if any Exception is thrown."
-  (try (eval expr)
+  (try (do (trace "About to eval:" (prn-str expr)) (eval expr))
     (catch Exception e#
       (trace e# "Tried to eval:" (let [w (java.io.StringWriter.)] (clojure.pprint/pprint expr w) (.toString w)))
       false)))
@@ -135,15 +136,22 @@
   (assert (sequential? props))
   (assert (every? keyword? props))
   (let [args (vo-constructor-arglist-from-map votrait props)]
-    `(if (map? ~'value-map)
-      (let [~'construct-expr# (list '.apply '~(companion-object-symbol votrait) ~@args)
-            ~'instance# (eval? ~'construct-expr#)]
-        (if (and ~'instance# ~'stable-value-map)
-          (intern-vo-expr ~'instance# ~'construct-expr#)
-        #_else
-          ~'construct-expr#))
-    ;else: Runtime argument; return fn instead
-      `(~~runtime-constructor ~~'value-map);)
+    `(cond
+      (instance? ~votrait ~'value-map)
+        (intern-vo-expr ~'value-map nil)
+
+      (map? ~'value-map)
+        (let [~'construct-expr# (list '.apply '~(companion-object-symbol votrait) ~@args)
+              ~'instance#       (if ~'stable-value-map (eval? ~'construct-expr#))
+              ~'undefined       (clojure.set/difference (set (map key ~'value-map)) ~(set props))]
+          (assert (empty? ~'undefined), (str "\n  " ~votrait " defined fields,\n  are:   " (prn-str ~@props) ",\n  not! " ~'undefined))
+          (if ~'instance#
+            (intern-vo-expr ~'instance# ~'construct-expr#)
+          #_else
+            ~'construct-expr#))
+
+      :else ;Runtime argument; return fn instead
+        `(~~runtime-constructor ~~'value-map);)
     )))
 
 (defmacro defvo
@@ -171,9 +179,7 @@
           ([] ~converterfn-name)
           ([~'value-map-expr]
           (let [~'stable-value-map (stable-argument? ~'value-map-expr)
-                ~'value-map (or
-                              (and ~'stable-value-map (if-let [~'evald (eval? ~'value-map-expr)] (if (map? ~'evald) ~'evald ~'value-map-expr)))
-                              ~'value-map-expr)]
+                ~'value-map        (if (and ~'stable-value-map (list? ~'value-map-expr)) (eval ~'value-map-expr) ~'value-map-expr)]
             ~macro-body)))
         (alter-meta! (var ~macroname) assoc :pure true)
       ))

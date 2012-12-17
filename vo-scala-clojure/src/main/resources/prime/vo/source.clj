@@ -20,17 +20,19 @@
 (defmacro def-valuesource [typeName args & definitions]
   `(deftype ~typeName ~args
   prime.vo.source.ValueSource
-    (typeID [this# ID#] ID#)
+  ~@(concat
+      (let [overrides (set (map first definitions))]
+        (remove #(overrides (first %)) '[
+          (typeID [this ID] ID)
 
-    (intAt    [this#, name# idx# notFound#] (prime.types/to-Integer (.anyAt this# name# idx# notFound#)))
-    (doubleAt [this#, name# idx# notFound#] (prime.types/to-Decimal (.anyAt this# name# idx# notFound#)))
+          (intAt    [this, name idx notFound] (prime.types/to-Integer (.anyAt this name idx notFound)))
+          (doubleAt [this, name idx notFound] (prime.types/to-Decimal (.anyAt this name idx notFound)))
 
-    (anyAt    [this#, name# idx#]           (.anyAt    this# name# idx# nil))
-    (intAt    [this#, name# idx#]           (.intAt    this# name# idx# Integer/MIN_VALUE))
-    (doubleAt [this#, name# idx#]           (.doubleAt this# name# idx# Double/NaN))
-
-    ~@definitions
-))
+          (anyAt    [this, name idx]          (.anyAt    this name idx nil))
+          (intAt    [this, name idx]          (.intAt    this name idx Integer/MIN_VALUE))
+          (doubleAt [this, name idx]          (.doubleAt this name idx Double/NaN))
+        ]))
+      definitions)))
 
 ;
 ; PersistentMap implementation

@@ -291,7 +291,7 @@
     (let [
       filter     (map-keywords->hex-fields vo filter)
       filter     (if-not filter (if-not (empty? vo) (vo->term-filter vo))
-                  #_else+filter (if-not (empty? vo) {:and (conj [filter] (vo->term-filter vo ""))}  #_else filter))
+                  #_else+filter (if-not (empty? vo) {:and (conj [filter] (vo->term-filter vo))}  #_else filter))
       fields     (if (or only exclude) (map field-hexname (vo/field-filtered-seq vo only exclude)))
       es-options (into {:format :java, :indices (if (vector? indices) indices [indices])}
         (clojure.core/filter val {

@@ -4,7 +4,7 @@
 
 (ns prime.vo.definition
   (:use prime.vo.printer, [taoensso.timbre :as timbre :only (trace debug info warn error fatal spy)])
-  (:require clojure.pprint, prime.types)
+  (:require clojure.pprint, prime.types, [clojure.set :as set])
   (:import (prime.vo ValueObject) (clojure.lang Symbol Keyword) prime.types.Conversion$NoInputException$))
 
 (set! *warn-on-reflection* true)
@@ -114,6 +114,7 @@
 ;
 
 (defn intern-vo-expr "Creates a var using (intern ..) and returns the symbol of it" [^ValueObject vo construct-expr]
+  (trace (prn-str "Possibly interning: " vo ":" construct-expr))
   (if (empty? vo)
     (list '.empty (companion-object-symbol vo))
   #_else
@@ -143,7 +144,7 @@
       (map? ~'value-map)
         (let [~'construct-expr# (list '.apply '~(companion-object-symbol votrait) ~@args)
               ~'instance#       (if ~'stable-value-map (eval? ~'construct-expr#))
-              ~'undefined       (clojure.set/difference (set (map key ~'value-map)) ~(set props))]
+              ~'undefined       (set/difference (set (map key ~'value-map)) ~(set props))]
           (assert (empty? ~'undefined), (str "\n  " ~votrait " defined fields,\n  are:   " (prn-str ~@props) ",\n  not! " ~'undefined))
           (if ~'instance#
             (intern-vo-expr ~'instance# ~'construct-expr#)

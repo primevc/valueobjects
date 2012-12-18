@@ -43,7 +43,7 @@
       (condp instance? valueType
         package$ValueTypes$Tdef   "object"
         package$ValueTypes$Tenum  "object"
-        package$ValueTypes$Tarray (mapping-field-type-name (. ^package$ValueTypes$Tarray valueType innerType)))))
+        package$ValueTypes$Tarray (assert false "array should be mapped as it's contents"))))
 
 (declare vo-mapping)
 
@@ -53,6 +53,9 @@
                    (. field valueType) (. field id) (. field keyword)))
 
   ([option-map, ^package$ValueType value-type, id, field-key]
+    (if (instance? package$ValueTypes$Tarray value-type)
+      (field-mapping option-map (. ^package$ValueTypes$Tarray value-type innerType) id field-key)
+    ; Else: not an array
     { (Integer/toHexString id),
     (conj {:store "no"
            :index_name (name field-key)
@@ -79,7 +82,8 @@
         :else nil)
 
       option-map ;overwrites defaults
-    )}))
+    )
+    })))
 
 
 (defn vo-mapping "Create an ElasticSearch compatible mapping from an empty ValueObject.
@@ -87,17 +91,21 @@
   - :only    exclusive #{set} of fields to include in mapping
   - :exclude #{set} of fields not to include in mapping
   - any ElasticSearch option.
+
+  Known issues / TODO:
+   - ValueObjects fields need to have their subtypes mappings merged in,
+      or ElasticSearch will complain about strict mapping when storing a vo that has subtype specific fields.
   "
   ([^ValueObject vo] (vo-mapping vo {}))
 
   ([^ValueObject vo, option-map]
-   (let [id-field (._id ^prime.vo.IDField (. vo voManifest))]
+   (let [id-field (if (instance? prime.vo.IDField (. vo voManifest)) (._id ^prime.vo.IDField (. vo voManifest)))]
     { :type       "object"
       :dynamic    "strict"
       :properties
       (into {}
         (map
-          (fn [^ValueObjectField field] (field-mapping (option-map (.keyword field)) field (identical? id-field field)))
+          (fn [^ValueObjectField field] (field-mapping (option-map (.keyword field)) field (if id-field (identical? id-field field))))
           (vo/field-filtered-seq vo (:only option-map) (:exclude option-map))))
     }))
 )
@@ -263,6 +271,9 @@
   (.apply voCompanion
     (ElasticSearch-ValueSource. (Integer/parseInt (.type hit) 16) (source-fn hit) hit)))
 
+; TODO:
+; - add "type" filter by default.
+; - use id->voCompanion when type filter is removed, to allow searching for multiple types.
 (defn search
   "options: see clj-elasticsearch.client/search
   example: (vo/search {:filter {:term {:name 'Henk'}}})
@@ -326,10 +337,10 @@
 
 (defn moveTo "Change position of an item in an array" [es vo path pos])
 
-;TODO 
+;TODO:
 ;  Convert fieldnames
 ;  Put values to params
-(defn appendTo "Add something to the end of an array" [es vo id & {:as options :keys [index]}]
+(defn appendTo "Add something to the end of an array" [es ^ValueObject vo id & {:as options :keys [index]}]
   {:pre [(instance? ValueObject vo) (not (nil? id))]}
   (ces/update-doc es (conj options {
     :type (Integer/toHexString (.. vo voManifest ID))
@@ -352,3 +363,17 @@
     :id     (.. ^ID vo _id toString)
     :type   (Integer/toHexString (.. vo voManifest ID))
   })))
+
+
+;
+; Query helpers
+;
+
+(defn vo-hexname [^ValueObject vo] (Integer/toHexString (.. vo voManifest ID)))
+
+(defn has-child-vo
+  "Construct a 'has_child' query for the given VO type and optional query (defaults to match_all)."
+  ([vo] (has-child-vo vo {"match_all" {}}))
+
+  ([vo child-query]
+    {"has_child" {"type" (vo-hexname vo), "query" child-query}}))

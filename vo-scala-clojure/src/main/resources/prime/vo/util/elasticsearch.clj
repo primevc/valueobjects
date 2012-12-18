@@ -287,10 +287,22 @@
           :listener listener, :ignore-indices ignore-indices, :routing routing, :listener_threaded? listener-threaded?, :search-type search-type
           :operation-threading operation-threading, :query-hint query-hint, :scroll scroll, :source source
           :extra-source (json/encode (into {} (clojure.core/filter val {
-            :query  (map-keywords->hex-fields vo query),  :filter filter,         :from from,     :size size,    :types types,
-            :sort     sort, :highlighting   highlighting,
-            :fields fields, :script_fields script-fields, :preference preference, :facets facets, :named_filters named-filters,
-            :boost boost,   :explain explain,             :version version,       :min_score min-score
+            :query            (map-keywords->hex-fields vo query),
+            :filter           filter,
+            :from             from,
+            :size             size,
+            :types            types,
+            :sort             (map-keywords->hex-fields vo sort),
+            :highlighting     (map-keywords->hex-fields vo highlighting),
+            :fields           fields,
+            :script_fields    (map-keywords->hex-fields vo script-fields),
+            :preference       preference,
+            :facets           (map-keywords->hex-fields vo facets),
+            :named_filters    (map-keywords->hex-fields vo named-filters),
+            :boost            boost,
+            :explain          explain,
+            :version          version,
+            :min_score        min-score
           })))
       }))
       response ^SearchResponse (ces/search es es-options)

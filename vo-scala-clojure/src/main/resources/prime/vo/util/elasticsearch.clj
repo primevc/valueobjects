@@ -121,6 +121,8 @@
 
 (defn map-keywords->hex-fields [^prime.vo.ValueObject vo, expr]
   (cond
+    (instance? ValueObject expr)
+      expr
     (keyword? expr)
       (or (keyword->hex-field vo expr) expr)
     (vector? expr) ; Clojure wart: A MapEntry is a vector, but not a PersistentCollection :-S and does not implement (empty ..)
@@ -128,6 +130,8 @@
     (empty expr)
       (into (empty expr) (map (partial map-keywords->hex-fields vo) expr))
     :else expr))
+
+(defn vo-hexname [^ValueObject vo] (Integer/toHexString (.. vo voManifest ID)))
 
 
 ;
@@ -138,6 +142,14 @@
   (assert options)
   [ (Integer/toHexString (.. vo voManifest ID)),
     (conj (dissoc (vo-mapping vo options) :type) options) ])
+
+(defn put-mapping [es index-name, vo-options-pair]
+  (let [[type mapping] (vo-index-mapping-pair vo-options-pair)]
+    (ces/put-mapping es, {
+      :index  index-name
+      :type   type
+      :source {type mapping}
+    })))
 
 (defn create-index
   ([es index-name vo->options-map]
@@ -153,6 +165,10 @@
 ; ValueObjects and valuetypes JSON encoding
 ;
 
+(def ^:dynamic *root-vo-parent-id*
+  "Option to encode-vo.
+   Writes this value as a \"_parent\" json property in the root, if not nil." nil)
+
 (defn encode-enum [^EnumValue in ^JsonGenerator out]
   (.writeStartObject out)
   (if (not (.isInstance scala.Product in))
@@ -163,18 +179,23 @@
 
 (defn encode-vo
   ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex]
-    (encode-vo out vo date-format ex (.. vo voManifest ID)))
+    (encode-vo out vo date-format ex (.. vo voManifest ID) *root-vo-parent-id*))
 
-  ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex ^Integer baseTypeID]
+  ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex ^Integer baseTypeID, parent-id]
     (.writeStartObject out)
+
+    (if parent-id
+        (.writeObjectField out "_parent" parent-id))
     (if (not (== baseTypeID (.. vo voManifest ID)))
       (.writeNumberField out "t" (.. vo voManifest ID)))
+
     (doseq [[^ValueObjectField k v] vo]
       (.writeFieldName out (field-hexname k))
       (if (instance? ValueObject v)
-        (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID))
+        (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID) nil)
       #_else
-        (cheshire.generate/generate out v date-format ex)))
+        (binding [*root-vo-parent-id* nil] (cheshire.generate/generate out v date-format ex))))
+
     (.writeEndObject out)))
 
 (defn encode-instant [^org.joda.time.ReadableInstant in ^JsonGenerator out]
@@ -198,8 +219,10 @@
 
 
 ;
-; ElasticSearch querying API
+; ElasticSearch ValueSource
 ;
+
+(declare convert-search-result)
 
 (def-valuesource ElasticSearch-ValueSource [^int type, ^java.util.Map jmap, response]
   (typeID   [this, base] (if (not (== -1 type)) type #_else base))
@@ -208,18 +231,29 @@
   (anyAt    [this, name idx notFound] (or
     (if jmap
       (let [item (.get jmap (Integer/toHexString (bit-shift-right idx 8)))]
-        (condp instance? item
-          SearchHitField
-            (.value ^SearchHitField item)
-
-          java.util.Map
-            (let [item ^java.util.Map item]
-              (if-let [x (.get item "x")] x
-              (if-let [v (.get item "v")] v
-              (ElasticSearch-ValueSource. (or (.get item "t") -1), item, response))))
-
-          item)))
+        (convert-search-result item)))
     notFound)))
+
+(defn convert-search-result [item]
+  (condp instance? item
+  SearchHitField
+    (.value ^SearchHitField item)
+
+  java.util.Map
+    (let [item ^java.util.Map item]
+      (if-let [x (.get item "x")] x
+      (if-let [v (.get item "v")] v
+      (ElasticSearch-ValueSource. (or (.get item "t") -1), item, nil))))
+
+  java.util.List
+    (map convert-search-result item)
+
+  item))
+
+
+;
+; ElasticSearch querying API
+;
 
 (defn vo->term-filter
   ([vo]
@@ -235,6 +269,7 @@
         (map (fn [pair] (let [[k v] pair]
               (cond
                 (map? v)                (vo->term-filter v (str k "."))
+                (vector? v)             (vo->term-filter (first v) (str k "."))
                 (instance? EnumValue v) (if (.isInstance scala.Product v) [(str k ".x") (.toString v)] #_else [(str k ".v") (.value ^EnumValue v)])
                 :else  pair)))
         (seq vo))))))
@@ -289,9 +324,11 @@
     listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source]}]
   {:pre [(instance? ValueObject vo) (or (string? indices) (vector? indices)) (not-empty indices)]}
     (let [
+      typefilter {:type {:value (vo-hexname vo)}}
       filter     (map-keywords->hex-fields vo filter)
       filter     (if-not filter (if-not (empty? vo) (vo->term-filter vo))
                   #_else+filter (if-not (empty? vo) {:and (conj [filter] (vo->term-filter vo))}  #_else filter))
+      filter     (if filter {:and [typefilter filter]} typefilter)
       fields     (if (or only exclude) (map field-hexname (vo/field-filtered-seq vo only exclude)))
       es-options (into {:format :java, :indices (if (vector? indices) indices [indices])}
         (clojure.core/filter val {
@@ -324,13 +361,27 @@
           (.. response hits hits))
         {:request es-options, :response response})))
 
+(defn vo+parent->smile [vo parent-id]
+  (if parent-id
+    (binding [*root-vo-parent-id* parent-id] (json/encode-smile vo)))
+  #_else
+    (js/encode-smile vo))
+
+(defn- patched-update-options [options]
+  (let [{:keys [upsert parent] options}]
+    (if (instance? ValueObject upsert)
+        (assoc options
+          :upsert (vo+parent->smile upsert parent))
+      #_else
+        options)))
+
 (defn update
   [es ^ValueObject vo id & {:as options :keys [index]}]
   {:pre [(instance? ValueObject vo) (not (nil? id))]}
-  (ces/update-doc es (conj options {
-    :type (Integer/toHexString (.. vo voManifest ID))
-    :id  (str id)
-    :doc (json/encode-smile vo)
+  (ces/update-doc es (conj (patched-update-options options) {
+    :type   (Integer/toHexString (.. vo voManifest ID))
+    :id     (str id)
+    :doc    (json/encode-smile vo)
     })))
 
 (defn insertAt "Add something to an array with a specific position" [es vo path value pos])
@@ -342,11 +393,7 @@
 ;  Put values to params
 (defn appendTo "Add something to the end of an array" [es ^ValueObject vo id & {:as options :keys [index]}]
   {:pre [(instance? ValueObject vo) (not (nil? id))]}
-  (ces/update-doc es (conj
-    (if (instance? ValueObject (:upsert options))
-      (assoc options :upsert (json/encode-smile (:upsert options)))
-    #_else
-      options),
+  (ces/update-doc es (conj (patched-update-options options),
     {
       :type   (Integer/toHexString (.. vo voManifest ID))
       :id     (str id)
@@ -379,11 +426,10 @@
 ; Query helpers
 ;
 
-(defn vo-hexname [^ValueObject vo] (Integer/toHexString (.. vo voManifest ID)))
-
 (defn has-child-vo
-  "Construct a 'has_child' query for the given VO type and optional query (defaults to match_all)."
-  ([vo] (has-child-vo vo {"match_all" {}}))
+  "Construct a 'has_child' query for the given VO type and optional query.
+   If no query is given: query is built using vo as term filter, or match_all if vo is empty."
+  ([vo] (has-child-vo vo (if (empty? vo) {"match_all" {}} #_else (vo->term-filter vo))))
 
   ([vo child-query]
     {"has_child" {"type" (vo-hexname vo), "query" child-query}}))

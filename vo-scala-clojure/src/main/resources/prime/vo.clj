@@ -4,7 +4,8 @@
 
 (ns prime.vo
   (:require [clojure.set     :as    s])
-  (:import  [prime.vo ValueObject ValueObjectField ValueObjectManifest_0 ValueObjectManifest_1 ValueObjectManifest_N ID]))
+  (:import  [prime.vo ValueObject ValueObjectField ValueObjectManifest_0 ValueObjectManifest_1 ValueObjectManifest_N ID]
+            [prime.types package$ValueType package$ValueTypes$Tarray package$ValueTypes$Tdef]))
 
 (def ^:dynamic *proxy-map* "
   A function from VOType => VOProxy. Used to fetch a ValueObject when dereferencing VORef properties.
@@ -48,11 +49,18 @@
 (defn id->voCompanion [^Integer id]
   (.apply (.typeMap data.vo.VO$/MODULE$) id))
 
-(defn fields-path-seq [vo [first-field-name & path]]
+(defn type-default-vo [^package$ValueType field]
+  (condp instance? field
+    package$ValueTypes$Tdef   (.empty field)
+    package$ValueTypes$Tarray (type-default-vo (.innerType field))
+    nil))
+
+(defn fields-path-seq [^ValueObject vo [first-field-name & path]]
   (let [field (.. vo voManifest (findOrNull first-field-name))]
     (if field
       (if path
-        (let [next-fields (fields-path-seq (.defaultValue field) path)]
+        (let [inner-vo    (type-default-vo (.valueType field))
+              next-fields (fields-path-seq inner-vo path)]
           (if next-fields (cons field next-fields)))
       #_else
         (cons field nil)))))

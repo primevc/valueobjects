@@ -365,10 +365,10 @@
   (if parent-id
     (binding [*root-vo-parent-id* parent-id] (json/encode-smile vo)))
   #_else
-    (js/encode-smile vo))
+    (json/encode-smile vo))
 
 (defn- patched-update-options [options]
-  (let [{:keys [upsert parent] options}]
+  (let [{:keys [upsert parent]} options]
     (if (instance? ValueObject upsert)
         (assoc options
           :upsert (vo+parent->smile upsert parent))

@@ -329,8 +329,8 @@
   {:pre [(instance? ValueObject vo) (not (nil? id))]}
   (ces/update-doc es (conj options {
     :type (Integer/toHexString (.. vo voManifest ID))
-    :id (str id)
-    :doc (binding [prime.vo/*voseq-key-fn* field-hexname] (json/encode-smile vo))
+    :id  (str id)
+    :doc (json/encode-smile vo)
     })))
 
 (defn insertAt "Add something to an array with a specific position" [es vo path value pos])
@@ -342,10 +342,20 @@
 ;  Put values to params
 (defn appendTo "Add something to the end of an array" [es ^ValueObject vo id & {:as options :keys [index]}]
   {:pre [(instance? ValueObject vo) (not (nil? id))]}
-  (ces/update-doc es (conj options {
-    :type (Integer/toHexString (.. vo voManifest ID))
-    :id (str id)
-    :script (apply str (map #(str "ctx._source." (name (key %)) " += " (val %) ";") vo))
+  (ces/update-doc es (conj
+    (if (instance? ValueObject (:upsert options))
+      (assoc options :upsert (json/encode-smile (:upsert options)))
+    #_else
+      options),
+    {
+      :type   (Integer/toHexString (.. vo voManifest ID))
+      :id     (str id)
+      :source (json/encode-smile {
+        :script (binding [prime.vo/*voseq-key-fn* field-hexname] {
+          :script (apply str (map #(str "ctx._source['" % "'] += v" % ";") (keys vo)))
+          :params (into  {}  (map #(let [[k v] %1] [(str "v" k) v]) vo))
+        })
+      })
     })))
 
 (defn replaceAt "Replaces a value in an array at given position" [es vo pos value])

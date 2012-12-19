@@ -237,7 +237,7 @@
 (defn convert-search-result [item]
   (condp instance? item
   SearchHitField
-    (.value ^SearchHitField item)
+    (convert-search-result (.value ^SearchHitField item))
 
   java.util.Map
     (let [item ^java.util.Map item]
@@ -433,3 +433,6 @@
 
   ([vo child-query]
     {"has_child" {"type" (vo-hexname vo), "query" child-query}}))
+
+(defn convert [res]
+  (ces/convert (:response (meta res)) :clj))

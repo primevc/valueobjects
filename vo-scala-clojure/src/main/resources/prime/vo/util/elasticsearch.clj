@@ -317,7 +317,7 @@
 
   Returns: seq of SearchHits, with the full SearchResponse as meta-data.
   "
-  [es ^ValueObject vo indices & {:as options :keys [
+  [es indices ^ValueObject vo & {:as options :keys [
     ; extra-source parameters
     query filter from size types sort highlighting only exclude script-fields preference facets named-filters boost explain version min-score
     ; ces/search parameters

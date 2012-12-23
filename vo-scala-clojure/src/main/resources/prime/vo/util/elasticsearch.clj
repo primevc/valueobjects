@@ -165,10 +165,6 @@
 ; ValueObjects and valuetypes JSON encoding
 ;
 
-(def ^:dynamic *root-vo-parent-id*
-  "Option to encode-vo.
-   Writes this value as a \"_parent\" json property in the root, if not nil." nil)
-
 (defn encode-enum [^EnumValue in ^JsonGenerator out]
   (.writeStartObject out)
   (if (not (.isInstance scala.Product in))
@@ -179,22 +175,20 @@
 
 (defn encode-vo
   ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex]
-    (encode-vo out vo date-format ex (.. vo voManifest ID) *root-vo-parent-id*))
+    (encode-vo out vo date-format ex (.. vo voManifest ID)))
 
-  ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex ^Integer baseTypeID, parent-id]
+  ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex ^Integer baseTypeID]
     (.writeStartObject out)
 
-    (if parent-id
-        (.writeObjectField out "_parent" parent-id))
     (if (not (== baseTypeID (.. vo voManifest ID)))
       (.writeNumberField out "t" (.. vo voManifest ID)))
 
     (doseq [[^ValueObjectField k v] vo]
       (.writeFieldName out (field-hexname k))
       (if (instance? ValueObject v)
-        (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID) nil)
+        (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID))
       #_else
-        (binding [*root-vo-parent-id* nil] (cheshire.generate/generate out v date-format ex))))
+        (cheshire.generate/generate out v date-format ex)))
 
     (.writeEndObject out)))
 
@@ -361,28 +355,29 @@
           (.. response hits hits))
         {:request es-options, :response response})))
 
-(defn vo+parent->smile [vo parent-id]
-  (if parent-id
-    (binding [*root-vo-parent-id* parent-id] (json/encode-smile vo))
-  #_else
-    (json/encode-smile vo)))
+(defn ^org.elasticsearch.action.index.IndexRequest ->IndexRequest [^String index ^String type ^String id, input]
+  (let [^"[B" input (if (instance? ValueObject input) (json/encode-smile input) input)
+            request (new org.elasticsearch.action.index.IndexRequest index type id)]
+    (. request source input)
+    request))
 
-(defn- patched-update-options [options]
+(defn- patched-update-options [type id options]
   (let [{:keys [upsert parent]} options]
-    (if (instance? ValueObject upsert)
-        (assoc options
-          :upsert (vo+parent->smile upsert parent))
-      #_else
-        options)))
+    (if upsert
+      (assoc options :upsert (.parent (->IndexRequest (:index options) type id, upsert) parent))
+    #_else
+      options)))
 
 (defn update
   [es ^ValueObject vo id & {:as options :keys [index]}]
-  {:pre [(instance? ValueObject vo) (not (nil? id))]}
-  (ces/update-doc es (conj (patched-update-options options) {
-    :type   (Integer/toHexString (.. vo voManifest ID))
-    :id     (str id)
-    :doc    (json/encode-smile vo)
-    })))
+  {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
+  (let [type (Integer/toHexString (.. vo voManifest ID))
+        id   (str id)]
+    (ces/update-doc es (conj (patched-update-options type id options) {
+      :type   type
+      :id     id
+      :doc    (json/encode-smile vo)
+    }))))
 
 (defn insertAt "Add something to an array with a specific position" [es vo path value pos])
 
@@ -392,18 +387,19 @@
 ;  Convert fieldnames
 ;  Put values to params
 (defn appendTo "Add something to the end of an array" [es ^ValueObject vo id & {:as options :keys [index]}]
-  {:pre [(instance? ValueObject vo) (not (nil? id))]}
-  (ces/update-doc es (conj (patched-update-options options),
-    {
-      :type   (Integer/toHexString (.. vo voManifest ID))
-      :id     (str id)
-      :source (json/encode-smile {
-        :script (binding [prime.vo/*voseq-key-fn* field-hexname] {
+  {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
+  (let [type (Integer/toHexString (.. vo voManifest ID))
+        id   (str id)]
+    (ces/update-doc es (conj (patched-update-options type id options), {
+      :type         type
+      :id           id
+
+      :source (json/encode-smile
+        (binding [prime.vo/*voseq-key-fn* field-hexname] {
           :script (apply str (map #(str "ctx._source['" % "'] += v" % ";") (keys vo)))
           :params (into  {}  (map #(let [[k v] %1] [(str "v" k) v]) vo))
-        })
-      })
-    })))
+        }))
+    }))))
 
 (defn replaceAt "Replaces a value in an array at given position" [es vo pos value])
 

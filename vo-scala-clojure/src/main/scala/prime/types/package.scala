@@ -13,8 +13,8 @@ package object types
 {
   def voManifest[V <: ValueObject](implicit manifest : ValueObjectManifest[V]) = manifest;
 
-  type URL = org.apache.commons.httpclient.URI
-  type URI = org.apache.commons.httpclient.URI
+  type URL = java.net.URL
+  type URI = java.net.URI
   type ObjectId = org.bson.types.ObjectId
   type EmailAddr = javax.mail.internet.InternetAddress
 
@@ -23,7 +23,8 @@ package object types
   type Interval = org.joda.time.Interval
   
   val emptyString    = "";
-  val emptyURI       = new URI("", true);
+  val emptyURI       = new URI("");
+  val emptyURL       = new URL("http:");
   val emptyEmailAddr = new EmailAddr("",null);
   val emptyFileRef   = new FileRef("",null);
   val emptyObjectId  = new ObjectId(Array[Byte](0,0,0,0,0,0,0,0,0,0,0,0));

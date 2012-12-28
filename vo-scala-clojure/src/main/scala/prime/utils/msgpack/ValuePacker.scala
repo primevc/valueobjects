@@ -4,7 +4,7 @@ import org.msgpack.Packer
 import java.lang.Math
 import java.io.OutputStream
 import org.bson.types.ObjectId
-import prime.types.{Ref, RefArray, EmailAddr, Enum, RGBA, FileRef, URI, DateTime, Date}
+import prime.types.{Conversion, Ref, RefArray, EmailAddr, Enum, RGBA, FileRef, URI, DateTime, Date}
 import prime.vo._
 import Util._
 
@@ -55,10 +55,10 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
     for (item <- v) pack(item);
   }
 
-  final def pack(fileRef : FileRef)                 { super.pack(fileRef.toString);           }
-  final def pack(uri     : URI)                     { super.pack(uri.getEscapedURIReference); }
-  final def pack(email   : EmailAddr)               { super.pack(email.toString);             }
-  final def pack(rgba    : RGBA)                    { super.pack(rgba.rgba);                  }
+  final def pack(fileRef : FileRef)                 { super.pack(fileRef.toString);       }
+  final def pack(uri     : URI)                     { super.pack(Conversion.String(uri)); }
+  final def pack(email   : EmailAddr)               { super.pack(email.toString);         }
+  final def pack(rgba    : RGBA)                    { super.pack(rgba.rgba);              }
 
   final def pack(date : org.joda.time.DateTime)     { pack( date.toInstant );       }
   final def pack(date : org.joda.time.DateMidnight) { pack( date.toInstant );       }

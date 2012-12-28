@@ -171,10 +171,6 @@
 ; ValueObjects and valuetypes JSON encoding
 ;
 
-(def ^:dynamic *root-vo-parent-id*
-  "Option to encode-vo.
-   Writes this value as a \"_parent\" json property in the root, if not nil." nil)
-
 (defn encode-enum [^EnumValue in ^JsonGenerator out]
   (.writeStartObject out)
   (if (not (.isInstance scala.Product in))
@@ -185,22 +181,20 @@
 
 (defn encode-vo
   ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex]
-    (encode-vo out vo date-format ex (.. vo voManifest ID) *root-vo-parent-id*))
+    (encode-vo out vo date-format ex (.. vo voManifest ID)))
 
-  ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex ^Integer baseTypeID, parent-id]
+  ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex ^Integer baseTypeID]
     (.writeStartObject out)
 
-    (if parent-id
-        (.writeObjectField out "_parent" parent-id))
     (if (not (== baseTypeID (.. vo voManifest ID)))
       (.writeNumberField out "t" (.. vo voManifest ID)))
 
     (doseq [[^ValueObjectField k v] vo]
       (.writeFieldName out (field-hexname k))
       (if (instance? ValueObject v)
-        (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID) nil)
+        (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID))
       #_else
-        (binding [*root-vo-parent-id* nil] (cheshire.generate/generate out v date-format ex))))
+        (cheshire.generate/generate out v date-format ex)))
 
     (.writeEndObject out)))
 
@@ -305,12 +299,26 @@
     :source (json/encode-smile vo)
   })))
 
+;
+; Search
+;
+
 (defn SearchHit->fields [^SearchHit sh] (.fields sh)     )
 (defn SearchHit->source [^SearchHit sh] (.sourceAsMap sh))
 
 (defn SearchHit->ValueObject [source-fn, ^ValueObjectCompanion voCompanion, ^SearchHit hit]
   (.apply voCompanion
     (ElasticSearch-ValueSource. (Integer/parseInt (.type hit) 16) (source-fn hit) hit)))
+
+(defn scroll-seq [es, ^SearchResponse scroll-req keep-alive, from]
+  (let [ ^SearchResponse response (ces/scroll es {:scroll-id (.scrollId scroll-req) :scroll keep-alive, :format :java})
+          hits     (.. response hits hits)
+          num-hits (.. response hits totalHits)
+          last-hit (+  from (count hits)) ]
+    (if (and (.scrollId response) (< last-hit num-hits))
+      (concat hits (lazy-seq (scroll-seq es response keep-alive last-hit)))
+    #_else    hits)))
+
 
 ; TODO:
 ; - add "type" filter by default.
@@ -323,7 +331,7 @@
 
   Returns: seq of SearchHits, with the full SearchResponse as meta-data.
   "
-  [es ^ValueObject vo indices & {:as options :keys [
+  [es indices ^ValueObject vo & {:as options :keys [
     ; extra-source parameters
     query filter from size types sort highlighting only exclude script-fields preference facets named-filters boost explain version min-score
     ; ces/search parameters
@@ -364,31 +372,37 @@
       (with-meta
         (map
           (partial SearchHit->ValueObject (if fields SearchHit->fields #_else SearchHit->source) (. vo voCompanion))
-          (.. response hits hits))
+          (if-not scroll (.. response hits hits) #_else (scroll-seq es response scroll 0)))
         {:request es-options, :response response})))
 
-(defn vo+parent->smile [vo parent-id]
-  (if parent-id
-    (binding [*root-vo-parent-id* parent-id] (json/encode-smile vo)))
-  #_else
-    (json/encode-smile vo))
+(defn ^org.elasticsearch.action.index.IndexRequest ->IndexRequest [^String index ^String type ^String id, input options]
+  (let [^"[B" input (if (instance? ValueObject input) (json/encode-smile input) input)
+            request (new org.elasticsearch.action.index.IndexRequest index type id)
+        {:keys [routing parent timestamp ttl version versionType]} options]
+    (. request source input)
+    (when routing     (. request routing     routing))
+    (when parent      (. request parent      parent))
+    (when timestamp   (. request timestamp   timestamp))
+    (when ttl         (. request ttl         ttl))
+    (when version     (. request version     version))
+    (when versionType (. request versionType versionType))
+    request))
 
-(defn- patched-update-options [options]
-  (let [{:keys [upsert parent]} options]
-    (if (instance? ValueObject upsert)
-        (assoc options
-          :upsert (vo+parent->smile upsert parent))
-      #_else
-        options)))
+(defn- patched-update-options [type id options]
+  (let [ {:keys [upsert doc]} options
+        options (if upsert (assoc options :upsert (->IndexRequest (:index options) type id, upsert options)) #_else options)
+        options (if doc    (assoc options :doc    (->IndexRequest (:index options) type id, doc    options)) #_else options) ]
+    (conj options {
+      :type   type
+      :id     id
+    })))
 
 (defn update
   [es ^ValueObject vo id & {:as options :keys [index]}]
-  {:pre [(instance? ValueObject vo) (not (nil? id))]}
-  (ces/update-doc es (conj (patched-update-options options) {
-    :type   (Integer/toHexString (.. vo voManifest ID))
-    :id     (str id)
-    :doc    (json/encode-smile vo)
-    })))
+  {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
+  (let [type (Integer/toHexString (.. vo voManifest ID))
+        id   (str id)]
+    (ces/update-doc es (patched-update-options type id (assoc options :doc vo)))))
 
 (defn insertAt "Add something to an array with a specific position" [es vo path value pos])
 
@@ -396,20 +410,17 @@
 
 ;TODO:
 ;  Convert fieldnames
-;  Put values to params
 (defn appendTo "Add something to the end of an array" [es ^ValueObject vo id & {:as options :keys [index]}]
-  {:pre [(instance? ValueObject vo) (not (nil? id))]}
-  (ces/update-doc es (conj (patched-update-options options),
-    {
-      :type   (Integer/toHexString (.. vo voManifest ID))
-      :id     (str id)
-      :source (json/encode-smile {
-        :script (binding [prime.vo/*voseq-key-fn* field-hexname] {
+  {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
+  (let [type (Integer/toHexString (.. vo voManifest ID))
+        id   (str id)]
+    (ces/update-doc es (patched-update-options type id (assoc options
+      :source (json/encode-smile
+        (binding [prime.vo/*voseq-key-fn* field-hexname] {
           :script (apply str (map #(str "ctx._source['" % "'] += v" % ";") (keys vo)))
           :params (into  {}  (map #(let [[k v] %1] [(str "v" k) v]) vo))
-        })
-      })
-    })))
+        }))))
+    )))
 
 (defn replaceAt "Replaces a value in an array at given position" [es vo pos value])
 

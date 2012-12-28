@@ -4,7 +4,7 @@ import org.msgpack.Packer
 import java.lang.Math
 import java.io.OutputStream
 import org.bson.types.ObjectId
-import prime.types.{Ref, RefArray, Enum, RGBA, FileRef, URI}
+import prime.types.{Conversion, Ref, RefArray, Enum, RGBA, FileRef, URI}
 
 /**
  * Created by IntelliJ IDEA.
@@ -26,7 +26,7 @@ class MutableVOPacker (out:OutputStream) extends Packer(out)
   }
 
   final def pack(fileRef  : FileRef) : Unit = pack(fileRef.toString);
-  final def pack(uri      : URI)     : Unit = pack(uri.getEscapedURIReference);
+  final def pack(uri      : URI)     : Unit = pack(Conversion.String(uri));
   final def pack(rgba     : RGBA)    : Unit = pack(rgba.rgba);
 
   /** Packs a full ValueObject: Updates the VO fields-set bits, and uses those. */

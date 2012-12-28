@@ -12,7 +12,7 @@ import java.lang.Long.parseLong
 import org.bson.BSONObject
 import org.bson.types.{BasicBSONList, ObjectId}
 import collection.JavaConversions
-import org.apache.commons.httpclient.{URIException}
+import prime.types.Conversion
 
 //import java.net.{URISyntaxException, URL, URI}
 import org.msgpack.`object`.{NilType, ArrayType, IntegerType, FloatType, RawType}
@@ -107,16 +107,13 @@ object ConvertTo
 
   def uri           (value:Any) : URI = unpack(value) match {
     case v:URI => v
-    case v:java.net.URI => uri(v.toString)
-    case v:java.net.URL => uri(v.toString)
+    case v:java.net.URL => v.toURI
     case v:String => uri(v)
     case v:RawType => uri(v.asString)
     case None => null
   }
 
-  def uri (v:String) : URI = if (v == null || v.isEmpty) null
-    else try { new prime.types.URI(v, true) }
-       catch { case e:URIException => new URI(v, false) }
+  def uri (v:String) : URI = if (v == null || v.isEmpty) null else Conversion.URI(v)
 
   def email         (value:Any) : InternetAddress = unpack(value) match {
     case v:InternetAddress => v
@@ -151,7 +148,7 @@ object ConvertTo
     case None => null
     case _ => value.toString
   }
-  def string        (value:URI) : String = value.getEscapedURIReference
+  def string        (value:URI) : String = value.toString
   def string        (value:String) : String = if (value == null || value.isEmpty) null else value
   def string        (value:Double, format:String) = decimalFormatter(format).format(value)
   def string        (value:RawType) : String = value.asString

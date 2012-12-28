@@ -36,7 +36,7 @@ object Conversion
   def String    (value:Long)                  : String = value.toString;
   def String    (value:Double)                : String = value.toString;
   def String    (value:Double, format:String) : String = if (format == null) value.toString else decimalFormatter(format).format(value);
-  def String    (value:URI)                   : String = value.getEscapedURIReference;
+  def String    (value:URI)                   : String = value.toString;
   def String    (value:Any, format:String)    : String = unpack(value) match {
     case v:String      => String(v)
     case v:RawType     => String(v)
@@ -250,45 +250,50 @@ object Conversion
 
   //  -------
 
-  def EmailAddr (value:EmailAddr)    : EmailAddr = value;
-  def EmailAddr (value:String)       : EmailAddr = new EmailAddr(String(value));
-  def EmailAddr (value:RawType)      : EmailAddr = EmailAddr(value.asString);
-  def EmailAddr (value:URI)          : EmailAddr = EmailAddr(value.getPath);
-  def EmailAddr (value:java.net.URI) : EmailAddr = EmailAddr(value.getPath);
-  def EmailAddr (value:java.net.URL) : EmailAddr = EmailAddr(value.getFile);
+  def EmailAddr (value:EmailAddr) : EmailAddr = value;
+  def EmailAddr (value:String)    : EmailAddr = new EmailAddr(String(value));
+  def EmailAddr (value:RawType)   : EmailAddr = EmailAddr(value.asString);
+  def EmailAddr (value:URI)       : EmailAddr = EmailAddr(value.getPath);
+  def EmailAddr (value:URL)       : EmailAddr = EmailAddr(value.getFile);
 
   def EmailAddr(value:Any) : EmailAddr = unpack(value) match {
-    case v:EmailAddr                                   => v
-    case v:String                                      => EmailAddr(v)
-    case v:URI          if ("mailto" == v.getScheme)   => EmailAddr(v)
-    case v:java.net.URI if ("mailto" == v.getScheme)   => EmailAddr(v)
-    case v:java.net.URL if ("mailto" == v.getProtocol) => EmailAddr(v)
-    case v:RawType                                     => EmailAddr(v)
+    case v:EmailAddr                                => v
+    case v:String                                   => EmailAddr(v)
+    case v:URI       if ("mailto" == v.getScheme)   => EmailAddr(v)
+    case v:URL       if ("mailto" == v.getProtocol) => EmailAddr(v)
+    case v:RawType                                  => EmailAddr(v)
     case None  => throw NoInputException;
     case value => val v = e_mail.invoke(value); if (v != null) v.asInstanceOf[EmailAddr] else throw FailureException;
   }
 
   //  -------
 
-  def URI       (value:URI)          : URI = value;
-  def URI       (value:String)       : URI = try { new URI(value, true) } catch { case e:org.apache.commons.httpclient.URIException => new URI(value, false) }
-  def URI       (value:RawType)      : URI = URI(value.asString);
-  def URI       (value:java.net.URI) : URI = URI(value.toString);
-  def URI       (value:java.net.URL) : URI = URI(value.toString);
+  def URI       (value:URI)       : URI = value;
+  def URI       (value:String)    : URI = try { new URI(value.replace(" ", "%20")) } catch { case e:org.apache.commons.httpclient.URIException => new URI(value) }
+  def URI       (value:RawType)   : URI = URI(value.asString);
+  def URI       (value:URL)       : URI = value.toURI;
 
   def URI(value:Any) : URI = unpack(value) match {
-    case v:URI          => v
-    case v:String       => URI(v)
-    case v:java.net.URI => URI(v)
-    case v:java.net.URL => URI(v)
-    case v:RawType      => URI(v)
-    case None           => throw NoInputException;
-    case value          => val v = uri.invoke(value); if (v != null) v.asInstanceOf[URI] else throw FailureException;
+    case v:URI       => v
+    case v:String    => URI(v)
+    case v:URL       => URI(v)
+    case v:RawType   => URI(v)
+    case None        => throw NoInputException;
+    case value       => val v = uri.invoke(value); if (v != null) v.asInstanceOf[URI] else throw FailureException;
   }
 
   implicit def URI(ref : FileRef)(implicit repository:FileRepository) : URI = repository.toURI(ref);
 
-  def URL (value:URI) = if (value.getHost != null) value else throw FailureException;
+  //  -------
+
+  def URL (value:URI) = if (value.getHost != null) value.toURL else throw FailureException;
+
+  def URL (value:Any) : URL = unpack(value) match {
+    case v:URL          => v
+    case v:URI          => v.toURL
+    case None           => throw NoInputException;
+    case value          => val v = uri.invoke(value); if (v != null) v.asInstanceOf[URI].toURL else throw FailureException;
+  }
 
   //  -------
 

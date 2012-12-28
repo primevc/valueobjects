@@ -145,7 +145,7 @@ object RGBASerializer extends Serializer[RGBA](true,true) {
 
 object URISerializer extends Serializer[URI](true,true) {
   def write (kryo:Kryo, out:io.Output, value:URI) {
-    out.writeString(value.getEscapedURIReference)
+    out.writeString(String(value))
   }
   def read  (kryo:Kryo, in: io.Input, clz:Class[URI]): URI = URI(in.readString());
 }

@@ -18,10 +18,16 @@
 
 (set! *warn-on-reflection* true)
 
+;(defonce es-client (ces/make-client :transport {:hosts ["127.0.0.1:9300"] :cluster-name (str "elasticsearch_" (System/getenv "USER"))}))
+
+(defn create-client [hosts cluster-name & options]
+  (ces/make-client :transport {:hosts hosts :cluster-name cluster-name}))
+
+
+
 ;
 ; Generate ElasticSearch mapping from VO:
 ;
-
 
 (defn mapping-field-type-name
   [^package$ValueType valueType]

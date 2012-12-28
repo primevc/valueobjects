@@ -84,6 +84,6 @@
 
   VOSearchProxy
   ; [es ^ValueObject vo indices & {:as options :keys [ query filter from size types sort highlighting only exclude script-fields preference facets named-filters boost explain version min-score listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source]}]
-  (search [this vo & options]
+  (search [this vo options]
     vo)
 )

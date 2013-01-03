@@ -204,11 +204,15 @@
 (defn encode-uri [^org.apache.commons.httpclient.URI in ^JsonGenerator out]
   (.writeString out (.toString in)))
 
+(defn encode-internetAddress [^javax.mail.internet.InternetAddress in ^JsonGenerator out]
+  (.writeString out (.toString in)))
+
 (doseq [add-encoder [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
-  (add-encoder prime.types.EnumValue              encode-enum)
-  (add-encoder prime.vo.ValueObject               encode-vo)
-  (add-encoder org.apache.commons.httpclient.URI  encode-uri)
-  (add-encoder org.joda.time.ReadableInstant      encode-instant))
+  (add-encoder prime.types.EnumValue                encode-enum)
+  (add-encoder prime.vo.ValueObject                 encode-vo)
+  (add-encoder org.apache.commons.httpclient.URI    encode-uri)
+  (add-encoder org.joda.time.ReadableInstant        encode-instant)
+  (add-encoder javax.mail.internet.InternetAddress  encode-internetAddress))
 
 (alter-var-root #'cheshire.generate/generate
   (fn [orig-generate]

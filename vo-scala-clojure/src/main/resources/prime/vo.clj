@@ -46,9 +46,6 @@
       #(field-keys (.keyword ^ValueObjectField %))
       (fields vo))))
 
-(defn id->voCompanion [^Integer id]
-  (.apply (.typeMap data.vo.VO$/MODULE$) id))
-
 (defn type-default-vo [^package$ValueType field]
   (condp instance? field
     package$ValueTypes$Tdef   (.empty field)

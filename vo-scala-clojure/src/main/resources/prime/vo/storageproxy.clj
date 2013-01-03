@@ -18,23 +18,23 @@
 
   ; Update
   ; Updating will add the new VO to the extisting one. Replacing data if it already exists
-  (update [this] [this vo id] [this vo id options] "Updates a VO")
+  (update [proxy] [proxy vo id] [proxy vo id options] "Updates a VO")
 
   ; Update-if
   ; Same as update but only executes when certain requirements are met.
-  #_(update-if [this predicate options])
+  #_(update-if [proxy predicate options])
 
   ; [es vo path value pos]
-  (insertAt [vo] [this vo])
+  (insertAt [vo] [proxy vo])
 
   ; [es vo path pos]
-  (moveTo [vo] [this vo])
+  (moveTo [vo] [proxy vo])
 
   ; [es ^ValueObject vo id & {:as options :keys [index]}]
-  (appendTo [vo] [this vo id] [this vo id options])
+  (appendTo [vo] [proxy vo id] [proxy vo id options])
 
   ; [es vo pos value]
-  (replaceAt [vo] [this vo])
+  (replaceAt [vo] [proxy vo])
 
   ; Delete
   ; Deletes a VO. Use with care :-)
@@ -44,7 +44,7 @@
 (defprotocol VOSearchProxy
   ; Search
   ; Search elastic. Returns VO's
-  (search [vo] [this vo] [this vo options])
+  (search [vo] [proxy vo] [proxy vo options])
 )
 
 (defrecord ElasticSearchVOProxy [^String index ^org.elasticsearch.client.transport.TransportClient client]
@@ -84,6 +84,9 @@
 
   VOSearchProxy
   ; [es ^ValueObject vo indices & {:as options :keys [ query filter from size types sort highlighting only exclude script-fields preference facets named-filters boost explain version min-score listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source]}]
+  (search [this vo]
+    (let [resp (es/search client index vo)] (prn resp) resp))
+
   (search [this vo options]
-    vo)
+    (apply es/search client index vo options))
 )

@@ -55,7 +55,6 @@
   VOProxy
   ; [es es-index ^ValueObject vo options]
   (get-vo [this vo] 
-  	(prn vo)
   	(es/get client index vo))
 
   ; [es ^ValueObject vo & {:as options :keys [index]}]

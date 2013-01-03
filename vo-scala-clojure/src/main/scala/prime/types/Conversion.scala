@@ -269,7 +269,7 @@ object Conversion
   //  -------
 
   def URI       (value:URI)       : URI = value;
-  def URI       (value:String)    : URI = try { new URI(value.replace(" ", "%20")) } catch { case e:org.apache.commons.httpclient.URIException => new URI(value) }
+  def URI       (value:String)    : URI = new URI(value.replace(" ", "%20"));
   def URI       (value:RawType)   : URI = URI(value.asString);
   def URI       (value:URL)       : URI = value.toURI;
 

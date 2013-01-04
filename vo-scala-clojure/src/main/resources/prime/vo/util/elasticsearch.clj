@@ -9,7 +9,7 @@
             [cheshire.core   :as json], cheshire.generate, cheshire.custom, cheshire.factory
             [clj-elasticsearch.client :as ces])
   (:use [prime.vo.source :only [def-valuesource]])
-  (:import [prime.types EnumValue package$ValueType package$ValueTypes$Tdef package$ValueTypes$Tarray package$ValueTypes$Tenum]
+  (:import [prime.types VORef EnumValue package$ValueType package$ValueTypes$Tdef package$ValueTypes$Tarray package$ValueTypes$Tenum]
            [prime.vo ValueObject ValueObjectField ValueObjectCompanion ID]
            [com.fasterxml.jackson.core JsonGenerator]
 
@@ -198,6 +198,9 @@
 
     (.writeEndObject out)))
 
+(defn encode-voref [^JsonGenerator out, ^VORef in ^String date-format ^Exception ex]
+  (cheshire.generate/generate out (._id in) date-format ex))
+
 (defn encode-instant [^org.joda.time.ReadableInstant in ^JsonGenerator out]
   (.writeNumber out (.getMillis in)))
 
@@ -222,8 +225,9 @@
   (fn [orig-generate]
     (fn [^JsonGenerator jg obj ^String date-format ^Exception ex]
       (binding [prime.vo/*voseq-key-fn* identity]
-        (if (instance? ValueObject obj) (encode-vo jg obj date-format ex)
-        #_else                          (orig-generate jg obj date-format ex))))))
+        (if (instance? ValueObject obj) (encode-vo     jg obj date-format ex)
+        #_else(if (instance? VORef obj) (encode-voref  jg obj date-format ex)
+        #_else                          (orig-generate jg obj date-format ex)))))))
 
 
 ;

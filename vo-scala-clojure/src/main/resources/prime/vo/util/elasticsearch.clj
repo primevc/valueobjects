@@ -204,6 +204,9 @@
 (defn encode-uri [^java.net.URI in ^JsonGenerator out]
   (.writeString out (.toString in)))
 
+(defn encode-url [^java.net.URL in ^JsonGenerator out]
+  (.writeString out (.toString in)))
+
 (defn encode-internetAddress [^javax.mail.internet.InternetAddress in ^JsonGenerator out]
   (.writeString out (.toString in)))
 
@@ -211,6 +214,7 @@
   (add-encoder prime.types.EnumValue                encode-enum)
   (add-encoder prime.vo.ValueObject                 encode-vo)
   (add-encoder java.net.URI                         encode-uri)
+  (add-encoder java.net.URL                         encode-url)
   (add-encoder org.joda.time.ReadableInstant        encode-instant)
   (add-encoder javax.mail.internet.InternetAddress  encode-internetAddress))
 

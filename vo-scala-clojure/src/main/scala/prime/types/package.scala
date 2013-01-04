@@ -21,7 +21,7 @@ package object types
   type Date     = org.joda.time.DateMidnight
   type DateTime = org.joda.time.DateTime
   type Interval = org.joda.time.Interval
-  
+
   val emptyString    = "";
   val emptyURI       = new URI("");
   val emptyURL       = new URL("http:");
@@ -52,11 +52,7 @@ package object types
 
       val keyword          = k(empty.getClass.getPackage.getName, empty.getClass.getSimpleName.dropRight(2).intern);
       override def isLazy  = true;
-      def convert(any:Any) = if (!ref) empty.voCompanion.valueOf(any) else {
-        val voCompanion = empty.voCompanion.asInstanceOf[ValueObjectCompanion[prime.vo.ValueObject with prime.vo.ID{type IDType = Any}]]; //sigh
-        val voManifest  = empty.voManifest .asInstanceOf[ValueObjectManifest [prime.vo.ValueObject with prime.vo.ID{type IDType = Any}] with IDField]; //sigh
-        VORef[ValueObject with ID { type IDType = Any }, Any](any)(voCompanion, voManifest._id.valueType.convert);
-      }
+      def convert(any:Any) = if (!ref) empty.voCompanion.valueOf(any) else VORef.valueOf(any)(empty.asInstanceOf[ValueObject with ID{type IDType = Any}]);
     }
     case class Tenum      (t: Enum) extends ValueType {
       val keyword          = k(t.getClass.getPackage.getName, t.getClass.getSimpleName);

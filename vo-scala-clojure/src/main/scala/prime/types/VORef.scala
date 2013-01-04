@@ -40,6 +40,12 @@ object VORef {
         case FailureException => vo_ref.invoke(value, V).asInstanceOf[VORef[V]];
       }
   }
+
+  def valueOf[V <: ValueObject with ID](any : Any)(empty : V) = {
+    val voCompanion = empty.voCompanion.asInstanceOf[ValueObjectCompanion[V]];
+    val voManifest  = empty.voManifest .asInstanceOf[ValueObjectManifest [V] with IDField];
+    VORef[V, V#IDType](any)(voCompanion, (voManifest._id.valueType.convert _).asInstanceOf[Any => V#IDType]);
+  }
 }
 
 protected[prime] object VORefImpl {

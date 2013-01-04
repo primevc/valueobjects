@@ -3,8 +3,8 @@ package primevc.tools.valueobjects.output;
   using primevc.tools.valueobjects.VODefinition;
 
 class ScalaPropUtil {
-	static public function scalaType(p:Property) return p.isReference()? "VORef["+ ScalaUtil.scalaType(p.type).name +"]" : ScalaUtil.scalaType(p.type).name
-	static public function lazyInit(p:Property) return !p.isReference() && lazyInitType(p.type)
+	static public function scalaType(p:Property) return ScalaUtil.scalaType(p.type, p.isReference()? "VORef" : null).name
+	static public function lazyInit (p:Property) return !p.isReference() && lazyInitType(p.type)
 
 	static public function lazyInitType(t:PType) return switch(t)
 	{
@@ -14,6 +14,18 @@ class ScalaPropUtil {
 			case Tenum(_): false;
 		}
 		default: false;
+	}
+
+	static public function scalaConversionExpr(p:Property, inputExpr:String = null) : String return switch(p.type)
+	{
+		case Tarray(innerT,_,_):
+			if (!p.isReference())
+				ScalaUtil.scalaConversionExpr(p.type, inputExpr);
+			else
+				"Vector(" + inputExpr + ")(VORef.valueOf(_)("+ ScalaUtil.scalaType(innerT).name +".empty))";
+
+		default:
+			ScalaUtil.scalaConversionExpr(p.type, inputExpr);
 	}
 }
 
@@ -67,10 +79,14 @@ class ScalaUtil
 
 	static public function scalaType(t:PType, ?surroundWithType:String) : {name:String, defaultValue:Dynamic}
 	{
-		var res = {name:null, defaultValue: null};
-		res.name = (surroundWithType != null? surroundWithType + "[" : "") +
-		  (switch(t) {
-			case Tarray(innerT,_,_):	"IndexedSeq["+ scalaType(innerT).name +"]";
+		var res  = {name:null, defaultValue: null};
+		res.name = switch(t) {
+			case Tarray(innerT,_,_):
+				var inner = scalaType(innerT).name;
+				var surr  = surroundWithType;
+				surroundWithType = null;
+				"IndexedSeq["+ ((surr != null)? surr + "["+ inner +"]" : inner) +"]";
+
 			case Turi, Turl:			"prime.types.URI";
 			case TuniqueID:				"prime.types.ObjectId";
 			case TfileRef:				"prime.types.FileRef";
@@ -90,8 +106,9 @@ class ScalaUtil
 				case Tclass		(def):	def.fullName;
 				case Tenum		(def):	def.fullName;
 			};
-		  }) + (surroundWithType != null? "]" : "");
+		  };
 
+		if (surroundWithType != null) res.name = surroundWithType + "[" + res.name + "]";
 		return res;
 	}
 

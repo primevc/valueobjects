@@ -311,7 +311,7 @@ import prime.types.ValueTypes._;
 
 				case Tarray(t,_,_):
 					onlyDoubles = onlyIntegers = false;
-					if (leafNode) leafNode = t.isSingleValue();
+					if (leafNode) leafNode = t.isSingleValue() || p.isReference();
 
 				case Tinteger(_,_,_): onlyDoubles  = false; hasIntegers = true;
 				case Tdecimal(_,_,_): onlyIntegers = false; hasDoubles  = true;
@@ -598,12 +598,12 @@ trait ")); a(def.name); a(" extends ");
 	      				case Tinteger(_,_,_): a(   intAt(p, true));
 						case Tdecimal(_,_,_): a(doubleAt(p, true));
 						default:
-							if (p.isReference()) {
+							if (!p.isArray() && p.isReference()) {
 								var idType = p.type.getPTypedef().unpackPTypedef().as(ClassDef).getIDPropertyFromTWithProperties().type;
 								a("    VORef("); a(anyAt(p, true)); a(")("); a(p.type.scalaType().name); a(", "); a(idType.scalaConversionExpr()); a(")");
 							}
 							else if (!p.lazyInit()) {
-								a(p.type.scalaConversionExpr(anyAt(p, true)));
+								a(p.scalaConversionExpr(anyAt(p, true)));
 							}
 							else {
 								a(p.name.quote()); a(",\n");
@@ -959,7 +959,7 @@ file.writeString("
 
 import scala.collection.JavaConversions
 import scala.xml.NodeSeq
-import prime.types.{Type, Field, Ref, Enum, EnumValue, FileRef}
+import prime.types.{Type, Field, Ref, RefArray, Enum, EnumValue, FileRef}
 import prime.types.Conversion._;
 import prime.utils._
 import prime.utils.msgpack._

@@ -53,7 +53,8 @@ class ScalaUtil
 		res.name = (surroundWithType != null? surroundWithType + "[" : "") +
 		  (switch(t) {
 			case Tarray(innerT,_,_):	"Array["+ typeNameInMutablePkg(innerT).name +"]";
-			case Turi, Turl:			"prime.types.URI";
+			case Turi:					"prime.types.URI";
+			case Turl:					"prime.types.URL";
 			case TuniqueID:				"prime.types.ObjectId";
 			case TfileRef:				"prime.types.FileRef";
 			case Tstring:				"String";

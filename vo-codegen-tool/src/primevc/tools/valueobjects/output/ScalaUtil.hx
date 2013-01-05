@@ -120,7 +120,8 @@ class ScalaUtil
 		var converterFn = switch(t)
 		{
 			case Tarray(innerT,_,_):	arrayType = innerT; "Vector";
-			case Turi, Turl:			"      URI";
+			case Turi:					"      URI";
+			case Turl:					"      URL";
 			case TuniqueID:				" ObjectId";
 			case TfileRef:				"  FileRef";
 			case Tstring:				"   String";

@@ -98,11 +98,17 @@ private class ScalaBase
 			}
 			else a('""');
 
-		case Turi, Turl:
+		case Turi:
 			if (val != null) {
 				a("URI("); ac('"'.code); a(Std.string(val)); a('")');
 			}
 			else a("prime.types.emptyURI");
+
+		case Turl:
+			if (val != null) {
+				a("URL("); ac('"'.code); a(Std.string(val)); a('")');
+			}
+			else a("prime.types.emptyURL");
 
 		case Temail:
 			if (val != null) {
@@ -1742,7 +1748,8 @@ import prime.vo.mutable._
 			case Tdef(_):			(Util.isEnum(innerT)? "ConvertTo.array[" : "ConvertTo.voArray[") + innerT.typeNameInMutablePkg().name + "]";
 			default:				"ConvertTo.array["+innerT.typeNameInMutablePkg().name+"]";
 		}
-		case Turi, Turl:			"ConvertTo.uri";
+		case Turi:					"ConvertTo.uri";
+		case Turl:					"ConvertTo.url";
 		case Temail:				"ConvertTo.email";
 		case Tinterval:				"ConvertTo.interval";
 		case TuniqueID:				"ConvertTo.uniqueID";

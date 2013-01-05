@@ -88,7 +88,8 @@ class ScalaUtil
 				surroundWithType = null;
 				"IndexedSeq["+ ((surr != null)? surr + "["+ inner +"]" : inner) +"]";
 
-			case Turi, Turl:			"prime.types.URI";
+			case Turi:					"prime.types.URI";
+			case Turl:					"prime.types.URL";
 			case TuniqueID:				"prime.types.ObjectId";
 			case TfileRef:				"prime.types.FileRef";
 			case Tstring:				"String";

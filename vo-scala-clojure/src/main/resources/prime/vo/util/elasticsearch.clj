@@ -213,12 +213,16 @@
 (defn encode-internetAddress [^javax.mail.internet.InternetAddress in ^JsonGenerator out]
   (.writeString out (.toString in)))
 
+(defn encode-objectId [^org.bson.types.ObjectId in ^JsonGenerator out]
+  (.writeString out (.toString in)))
+
 (doseq [add-encoder [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
   (add-encoder prime.types.EnumValue                encode-enum)
   (add-encoder prime.vo.ValueObject                 encode-vo)
   (add-encoder java.net.URI                         encode-uri)
   (add-encoder java.net.URL                         encode-url)
   (add-encoder org.joda.time.ReadableInstant        encode-instant)
+  (add-encoder org.bson.types.ObjectId              encode-objectId)
   (add-encoder javax.mail.internet.InternetAddress  encode-internetAddress))
 
 (alter-var-root #'cheshire.generate/generate
@@ -410,10 +414,11 @@
     })))
 
 (defn update
-  [es ^ValueObject vo id & {:as options :keys [index]}]
+  [es ^ValueObject vo id & {:as options :keys [index fields]}]
   {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
-  (let [type (Integer/toHexString (.. vo voManifest ID))
-        id   (str id)]
+  (let [type    (Integer/toHexString (.. vo voManifest ID))
+        id      (str id)]
+        fields  (map field-hexname fields)
     (ces/update-doc es (patched-update-options type id (assoc options :doc vo)))))
 
 (defn insertAt "Add something to an array with a specific position" [es vo path value pos])

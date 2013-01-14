@@ -115,6 +115,16 @@ object ConvertTo
 
   def uri (v:String) : URI = if (v == null || v.isEmpty) null else Conversion.URI(v)
 
+  def url           (value:Any) : URL = unpack(value) match {
+    case v:java.net.URL => v
+    case v:URI => v.toURL
+    case v:String => url(v)
+    case v:RawType => url(v.asString)
+    case None => null
+  }
+
+  def url (v:String) : URL = if (v == null || v.isEmpty) null else Conversion.URL(v)
+
   def email         (value:Any) : InternetAddress = unpack(value) match {
     case v:InternetAddress => v
     case v:URI if ("mailto" == v.getScheme)            => new InternetAddress(v.getPath)

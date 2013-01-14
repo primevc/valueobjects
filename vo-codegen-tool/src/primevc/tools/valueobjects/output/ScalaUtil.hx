@@ -53,7 +53,8 @@ class ScalaUtil
 		res.name = (surroundWithType != null? surroundWithType + "[" : "") +
 		  (switch(t) {
 			case Tarray(innerT,_,_):	"Array["+ typeNameInMutablePkg(innerT).name +"]";
-			case Turi, Turl:			"prime.types.URI";
+			case Turi:					"prime.types.URI";
+			case Turl:					"prime.types.URL";
 			case TuniqueID:				"prime.types.ObjectId";
 			case TfileRef:				"prime.types.FileRef";
 			case Tstring:				"String";
@@ -87,7 +88,8 @@ class ScalaUtil
 				surroundWithType = null;
 				"IndexedSeq["+ ((surr != null)? surr + "["+ inner +"]" : inner) +"]";
 
-			case Turi, Turl:			"prime.types.URI";
+			case Turi:					"prime.types.URI";
+			case Turl:					"prime.types.URL";
 			case TuniqueID:				"prime.types.ObjectId";
 			case TfileRef:				"prime.types.FileRef";
 			case Tstring:				"String";
@@ -118,7 +120,8 @@ class ScalaUtil
 		var converterFn = switch(t)
 		{
 			case Tarray(innerT,_,_):	arrayType = innerT; "Vector";
-			case Turi, Turl:			"      URI";
+			case Turi:					"      URI";
+			case Turl:					"      URL";
 			case TuniqueID:				" ObjectId";
 			case TfileRef:				"  FileRef";
 			case Tstring:				"   String";

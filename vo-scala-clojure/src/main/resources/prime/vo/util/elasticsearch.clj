@@ -285,7 +285,7 @@
         (map (fn [pair] (let [[k v] pair]
               (cond
                 (map? v)                (vo->term-filter v (str k "."))
-                (vector? v)             (vo->term-filter (first v) (str k "."))
+                (vector? v)             (if (instance? ValueObject (first v)) (vo->term-filter (first v) (str k ".")) #_else [k (first v)])
                 (instance? EnumValue v) (if (.isInstance scala.Product v) [(str k ".x") (.toString v)] #_else [(str k ".v") (.value ^EnumValue v)])
                 :else  pair)))
         (seq vo))))))

@@ -66,6 +66,11 @@
 (def-default-converter URI        =>  URI              String       java.net.URI  java.net.URL)
 (def-default-converter ObjectId   =>  ObjectId         String       ByteArray)
 
+(extend-type org.bson.types.ObjectId
+  To-String
+  (^String to-String
+    ([in] (.toString in))
+    ([in ^String format] (.toString in))))
 
 ; Default formatted String converters
 (extend-type Double To-String

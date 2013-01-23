@@ -134,7 +134,7 @@
   [^Class votrait runtime-constructor props]
   (assert (class? votrait))
   (assert (symbol? runtime-constructor))
-  (assert (sequential? props))
+  (assert (or (empty? props) (sequential? props)))
   (assert (every? keyword? props))
   (let [args (vo-constructor-arglist-from-map votrait props)]
     `(cond

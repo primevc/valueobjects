@@ -51,6 +51,27 @@
         package$ValueTypes$Tenum  "object"
         package$ValueTypes$Tarray (assert false "array should be mapped as it's contents"))))
 
+(defn mapping-field-type-defaults
+  [^package$ValueType valueType]
+  (case (. valueType keyword)
+    :prime.types/boolean    nil
+    :prime.types/integer    nil
+    :prime.types/decimal    nil
+    :prime.types/Date       nil
+    :prime.types/Date+time  nil
+    :prime.types/Interval   {:properties {:s {:type "date"} :e {:type "date"}}}
+    :prime.types/Color      nil
+    :prime.types/String     nil
+    :prime.types/URI        {:index "not_analyzed"}
+    :prime.types/URL        {:index "not_analyzed"}
+    :prime.types/E-mail     {:index "not_analyzed"}
+    :prime.types/ObjectId   {:index "not_analyzed"}
+    :prime.types/FileRef    {:index "not_analyzed"}
+    #_default
+      (condp instance? valueType
+        package$ValueTypes$Tenum  {:properties {:v {:type "integer"} :x {:type "string", :index "not_analyzed"}}} ;x = extended value, currently only String
+        package$ValueTypes$Tarray (assert false "array should be mapped as it's contents"))))
+
 (declare vo-mapping)
 
 (defn field-mapping
@@ -66,10 +87,7 @@
     (conj {:store "no"
            :index_name (name field-key)
            :type       (mapping-field-type-name value-type)}
-      (cond
-        (instance? package$ValueTypes$Tenum value-type)
-          {:properties {:v {:type "integer"} :x {:type "string", :index "not_analyzed"}}} ;x = extended value, currently only String
-
+      (if
         (instance? package$ValueTypes$Tdef  value-type)
           (let [^package$ValueTypes$Tdef value-type value-type
                 ^ValueObject             empty      (.. value-type empty)]
@@ -77,15 +95,12 @@
               (if (.. value-type ref)
                 {:type (mapping-field-type-name (.valueType (._id ^IDField (. empty voManifest))))}
               #_else
-                  (vo-mapping empty (or option-map {})))
+                (vo-mapping empty (or option-map {})))
 
               option-map
           ))
-
-        (= :prime.types/Interval field-key)
-          {:properties {:s {:type "date"} :e {:type "date"}}}
-
-        :else nil)
+        #_else
+          (mapping-field-type-defaults value-type))
 
       option-map ;overwrites defaults
     )
@@ -112,7 +127,7 @@
       (into {}
         (map
           (fn [^ValueObjectField field] (field-mapping (option-map (.keyword field)) field (if id-field (identical? id-field field))))
-          (vo/field-filtered-seq vo (:only option-map) (:exclude option-map))))
+          (mapcat #(vo/field-filtered-seq % (:only option-map) (:exclude option-map)) (vo/vo+subtypes-manifests-seq (.voManifest vo)))))
     }))
 )
 

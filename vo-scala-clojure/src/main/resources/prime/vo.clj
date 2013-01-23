@@ -4,7 +4,7 @@
 
 (ns prime.vo
   (:require [clojure.set     :as    s])
-  (:import  [prime.vo IDField ValueObject ValueObjectField ValueObjectManifest_0 ValueObjectManifest_1 ValueObjectManifest_N ID]
+  (:import  [prime.vo IDField ValueObject ValueObjectField ValueObjectManifest ValueObjectManifest_0 ValueObjectManifest_1 ValueObjectManifest_N ID]
             [prime.types package$ValueType package$ValueTypes$Tarray package$ValueTypes$Tdef]))
 
 (set! *warn-on-reflection* true)
@@ -33,20 +33,20 @@
     ValueObjectManifest_1 (remove nil? (cons (.. ^ValueObjectManifest_1 in first) nil))
     ValueObjectManifest_0 nil))
 
-(defn field-set [^ValueObject vo]
-  (set (map #(.keyword ^ValueObjectField %) (fields vo))))
+(defn field-set [vo-or-manifest]
+  (set (map #(.keyword ^ValueObjectField %) (fields vo-or-manifest))))
 
-(defn field-filtered-seq [^ValueObject vo, only, exclude]
+(defn field-filtered-seq [vo-or-manifest, only, exclude]
   (let [only       (set only   )
         exclude    (set exclude)
-        all-keys   (field-set vo)
+        all-keys   (field-set vo-or-manifest)
         field-keys (if-not (empty? only)    (s/select     only       all-keys) all-keys)
         field-keys (if-not (empty? exclude) (s/difference field-keys exclude)  field-keys)]
     (assert (empty? (s/difference only    all-keys)) (str ":only    contains key not present in VO field-set: " all-keys))
     (assert (empty? (s/difference exclude all-keys)) (str ":exclude contains key not present in VO field-set: " all-keys))
     (filter
       #(field-keys (.keyword ^ValueObjectField %))
-      (fields vo))))
+      (fields vo-or-manifest))))
 
 (defn type-default-vo [^package$ValueType field]
   (condp instance? field
@@ -54,8 +54,9 @@
     package$ValueTypes$Tarray (type-default-vo (.innerType ^package$ValueTypes$Tarray field))
     nil))
 
-(defn fields-path-seq [^ValueObject vo [first-field-name & path]]
-  (let [field (.. vo voManifest (findOrNull first-field-name))]
+(defn fields-path-seq [vo [first-field-name & path]]
+  (let [^ValueObjectManifest voManifest (if (instance? ValueObject vo) (.voManifest ^ValueObject vo) #_else vo)
+        field (. voManifest (findOrNull first-field-name))]
     (if field
       (if path
         (let [inner-vo    (type-default-vo (.valueType field))
@@ -67,3 +68,6 @@
 (defn has-id? [^ValueObject vo]
   (and vo (instance? IDField (. vo voManifest))
     (. (._id ^IDField (. vo voManifest)) in vo)))
+
+(defn vo+subtypes-manifests-seq "Builds a seq of all subtype manifest." [^ValueObjectManifest voManifest]
+  (cons voManifest (mapcat vo+subtypes-manifests-seq (.subtypes voManifest))))

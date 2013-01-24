@@ -29,6 +29,50 @@
 ; Generate ElasticSearch mapping from VO:
 ;
 
+(defprotocol TermFilter "Used while creating mappings and term-filter queries from a ValueObject."
+  (term-kv-pair [value key kv-pair] "Returns a vector of [^String key, value] which gets appended to the term-filter map.")
+  (mapping-field-type-defaults [valueType] "Returns a map with default options for ElasticSearch mapping."))
+
+(extend-protocol TermFilter
+
+  Object
+  (term-kv-pair [v k kv-pair] kv-pair)
+
+  EnumValue
+  (term-kv-pair [v k kv-pair]
+    (if (.isInstance scala.Product v)
+      [(str k ".x") (. v toString)]
+    #_else
+      [(str k ".v") (. v value   )]))
+
+  (mapping-field-type-defaults [value]
+    {:properties {
+      :v {:type "integer"}
+      :x {:type "string", :index "not_analyzed"} ;x = extended value, currently only String
+    }})
+
+  package$ValueType
+  (mapping-field-type-defaults [valueType]
+    (case (. valueType keyword)
+      :prime.types/boolean    nil
+      :prime.types/integer    nil
+      :prime.types/decimal    nil
+      :prime.types/Date       nil
+      :prime.types/Date+time  nil
+      :prime.types/Interval   {:properties {:s {:type "date"} :e {:type "date"}}}
+      :prime.types/Color      nil
+      :prime.types/String     nil
+      :prime.types/URI        {:index "not_analyzed"}
+      :prime.types/URL        {:index "not_analyzed"}
+      :prime.types/E-mail     {:index "not_analyzed"}
+      :prime.types/ObjectId   {:index "not_analyzed"}
+      :prime.types/FileRef    {:index "not_analyzed"}
+      #_default
+        (condp instance? valueType
+          package$ValueTypes$Tenum  (mapping-field-type-defaults (.. ^package$ValueTypes$Tenum valueType t valueSet first))
+          package$ValueTypes$Tarray (assert false "array should be mapped as it's contents"))))
+)
+
 (defn mapping-field-type-name
   [^package$ValueType valueType]
   (case (. valueType keyword)
@@ -49,27 +93,6 @@
       (condp instance? valueType
         package$ValueTypes$Tdef   "object"
         package$ValueTypes$Tenum  "object"
-        package$ValueTypes$Tarray (assert false "array should be mapped as it's contents"))))
-
-(defn mapping-field-type-defaults
-  [^package$ValueType valueType]
-  (case (. valueType keyword)
-    :prime.types/boolean    nil
-    :prime.types/integer    nil
-    :prime.types/decimal    nil
-    :prime.types/Date       nil
-    :prime.types/Date+time  nil
-    :prime.types/Interval   {:properties {:s {:type "date"} :e {:type "date"}}}
-    :prime.types/Color      nil
-    :prime.types/String     nil
-    :prime.types/URI        {:index "not_analyzed"}
-    :prime.types/URL        {:index "not_analyzed"}
-    :prime.types/E-mail     {:index "not_analyzed"}
-    :prime.types/ObjectId   {:index "not_analyzed"}
-    :prime.types/FileRef    {:index "not_analyzed"}
-    #_default
-      (condp instance? valueType
-        package$ValueTypes$Tenum  {:properties {:v {:type "integer"} :x {:type "string", :index "not_analyzed"}}} ;x = extended value, currently only String
         package$ValueTypes$Tarray (assert false "array should be mapped as it's contents"))))
 
 (declare vo-mapping)
@@ -97,13 +120,11 @@
               #_else
                 (vo-mapping empty (or option-map {})))
 
-              option-map
+              (dissoc option-map :type)
           ))
         #_else
-          (mapping-field-type-defaults value-type))
-
-      option-map ;overwrites defaults
-    )
+          (conj {} (mapping-field-type-defaults value-type) option-map) ;overwrites defaults
+    ))
     })))
 
 
@@ -154,6 +175,26 @@
 
 (defn vo-hexname [^ValueObject vo] (Integer/toHexString (.. vo voManifest ID)))
 
+(defmacro map-enum-as-integer [enum-class]
+  `(do
+    (doseq [add-encoder# [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
+      (add-encoder# ~enum-class
+        (fn [^prime.types.EnumValue in# ^JsonGenerator out#]
+          (.writeNumber out# (. in# value)))))
+      (extend-type ~enum-class, TermFilter
+        (term-kv-pair [v# k# kv-pair#]  [k# (. v# value)])
+        (mapping-field-type-defaults [value#] {:type "integer"}) )))
+
+(defmacro map-enum-as-string  [enum-class, string-method]
+  `(do
+    (doseq [add-encoder# [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
+      (add-encoder# ~enum-class
+        (fn [^prime.types.EnumValue in# ^JsonGenerator out#]
+          (.writeString out# (. in# ~string-method)))))
+      (extend-type ~enum-class, TermFilter
+        (term-kv-pair [v# k# kv-pair#]  [k# (. v# ~string-method)])
+        (mapping-field-type-defaults [value#] {:type "string"}) )))
+
 
 ;
 ; ElasticSearch index management (mapping API)
@@ -165,21 +206,28 @@
     (conj (dissoc (vo-mapping vo options) :type) options) ])
 
 (defn put-mapping [es index-name, vo-options-pair]
+  (if (map? vo-options-pair)
+    (doseq [pair vo-options-pair]
+      (put-mapping es index-name pair))
+  ;else
   (let [[type mapping] (vo-index-mapping-pair vo-options-pair)]
     (ces/put-mapping es, {
       :index  index-name
       :type   type
       :source {type mapping}
-    })))
+    }))))
 
 (defn create-index
   ([es index-name vo->options-map]
     (create-index es index-name vo->options-map {}))
   ([es index-name vo->options-map root-options]
-    (ces/create-index es, {
-      :index  index-name
-      :source (assoc root-options :mappings (into {} (map vo-index-mapping-pair vo->options-map)))
-    })))
+    (try
+      (ces/create-index es, {
+        :index  index-name
+        :source (assoc root-options :mappings (into {} (map vo-index-mapping-pair vo->options-map)))
+      })
+    (catch org.elasticsearch.indices.IndexAlreadyExistsException e
+      (put-mapping es index-name vo->options-map)))))
 
 
 ;
@@ -299,10 +347,9 @@
       (into {}
         (map (fn [pair] (let [[k v] pair]
               (cond
-                (map? v)                (vo->term-filter v (str k "."))
-                (vector? v)             (if (instance? ValueObject (first v)) (vo->term-filter (first v) (str k ".")) #_else [k (first v)])
-                (instance? EnumValue v) (if (.isInstance scala.Product v) [(str k ".x") (.toString v)] #_else [(str k ".v") (.value ^EnumValue v)])
-                :else  pair)))
+                (map? v)     (vo->term-filter v (str k "."))
+                (vector? v)  (if (instance? ValueObject (first v)) (vo->term-filter (first v) (str k ".")) #_else [k (first v)])
+                :else        (term-kv-pair v k pair))))
         (seq vo))))))
 
 

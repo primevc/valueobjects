@@ -69,5 +69,5 @@
   (and vo (instance? IDField (. vo voManifest))
     (. (._id ^IDField (. vo voManifest)) in vo)))
 
-(defn vo+subtypes-manifests-seq "Builds a seq of all subtype manifest." [^ValueObjectManifest voManifest]
+(defn vo+subtypes-manifests-seq "Builds a seq of all subtype manifests." [^ValueObjectManifest voManifest]
   (cons voManifest (mapcat vo+subtypes-manifests-seq (.subtypes voManifest))))

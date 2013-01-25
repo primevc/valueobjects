@@ -101,6 +101,14 @@ trait ValueObjectManifest[T <: ValueObject]
   final def fieldMask(mask:Int, field : ValueObjectField[VOType]) = mask | (1 << index(field));
 
   protected def makeMetaMixin = ValueObjectMixin(if (mixins.isEmpty) 0 else java.lang.Integer.numberOfTrailingZeros(java.lang.Integer.highestOneBit(mixins.last.fieldIndexMask)) + 1, this.fieldIndexMask ^ mixinIndexMask, this);
+
+  /** Array of all (initialized) ValueObjectManifests of classes extending VOType.
+      If you expect a manifest to be here, but isn't: make sure the ValueObjectManifest is initialized/constructed.
+  */
+  var subtypes = Array[ValueObjectManifest[_ >: T]]();
+  for (mixin <- this.mixins) {
+    mixin.manifest.asInstanceOf[ValueObjectManifest[_ <: T]].subtypes +:= this;
+  }
 }
 
 case class ValueObjectMixin(numberOfIndexBitsShifted : Int, fieldIndexMask : Int, manifest : ValueObjectManifest[_ <: ValueObject]) {

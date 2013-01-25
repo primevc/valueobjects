@@ -59,14 +59,14 @@
 
   ; [es ^ValueObject vo & {:as options :keys [index]}]
   (put [this vo]
-  	(es/put client vo :index index))
+  	(es/put client vo index))
 
   ; [es ^ValueObject vo id & {:as options :keys [index]}]
   (update [this vo id]
-    (es/update client vo id :index index :options {}))
+    (es/update client vo id index {}))
 
   (update [this vo id options] 
-  	(es/update client vo id :index index :options options))
+  	(es/update client vo id index options))
   
   ; [es vo path value pos]
   (insertAt [vo] vo)
@@ -76,23 +76,23 @@
 
   ; [es ^ValueObject vo id & {:as options :keys [index]}]
   (appendTo [this vo id]
-    (es/appendTo client vo id :index index))
+    (es/appendTo client vo id index {}))
 
   (appendTo [this vo id options]
-  	(es/appendTo client vo id :index index :options options))
+  	(es/appendTo client vo id index options))
 
   ; [es vo pos value]
   (replaceAt [vo] vo)
 
   ; [es ^ValueObject vo & {:as options :keys [index]}]
   (delete [this vo]
-    (es/delete client vo :index index))
+    (es/delete client vo index))
 
   VOSearchProxy
   ; [es ^ValueObject vo indices & {:as options :keys [ query filter from size types sort highlighting only exclude script-fields preference facets named-filters boost explain version min-score listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source]}]
   (search [this vo]
-    (es/search client index vo))
+    (es/search client index vo {}))
 
   (search [this vo options]
-    (apply es/search client index vo :options options))
+    (es/search client index vo options))
 )

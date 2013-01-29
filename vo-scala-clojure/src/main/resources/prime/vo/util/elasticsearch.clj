@@ -368,7 +368,7 @@
 
 (defn put
   "options: see clj-elasticsearch.client/index-doc"
-  [es ^ValueObject vo index {:as options}]
+  [es ^ValueObject vo index options]
   (assert index ":index required")
   (assert (prime.vo/has-id? vo) (str "vo: " (prn-str vo) " requires an id"))
   (ces/index-doc es (conj options {

@@ -14,11 +14,11 @@
   ; Put
   ; Putting will replace the existing VO with the new one.
   ; Requires ID
-  (put [vo] [proxy vo] [proxy vo options] "Replaces existing VO.")
+  (put-vo [vo] [proxy vo] [proxy vo options] "Replaces existing VO.")
 
   ; Update
   ; Updating will add the new VO to the extisting one. Replacing data if it already exists
-  (update [proxy] [proxy vo id] [proxy vo id options] "Updates a VO")
+  (update [vo] [proxy vo id] [proxy vo id options] "Updates a VO")
 
   ; Update-if
   ; Same as update but only executes when certain requirements are met.
@@ -38,7 +38,7 @@
 
   ; Delete
   ; Deletes a VO. Use with care :-)
-  (delete [vo] [proxy vo])
+  (delete [vo] [proxy vo] [proxy vo options])
 )
 
 (defprotocol VOSearchProxy
@@ -47,7 +47,7 @@
   (search [vo] [proxy vo] [proxy vo options])
 )
 
-(defrecord ElasticSearchVOProxy [^String index ^org.elasticsearch.client.transport.TransportClient client]
+(deftype ElasticSearchVOProxy [^String index ^org.elasticsearch.client.transport.TransportClient client]
   ;ElasticSearchMapped
   ;(index-name   [this] index)
   ;(mapping-name [this] (str (.. empty-vo voManifest ID)))
@@ -58,8 +58,11 @@
   	(es/get client index vo))
 
   ; [es ^ValueObject vo & {:as options :keys [index]}]
-  (put [this vo]
-  	(es/put client vo index))
+  (put-vo [this vo]
+    (es/put client vo index {}))
+
+  (put-vo [this vo options]
+    (es/put client vo index options))
 
   ; [es ^ValueObject vo id & {:as options :keys [index]}]
   (update [this vo id]
@@ -86,7 +89,10 @@
 
   ; [es ^ValueObject vo & {:as options :keys [index]}]
   (delete [this vo]
-    (es/delete client vo index))
+    (es/delete client vo index {}))
+
+  (delete [this vo options]
+    (es/delete client vo index options))
 
   VOSearchProxy
   ; [es ^ValueObject vo indices & {:as options :keys [ query filter from size types sort highlighting only exclude script-fields preference facets named-filters boost explain version min-score listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source]}]

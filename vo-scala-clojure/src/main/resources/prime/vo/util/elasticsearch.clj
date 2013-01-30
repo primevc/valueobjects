@@ -480,8 +480,8 @@
   [es ^ValueObject vo id index {:as options :keys [fields]}]
   {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
   (let [type    (Integer/toHexString (.. vo voManifest ID))
-        id      (prime.types/to-String id)]
-        fields  (map field-hexname fields)
+        id      (prime.types/to-String id)
+        fields  (map field-hexname fields)]
     (ces/update-doc es (patched-update-options type id (assoc options :index index :doc vo)))))
 
 (defn insertAt "Add something to an array with a specific position" [es vo path value pos])

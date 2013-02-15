@@ -40,6 +40,7 @@ package prime.bindable.collections;
   using prime.tools.valueobjects.ChangesUtil;
   using prime.utils.FastArray;
   using prime.utils.IfUtil;
+  using prime.bindable.collections.ListChange;
 
 
 private typedef ListFlags = RevertableArrayListFlags;

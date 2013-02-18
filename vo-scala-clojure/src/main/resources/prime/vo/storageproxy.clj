@@ -3,7 +3,9 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.vo.storageproxy
-	(:require [prime.vo.util.elasticsearch :as es]))
+	(:require 
+    [prime.vo.util.elasticsearch  :as es]
+    [prime.vo.util.msgpack        :as mp]))
 
 (defprotocol VOProxy
   "Doc string"
@@ -55,7 +57,7 @@
   VOProxy
   ; [es es-index ^ValueObject vo options]
   (get-vo [this vo] 
-  	(es/get client index vo))
+    (es/get client index vo))
 
   ; [es ^ValueObject vo & {:as options :keys [index]}]
   (put-vo [this vo]
@@ -69,7 +71,7 @@
     (es/update client vo id index {}))
 
   (update [this vo id options] 
-  	(es/update client vo id index options))
+    (es/update client vo id index options))
   
   ; [es vo path value pos]
   (insertAt [vo] vo)
@@ -82,7 +84,7 @@
     (es/appendTo client vo id index {}))
 
   (appendTo [this vo id options]
-  	(es/appendTo client vo id index options))
+    (es/appendTo client vo id index options))
 
   ; [es vo pos value]
   (replaceAt [vo] vo)
@@ -101,6 +103,30 @@
 
   (search [this vo options]
     (es/search client index vo options))
+)
+
+(deftype MessagePackVOProxy [^String directory]
+  VOProxy
+  (get-vo [this vo] 
+  	(mp/get directory vo))
+
+  (put-vo [this vo]
+    (mp/put directory vo {}))
+
+  (put-vo [this vo options]
+    (mp/put directory vo options))
+
+  (update [this vo id]
+    (mp/update directory vo id {}))
+
+  (update [this vo id options] 
+  	(mp/update directory vo id options))
+  
+  (delete [this vo]
+    (mp/delete directory vo {}))
+
+  (delete [this vo options]
+    (mp/delete directory vo options))
 )
 
 (defn symbolize [sym appendix] (let [sym (if (keyword? sym) (.sym sym) sym)] (symbol (str sym appendix))))

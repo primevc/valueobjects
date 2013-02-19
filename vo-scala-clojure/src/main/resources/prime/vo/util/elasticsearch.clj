@@ -362,7 +362,7 @@
     ;{:pre [ ... ]} is bugged for multi arity fns
     (assert es) (assert (string? es-index)) (assert (not (empty? vo))) (assert options)
     (let [resp ^GetResponse
-          (ces/get-doc es (assoc options, :index es-index, :format :java, :id (.. ^ID vo _id toString)))]
+          (ces/get-doc es (assoc options, :type (Integer/toHexString (.. vo voManifest ID)), :index es-index, :format :java, :id (.. ^ID vo _id toString)))]
       (.apply (. vo voCompanion)
               (ElasticSearch-ValueSource. (.. vo voManifest ID) (.sourceAsMap resp) resp)))))
 

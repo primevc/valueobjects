@@ -66,11 +66,11 @@
   (assert (prime.vo/has-id? vo) (str "vo: " (prn-str vo) " requires an id"))
   (pack vo directory))
 
+(defn delete [directory ^ValueObject vo options]
+  (.delete (java.io.File. (create-filename directory vo))))
+
 (defn update [directory ^ValueObject vo id options]
   (let [old-vo (get directory (conj vo {:id id}))] ; Conj id into vo to overwrite possible new id.
     (when (not= id (:id vo)) ; Delete old file
       (delete directory old-vo {}))
     (put directory (if old-vo (conj old-vo vo) vo) options)))
-
-(defn delete [directory ^ValueObject vo options]
-  (.delete (java.io.File. (create-filename directory vo))))

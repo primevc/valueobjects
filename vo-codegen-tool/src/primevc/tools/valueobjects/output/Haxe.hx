@@ -1117,7 +1117,14 @@ class Haxe implements CodeGenerator
 		if (p.description != null)
 			addComment(p.description);
 		
-		a("\tpublic var "); a(p.name);
+		if (immutable)
+    {
+      a("\tpublic var "); a(p.name);
+    }
+    else
+    {
+      a("\t@:isVar public var "); a(p.name);
+    }
 
 
 		var genGetterFn = p.shouldHaveGetter();

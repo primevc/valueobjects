@@ -108,7 +108,7 @@
     ; Else: not an array
     { (Integer/toHexString id),
     (conj {:store "no"
-           :index_name (name field-key)
+           ;:index_name (name field-key)
            :type       (mapping-field-type-name value-type)}
       (if
         (instance? package$ValueTypes$Tdef  value-type)
@@ -378,16 +378,17 @@
     ;{:pre [ ... ]} is bugged for multi arity fns
     (assert es) (assert (string? es-index)) (assert (not (empty? vo))) (assert options)
     (let [resp ^GetResponse
-          (ces/get-doc es (assoc options, :index es-index, :format :java, :id (.. ^ID vo _id toString)))]
+          (ces/get-doc es (assoc options, :type (Integer/toHexString (.. vo voManifest ID)), :index es-index, :format :java, :id (.. ^ID vo _id toString)))]
       (.apply (. vo voCompanion)
               (ElasticSearch-ValueSource. (.. vo voManifest ID) (.sourceAsMap resp) resp)))))
 
 (defn put
   "options: see clj-elasticsearch.client/index-doc"
-  [es ^ValueObject vo & {:as options :keys [index]}]
+  [es ^ValueObject vo index options]
   (assert index ":index required")
   (assert (prime.vo/has-id? vo) (str "vo: " (prn-str vo) " requires an id"))
   (ces/index-doc es (conj options {
+    :index  index
     :id     (prime.types/to-String (.. ^ID vo _id))
     :type   (Integer/toHexString (.. vo voManifest ID))
     :source (json/encode-smile vo)
@@ -425,7 +426,7 @@
 
   Returns: seq of SearchHits, with the full SearchResponse as meta-data.
   "
-  [es indices ^ValueObject vo & {:as options :keys [
+  [es indices ^ValueObject vo {:as options :keys [
     ; extra-source parameters
     query filter from size types sort highlighting only exclude script-fields preference facets named-filters boost explain version min-score
     ; ces/search parameters
@@ -492,12 +493,12 @@
     })))
 
 (defn update
-  [es ^ValueObject vo id & {:as options :keys [index fields]}]
+  [es ^ValueObject vo id index {:as options :keys [fields]}]
   {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
   (let [type    (Integer/toHexString (.. vo voManifest ID))
-        id      (prime.types/to-String id)]
-        fields  (map field-hexname fields)
-    (ces/update-doc es (patched-update-options type id (assoc options :doc vo)))))
+        id      (prime.types/to-String id)
+        fields  (map field-hexname fields)]
+    (ces/update-doc es (patched-update-options type id (assoc options :index index :doc vo)))))
 
 (defn insertAt "Add something to an array with a specific position" [es vo path value pos])
 
@@ -505,11 +506,12 @@
 
 ;TODO:
 ;  Convert fieldnames
-(defn appendTo "Add something to the end of an array" [es ^ValueObject vo id & {:as options :keys [index]}]
+(defn appendTo "Add something to the end of an array" [es ^ValueObject vo id index options]
   {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
   (let [type (Integer/toHexString (.. vo voManifest ID))
         id   (prime.types/to-String id)]
     (ces/update-doc es (patched-update-options type id (assoc options
+      :index index
       :source (json/encode-smile
         (binding [prime.vo/*voseq-key-fn* field-hexname] {
           :script (apply str (map #(str "ctx._source['" % "'] += v" % ";") (keys vo)))
@@ -524,11 +526,12 @@
 #_(defn update-if
   [es ^ValueObject vo id predicate &])
 
-(defn delete [es ^ValueObject vo & {:as options :keys [index]}]
+(defn delete [es ^ValueObject vo index {:as options :keys []}]
   {:pre [(instance? ValueObject vo)]}
   (assert index ":index required")
   (assert (prime.vo/has-id? vo) (str "vo: " (prn-str vo) " requires an id"))
   (ces/delete-doc es (conj options {
+    :index  index
     :id     (prime.types/to-String (.. ^ID vo _id))
     :type   (Integer/toHexString (.. vo voManifest ID))
   })))

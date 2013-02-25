@@ -22,8 +22,8 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
   def pack(vo : mutable.ValueObject);
 
   final def pack(v : EnumValue) {
-    if (v.isInstanceOf[scala.Product]) pack(v.toString)
-    else                               pack(v.value)
+    if (v.isInstanceOf[scala.Product]) super.pack(v.toString)
+    else                               super.pack(v.value)
   }
 
   final def pack(ref: VORef[_ <: ValueObject]) {

@@ -4,7 +4,7 @@ import org.msgpack.Packer
 import java.lang.Math
 import java.io.OutputStream
 import org.bson.types.ObjectId
-import prime.types.{Conversion, Ref, RefArray, EmailAddr, Enum, RGBA, FileRef, URI, DateTime, Date}
+import prime.types.{Conversion, VORef, Ref, RefArray, EmailAddr, Enum, RGBA, FileRef, URI, DateTime, Date}
 import prime.vo._
 import Util._
 
@@ -20,6 +20,11 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
 {
   def pack(vo : ValueObject);
   def pack(vo : mutable.ValueObject);
+
+  final def pack(ref: VORef[_ <: ValueObject]) {
+    if (ref.isDefined) pack(ref.get)
+    else               pack(ref._id)
+  }
 
   final def pack(ref: Ref[_ <: ValueObject]) {
     if (ref.vo_! != null) pack(ref.vo_!)
@@ -80,7 +85,8 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
     case v : RGBA                     => pack(v);
     case v : EmailAddr                => pack(v);
     case v : ValueObject              => pack(v);
-    case v if v.isInstanceOf[Ref[_]]  => pack(v);
+    case v : VORef[_]                 => pack(v);
+    case v : Ref[_]                   => pack(v);
     case v : mutable.ValueObject      => pack(v);
     case v : IndexedSeq[_]            => pack(v);
     case null                         => packNil();

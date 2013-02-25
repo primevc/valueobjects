@@ -146,9 +146,12 @@
       :dynamic    "strict"
       :properties
       (into {}
-        (map
-          (fn [^ValueObjectField field] (field-mapping (option-map (.keyword field)) field (if id-field (identical? id-field field))))
-          (mapcat #(vo/field-filtered-seq % (:only option-map) (:exclude option-map)) (vo/vo+subtypes-manifests-seq (.voManifest vo)))))
+        (cons
+          {"t" {:type "integer", :store "no"}},
+          (map
+            (fn [^ValueObjectField field] (field-mapping (option-map (.keyword field)) field (if id-field (identical? id-field field))))
+            (mapcat #(vo/field-filtered-seq % (:only option-map) (:exclude option-map)) (vo/vo+subtypes-manifests-seq (.voManifest vo))))
+          ))
     }))
 )
 
@@ -242,22 +245,35 @@
     (.writeObjectField out "x", (.toString in)))
   (.writeEndObject out))
 
+(def ^:dynamic *vo-baseTypeID* nil)
+
 (defn encode-vo
   ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex]
-    (encode-vo out vo date-format ex (.. vo voManifest ID)))
+    (encode-vo out vo date-format ex (or *vo-baseTypeID* (.. vo voManifest ID))))
 
   ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex ^Integer baseTypeID]
     (.writeStartObject out)
 
+    (prn vo baseTypeID *vo-baseTypeID*)
     (if (not (== baseTypeID (.. vo voManifest ID)))
       (.writeNumberField out "t" (.. vo voManifest ID)))
 
     (doseq [[^ValueObjectField k v] vo]
       (.writeFieldName out (field-hexname k))
-      (if (instance? ValueObject v)
-        (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID))
-      #_else
-        (cheshire.generate/generate out v date-format ex)))
+      (cond
+        (instance? ValueObject v)
+          (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID))
+
+        (vector? v)
+          (let [innerType (. ^package$ValueTypes$Tarray (. k valueType) innerType)
+                voType    (if (instance? package$ValueTypes$Tdef innerType) (.. ^package$ValueTypes$Tdef innerType empty voManifest ID) #_else -1)]
+            (if (> voType 0)
+              (binding [*vo-baseTypeID* voType] (cheshire.generate/generate-array out v date-format ex))
+            #_else
+              (cheshire.generate/generate-array out v date-format ex)))
+
+        :else
+          (cheshire.generate/generate out v date-format ex)))
 
     (.writeEndObject out)))
 

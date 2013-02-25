@@ -108,7 +108,7 @@
     ; Else: not an array
     { (Integer/toHexString id),
     (conj {:store "no"
-           :index_name (name field-key)
+           ;:index_name (name field-key)
            :type       (mapping-field-type-name value-type)}
       (if
         (instance? package$ValueTypes$Tdef  value-type)

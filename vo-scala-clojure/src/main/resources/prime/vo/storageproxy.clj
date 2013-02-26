@@ -181,8 +181,10 @@
                       ~@(apply concat (for [function fncs]
                           (if (= function :proxies)
                              (all-or-try (opts :proxies) 'vo fnc (drop 2 param))
-                             [(symbolize function "-result") (opts function)]
-                              )))
+                             `[~(symbolize function "-result") ~(opts function)
+                              ~@(if-not (nil? (opts function))
+                                ['vo 
+                                `(or ~(symbolize function "-result") ~'vo)])])))
                         ] 
                         ~(let [
                           res          (if (= fnc `get-vo) ; Exception for a get.

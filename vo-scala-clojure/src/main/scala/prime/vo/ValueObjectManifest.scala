@@ -124,8 +124,15 @@ trait IDField {
 }
 
 object ValueObjectManifest {
-  class NoSuchFieldException(vo : ValueObjectManifest[_], field : String) extends java.lang.IllegalArgumentException("The given name or index `"+ field +"` is not part of "+ vo.VOType.erasure.getName) {
-    def this(vo : ValueObjectManifest[_], idx : Int) = this(vo, idx.toString)
+  class NoSuchFieldException(vo : ValueObjectManifest[_], field : String, extraInfo : String) extends java.lang.IllegalArgumentException(
+    "\n  The given name or index `"+ field +"` is not part of "+ vo.VOType.erasure.getName + extraInfo
+  ){
+    def this(vo : ValueObject, field : String) = this(vo.voManifest, field, "\n  Defined field names are:\n    " +
+      vo.voCompanion.fields.filter(_ != null).map(_.name).mkString(", ")  + "\n\n"
+    );
+
+    def this(vo : ValueObjectManifest[_], field : String) = this(vo, field, "")
+    def this(vo : ValueObjectManifest[_], idx   : Int)    = this(vo, idx.toString)
   }
 
   def valueObjectTraits(cl : Class[_]) : Array[Class[_]] = cl.getInterfaces
@@ -253,15 +260,18 @@ abstract class ValueObjectField[-VO <: ValueObject] protected(
   val keyword      : clojure.lang.Keyword,
   val valueType    : ValueType,
   val defaultValue : Any
-){
+)
+ extends clojure.lang.ILookupThunk
+{
   require(valueType != null, "Field needs a valueType");
 
-  /* TODO *
-    - Implement clojure's KeywordThunk optimization thingy
-  */
 
   def this(id:Int, symbol:Symbol, valueType:ValueType, defaultValue:Any) = this(id, symbol.name, symbol, Keyword.intern(null, symbol.name), valueType, defaultValue)
 
+  /** True if  `obj` is a type which can contain this ValueObject field. */
+  def isFieldOf(obj : AnyRef) : Boolean;
+
+  /** Get the value for this field from `vo`. */
   def apply(vo  : VO) : Any;
   def apply(src : ValueSource, orElse : Any) : Any = src.anyAt(name, id, orElse);
 
@@ -274,6 +284,8 @@ abstract class ValueObjectField[-VO <: ValueObject] protected(
   def isLazy = valueType isLazy;
 
   final def VOTypeID = id >>> 8;
+
+  def get(target:AnyRef) = if (this.isFieldOf(target)) prime.vo.util.ClojureSupport.get(this, target.asInstanceOf[VO]) else this;
 }
 
 abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protected(

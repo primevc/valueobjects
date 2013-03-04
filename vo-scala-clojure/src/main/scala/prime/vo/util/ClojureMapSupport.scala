@@ -1,7 +1,7 @@
 package prime.vo.util
  import prime.vo._
  import prime.vo.source._
- import clojure.lang.{Var, RT, Util, IFn, Keyword, MapEntry, MapEquivalence}
+ import clojure.lang.{Var, RT, Util, IFn, IKeywordLookup, ILookupThunk, Keyword, MapEntry, MapEquivalence}
  import clojure.lang.{ASeq, ISeq, Counted, IPersistentCollection, IPersistentMap, IPersistentVector, IPending, Indexed}
 
 object ClojureSupport {
@@ -20,6 +20,7 @@ trait ClojureMapSupport extends IPersistentMap
  with ClojureFn
  with Indexed
  with IPending
+ with IKeywordLookup
  with JavaMapSupport[Keyword] {
   this: ValueObject =>
 
@@ -194,6 +195,12 @@ trait ClojureMapSupport extends IPersistentMap
   }
   final def valAt (key: Any) : AnyRef = valAt(key, null);
 
+  // IKeywordLookup
+  final def getLookupThunk(key: Keyword): ILookupThunk = voManifest.findOrNull(key) match {
+    case null => throw new ValueObjectManifest.NoSuchFieldException(this, key.toString);
+    case f    => f;
+  }
+
   // Iterable
   /**
     Always returns null. Why? I'll tell you why:
@@ -210,7 +217,7 @@ trait ClojureMapSupport extends IPersistentMap
   // ---
   override final def invoke  (key: AnyRef)                   : AnyRef = invoke(key, null)
   override final def invoke  (key: AnyRef, notFound: AnyRef) : AnyRef = voManifest.findOrNull(key) match {
-    case null => throw new ValueObjectManifest.NoSuchFieldException(voManifest, key.toString);
+    case null => throw new ValueObjectManifest.NoSuchFieldException(this, key.toString);
     case f    => if (f in self) ClojureSupport.get(f, self) else notFound;
   }
 

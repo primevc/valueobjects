@@ -718,7 +718,9 @@ trait ")); a(def.name); a(" extends ");
 				}
 			}
 
-			a(") { def apply(vo: "); a(def.name); a("): "); a(!voField? "Any" : p.type.scalaType().name); a(" = vo."); a(p.name.quote()); a("; }\n");
+			a(") { def isFieldOf(obj: AnyRef) = obj.isInstanceOf["); a(def.name);
+			a("];  def apply(vo: "); a(def.name); a("): "); a(!voField? "Any" : p.type.scalaType().name); a(" = vo."); a(p.name.quote());
+			a("; }\n");
 		} else {
 			a("    final val "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" = ");
 			a(p.definedIn.fullName); a(".field."); a(p.name.quote()); a(";\n");

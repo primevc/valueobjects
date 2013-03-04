@@ -41,6 +41,7 @@ object ObjectId
 {
 	object field {
     object id extends ValueObjectField[ObjectId](0x1D00,'id,TobjectId,null) {
+      def isFieldOf(vo : AnyRef) = vo.isInstanceOf[ObjectId];
       def apply(vo : ObjectId) = vo.id;
     }
   }

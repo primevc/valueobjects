@@ -1,14 +1,29 @@
 package prime.types;
  import prime.vo.util.ClojureFn;
- import clojure.lang.{ISeq, RT};
+ import org.msgpack.`object`.{RawType, IntegerType};
+ import clojure.lang.{ILookup, ISeq, Keyword, RT};
 
-abstract class EnumValue extends java.io.Serializable
+abstract class EnumValue extends java.io.Serializable with ILookup
 {
   def owner : Enum;
   val value : Int;
 
   /** The name of this enumeration. */
   override def toString = (getClass.getName stripSuffix "$" split '.' last) split '$' last;
+
+  /** This hack makes it easier to compare Enums:  (if (:male gender-enum) "I'm a real boy!") */
+  final def valAt(key : AnyRef, notFound : AnyRef) = if (key eq this) this else if (key match {
+    case null        => false;
+    case key:Keyword =>
+      val s = key.sym;
+      (s.getNamespace == null || s.getNamespace == this.getClass.getPackage.getName) && s.getName == toString;
+    case key:Integer => value    == key;
+    case key:String  => toString == key;
+    case key         => (try Conversion.Integer(key) == value    catch { case _ => false }) ||
+                        (try Conversion.String (key) == toString catch { case _ => false });
+  }) this else null;
+
+  final def valAt(key : AnyRef) = valAt(key, null);
 }
 
 /**
@@ -31,13 +46,13 @@ abstract class Enum extends ClojureFn
   def       apply(value : Int)         : Value;// = values.find(_.value    == value) getOrElse(Null);
   def       apply(value : String)      : Value = valueSet.find(_.toString == value) getOrElse(stringCatchAll(value));
   final def apply(value : Long)        : Value = apply(value.toInt);
-  final def apply(value : org.msgpack.`object`.RawType)     : Value = apply(value.asString);
-  final def apply(value : org.msgpack.`object`.IntegerType) : Value = apply(value.asInt);
-  final def apply(value : clojure.lang.Keyword)     : Value = apply(value.sym.getName);
+  final def apply(value : RawType)     : Value = apply(value.asString);
+  final def apply(value : IntegerType) : Value = apply(value.asInt);
+  final def apply(value : Keyword)     : Value = apply(value.sym.getName);
   final def apply(value : Symbol)      : Value = apply(value.name);
 
   def valueOf(value : Any): Value = Conversion.unpack(value) match {
-    case v : clojure.lang.Keyword             => apply(v)
+    case v : Keyword     => apply(v)
     case v : org.msgpack.`object`.IntegerType => apply(v)
     case v : org.msgpack.`object`.RawType     => apply(v)
     case v : String      => apply(v)

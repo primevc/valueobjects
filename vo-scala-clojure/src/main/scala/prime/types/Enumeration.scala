@@ -53,8 +53,8 @@ abstract class Enum extends ClojureFn
 
   def valueOf(value : Any): Value = Conversion.unpack(value) match {
     case v : Keyword     => apply(v)
-    case v : org.msgpack.`object`.IntegerType => apply(v)
-    case v : org.msgpack.`object`.RawType     => apply(v)
+    case v : IntegerType => apply(v)
+    case v : RawType     => apply(v)
     case v : String      => apply(v)
     case v : Int         => apply(v)
     case v : Long        => apply(v)

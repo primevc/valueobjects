@@ -275,7 +275,7 @@ abstract class ValueObjectField[-VO <: ValueObject] protected(
   def apply(vo  : VO) : Any;
   def apply(src : ValueSource, orElse : Any) : Any = src.anyAt(name, id, orElse);
 
-  def get(vo : ValueObject) : Any =  vo match { case vo : VO => this(vo); case _ => null; }
+  def get(vo : ValueObject) : Any = this(vo.asInstanceOf[VO]);
 
   final def in (vo : VO) = {
     ((vo.initIndexSet & (1 << vo.voManifest.index(this.asInstanceOf[ValueObjectField[vo.VOType]]))) != 0) || (isLazy && apply(vo) != defaultValue);
@@ -285,7 +285,7 @@ abstract class ValueObjectField[-VO <: ValueObject] protected(
 
   final def VOTypeID = id >>> 8;
 
-  def get(target:AnyRef) = if (this.isFieldOf(target)) prime.vo.util.ClojureSupport.get(this, target.asInstanceOf[VO]) else this;
+  def get(target:AnyRef) = if (this.isFieldOf(target)) prime.vo.util.ClojureSupport.valAt(this, target.asInstanceOf[VO]) else this;
 }
 
 abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protected(
@@ -311,6 +311,8 @@ abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protecte
       if (!(root eq src)) /*eager convert to T*/ voCompanion(vo);
       else /*lazy convert*/ if (self.voSource eq ValueSource.empty) null.asInstanceOf[T] else lazyVar;
   }
+
+  final override def get(target:AnyRef) = if (this.isFieldOf(target)) apply(target.asInstanceOf[VO]) else this;
 }
 
 trait IntValueObjectField {

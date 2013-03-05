@@ -164,11 +164,11 @@ object ClojureVectorSupport {
 
   implicit def asScala[A]( v : IPersistentVector )(implicit to_A : Any => A, typeA : Manifest[A]) : IndexedSeq[A] = v match {
     case s @ ScalaSeqWrapper(wrapped) => if (typeA != null && s.itemType == typeA) wrapped.asInstanceOf[Seq[A]].toIndexedSeq else wrapped.map(to_A).toIndexedSeq
-    case _ => ClojureVectorWrapper(v)
+    case _ => if (v.length == 0) IndexedSeq.empty.asInstanceOf[IndexedSeq[A]] else ClojureVectorWrapper(v)
   }
 
   implicit def asClojure[A]( v : Seq[A] )(implicit to_A : Any => A, typeA : Manifest[A]) : IPersistentVector = v match {
     case ClojureVectorWrapper(wrapped) => wrapped
-    case _ => ScalaSeqWrapper(v)
+    case _ => if (v.isEmpty) PersistentVector.EMPTY else ScalaSeqWrapper(v)
   }
 }

@@ -683,7 +683,7 @@ trait ")); a(def.name); a(" extends ");
 		// object manifest
 		function manifestFieldType(p:Property) {
 			var voField = !p.isReference() && p.type.isTclass();
-			a(!voField? "ValueObjectField[" : "VOValueObjectField["); a(def.name);
+			a(voField? "VOValueObjectField[" : p.isArray()? "VectorValueObjectField[" : "SimpleValueObjectField["); a(def.name);
 			if (voField) { a(", "); a(p.type.scalaType().name); }
 			a("]");
 		}
@@ -697,7 +697,7 @@ trait ")); a(def.name); a(" extends ");
 
 			if (p.isReference() || !p.type.isTclass()) {
 				addFieldTypeConstructor(p.type, p.isReference());
-				a(", ");
+				if (!p.isArray()) a(", ");
 			}
 
 			if (def.isMixin) {
@@ -707,14 +707,16 @@ trait ")); a(def.name); a(" extends ");
 					a(p.type.scalaType().name); a(".empty");
 				}
 			}
-			else if (p.isReference()) {
-				a("null");
-			}
-			else {
-				a("empty");
-				// Check for the special case of referring to itself
-				if (p.type.isArray() || p.type.getPTypedef().unpackPTypedef() != def){
-					ac('.'.code); a(p.name.quote());
+			else if (!p.isArray())
+			{
+				if (p.isReference())
+					a("null");
+				else {
+					a("empty");
+					// Check for the special case of referring to itself
+					if (p.type.isArray() || p.type.getPTypedef().unpackPTypedef() != def){
+						ac('.'.code); a(p.name.quote());
+					}
 				}
 			}
 

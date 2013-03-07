@@ -1,7 +1,7 @@
 package prime.vo;
  import prime.vo.source._
  import prime.types._
- import clojure.lang.Keyword
+ import clojure.lang.{ILookupThunk, Keyword}
 
 
 trait ValueObjectManifest[T <: ValueObject]
@@ -230,7 +230,7 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
   }
 
   final def index(field : ValueObjectField[_]) : Int = {
-    val fields = this.fields; var i = 0;
+    val fields = this.fields; var i = field.id & 0xFF;
     while (i < fields.length) if (fields(i) eq field) return i; else i += 1;
     -1;
   }
@@ -260,16 +260,21 @@ abstract class ValueObjectField[-VO <: ValueObject] protected(
   val keyword      : clojure.lang.Keyword,
   val valueType    : ValueType,
   val defaultValue : Any
-)
- extends clojure.lang.ILookupThunk
-{
+){
+/*****
+  We specifically do NOT implement ILookupThunk on this base class,
+  because if we do, the JIT cannot eliminate the virtual call to `get`.
+
+  Also: we don't even want to see ILookupThunk from scala code,
+    as it's merely an implementation detail of optimized clojure interop.
+ *****/
   require(valueType != null, "Field needs a valueType");
 
 
-  def this(id:Int, symbol:Symbol, valueType:ValueType, defaultValue:Any) = this(id, symbol.name, symbol, Keyword.intern(null, symbol.name), valueType, defaultValue)
-
   /** True if  `obj` is a type which can contain this ValueObject field. */
   def isFieldOf(obj : AnyRef) : Boolean;
+  /** True if this field is set in `vo`. */
+  def in(vo : VO) : Boolean;
 
   /** Get the value for this field from `vo`. */
   def apply(vo  : VO) : Any;
@@ -277,22 +282,52 @@ abstract class ValueObjectField[-VO <: ValueObject] protected(
 
   def get(vo : ValueObject) : Any = this(vo.asInstanceOf[VO]);
 
-  final def in (vo : VO) = {
-    ((vo.initIndexSet & (1 << vo.voManifest.index(this.asInstanceOf[ValueObjectField[vo.VOType]]))) != 0) || (isLazy && apply(vo) != defaultValue);
-  }
-
-  def isLazy = valueType isLazy;
+  final def isLazy = valueType isLazy;
 
   final def VOTypeID = id >>> 8;
+}
 
-  def get(target:AnyRef) = if (this.isFieldOf(target)) prime.vo.util.ClojureSupport.valAt(this, target.asInstanceOf[VO]) else this;
+abstract class SimpleValueObjectField[-VO <: ValueObject](id:Int, symbol:Symbol, valueType:ValueType, defaultValue:Any)
+ extends ValueObjectField[VO](id, symbol.name, symbol, Keyword.intern(null, symbol.name), valueType, defaultValue)
+    with ILookupThunk
+{
+  @inline final def in (vo : VO) = ((vo.initIndexSet & (1 << vo.voManifest.index(this.asInstanceOf[ValueObjectField[vo.VOType]]))) != 0);
+
+  final def get(target:AnyRef) = {
+    val obj = target.asInstanceOf[VO];
+    if      (this in obj)            apply(obj).asInstanceOf[AnyRef]
+    else if (this.isFieldOf(target)) null
+    else                             this;
+  }
+}
+
+abstract class VectorValueObjectField[-VO <: ValueObject] protected(
+  id           : Int,
+  symbol       : Symbol,
+  valueType    : ValueType
+) extends ValueObjectField[VO](id, symbol.name, symbol, Keyword.intern(null, symbol.name), valueType, IndexedSeq.empty)
+     with ILookupThunk
+{
+
+  @inline final def in (vo : VO) = !(apply(vo).asInstanceOf[AnyRef] eq defaultValue.asInstanceOf[AnyRef]);
+
+  final override def get(target:AnyRef) = {
+    val obj = target.asInstanceOf[VO];
+    if (this in obj)                 prime.vo.util.ClojureVectorSupport.asClojure(apply(obj).asInstanceOf[scala.collection.IndexedSeq[Any]])(valueType.convert,null)
+    else if (this.isFieldOf(target)) clojure.lang.PersistentVector.EMPTY
+    else this;
+  }
 }
 
 abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protected(
   id           : Int,
   symbol       : Symbol,
   override val defaultValue : T // Must always refer to the `empty` instance.
-) extends ValueObjectField[VO](id, symbol.name, symbol, Keyword.intern(null, symbol.name), ValueTypes.Tdef(defaultValue, false), defaultValue) {
+) extends ValueObjectField[VO](id, symbol.name, symbol, Keyword.intern(null, symbol.name), ValueTypes.Tdef(defaultValue, false), defaultValue) 
+     with ILookupThunk
+{
+
+  @inline final def in (vo : VO) = !(apply(vo).asInstanceOf[AnyRef] eq defaultValue.asInstanceOf[AnyRef]);
 
   val voCompanion : ValueObjectCompanion[T] = defaultValue.voCompanion.asInstanceOf[ValueObjectCompanion[T]];
 

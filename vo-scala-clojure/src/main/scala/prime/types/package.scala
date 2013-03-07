@@ -51,7 +51,7 @@ package object types
       //require(empty.voManifest.VOType.erasure != null, "ValueObject needs a manifest.VOType.erasure")
 
       val keyword          = k(empty.getClass.getPackage.getName, empty.getClass.getSimpleName.dropRight(2).intern);
-      override def isLazy  = true;
+      override def isLazy  = !ref;
       def convert(any:Any) = if (!ref) empty.voCompanion.valueOf(any) else VORef.valueOf(any)(empty.asInstanceOf[ValueObject with ID{type IDType = Any}]);
     }
     case class Tenum      (t: Enum) extends ValueType {

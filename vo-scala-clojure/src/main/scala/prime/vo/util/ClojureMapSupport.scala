@@ -222,7 +222,7 @@ trait ClojureMapSupport extends IPersistentMap
   // IKeywordLookup
   final def getLookupThunk(key: Keyword): ILookupThunk = voManifest.findOrNull(key) match {
     case null => throw new ValueObjectManifest.NoSuchFieldException(this, key.toString);
-    case f    => f;
+    case f    => f.asInstanceOf[ILookupThunk];
   }
 
   // Iterable

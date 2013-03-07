@@ -70,9 +70,14 @@ trait ValueObject extends ValueSource
     Conjoin `src` and `this`.
 
     Will return a new copy with all fields from `src` and any other fields from `this`.
-    If `src` has no different values or is empty, `this` is returned.
+
+    - If `src` has no different values or is empty:
+      `this` is returned.
+
+    - If `src` has different values and this VO was constructed from scratch (empty ValueSource):
+      the returned new copy will have `this` as `voSource`.
   */
-  final def    conj(src : ValueSource)         : this.type = conj(src, this.voSource);
+  final def    conj(src : ValueSource)         : this.type = conj(src, if (this.voSource eq ValueSource.empty) this else this.voSource);
 
   def         assoc(field : ValueObjectField[VOType], value : Any) : this.type = conj(new SingleValueSource(field.name, value));
 

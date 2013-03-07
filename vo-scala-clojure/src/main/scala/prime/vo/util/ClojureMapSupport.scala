@@ -48,7 +48,7 @@ trait ClojureMapSupport extends IPersistentMap
 
   import ClojureSupport.clojurify;
 
-  protected var _hash : Int = -1;
+  private[this] var _hash : Int = -1;
   override def hashCode = if(_hash != -1) _hash else {
     _hash = clojure.lang.APersistentMap.mapHash(this);
     _hash

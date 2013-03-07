@@ -189,7 +189,7 @@ abstract class ValueObject_1 extends ValueObjectBase {
 }
 
 abstract class ValueObject_4(_voIndexSet0 : Int, _srcDiff0 : Int) extends ValueObjectBase {
-  protected val _bits: Byte = (_voIndexSet0 & 0xF) | (_srcDiff0 << 4) toByte;
+  private[this] val _bits: Byte = (_voIndexSet0 & 0xF) | (_srcDiff0 << 4) toByte;
   protected def _voIndexSet = _bits & 0xF;
   
   def voIndexSet : Int = _voIndexSet;
@@ -198,19 +198,19 @@ abstract class ValueObject_4(_voIndexSet0 : Int, _srcDiff0 : Int) extends ValueO
   def initIndexSet = _voIndexSet;
 }
 
-abstract class ValueObject_8(protected val _voIndexSet : Byte, @transient protected val _srcDiff : Byte) extends ValueObjectBase {
+abstract class ValueObject_8(protected val _voIndexSet : Byte,   @transient private[this] val _srcDiff : Byte)  extends ValueObjectBase {
   def voIndexSet : Int = _voIndexSet & 0xFF;
   def srcDiff    : Int = _srcDiff    & 0xFF;
   def initIndexSet = _voIndexSet     & 0xFF;
 }
 
-abstract class ValueObject_16(protected val _voIndexSet : Short, @transient protected val _srcDiff : Short) extends ValueObjectBase {
+abstract class ValueObject_16(protected val _voIndexSet : Short, @transient private[this] val _srcDiff : Short) extends ValueObjectBase {
   def voIndexSet : Int = _voIndexSet & 0xFFFF;
   def srcDiff    : Int = _srcDiff    & 0xFFFF;
   def initIndexSet = _voIndexSet     & 0xFFFF;
 }
 
-abstract class ValueObject_32(protected val _voIndexSet : Int, @transient protected val _srcDiff : Int) extends ValueObjectBase {
+abstract class ValueObject_32(protected val _voIndexSet : Int,   @transient private[this] val _srcDiff : Int)   extends ValueObjectBase {
   def voIndexSet : Int = _voIndexSet;
   def srcDiff    : Int = _srcDiff;
 

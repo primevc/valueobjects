@@ -211,13 +211,17 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
 
 
   final def findOrNull(idx : Int)    : ValueObjectField[VOType] = index(idx) match { case -1 => null; case i => fields(i); }
-  final def findOrNull(name: String) : ValueObjectField[VOType] = { for (f <- fields) if (f != null && f.name == name) return f; null }
+  final def findOrNull(name: String) : ValueObjectField[VOType] = {
+    val fields = this.fields; var i = 0;
+    do { val f = fields(i); if (f != null && (f.name == name)) return f; else i += 1; } while (i < fields.length);
+    null;
+  }
 
   final def index(n : Int) : Int = {
     if (n <= 32) {
       if ((fieldIndexMask & (1 << n)) != 0) return n;
     } else {
-      val fields = this.fields; var i = 0;
+      val fields = this.fields; var i = 0 & 0xFF;
       while (i < fields.length) { val f = fields(i); if (f != null && f.id == n) return i; else i += 1; }
     }
     -1;
@@ -225,7 +229,7 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
 
   final def index(name : String) : Int = {
     val fields = this.fields; var i = 0;
-    while (i < fields.length) { val f = fields(i); if (f != null && (f.name == name)) return i; else i += 1; }
+    do { val f = fields(i); if (f != null && (f.name == name)) return i; else i += 1; } while (i < fields.length);
     -1;
   }
 

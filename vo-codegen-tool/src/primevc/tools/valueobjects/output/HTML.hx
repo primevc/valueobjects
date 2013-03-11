@@ -236,6 +236,7 @@ class HTML implements CodeGenerator
 		
 		this.result.add(t_type.execute({
 			type			: type,
+			description		: def.description != null? def.description : "",
 			name			: def.name,
 			fullName		: def.fullName,
 			implemented		: linkTypes('Implemented by: ', cast def.implementedBy),
@@ -348,7 +349,7 @@ class HTML implements CodeGenerator
 		font-weight: normal;
 		color: #A0F020;
 	}
-	
+	p { white-space: pre; word-wrap: break-word; }
 	a:hover, td > a:hover {
 		color: #FFF;
 		text-decoration: underline;
@@ -383,6 +384,7 @@ class HTML implements CodeGenerator
 		<h2><b>::type::</b> <a name="::fullName::">::name::</a></h2>
 		<div class="supers">::supers::</div>
 		<div class="implemented">::implemented::</div>
+		<p>::description::</p>
 		::options:: <br/>
 		::properties::
 	');

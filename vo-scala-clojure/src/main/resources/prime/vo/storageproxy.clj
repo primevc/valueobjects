@@ -4,8 +4,9 @@
 
 (ns prime.vo.storageproxy
 	(:require 
-    [prime.vo.util.elasticsearch  :as es]
-    [prime.vo.util.msgpack        :as mp]))
+    [prime.vo.util.elasticsearch      :as es]
+    [prime.vo.util.msgpack            :as mp]
+    [prime.vo.util.cassandra-history   :as ch]))
 
 (defprotocol VOProxy
   "Doc string"
@@ -129,6 +130,35 @@
     (mp/delete directory vo options))
 )
 
+(deftype CassandraHistoryVOProxy [cluster]
+  VOProxy
+  (get-vo [this vo]
+    (ch/get cluster vo))
+
+  (put-vo [this vo]
+    (ch/put cluster vo {}))
+
+  (put-vo [this vo options]
+    (ch/put cluster vo options))
+
+  (update [this vo id]
+    (ch/update cluster vo id {}))
+
+  (update [this vo id options]
+    (ch/update cluster vo id options))
+
+  (appendTo [this vo id]
+    (ch/appendTo cluster vo id {}))
+
+  (appendTo [this vo id options]
+    (ch/appendTo cluster vo id options))
+  (delete [this vo]
+    (ch/delete cluster vo {}))
+
+  (delete [this vo options]
+    (ch/delete cluster vo options))
+)
+
 (defn symbolize [sym appendix] (let [sym (if (keyword? sym) (.sym sym) sym)] (symbol (str sym appendix))))
 
 (defn try-proxies [proxies vo fnc options] ; Does not require options. Try is for get only.
@@ -242,5 +272,3 @@
                         ~@(apply concat (for [option (apply hash-map (drop 1 option))]
                           `[~(first option) (do ~(concat (list fnc (second option)) param))])))
                     `(do ~(concat (list fnc (second option)) param))))))))))))
-
-

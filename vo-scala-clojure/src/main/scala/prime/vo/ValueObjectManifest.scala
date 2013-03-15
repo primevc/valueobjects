@@ -1,7 +1,7 @@
 package prime.vo;
  import prime.vo.source._
  import prime.types._
- import clojure.lang.Keyword
+ import clojure.lang.{ILookupThunk, Keyword}
 
 
 trait ValueObjectManifest[T <: ValueObject]
@@ -124,8 +124,15 @@ trait IDField {
 }
 
 object ValueObjectManifest {
-  class NoSuchFieldException(vo : ValueObjectManifest[_], field : String) extends java.lang.IllegalArgumentException("The given name or index `"+ field +"` is not part of "+ vo.VOType.erasure.getName) {
-    def this(vo : ValueObjectManifest[_], idx : Int) = this(vo, idx.toString)
+  class NoSuchFieldException(vo : ValueObjectManifest[_], field : String, extraInfo : String) extends java.lang.IllegalArgumentException(
+    "\n  The given name or index `"+ field +"` is not part of "+ vo.VOType.erasure.getName + extraInfo
+  ){
+    def this(vo : ValueObject, field : String) = this(vo.voManifest, field, "\n  Defined field names are:\n    " +
+      vo.voCompanion.fields.filter(_ != null).map(_.name).mkString(", ")  + "\n\n"
+    );
+
+    def this(vo : ValueObjectManifest[_], field : String) = this(vo, field, "")
+    def this(vo : ValueObjectManifest[_], idx   : Int)    = this(vo, idx.toString)
   }
 
   def valueObjectTraits(cl : Class[_]) : Array[Class[_]] = cl.getInterfaces
@@ -204,13 +211,17 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
 
 
   final def findOrNull(idx : Int)    : ValueObjectField[VOType] = index(idx) match { case -1 => null; case i => fields(i); }
-  final def findOrNull(name: String) : ValueObjectField[VOType] = { for (f <- fields) if (f != null && f.name == name) return f; null }
+  final def findOrNull(name: String) : ValueObjectField[VOType] = {
+    val fields = this.fields; var i = 0;
+    do { val f = fields(i); if (f != null && (f.name == name)) return f; else i += 1; } while (i < fields.length);
+    null;
+  }
 
   final def index(n : Int) : Int = {
     if (n <= 32) {
       if ((fieldIndexMask & (1 << n)) != 0) return n;
     } else {
-      val fields = this.fields; var i = 0;
+      val fields = this.fields; var i = 0 & 0xFF;
       while (i < fields.length) { val f = fields(i); if (f != null && f.id == n) return i; else i += 1; }
     }
     -1;
@@ -218,12 +229,12 @@ abstract class ValueObjectManifest_N[VOType <: ValueObject : Manifest] extends V
 
   final def index(name : String) : Int = {
     val fields = this.fields; var i = 0;
-    while (i < fields.length) { val f = fields(i); if (f != null && (f.name == name)) return i; else i += 1; }
+    do { val f = fields(i); if (f != null && (f.name == name)) return i; else i += 1; } while (i < fields.length);
     -1;
   }
 
   final def index(field : ValueObjectField[_]) : Int = {
-    val fields = this.fields; var i = 0;
+    val fields = this.fields; var i = field.id & 0xFF;
     while (i < fields.length) if (fields(i) eq field) return i; else i += 1;
     -1;
   }
@@ -254,33 +265,73 @@ abstract class ValueObjectField[-VO <: ValueObject] protected(
   val valueType    : ValueType,
   val defaultValue : Any
 ){
+/*****
+  We specifically do NOT implement ILookupThunk on this base class,
+  because if we do, the JIT cannot eliminate the virtual call to `get`.
+
+  Also: we don't even want to see ILookupThunk from scala code,
+    as it's merely an implementation detail of optimized clojure interop.
+ *****/
   require(valueType != null, "Field needs a valueType");
 
-  /* TODO *
-    - Implement clojure's KeywordThunk optimization thingy
-  */
 
-  def this(id:Int, symbol:Symbol, valueType:ValueType, defaultValue:Any) = this(id, symbol.name, symbol, Keyword.intern(null, symbol.name), valueType, defaultValue)
+  /** True if  `obj` is a type which can contain this ValueObject field. */
+  def isFieldOf(obj : AnyRef) : Boolean;
+  /** True if this field is set in `vo`. */
+  def in(vo : VO) : Boolean;
 
+  /** Get the value for this field from `vo`. */
   def apply(vo  : VO) : Any;
   def apply(src : ValueSource, orElse : Any) : Any = src.anyAt(name, id, orElse);
 
-  def get(vo : ValueObject) : Any =  vo match { case vo : VO => this(vo); case _ => null; }
+  def get(vo : ValueObject) : Any = this(vo.asInstanceOf[VO]);
 
-  final def in (vo : VO) = {
-    ((vo.initIndexSet & (1 << vo.voManifest.index(this.asInstanceOf[ValueObjectField[vo.VOType]]))) != 0) || (isLazy && apply(vo) != defaultValue);
-  }
-
-  def isLazy = valueType isLazy;
+  final def isLazy = valueType isLazy;
 
   final def VOTypeID = id >>> 8;
+}
+
+abstract class SimpleValueObjectField[-VO <: ValueObject](id:Int, symbol:Symbol, valueType:ValueType, defaultValue:Any)
+ extends ValueObjectField[VO](id, symbol.name, symbol, Keyword.intern(null, symbol.name), valueType, defaultValue)
+    with ILookupThunk
+{
+  @inline final def in (vo : VO) = ((vo.initIndexSet & (1 << vo.voManifest.index(this.asInstanceOf[ValueObjectField[vo.VOType]]))) != 0);
+
+  final def get(target:AnyRef) = {
+    val obj = target.asInstanceOf[VO];
+    if      (this in obj)            apply(obj).asInstanceOf[AnyRef]
+    else if (this.isFieldOf(target)) null
+    else                             this;
+  }
+}
+
+abstract class VectorValueObjectField[-VO <: ValueObject] protected(
+  id           : Int,
+  symbol       : Symbol,
+  valueType    : ValueType
+) extends ValueObjectField[VO](id, symbol.name, symbol, Keyword.intern(null, symbol.name), valueType, IndexedSeq.empty)
+     with ILookupThunk
+{
+
+  @inline final def in (vo : VO) = !(apply(vo).asInstanceOf[AnyRef] eq defaultValue.asInstanceOf[AnyRef]);
+
+  final override def get(target:AnyRef) = {
+    val obj = target.asInstanceOf[VO];
+    if (this in obj)                 prime.vo.util.ClojureVectorSupport.asClojure(apply(obj).asInstanceOf[scala.collection.IndexedSeq[Any]])(valueType.convert,null)
+    else if (this.isFieldOf(target)) clojure.lang.PersistentVector.EMPTY
+    else this;
+  }
 }
 
 abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protected(
   id           : Int,
   symbol       : Symbol,
   override val defaultValue : T // Must always refer to the `empty` instance.
-) extends ValueObjectField[VO](id, symbol.name, symbol, Keyword.intern(null, symbol.name), ValueTypes.Tdef(defaultValue, false), defaultValue) {
+) extends ValueObjectField[VO](id, symbol.name, symbol, Keyword.intern(null, symbol.name), ValueTypes.Tdef(defaultValue, false), defaultValue) 
+     with ILookupThunk
+{
+
+  @inline final def in (vo : VO) = !(apply(vo).asInstanceOf[AnyRef] eq defaultValue.asInstanceOf[AnyRef]);
 
   val voCompanion : ValueObjectCompanion[T] = defaultValue.voCompanion.asInstanceOf[ValueObjectCompanion[T]];
 
@@ -299,6 +350,8 @@ abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protecte
       if (!(root eq src)) /*eager convert to T*/ voCompanion(vo);
       else /*lazy convert*/ if (self.voSource eq ValueSource.empty) null.asInstanceOf[T] else lazyVar;
   }
+
+  final override def get(target:AnyRef) = if (this.isFieldOf(target)) apply(target.asInstanceOf[VO]) else this;
 }
 
 trait IntValueObjectField {

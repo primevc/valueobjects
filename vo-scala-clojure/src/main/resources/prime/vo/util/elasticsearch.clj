@@ -253,8 +253,6 @@
 
   ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex ^Integer baseTypeID]
     (.writeStartObject out)
-
-    ;(prn vo baseTypeID *vo-baseTypeID*)
     (if (not (== baseTypeID (.. vo voManifest ID)))
       (.writeNumberField out "t" (.. vo voManifest ID)))
 

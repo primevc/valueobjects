@@ -1,5 +1,4 @@
 package prime.types;
- import org.apache.commons.codec.binary.Base64
  import org.bouncycastle.crypto.digests.SHA256Digest
  import org.bouncycastle.crypto.io.DigestOutputStream
  import org.bouncycastle.crypto.Digest
@@ -28,9 +27,10 @@ trait FileRepository {
 }
 
 trait LocalFileRepository extends FileRepository {
-  def getFile(instance : FileRef): File
-  def apply  (instance : FileRef): File = this getFile instance
-  def stream (instance : FileRef): InputStream = new FileInputStream(this(instance))
+  def getFile(instance: FileRef): File
+  def apply(instance: FileRef) = getFile(instance)
+  def stream(instance: FileRef) = new FileInputStream(getFile(instance))
+  def exists(instance: FileRef) = getFile(instance).exists
 }
 
 class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
@@ -39,9 +39,6 @@ class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
 
   def toURI   (f : FileRef) = Conversion.URI(f.toString)
   def getFile (f : FileRef) = new File(root.getAbsolutePath + "/" + f.toString)
-  def exists  (f : FileRef) = getFile(f).exists
-
-//  def save (stream : OutputStream) = FileRef(new StreamWrapper(stream)).get
 
   def absorb (file : File) = {
     val ref = LocalFileRef(file)
@@ -61,7 +58,7 @@ class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
   {
     def this(tmpFile : File) = this(tmpFile, new FileOutputStream(tmpFile))
     def this() = this(File.createTempFile("blfr-", ".tmp", root))
-    
+
     protected val builder = LocalFileRef(this)
 
     def ref = {
@@ -97,4 +94,104 @@ object LocalFileRef
   }
 
   implicit def builderToOutput(b:Builder):OutputStream = b.output
+}
+
+/** This repository is used for reading and writing to NFS file repositories.
+  *
+  * It recognises and creates `nfs:` [[prime.types.FileRef]] objects. The idea
+  * is that files are not distributed among the servers/hosts, but are loaded
+  * from the host the file resides on.
+  *
+  * The [[prime.types.FileRef]] prefix for this repository follows the following
+  * convention: `nfs:internal-hostname//repository-name/`. A file can be read
+  * and written to the path `/nfsMountRoot/internal-hostname/repository-name/HASH`.
+  *
+  * @param nfsMountsRoot A file pointing to the root directory of all mount
+  *                      points accessible by this host.
+  * @param repositoryName The name of this repository.
+  */
+class NFSRepository(nfsMountsRoot: File, repositoryName: String)
+    extends LocalFileRepository {
+
+  import java.net.InetAddress
+
+  require(nfsMountsRoot.exists && nfsMountsRoot.isDirectory,
+    "The root directory of all NFS mounts must exist and point to a directory.")
+
+  val myLocalHostname = InetAddress.getLocalHost().getHostName();
+  val myNFSMount = new File(nfsMountsRoot, myLocalHostname)
+
+  require(myNFSMount.exists && myNFSMount.isDirectory,
+    "The NFS \"mount\" for this host, which should be located at '" +
+    myNFSMount.getAbsolutePath + "', does not exist or is not a directory.")
+
+  val myRoot = new File(myNFSMount, repositoryName)
+  myRoot.mkdir
+
+  require(myRoot.exists && myRoot.isDirectory,
+    "The local repository directory, which should be located at '" +
+    myRoot.getAbsolutePath + "', could not be created.")
+
+  val myPrefix = "nfs://" + myLocalHostname + "/" + repositoryName + "/"
+
+
+  /** Create an URI for the specified URI.
+    * @param fileRef The FileRef to get the URI from.
+    */
+  def toURI(fileRef: FileRef) = Conversion.URI(fileRef.toString)
+
+  /** Return the [[java.io.File]] where the specified [[prime.types.FileRef]]
+    * can be found on this host.
+    *
+    * @param f The FileRef to get a File object for. Note that this must be a
+               FileRef with the `nfs: ` scheme for its URI.
+    */
+  def getFile (fileRef: FileRef) = {
+    val fileRefURI = toURI(fileRef)
+    require(fileRefURI.getScheme == "nfs", "Cannot read a non-NFS FileRef from an NFS repository.")
+    val filePath = nfsMountsRoot.getAbsolutePath + "/" + fileRefURI.getHost +
+                   "/" + fileRefURI.getPath
+    new File(filePath)
+  }
+
+  /** Opens an [[prime.types.FileRefOutputStream]] to write a new file to, which
+    * can reture the [[prime.types.FileRef]] reference to it.
+    */
+  def create = {
+    val tmpFile = File.createTempFile("nfs-", ".tmp", myRoot)
+
+    class TmpFileStream(out: OutputStream)
+        extends FilterOutputStream(out)
+        with FileRefOutputStream {
+
+      val builder = LocalFileRef(this, myPrefix)
+      def ref = {
+        val ref = builder.get
+        tmpFile.renameTo(getFile(ref))
+        ref
+      }
+    }
+
+    new TmpFileStream(new FileOutputStream(tmpFile))
+  }
+
+  /** Absorb the specified File into this NFS repository. The specified File is
+    * deleted after it is absorbed. A FileRef to the new location of File in
+    * this NFS repository is returned.
+    *
+    * @param file The File to absorb.
+    */
+  def absorb (file : File) = {
+    val ref = LocalFileRef(file, myPrefix)
+    val refFile = getFile(ref)
+    if (refFile.exists) {
+      org.apache.commons.io.FileUtils.touch(refFile) // update the access time.
+      file.delete
+    } else {
+      file.renameTo(refFile)
+    }
+    require(refFile.exists, "Absorbing "+ file.getAbsolutePath +" failed. Target: " +
+                            refFile.getAbsolutePath);
+    ref
+  }
 }

@@ -1,28 +1,57 @@
-package prime.types;
- import org.bouncycastle.crypto.digests.SHA256Digest
- import org.bouncycastle.crypto.io.DigestOutputStream
- import org.bouncycastle.crypto.Digest
- import org.apache.commons.codec.digest.DigestUtils
- import java.io._
+package prime.types
+
+import org.bouncycastle.crypto.digests.SHA256Digest
+import org.bouncycastle.crypto.io.DigestOutputStream
+import org.bouncycastle.crypto.Digest
+import org.apache.commons.codec.digest.DigestUtils
+import java.io._
 
 
+/* Public traits. */
 
 trait FileRefOutputStream extends OutputStream {
 
   /** Closes the OutputStream and returns the FileRef constructed. Use this
     * function _after_ the data has been written.
-    * @return A FileRef to the written file in the repository./
+    * @return A FileRef to the written file in the repository.
     */
   def ref: FileRef
 }
 
 trait FileRepository {
-  def exists (ref : FileRef): Boolean
+
+  /** Test whether the specified FileReference exists in the repository.
+    * @param ref The FileRef to test.
+    */
+  def exists (ref: FileRef): Boolean
+
+  /** Create an URI for the specified URI.
+    * @param fileRef The FileRef to get the URI from.
+    */
   def toURI  (ref : FileRef): URI
+
+  /** Opens an [[prime.types.FileRefOutputStream]] to write a new file to, which
+    * can return the [[prime.types.FileRef]] reference to it.
+    */
   def create (): FileRefOutputStream
+
+  /** Absorb the specified File into this NFS repository. The specified File is
+    * deleted after it is absorbed. A FileRef to the new location of File in
+    * this NFS repository is returned.
+    *
+    * @param file The File to absorb.
+    */
   def absorb (file : File): FileRef
+
+  /** Open an InputStream to the file as referenced by the FileRef.
+    * @param ref The FileRef to stream.
+    */
   def stream (ref : FileRef): InputStream
 
+  /** Store a file using a function that receives an OutputStream to the new
+    * file in the repository. The FileRef to the newly written file is returned.
+    * @param writer The function that writes the data to the OutputStream.
+    */
   def store[T](writer: FileRefOutputStream => T): FileRef = {
     val out = create
     writer(out)
@@ -30,19 +59,84 @@ trait FileRepository {
   }
 }
 
+
+/* Helper classes. */
+
+class DigestFileRefOutputStream private(wrap: DigestOutputStream, prefix: String, sha256: SHA256Digest)
+    extends FilterOutputStream(wrap)
+    with FileRefOutputStream {
+
+  def this(wrap: OutputStream, prefix: String, sha256: SHA256Digest) =
+    this(new DigestOutputStream(wrap, sha256), prefix, sha256)
+
+  def this(wrap: OutputStream, prefix: String) =
+    this(wrap, prefix, new SHA256Digest)
+
+  def ref = {
+    val innerRef = new FileRef(prefix, new Array[Byte](32))
+    sha256.doFinal(innerRef.hash, 0)
+    wrap.close()
+    innerRef
+  }
+}
+
+
+/* Helper classes for local file handling. */
+
 trait LocalFileRepository extends FileRepository {
+
+  /** Return the [[java.io.File]] where the specified [[prime.types.FileRef]]
+    * can be found on this host.
+    *
+    * @param f The FileRef to get a File object for. Note that this must be a
+    *          FileRef with the `nfs: ` scheme for its URI.
+    */
   def getFile(instance: FileRef): File
   def apply(instance: FileRef) = getFile(instance)
+
   def stream(instance: FileRef) = new FileInputStream(getFile(instance))
   def exists(instance: FileRef) = getFile(instance).exists
 }
 
+object LocalFileRef {
+  def apply(file: File): FileRef = apply(file, null);
+  def apply(file: File, prefix : String): FileRef =
+    new FileRef(prefix, DigestUtils.sha256(new FileInputStream(file)), file.getName);
+}
+
+class LocalDigestFileRefOutputStream private(repo: LocalFileRepository, prefix: String,
+                                             tmpFile: File, wrap: OutputStream)
+    extends DigestFileRefOutputStream(wrap, prefix) {
+
+  private def this(repo: LocalFileRepository, prefix: String, tmpFile: File) =
+    this(repo, prefix, tmpFile, new FileOutputStream(tmpFile))
+
+  def this(repo: LocalFileRepository, prefix: String) =
+    this(repo, prefix, File.createTempFile("localdigest-", ".tmp"))
+
+  override def ref = {
+    val innerRef = super.ref
+    tmpFile.renameTo(repo.getFile(innerRef))
+    innerRef
+  }
+}
+
+
+/* Actual repository implementations. */
+
+/** This repository is used for reading and writing to an arbritary location on
+  * the file system. It is not usable for production scenarios involving
+  * multiple hosts, but it is very suitable for testing scenarios.
+  *
+  * @param root The directory where to store and read the files.
+  */
 class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
   root.mkdir();
   require(root.isDirectory, root + " is not a directory.")
 
-  def toURI   (f : FileRef) = Conversion.URI(f.toString)
-  def getFile (f : FileRef) = new File(root.getAbsolutePath + "/" + f.toString)
+  def toURI(f: FileRef) = Conversion.URI(f.toString)
+  def getFile(f: FileRef) = new File(root.getAbsolutePath + "/" + f.toString)
+  def create = new LocalDigestFileRefOutputStream(this, null)
 
   def absorb (file : File) = {
     val ref = LocalFileRef(file)
@@ -55,19 +149,8 @@ class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
     assert(newFile.exists, "Absorbing "+ file.getAbsolutePath +" failed. Target: " + newFile.getAbsolutePath);
     ref
   }
-
-  def create = {
-    val tmpFile = File.createTempFile("basiclocal-", ".tmp", root)
-    val tmpFileOS = new FileOutputStream(tmpFile)
-    new DigestedFileRefOutputStream(tmpFileOS, null)
-  }
 }
 
-object LocalFileRef {
-  def apply(file: File): FileRef = apply(file, null);
-  def apply(file: File, prefix : String): FileRef =
-    new FileRef(prefix, DigestUtils.sha256(new FileInputStream(file)), file.getName);
-}
 
 /** This repository is used for reading and writing to NFS file repositories.
   *
@@ -108,17 +191,9 @@ class NFSRepository(nfsMountsRoot: File, repositoryName: String)
   val myPrefix = "nfs://" + myLocalHostname + "/" + repositoryName + "/"
 
 
-  /** Create an URI for the specified URI.
-    * @param fileRef The FileRef to get the URI from.
-    */
   def toURI(fileRef: FileRef) = Conversion.URI(fileRef.toString)
+  def create = new LocalDigestFileRefOutputStream(this, myPrefix)
 
-  /** Return the [[java.io.File]] where the specified [[prime.types.FileRef]]
-    * can be found on this host.
-    *
-    * @param f The FileRef to get a File object for. Note that this must be a
-               FileRef with the `nfs: ` scheme for its URI.
-    */
   def getFile (fileRef: FileRef) = {
     val fileRefURI = toURI(fileRef)
     require(fileRefURI.getScheme == "nfs", "Cannot read a non-NFS FileRef from an NFS repository.")
@@ -127,21 +202,6 @@ class NFSRepository(nfsMountsRoot: File, repositoryName: String)
     new File(filePath)
   }
 
-  /** Opens an [[prime.types.FileRefOutputStream]] to write a new file to, which
-    * can reture the [[prime.types.FileRef]] reference to it.
-    */
-  def create = {
-    val tmpFile = File.createTempFile("nfs-", ".tmp", myRoot)
-    val tmpFileOS = new FileOutputStream(tmpFile)
-    new DigestedFileRefOutputStream(tmpFileOS, myPrefix)
-  }
-
-  /** Absorb the specified File into this NFS repository. The specified File is
-    * deleted after it is absorbed. A FileRef to the new location of File in
-    * this NFS repository is returned.
-    *
-    * @param file The File to absorb.
-    */
   def absorb (file : File) = {
     val ref = LocalFileRef(file, myPrefix)
     val refFile = getFile(ref)
@@ -154,24 +214,5 @@ class NFSRepository(nfsMountsRoot: File, repositoryName: String)
     require(refFile.exists, "Absorbing "+ file.getAbsolutePath +" failed. Target: " +
                             refFile.getAbsolutePath);
     ref
-  }
-}
-
-class DigestedFileRefOutputStream private(wrap: DigestOutputStream, prefix: String, sha256: SHA256Digest)
-    extends FilterOutputStream(wrap)
-    with FileRefOutputStream {
-
-  def this(wrap: OutputStream, prefix: String, sha256: SHA256Digest) =
-    this(new DigestOutputStream(wrap, sha256), prefix, sha256)
-
-  def this(wrap: OutputStream, prefix: String) =
-    this(wrap, prefix, new SHA256Digest)
-
-  private val innerRef = new FileRef(prefix, new Array[Byte](32))
-
-  def ref = {
-    sha256.doFinal(innerRef.hash, 0)
-    wrap.close()
-    innerRef
   }
 }

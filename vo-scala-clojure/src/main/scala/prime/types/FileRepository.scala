@@ -8,7 +8,11 @@ package prime.types;
 
 
 trait FileRefOutputStream extends OutputStream {
-  /** Closes the OutputStream and returns the FileRef constructed */
+
+  /** Closes the OutputStream and returns the FileRef constructed. Use this
+    * function _after_ the data has been written.
+    * @return A FileRef to the written file in the repository./
+    */
   def ref: FileRef
 }
 
@@ -20,9 +24,9 @@ trait FileRepository {
   def stream (ref : FileRef): InputStream
 
   def store[T](writer: FileRefOutputStream => T): FileRef = {
-    val bldr = create
-    writer(bldr)
-    bldr.ref
+    val out = create
+    writer(out)
+    out.ref
   }
 }
 
@@ -52,48 +56,17 @@ class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
     ref
   }
 
-  def create = new TmpFileStream()
-
-  class TmpFileStream private[prime](tmpFile : File, out : FileOutputStream) extends FilterOutputStream(out) with FileRefOutputStream
-  {
-    def this(tmpFile : File) = this(tmpFile, new FileOutputStream(tmpFile))
-    def this() = this(File.createTempFile("blfr-", ".tmp", root))
-
-    protected val builder = LocalFileRef(this)
-
-    def ref = {
-      val ref = builder.get
-      tmpFile renameTo getFile(ref)
-      ref
-    }
+  def create = {
+    val tmpFile = File.createTempFile("basiclocal-", ".tmp", root)
+    val tmpFileOS = new FileOutputStream(tmpFile)
+    new DigestedFileRefOutputStream(tmpFileOS, null)
   }
 }
 
-object LocalFileRef
-{
-  def apply(file : File)   : FileRef = apply(file, null);
-  def apply(file : File, prefix : String) : FileRef = new FileRef(prefix, DigestUtils.sha256(new FileInputStream(file)), file.getName);
-
-  def apply(out : OutputStream)                  : Builder = new Builder(out, null);
-  def apply(out : OutputStream, prefix : String) : Builder = new Builder(out, prefix);
-
-  class Builder(wrapAround : OutputStream, prefix : String)
-  {
-    private val ref    = new FileRef(prefix, new Array[Byte](32))
-    private val sha256 = new SHA256Digest
-    val output = new DigestOutputStream(wrapAround, sha256)
-
-    /**
-     * Closes the output stream, tells the FileRepository to store() and returns the FileRef constructed for the data that was written.
-     */
-    lazy val get : FileRef = {
-      sha256.doFinal(ref.hash, 0)
-      output.close()
-      ref
-    }
-  }
-
-  implicit def builderToOutput(b:Builder):OutputStream = b.output
+object LocalFileRef {
+  def apply(file: File): FileRef = apply(file, null);
+  def apply(file: File, prefix : String): FileRef =
+    new FileRef(prefix, DigestUtils.sha256(new FileInputStream(file)), file.getName);
 }
 
 /** This repository is used for reading and writing to NFS file repositories.
@@ -159,20 +132,8 @@ class NFSRepository(nfsMountsRoot: File, repositoryName: String)
     */
   def create = {
     val tmpFile = File.createTempFile("nfs-", ".tmp", myRoot)
-
-    class TmpFileStream(out: OutputStream)
-        extends FilterOutputStream(out)
-        with FileRefOutputStream {
-
-      val builder = LocalFileRef(this, myPrefix)
-      def ref = {
-        val ref = builder.get
-        tmpFile.renameTo(getFile(ref))
-        ref
-      }
-    }
-
-    new TmpFileStream(new FileOutputStream(tmpFile))
+    val tmpFileOS = new FileOutputStream(tmpFile)
+    new DigestedFileRefOutputStream(tmpFileOS, myPrefix)
   }
 
   /** Absorb the specified File into this NFS repository. The specified File is
@@ -193,5 +154,24 @@ class NFSRepository(nfsMountsRoot: File, repositoryName: String)
     require(refFile.exists, "Absorbing "+ file.getAbsolutePath +" failed. Target: " +
                             refFile.getAbsolutePath);
     ref
+  }
+}
+
+class DigestedFileRefOutputStream private(wrap: DigestOutputStream, prefix: String, sha256: SHA256Digest)
+    extends FilterOutputStream(wrap)
+    with FileRefOutputStream {
+
+  def this(wrap: OutputStream, prefix: String, sha256: SHA256Digest) =
+    this(new DigestOutputStream(wrap, sha256), prefix, sha256)
+
+  def this(wrap: OutputStream, prefix: String) =
+    this(wrap, prefix, new SHA256Digest)
+
+  private val innerRef = new FileRef(prefix, new Array[Byte](32))
+
+  def ref = {
+    sha256.doFinal(innerRef.hash, 0)
+    wrap.close()
+    innerRef
   }
 }

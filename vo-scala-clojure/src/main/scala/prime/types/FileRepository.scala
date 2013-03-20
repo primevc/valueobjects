@@ -4,6 +4,7 @@ import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.io.DigestOutputStream
 import org.bouncycastle.crypto.Digest
 import org.apache.commons.codec.digest.DigestUtils
+import org.apache.commons.io.FileUtils
 import java.io._
 
 
@@ -108,15 +109,12 @@ class LocalDigestFileRefOutputStream private(repo: LocalFileRepository, prefix: 
                                              tmpFile: File, wrap: OutputStream)
     extends DigestFileRefOutputStream(wrap, prefix) {
 
-  private def this(repo: LocalFileRepository, prefix: String, tmpFile: File) =
+  def this(repo: LocalFileRepository, prefix: String, tmpFile: File) =
     this(repo, prefix, tmpFile, new FileOutputStream(tmpFile))
-
-  def this(repo: LocalFileRepository, prefix: String) =
-    this(repo, prefix, File.createTempFile("localdigest-", ".tmp"))
 
   override def ref = {
     val innerRef = super.ref
-    tmpFile.renameTo(repo.getFile(innerRef))
+    FileUtils.moveFile(tmpFile, repo.getFile(innerRef))
     innerRef
   }
 }
@@ -136,7 +134,8 @@ class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
 
   def toURI(f: FileRef) = Conversion.URI(f.toString)
   def getFile(f: FileRef) = new File(root.getAbsolutePath + "/" + f.toString)
-  def create = new LocalDigestFileRefOutputStream(this, null)
+  def create = new LocalDigestFileRefOutputStream(this, null,
+    File.createTempFile("basiclocal-", ".tmp", root))
 
   def absorb (file : File) = {
     val ref = LocalFileRef(file)
@@ -192,7 +191,8 @@ class NFSRepository(nfsMountsRoot: File, repositoryName: String)
 
 
   def toURI(fileRef: FileRef) = Conversion.URI(fileRef.toString)
-  def create = new LocalDigestFileRefOutputStream(this, myPrefix)
+  def create = new LocalDigestFileRefOutputStream(this, myPrefix,
+    File.createTempFile("nfs-", ".tmp", myRoot))
 
   def getFile (fileRef: FileRef) = {
     val fileRefURI = toURI(fileRef)

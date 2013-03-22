@@ -25,12 +25,12 @@
         (remove #(overrides (first %)) '[
           (typeID [this ID] ID)
 
-          (intAt    [this, name idx notFound] (prime.types/to-Integer (.anyAt this name idx notFound)))
-          (doubleAt [this, name idx notFound] (prime.types/to-Decimal (.anyAt this name idx notFound)))
+          (intAt    [this, ^String name ^int idx notFound] (prime.types/to-Integer (.anyAt this name idx notFound)))
+          (doubleAt [this, ^String name ^int idx notFound] (prime.types/to-Decimal (.anyAt this name idx notFound)))
 
-          (anyAt    [this, name idx]          (.anyAt    this name idx nil))
-          (intAt    [this, name idx]          (.intAt    this name idx Integer/MIN_VALUE))
-          (doubleAt [this, name idx]          (.doubleAt this name idx Double/NaN))
+          (anyAt    [this, ^String name ^int idx]          (.anyAt    this name idx nil))
+          (intAt    [this, ^String name ^int idx]          (.intAt    this name idx Integer/MIN_VALUE))
+          (doubleAt [this, ^String name ^int idx]          (.doubleAt this name idx Double/NaN))
         ]))
       definitions)))
 
@@ -42,7 +42,7 @@
   (contains [this name idx]
     "check contains? documentation at: \n
      http://clojure.github.com/clojure/clojure.core-api.html#clojure.core/contains?"
-    (or (contains? clj-map name) (contains? clj-map idx)))
+    (or (contains? clj-map name) (contains? clj-map (keyword name)) (contains? clj-map idx)))
 
   (anyAt [this, name idx notFound] (or (clj-map name) (clj-map (keyword name)) (clj-map idx) notFound)))
 

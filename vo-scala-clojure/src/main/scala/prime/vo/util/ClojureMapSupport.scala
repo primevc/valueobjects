@@ -50,7 +50,7 @@ trait ClojureMapSupport extends IPersistentMap
 
   private[this] var _hash : Int = -1;
   override def hashCode = if(_hash != -1) _hash else {
-    _hash = clojure.lang.APersistentMap.mapHash(this);
+    _hash = this.getClass.hashCode ^ clojure.lang.APersistentMap.mapHash(this);
     _hash
   }
 
@@ -99,19 +99,6 @@ trait ClojureMapSupport extends IPersistentMap
     //TODO: Benchmark if typecheck before unapply matters
     case v : ValueSource => conj(v);
     case ValueSource(v)  => conj(v);
-
-    case _ =>
-       //FIXME: pretty inefficient!
-      var ret : IPersistentMap = this;
-      var es = RT.seq(o);
-      while (es != null)
-      {
-        val e = es.first.asInstanceOf[java.util.Map.Entry[_,_]];
-        ret = ret.assoc(e.getKey(), e.getValue());
-
-        es = es.next();
-      }
-      ret;
   }
 
   protected def hasSameKeysAndValues(m : java.util.Map[_,_]) : Boolean = {
@@ -194,14 +181,14 @@ trait ClojureMapSupport extends IPersistentMap
     def withMeta(meta : IPersistentMap) = new Seq(seqFieldFn, remainingBits, index, meta);
   }
 
-  def seq = {
-    val bits  = voIndexSet;
+  def seq(bits : Int) = {
     if (bits != 0) {
       val index = java.lang.Integer.numberOfTrailingZeros(bits);
       new Seq(ClojureSupport.seqFieldFn.deref.asInstanceOf[IFn], bits >>> (1 + index), index)
     }
     else null;
   }
+  def seq = this.seq(voIndexSet);
 
   // ---
   // IPersistentMap

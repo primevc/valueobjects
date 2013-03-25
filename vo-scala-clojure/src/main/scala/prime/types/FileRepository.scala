@@ -129,7 +129,8 @@ class LocalDigestFileRefOutputStream private(repo: LocalFileRepository, prefix: 
 
   override def ref = {
     val innerRef = super.ref
-    FileUtils.moveFile(tmpFile, repo.getFile(innerRef))
+    if (! repo.exists(innerRef))
+      FileUtils.moveFile(tmpFile, repo.getFile(innerRef))
     innerRef
   }
 }

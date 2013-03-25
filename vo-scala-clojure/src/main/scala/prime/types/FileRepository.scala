@@ -4,7 +4,7 @@ import org.bouncycastle.crypto.digests.SHA256Digest
 import org.bouncycastle.crypto.io.DigestOutputStream
 import org.bouncycastle.crypto.Digest
 import org.apache.commons.codec.digest.DigestUtils
-import org.apache.commons.io.FileUtils
+import org.apache.commons.io.{FileUtils, IOUtils}
 import java.io._
 
 
@@ -24,30 +24,38 @@ trait FileRepository {
   /** Test whether the specified FileReference exists in the repository.
     * @param ref The FileRef to test.
     */
-  def exists (ref: FileRef): Boolean
+  def exists(ref: FileRef): Boolean
 
   /** Create an URI for the specified URI.
     * @param fileRef The FileRef to get the URI from.
     */
-  def toURI  (ref : FileRef): URI
+  def toURI(ref: FileRef): URI
 
   /** Opens an [[prime.types.FileRefOutputStream]] to write a new file to, which
     * can return the [[prime.types.FileRef]] reference to it.
     */
-  def create (): FileRefOutputStream
+  def create(): FileRefOutputStream
 
-  /** Absorb the specified File into this NFS repository. The specified File is
+  /** Absorb the specified File into the repository. The specified File is
     * deleted after it is absorbed. A FileRef to the new location of File in
-    * this NFS repository is returned.
+    * the repository is returned.
     *
     * @param file The File to absorb.
     */
-  def absorb (file : File): FileRef
+  def absorb(file: File): FileRef
+
+  /** Absorb the content given by the specified IntputStream. The inputstream is
+    * closed after it is absorbed. A FileRef to the location of the stored
+    * content is returned.
+    *
+    * @param is The InputStream with the contents of the file.
+    */
+  def absorb(is: InputStream): FileRef
 
   /** Open an InputStream to the file as referenced by the FileRef.
     * @param ref The FileRef to stream.
     */
-  def stream (ref : FileRef): InputStream
+  def stream(ref : FileRef): InputStream
 
   /** Store a file using a function that receives an OutputStream to the new
     * file in the repository. The FileRef to the newly written file is returned.
@@ -97,6 +105,13 @@ trait LocalFileRepository extends FileRepository {
 
   def stream(instance: FileRef) = new FileInputStream(getFile(instance))
   def exists(instance: FileRef) = getFile(instance).exists
+
+  def absorb(is: InputStream) = {
+    val fileRefOS = this.create
+    IOUtils.copy(is, fileRefOS)
+    is.close
+    fileRefOS.ref
+  }
 }
 
 object LocalFileRef {
@@ -114,7 +129,8 @@ class LocalDigestFileRefOutputStream private(repo: LocalFileRepository, prefix: 
 
   override def ref = {
     val innerRef = super.ref
-    FileUtils.moveFile(tmpFile, repo.getFile(innerRef))
+    if (! repo.exists(innerRef))
+      FileUtils.moveFile(tmpFile, repo.getFile(innerRef))
     innerRef
   }
 }

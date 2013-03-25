@@ -7,12 +7,12 @@
   (:use clojure.lang))
 
 (def-existing-protocol ValueSource
-  (typeID   [this, ^int baseTypeID])
+  (^int     typeID   [this, ^int baseTypeID])
 
-  (contains [this, name, idx])
-  (intAt    [this, name, idx] [this, name, idx, notFound])
-  (doubleAt [this, name, idx] [this, name, idx, notFound])
-  (anyAt    [this, name, idx] [this, name, idx, notFound]))
+  (^boolean contains [this, ^String name, ^int idx])
+  (^int     intAt    [this, ^String name, ^int idx] [this, ^String name, ^int idx, ^int    notFound])
+  (^double  doubleAt [this, ^String name, ^int idx] [this, ^String name, ^int idx, ^double notFound])
+  (^Object  anyAt    [this, ^String name, ^int idx] [this, ^String name, ^int idx, ^Object notFound]))
 
 (def-existing-protocol ValueSourceable
   (as-source [this] [this valueobject-definition]))
@@ -23,14 +23,14 @@
   ~@(concat
       (let [overrides (set (map first definitions))]
         (remove #(overrides (first %)) '[
-          (typeID [this ID] ID)
+          (^int    typeID   [this, ^int ID] ID)
 
-          (intAt    [this, ^String name ^int idx notFound] (prime.types/to-Integer (.anyAt this name idx notFound)))
-          (doubleAt [this, ^String name ^int idx notFound] (prime.types/to-Decimal (.anyAt this name idx notFound)))
+          (^int    intAt    [this, ^String name ^int idx ^int    notFound] (prime.types/to-Integer (.anyAt this name idx notFound)))
+          (^double doubleAt [this, ^String name ^int idx ^double notFound] (prime.types/to-Decimal (.anyAt this name idx notFound)))
 
-          (anyAt    [this, ^String name ^int idx]          (.anyAt    this name idx nil))
-          (intAt    [this, ^String name ^int idx]          (.intAt    this name idx Integer/MIN_VALUE))
-          (doubleAt [this, ^String name ^int idx]          (.doubleAt this name idx Double/NaN))
+          (^Object anyAt    [this, ^String name ^int idx]  (.anyAt    this name idx nil))
+          (^int    intAt    [this, ^String name ^int idx]  (.intAt    this name idx Integer/MIN_VALUE))
+          (^double doubleAt [this, ^String name ^int idx]  (.doubleAt this name idx Double/NaN))
         ]))
       definitions)))
 

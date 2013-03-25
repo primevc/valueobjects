@@ -29,7 +29,7 @@
 package prime.bindable.collections;
  import prime.bindable.collections.RevertableArrayList;
  import prime.bindable.collections.VOArrayList;
- import prime.signal.Signal1;
+ import prime.signals.Signal1;
  import prime.core.traits.IValueObject;
  import prime.bindable.RevertableBindableFlags;
 

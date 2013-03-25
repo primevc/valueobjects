@@ -33,10 +33,10 @@ package prime.core.net;
  import haxe.io.BytesOutput;
 
  import prime.core.events.CommunicationEvents;
- import prime.signal.Signals;
- import prime.signal.Signal0;
- import prime.signal.Signal1;
- import prime.signal.Wire;
+ import prime.signals.Signals;
+ import prime.signals.Signal0;
+ import prime.signals.Signal1;
+ import prime.signals.Wire;
  import prime.core.traits.IDisposable;
  import prime.core.traits.IMessagePackable;
  import prime.net.URLLoader;

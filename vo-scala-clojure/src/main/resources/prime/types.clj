@@ -131,11 +131,13 @@
   (^FileRefOutputStream create [this])
   (^Boolean             exists [this ^FileRef ref  ])
   (^URI                 toURI  [this ^FileRef ref  ])
-  (^FileRef             absorb [this ^File    file ])
   (^InputStream         stream [this ^FileRef ref  ])
-
   (^FileRef             store  [this writer]))
 
+(defn absorb [^filerepository repo, file-or-stream]
+  (condp instance? file-or-stream
+    File           (. repo absorb ^File        file-or-stream)
+    InputStream    (. repo absorb ^InputStream file-or-stream)))
 
 (comment
 ;

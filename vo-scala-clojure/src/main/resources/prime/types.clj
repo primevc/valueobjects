@@ -9,6 +9,7 @@
            org.apache.commons.httpclient.URI
            javax.mail.internet.InternetAddress
            scala.collection.immutable.IndexedSeq
+          [java.io File InputStream]
           [prime.types Conversion VORef]
           [org.joda.time DateMidnight DateTime Interval ReadableInstant]
           [org.joda.time.format DateTimeFormatter])
@@ -131,11 +132,13 @@
   (^FileRefOutputStream create [this])
   (^Boolean             exists [this ^FileRef ref  ])
   (^URI                 toURI  [this ^FileRef ref  ])
-  (^FileRef             absorb [this ^File    file ])
   (^InputStream         stream [this ^FileRef ref  ])
-
   (^FileRef             store  [this writer]))
 
+(defn absorb [^prime.types.FileRepository repo, file-or-stream]
+  (condp instance? file-or-stream
+    File           (. repo absorb ^File        file-or-stream)
+    InputStream    (. repo absorb ^InputStream file-or-stream)))
 
 (comment
 ;

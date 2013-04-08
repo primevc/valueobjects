@@ -484,7 +484,7 @@
 (defn- patched-update-options [type id options]
   (let [ {:keys [upsert doc]} options
         options (if upsert (assoc options :upsert (->IndexRequest (:index options) type id, upsert options)) #_else options)
-        options (if doc    (assoc options :doc    (->IndexRequest (:index options) type id, doc    options)) #_else options) ]
+        options (if doc    (assoc options :doc    (json/encode-smile doc)                                  ) #_else options) ]
     (conj options {
       :type   type
       :id     id

@@ -50,17 +50,17 @@
         (.packArray (if path 2 #_else 1))
         (.pack value))
     ]
-    (when path (.pack msgpack path)
-      (.close out)
-      (.toByteArray out))))
+    (when path (.pack msgpack path))
+    (.close out)
+    (.toByteArray out)))
 
 (defn byte-array->VOChange [bytes vo]
     (let [unpacker 
       (doto (org.msgpack.Unpacker. (org.apache.cassandra.utils.ByteBufferUtil/inputStream bytes))
               (.setVOHelper prime.utils.msgpack.VOUnpacker$/MODULE$))
       array (.. unpacker next getData asArray)]
-      [ (.. vo voCompanion (valueOf (nth array 1))) ; vo
-        (.asString (nth array 2)) ; path
+      [ (.. vo voCompanion (valueOf (nth array 0))) ; vo
+        (.asString (nth array 1)) ; path
       ]
       ))
 
@@ -78,13 +78,11 @@
 
 (defn get [cluster vo] 
   ; This should just send all records.
-  (let [result (first (alia/with-session cluster 
+  (let [result (alia/with-session cluster 
                 (alia/execute 
-                  (alia/prepare (apply str "SELECT * FROM " (get-table-name vo) " WHERE void = ?")) :values [(:id vo)])))
-        id (result "id")
-        version   (result "version")
-        data  (byte-array->VOChange (result "data") vo)]
-          (with-meta (first data) {:timestamp (.timestamp version) :version version :action (result "action") :path (second data)})))
+                  (alia/prepare (apply str "SELECT * FROM " (get-table-name vo) " WHERE id = ?")) :values [(:id vo)]))]
+    ;TODO: Create a custom ValueSource for history data, keeping the UUID and action around.
+    (first (byte-array->VOChange ((last result) "data") vo))))
 
 (defn get-slice [cluster vo]
   ; This should send a merge of all records since the last put.  
@@ -92,20 +90,21 @@
 
 (defn put [cluster vo options]
   (assert (:id vo) "vo requires an id")
+  (prn (type vo))
   (let [action (or (-> options :action) :put)]
     (alia/with-session cluster 
       (alia/execute (alia/prepare 
-        (apply str "INSERT INTO " (get-table-name vo) " (version, id, action, data) VALUES (?,?,?,?)")) 
+        (apply str "INSERT INTO " (get-table-name vo) " (version, id, action, data) VALUES ( ? , ? , ? , ? )")) 
         :values [ (tardis/unique-time-uuid (.getTime (java.util.Date.))) 
                   (:id vo) 
                   (-> actions action) 
                   (java.nio.ByteBuffer/wrap (VOChange->byte-array  vo ""))]))))
 
 (defn appendTo [cluster vo id options]
-  (put cluster vo (conj options {:action :vput})))
+  (put cluster (conj vo {:id id}) (conj options {:id id :action :vput})))
 
 (defn update [cluster vo id options]
-  (put cluster vo (conj options {:id id :action :update})))
+  (put cluster (conj vo {:id id}) (conj options {:id id :action :update})))
 
 (defn delete [cluster vo options]
-  (put cluster vo (conj options {:action :delete})))
+  (put cluster vo (conj options {:id id :action :delete})))

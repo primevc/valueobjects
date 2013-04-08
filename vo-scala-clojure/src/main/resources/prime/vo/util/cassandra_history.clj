@@ -101,10 +101,10 @@
                   (java.nio.ByteBuffer/wrap (VOChange->byte-array  vo ""))]))))
 
 (defn appendTo [cluster vo id options]
-  (put cluster (conj vo {:id id}) (conj options {:id id :action :vput})))
+  (put cluster (conj vo {:id id}) (conj options {:action :vput})))
 
 (defn update [cluster vo id options]
-  (put cluster (conj vo {:id id}) (conj options {:id id :action :update})))
+  (put cluster (conj vo {:id id}) (conj options {:action :update})))
 
 (defn delete [cluster vo options]
-  (put cluster vo (conj options {:id id :action :delete})))
+  (put cluster vo (conj options {:action :delete})))

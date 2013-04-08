@@ -295,11 +295,13 @@ abstract class SimpleValueObjectField[-VO <: ValueObject](id:Int, symbol:Symbol,
  extends ValueObjectField[VO](id, symbol.name, symbol, Keyword.intern(null, symbol.name), valueType, defaultValue)
     with ILookupThunk
 {
-  @inline final def in (vo : VO) = ((vo.initIndexSet & (1 << vo.voManifest.index(this.asInstanceOf[ValueObjectField[vo.VOType]]))) != 0);
+  @inline final def in (vo : VO) =
+    (vo != null) && ((vo.initIndexSet & (1 << vo.voManifest.index(this.asInstanceOf[ValueObjectField[vo.VOType]]))) != 0);
 
   final def get(target:AnyRef) = {
     val obj = target.asInstanceOf[VO];
-    if      (this in obj)            apply(obj).asInstanceOf[AnyRef]
+    if      (null eq obj)            null
+    else if (this in obj)            apply(obj).asInstanceOf[AnyRef]
     else if (this.isFieldOf(target)) null
     else                             this;
   }

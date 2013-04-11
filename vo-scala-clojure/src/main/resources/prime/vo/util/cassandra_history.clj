@@ -91,12 +91,14 @@
 (defn put [cluster vo options]
   (assert (:id vo) "vo requires an id")
   (prn (type vo))
-  (let [action (or (-> options :action) :put)]
+  (let [action (or (-> options :action) :put)
+    idconv (second (simple-prime-type->cql-type (.. vo voManifest _id valueType keyword)))
+    ]
     (alia/with-session cluster 
       (alia/execute (alia/prepare 
         (apply str "INSERT INTO " (get-table-name vo) " (version, id, action, data) VALUES ( ? , ? , ? , ? )")) 
         :values [ (tardis/unique-time-uuid (.getTime (java.util.Date.))) 
-                  (:id vo) 
+                  (idconv (:id vo)) ; Convert id to proper type.
                   (-> actions action) 
                   (java.nio.ByteBuffer/wrap (VOChange->byte-array  vo ""))]))))
 

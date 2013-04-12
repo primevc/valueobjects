@@ -17,11 +17,11 @@
     )
 )
 
-(defn ObjectId->byte-array [^org.bson.types.ObjectId oid] (.toByteArray oid))
+(defn ObjectId->byte-buffer [^org.bson.types.ObjectId oid] (java.nio.ByteBuffer/wrap (.toByteArray oid)))
 
 (defn simple-prime-type->cql-type [type-keyword]
   (case type-keyword
-    :prime.types/ObjectId   [ :blob       ObjectId->byte-array    ]
+    :prime.types/ObjectId   [ :blob       ObjectId->byte-buffer   ]
     :prime.types/integer    [ :int        prime.types/to-Integer  ]
     :prime.types/Color      [ :int        prime.types/to-Integer  ]
     :prime.types/String     [ :varchar    prime.types/to-String   ]

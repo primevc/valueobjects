@@ -65,7 +65,10 @@ protected[prime] final class VORefImpl[V <: ValueObject with ID](val _id:V#IDTyp
   @inline def isEmpty   = _cached.voCompanion.empty == _cached;
   @inline def isDefined = _cached.voCompanion.empty != _cached;
 
-  def apply(vo : V) = if (vo._id == _id) synchronized { _cached = vo; } else throw new IllegalArgumentException(toString + "._id does not match the given VO._id: "+ vo);
+  def apply(vo : V) {
+    if (vo != null && vo._id == _id) synchronized { _cached = vo; }
+    else throw new IllegalArgumentException(toString + (if (vo == null) " cannot cache a null VO." else "._id does not match the given VO._id: "+ vo));
+  }
 
   
   def   ? (implicit voGetter : V#IDType => Option[V]) = if (isDefined) Some(_cached) else voGetter(_id) match { case opt @ Some(vo) => apply(vo); opt; case None => None }

@@ -234,6 +234,12 @@
       :source {type mapping}
     }))))
 
+(defn index-exists? [es indices]
+  {:pre [(or (string? indices) (vector? indices)) (not-empty indices)]}
+  (-> (ces/exists-index es
+        {:indices (if (instance? String indices) [indices] #_else indices)})
+      :exists))
+
 (defn create-index
   ([es index-name vo->options-map]
     (create-index es index-name vo->options-map {}))
@@ -275,8 +281,8 @@
       (cond
         (instance? ValueObject v)
           ; First try to find and call a protocol implementation for this type immediately.
-          (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable obj))]
-            (to-json obj jg)
+          (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable v))]
+            (to-json v out)
           ; else: Regular VO, no protocol found
             (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID)))
 

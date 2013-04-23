@@ -274,7 +274,11 @@
       (.writeFieldName out (field-hexname k))
       (cond
         (instance? ValueObject v)
-          (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID))
+          ; First try to find and call a protocol implementation for this type immediately.
+          (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable obj))]
+            (to-json obj jg)
+          ; else: Regular VO, no protocol found
+            (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID)))
 
         (vector? v)
           (let [innerType (. ^package$ValueTypes$Tarray (. k valueType) innerType)
@@ -291,6 +295,8 @@
 
 (defn encode-voref [^JsonGenerator out, ^VORef in ^String date-format ^Exception ex]
   (cheshire.generate/generate out (._id in) date-format ex))
+
+; Protocol based encoders
 
 (defn encode-instant [^org.joda.time.ReadableInstant in ^JsonGenerator out]
   (.writeNumber out (.getMillis in)))
@@ -309,7 +315,6 @@
 
 (doseq [add-encoder [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
   (add-encoder prime.types.EnumValue                encode-enum)
-  (add-encoder prime.vo.ValueObject                 encode-vo)
   (add-encoder java.net.URI                         encode-uri)
   (add-encoder java.net.URL                         encode-url)
   (add-encoder org.joda.time.ReadableInstant        encode-instant)
@@ -320,9 +325,14 @@
   (fn [orig-generate]
     (fn [^JsonGenerator jg obj ^String date-format ^Exception ex]
       (binding [prime.vo/*voseq-key-fn* identity]
+        ; First try to find and call a protocol implementation for this type immediately.
+        (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable obj))]
+          (to-json obj jg)
+        ; else: No protocol found
         (if (instance? ValueObject obj) (encode-vo     jg obj date-format ex)
         #_else(if (instance? VORef obj) (encode-voref  jg obj date-format ex)
-        #_else                          (orig-generate jg obj date-format ex)))))))
+        #_else                          (orig-generate jg obj date-format ex)
+)))))))
 
 
 ;

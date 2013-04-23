@@ -11,7 +11,7 @@ trait VORef[V <: ValueObject with ID] {
   def isDefined : Boolean;
 
   def apply (vo : V);
-  def     ? (implicit voProxy : V#IDType => Option[V]) : Option[V];
+  def     ? (implicit voGetter : V#IDType => Option[V]) : Option[V];
   def   get : V;
   val   _id : V#IDType;
 }
@@ -50,7 +50,7 @@ object VORef {
 
 protected[prime] object VORefImpl {
   RT.loadResourceScript("prime/vo.clj");
-  val proxyVar = RT.`var`("prime.vo", "*proxy-map*");
+  val derefVar = RT.`var`("prime.vo", "*deref-map*");
 }
 
 protected[prime] final class VORefImpl[V <: ValueObject with ID](val _id:V#IDType, var _cached : V) extends VORef[V]
@@ -65,29 +65,32 @@ protected[prime] final class VORefImpl[V <: ValueObject with ID](val _id:V#IDTyp
   @inline def isEmpty   = _cached.voCompanion.empty == _cached;
   @inline def isDefined = _cached.voCompanion.empty != _cached;
 
-  def apply(vo : V) = if (vo._id == _id) synchronized { _cached = vo; } else throw new IllegalArgumentException(toString + "._id does not match the given VO._id: "+ vo);
+  def apply(vo : V) {
+    if (vo != null && vo._id == _id) synchronized { _cached = vo; }
+    else throw new IllegalArgumentException(toString + (if (vo == null) " cannot cache a null VO." else "._id does not match the given VO._id: "+ vo));
+  }
 
   
-  def   ? (implicit voProxy : V#IDType => Option[V]) = if (isDefined) Some(_cached) else voProxy(_id) match { case opt @ Some(vo) => apply(vo); opt; case None => None }
+  def   ? (implicit voGetter : V#IDType => Option[V]) = if (isDefined) Some(_cached) else voGetter(_id) match { case opt @ Some(vo) => apply(vo); opt; case None => None }
   def get = if (isDefined) _cached else throw new NoSuchElementException(toString + ".get");
 
   override def toString = "VORef["+ _cached.voManifest.VOType.erasure.getSimpleName +"]" + (if (isDefined) "(_id = "+ _id +")" else "(_id = "+ _id +", _cached = "+ _cached +")");
 
   // Clojure's `ref` behavior
-  private def proxy = {
-    val proxy = VORefImpl.proxyVar.invoke(_cached.voManifest.VOType.erasure).asInstanceOf[clojure.lang.IFn];
-    require(proxy != null, "No VOProxy found in "+ VORefImpl.proxyVar +" for: " + _cached.voManifest.VOType + " (voManifest: " + _cached.voManifest + ")");
-    proxy
+  private def derefFn = {
+    val derefFn = VORefImpl.derefVar.invoke(_cached.voManifest.VOType.erasure).asInstanceOf[clojure.lang.IFn];
+    require(derefFn != null, "No VO deref-function found in "+ VORefImpl.derefVar +" for: " + _cached.voManifest.VOType + " (voManifest: " + _cached.voManifest + ")");
+    derefFn
   }
 
   def deref = if (isDefined) _cached else {
-    val vo = proxy.invoke(_id).asInstanceOf[V];
+    val vo = derefFn.invoke(_id).asInstanceOf[V];
     apply(vo);
     vo;
   }
 
   def deref(timeoutInMs: Long, timeoutValue: Any) = {
-    val vo = proxy.invoke(_id, timeoutInMs, timeoutValue).asInstanceOf[V];
+    val vo = derefFn.invoke(_id, timeoutInMs, timeoutValue).asInstanceOf[V];
     if (vo != timeoutValue) apply(vo);
     vo;
   }

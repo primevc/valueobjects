@@ -5,7 +5,6 @@
 (ns prime.vo.util.elasticsearch
   (:refer-clojure :exclude [get])
   (:require [prime.vo        :as   vo]
-            [clj-http.client :as http]
             [cheshire.core   :as json], cheshire.generate, cheshire.custom, cheshire.factory
             [clj-elasticsearch.client :as ces])
   (:use [prime.vo.source :only [def-valuesource]])

@@ -68,8 +68,12 @@
       :prime.types/FileRef    {:index "not_analyzed"}
       #_default
         (condp instance? valueType
+          package$ValueTypes$Tdef   (mapping-field-type-defaults (.. ^package$ValueTypes$Tdef  valueType empty))
           package$ValueTypes$Tenum  (mapping-field-type-defaults (.. ^package$ValueTypes$Tenum valueType t valueSet first))
           package$ValueTypes$Tarray (assert false "array should be mapped as it's contents"))))
+
+  prime.vo.ValueObject
+  (mapping-field-type-defaults [vo] nil)
 )
 
 (defn mapping-field-type-name
@@ -109,8 +113,9 @@
     (conj {:store "no"
            ;:index_name (name field-key)
            :type       (mapping-field-type-name value-type)}
-      (if
-        (instance? package$ValueTypes$Tdef  value-type)
+      (if (and
+            (nil? (mapping-field-type-defaults value-type))
+            (instance? package$ValueTypes$Tdef  value-type))
           (let [^package$ValueTypes$Tdef value-type value-type
                 ^ValueObject             empty      (.. value-type empty)]
             (conj
@@ -196,6 +201,16 @@
       (extend-type ~enum-class, TermFilter
         (term-kv-pair [v# k# kv-pair#]  [k# (. v# ~string-method)])
         (mapping-field-type-defaults [value#] {:type "string"}) )))
+
+(defmacro map-as-string-type  [class, elasticsearch-type, to-string-fn]
+  `(do
+    (doseq [add-encoder# [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
+      (add-encoder# ~class
+        (fn [in# ^JsonGenerator out#]
+          (.writeString out# (~to-string-fn in#)))))
+      (extend-type ~class, TermFilter
+        (term-kv-pair [v# k# kv-pair#]  [k# (~to-string-fn v#)])
+        (mapping-field-type-defaults [value#] {:type ~elasticsearch-type}) )))
 
 
 ;

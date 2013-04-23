@@ -47,7 +47,6 @@
     out (java.io.ByteArrayOutputStream.)
     msgpack 
       (doto (prime.utils.msgpack.VOPacker. out)
-        (.packArray (if path 2 #_else 1))
         (.pack value))
     ]
     (when path (.pack msgpack path))
@@ -55,14 +54,14 @@
     (.toByteArray out)))
 
 (defn byte-array->VOChange [bytes vo]
-    (let [unpacker 
-      (doto (org.msgpack.Unpacker. (org.apache.cassandra.utils.ByteBufferUtil/inputStream bytes))
-              (.setVOHelper prime.utils.msgpack.VOUnpacker$/MODULE$))
-      array (.. unpacker next getData asArray)]
-      [ (.. vo voCompanion (valueOf (nth array 0))) ; vo
-        (.asString (nth array 1)) ; path
-      ]
-      ))
+  (apply prn (map #(Integer/toHexString (.get bytes %)) (range (.position bytes) (.capacity bytes))))
+  (let [ unpacker
+    (doto (org.msgpack.Unpacker. (org.apache.cassandra.utils.ByteBufferUtil/inputStream (.slice bytes)))
+      (.setVOHelper prime.utils.msgpack.VOUnpacker$/MODULE$))
+    vosource (.. unpacker next getData)
+    path     (.. unpacker next getData)]
+    [ (.. vo voCompanion (valueOf vosource))
+      (if path (.asInt path)) ]))
 
 (def actions {
   :put (int 1)
@@ -78,9 +77,10 @@
 
 (defn get [cluster vo] 
   ; This should just send all records.
-  (let [result (alia/with-session cluster 
+  (let [idconv (second (simple-prime-type->cql-type (.. vo voManifest _id valueType keyword)))
+        result (alia/with-session cluster 
                 (alia/execute 
-                  (alia/prepare (apply str "SELECT * FROM " (get-table-name vo) " WHERE id = ?")) :values [(:id vo)]))]
+                  (alia/prepare (apply str "SELECT * FROM " (get-table-name vo) " WHERE id = ?")) :values [(idconv (:id vo))]))]
     ;TODO: Create a custom ValueSource for history data, keeping the UUID and action around.
     (first (byte-array->VOChange ((last result) "data") vo))))
 
@@ -100,7 +100,7 @@
         :values [ (tardis/unique-time-uuid (.getTime (java.util.Date.))) 
                   (idconv (:id vo)) ; Convert id to proper type.
                   (-> actions action) 
-                  (java.nio.ByteBuffer/wrap (VOChange->byte-array  vo ""))]))))
+                  (java.nio.ByteBuffer/wrap (VOChange->byte-array  vo "."))]))))
 
 (defn appendTo [cluster vo id options]
   (put cluster (conj vo {:id id}) (conj options {:action :vput})))

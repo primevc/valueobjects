@@ -430,6 +430,7 @@
     ; ces/search parameters
     listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source]}]
   {:pre [(instance? ValueObject vo) (or (string? indices) (vector? indices)) (not-empty indices)]}
+  (assert (not (and size scroll)) "Error: Cannot use size and scroll in same query!")
     (let [
       typefilter {:type {:value (vo-hexname vo)}}
       filter     (map-keywords->hex-fields vo filter)

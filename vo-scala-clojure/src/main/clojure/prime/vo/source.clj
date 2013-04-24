@@ -71,13 +71,13 @@
 ; String ValueSources
 ;
 
-(def ^:private string-sources {})
+(defonce ^:dynamic *string-source-map* {})
 
 (extend-type java.lang.String
   ValueSourceable
   (as-source
     ([string target-VO-ID]
-      (if-let [func (string-sources target-VO-ID)] (as-source (func string))))))
+      (if-let [func (*string-source-map* target-VO-ID)] (as-source (func string))))))
 
 (defn def-string-source [target-VO-type, func]
-  (alter-var-root #'string-sources assoc target-VO-type func))
+  (alter-var-root #'*string-source-map* assoc target-VO-type func))

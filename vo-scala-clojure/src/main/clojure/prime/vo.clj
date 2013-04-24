@@ -9,7 +9,7 @@
 
 (set! *warn-on-reflection* true)
 
-(defonce ^:dynamic *deref-map* "
+(defonce ^{:dynamic true :doc "
   Used to fetch a ValueObject when dereferencing VORef properties.
   A function from VOType => deref-function.
 
@@ -22,7 +22,8 @@
 
   Usage:
     (binding [*deref-map* { MyReferencedValueObject (my-valueobject-proxy ...) }] @(:voref-field vo))
-  " {})
+  "
+} *deref-map* {})
 
 (def ^:dynamic *voseq-key-fn* "
   A function from ValueObjectField => Any, or nil.

@@ -19,6 +19,9 @@
 
 (defmacro def-valuesource [typeName args & definitions]
   `(deftype ~typeName ~args
+  prime.vo.source.ValueSourceable
+    ~'(as-source [this]   this)
+    ~'(as-source [this _] this)
   prime.vo.source.ValueSource
   ~@(concat
       (let [overrides (set (map first definitions))]
@@ -63,3 +66,18 @@
   (as-source
     ([this] (new prime.vo.source.MutableVOValueSource this))
     ([this valueobject-definition] (as-source this))))
+
+;
+; String ValueSources
+;
+
+(def ^:private string-sources {})
+
+(extend-type java.lang.String
+  ValueSourceable
+  (as-source
+    ([string target-VO-ID]
+      (if-let [func (string-sources target-VO-ID)] (as-source (func string))))))
+
+(defn def-string-source [target-VO-type, func]
+  (alter-var-root #'string-sources assoc target-VO-type func))

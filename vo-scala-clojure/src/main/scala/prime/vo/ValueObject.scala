@@ -234,12 +234,21 @@ trait ValueObjectCompanion[T <: ValueObject] {
   def valueOf(any : Any) : T  = any match {
     case null => empty;
     case vo if manifest.VOType.erasure.isInstance(vo) => vo.asInstanceOf[T];
-    case _ => apply(ValueSource(any, this));
+    case _ => apply(ValueSource(any, this.empty));
   }
 
   /** Override to find a subtype ValueObjectCompanion of T, with the given typeID. */
   def subtype(typeID : Int) : ValueObjectCompanion[_ <: T] = this;
 
-  def   apply(src : ValueSource) : T  = this.subtype(src.typeID(manifest.ID)).empty.conj(src, root = src)
   def unapply(any : Any)  : Option[T] = try Option(valueOf(any)) catch { case _ => None }
+
+  def   apply(src : ValueSource) : T  = {
+    assert(src != null);
+
+    val voc = this.subtype(src.typeID(manifest.ID));
+    if (voc.manifest.VOType.erasure.isInstance(src))
+      src.asInstanceOf[T];
+    else
+      voc.empty.conj(src, root = src);
+  }
 }

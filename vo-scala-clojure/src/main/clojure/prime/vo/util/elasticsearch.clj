@@ -68,8 +68,12 @@
       :prime.types/FileRef    {:index "not_analyzed"}
       #_default
         (condp instance? valueType
+          package$ValueTypes$Tdef   (mapping-field-type-defaults (.. ^package$ValueTypes$Tdef  valueType empty))
           package$ValueTypes$Tenum  (mapping-field-type-defaults (.. ^package$ValueTypes$Tenum valueType t valueSet first))
           package$ValueTypes$Tarray (assert false "array should be mapped as it's contents"))))
+
+  prime.vo.ValueObject
+  (mapping-field-type-defaults [vo] nil)
 )
 
 (defn mapping-field-type-name
@@ -109,8 +113,9 @@
     (conj {:store "no"
            ;:index_name (name field-key)
            :type       (mapping-field-type-name value-type)}
-      (if
-        (instance? package$ValueTypes$Tdef  value-type)
+      (if (and
+            (nil? (mapping-field-type-defaults value-type))
+            (instance? package$ValueTypes$Tdef  value-type))
           (let [^package$ValueTypes$Tdef value-type value-type
                 ^ValueObject             empty      (.. value-type empty)]
             (conj
@@ -197,6 +202,16 @@
         (term-kv-pair [v# k# kv-pair#]  [k# (. v# ~string-method)])
         (mapping-field-type-defaults [value#] {:type "string"}) )))
 
+(defmacro map-as-string-type  [class, elasticsearch-type, to-string-fn]
+  `(do
+    (doseq [add-encoder# [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
+      (add-encoder# ~class
+        (fn [in# ^JsonGenerator out#]
+          (.writeString out# (~to-string-fn in#)))))
+      (extend-type ~class, TermFilter
+        (term-kv-pair [v# k# kv-pair#]  [k# (~to-string-fn v#)])
+        (mapping-field-type-defaults [value#] {:type ~elasticsearch-type}) )))
+
 
 ;
 ; ElasticSearch index management (mapping API)
@@ -218,6 +233,12 @@
       :type   type
       :source {type mapping}
     }))))
+
+(defn index-exists? [es indices]
+  {:pre [(or (string? indices) (vector? indices)) (not-empty indices)]}
+  (-> (ces/exists-index es
+        {:indices (if (instance? String indices) [indices] #_else indices)})
+      :exists))
 
 (defn create-index
   ([es index-name vo->options-map]
@@ -259,7 +280,11 @@
       (.writeFieldName out (field-hexname k))
       (cond
         (instance? ValueObject v)
-          (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID))
+          ; First try to find and call a protocol implementation for this type immediately.
+          (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable v))]
+            (to-json v out)
+          ; else: Regular VO, no protocol found
+            (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID)))
 
         (vector? v)
           (let [innerType (. ^package$ValueTypes$Tarray (. k valueType) innerType)
@@ -276,6 +301,8 @@
 
 (defn encode-voref [^JsonGenerator out, ^VORef in ^String date-format ^Exception ex]
   (cheshire.generate/generate out (._id in) date-format ex))
+
+; Protocol based encoders
 
 (defn encode-instant [^org.joda.time.ReadableInstant in ^JsonGenerator out]
   (.writeNumber out (.getMillis in)))
@@ -294,7 +321,6 @@
 
 (doseq [add-encoder [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
   (add-encoder prime.types.EnumValue                encode-enum)
-  (add-encoder prime.vo.ValueObject                 encode-vo)
   (add-encoder java.net.URI                         encode-uri)
   (add-encoder java.net.URL                         encode-url)
   (add-encoder org.joda.time.ReadableInstant        encode-instant)
@@ -305,9 +331,14 @@
   (fn [orig-generate]
     (fn [^JsonGenerator jg obj ^String date-format ^Exception ex]
       (binding [prime.vo/*voseq-key-fn* identity]
+        ; First try to find and call a protocol implementation for this type immediately.
+        (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable obj))]
+          (to-json obj jg)
+        ; else: No protocol found
         (if (instance? ValueObject obj) (encode-vo     jg obj date-format ex)
         #_else(if (instance? VORef obj) (encode-voref  jg obj date-format ex)
-        #_else                          (orig-generate jg obj date-format ex)))))))
+        #_else                          (orig-generate jg obj date-format ex)
+)))))))
 
 
 ;

@@ -6,7 +6,8 @@ package prime.vo.source;
 //
 
 trait ValueSourceable {
-  def as_source : ValueSource;
+  def as_source           : ValueSource;
+  def as_source(kind:Any) : ValueSource;
 }
 // Geimplementeerd door objecten welke state moet bijhouden
 /*
@@ -36,7 +37,8 @@ trait ValueSource extends ValueSourceable {
   def doubleAt(name: String, idx: Int): Double  = doubleAt(name, idx, Double.NaN);
   def intAt   (name: String, idx: Int): Int     =    intAt(name, idx, Int.MinValue);
 
-  final def as_source = this;
+  final def as_source           = this;
+  final def as_source(kind:Any) = this;
 }
 
 trait Integers {

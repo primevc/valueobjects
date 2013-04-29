@@ -19,6 +19,15 @@
 
 ;(defonce es-client (ces/make-client :transport {:hosts ["127.0.0.1:9300"] :cluster-name (str "elasticsearch_" (System/getenv "USER"))}))
 
+; If Immutant is available, daemonize TransportClient
+(try
+  (require 'immutant.daemons)
+  (eval '(extend-type org.elasticsearch.client.Client
+    immutant.daemons/Daemon
+    (start [this])
+    (stop  [this] (.close this))))
+  (catch Exception e))
+
 (defn create-client [hosts cluster-name & options]
   (ces/make-client :transport {:hosts hosts :cluster-name cluster-name}))
 

@@ -146,13 +146,13 @@ case class ScalaSeqWrapper[A](underlying : Seq[A])(implicit val to_A : Any => A,
 
   Storing a Clojure-Vector into a ValueObject should wrap it with this class.
 */
-case class ClojureVectorWrapper[Any](underlying : IPersistentVector) extends scala.collection.immutable.IndexedSeq[Any] {
+case class ClojureVectorWrapper(underlying : IPersistentVector) extends scala.collection.immutable.IndexedSeq[Any] {
   def length = underlying.count
   def apply(i : Int) = underlying.nth(i)
   override def isEmpty = underlying.count == 0
 
   override def equals(any : Any) = any match {
-    case s:ClojureVectorWrapper[_] => s.underlying == underlying;
+    case s:ClojureVectorWrapper    => s.underlying == underlying;
     case v:IPersistentVector       => v.equals(underlying);
     case s:Seq[_]                  => underlying.equals(s);
     case _                         => false;

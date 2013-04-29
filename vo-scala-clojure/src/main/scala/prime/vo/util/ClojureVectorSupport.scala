@@ -146,9 +146,9 @@ case class ScalaSeqWrapper[A](underlying : Seq[A])(implicit val to_A : Any => A,
 
   Storing a Clojure-Vector into a ValueObject should wrap it with this class.
 */
-case class ClojureVectorWrapper[A](underlying : IPersistentVector)(implicit val to_A : Any => A) extends scala.collection.immutable.IndexedSeq[A] {
+case class ClojureVectorWrapper[Any](underlying : IPersistentVector) extends scala.collection.immutable.IndexedSeq[Any] {
   def length = underlying.count
-  def apply(i : Int) = to_A(underlying.nth(i))
+  def apply(i : Int) = underlying.nth(i)
   override def isEmpty = underlying.count == 0
 
   override def equals(any : Any) = any match {
@@ -164,11 +164,10 @@ object ClojureVectorSupport {
 
   implicit def asScala[A]( v : IPersistentVector )(implicit to_A : Any => A, typeA : Manifest[A]) : IndexedSeq[A] = v match {
     case s @ ScalaSeqWrapper(wrapped) => if (typeA != null && s.itemType == typeA) wrapped.asInstanceOf[Seq[A]].toIndexedSeq else wrapped.map(to_A).toIndexedSeq
-    case _ => if (v.length == 0) IndexedSeq.empty.asInstanceOf[IndexedSeq[A]] else ClojureVectorWrapper(v)
+    case _ => if (v.length == 0) IndexedSeq.empty.asInstanceOf[IndexedSeq[A]] else ClojureVectorWrapper(v).map(to_A).toIndexedSeq
   }
 
   implicit def asClojure[A]( v : Seq[A] )(implicit to_A : Any => A, typeA : Manifest[A]) : IPersistentVector = v match {
-    case ClojureVectorWrapper(wrapped) => wrapped
     case _ => if (v.isEmpty) PersistentVector.EMPTY else ScalaSeqWrapper(v)
   }
 }

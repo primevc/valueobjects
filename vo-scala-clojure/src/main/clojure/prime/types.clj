@@ -6,7 +6,7 @@
 
 (ns prime.types
   (:import org.bson.types.ObjectId
-           org.apache.commons.httpclient.URI
+           java.net.URI, java.net.URL
            javax.mail.internet.InternetAddress
            scala.collection.immutable.IndexedSeq
           [java.io File InputStream]
@@ -63,8 +63,8 @@
 (def-default-converter Date       =>  DateMidnight     DateTime        Number        Long Integer java.util.Date)
 (def-default-converter DateTime   =>  DateTime         ReadableInstant Number        Long Integer java.util.Date)
 (def-default-converter Interval   =>  Interval)
-(def-default-converter EmailAddr  =>  InternetAddress  String  URI  java.net.URI  java.net.URL)
-(def-default-converter URI        =>  URI              String       java.net.URI  java.net.URL)
+(def-default-converter EmailAddr  =>  InternetAddress  String  URI  URL)
+(def-default-converter URI        =>  URI              String       URL)
 (def-default-converter ObjectId   =>  ObjectId         String       ByteArray)
 
 (extend-type org.bson.types.ObjectId

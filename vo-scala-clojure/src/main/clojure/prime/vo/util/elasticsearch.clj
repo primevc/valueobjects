@@ -412,7 +412,7 @@
 
 (defn put
   "options: see clj-elasticsearch.client/index-doc"
-  [es ^ValueObject vo index options]
+  [es ^ValueObject index vo options]
   (assert index ":index required")
   (assert (prime.vo/has-id? vo) (str "vo: " (prn-str vo) " requires an id"))
   (ces/index-doc es (conj options {
@@ -522,20 +522,26 @@
     })))
 
 (defn update
-  [es ^ValueObject vo id index {:as options :keys [fields]}]
+  [es ^ValueObject index vo id {:as options :keys [fields]}]
   {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
   (let [type    (Integer/toHexString (.. vo voManifest ID))
         id      (prime.types/to-String id)
         fields  (map field-hexname fields)]
     (ces/update-doc es (patched-update-options type id (assoc options :index index :doc vo)))))
 
-(defn insertAt "Add something to an array with a specific position" [es vo path value pos])
 
-(defn moveTo "Change position of an item in an array" [es vo path pos])
 
-;TODO:
-;  Convert fieldnames
-(defn appendTo "Add something to the end of an array" [es ^ValueObject vo id index options]
+(defn delete [es ^ValueObject index vo {:as options :keys []}]
+  {:pre [(instance? ValueObject vo)]}
+  (assert index ":index required")
+  (assert (prime.vo/has-id? vo) (str "vo: " (prn-str vo) " requires an id"))
+  (ces/delete-doc es (conj options {
+    :index  index
+    :id     (prime.types/to-String (.. ^ID vo _id))
+    :type   (Integer/toHexString (.. vo voManifest ID))
+  })))
+
+(defn appendTo "Add something to the end of an array" [es ^ValueObject index vo id options]
   {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
   (let [type (Integer/toHexString (.. vo voManifest ID))
         id   (prime.types/to-String id)]
@@ -548,22 +554,49 @@
         }))))
     )))
 
-(defn replaceAt "Replaces a value in an array at given position" [es vo pos value])
+(defn desolve-path [vo path]
+  (prn (-> vo .voManifest (.apply :keyword) .id))
+  vo path)
 
-(defn removeByValue "Removes an item from an array by value" [es vo val])
+(defn insertAt [client index vo id path options]
+  {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
+; {
+;   "script": "var folders = ctx._source['1806']; folders.add(position, newval); ctx._source['1806'] = folders",
+;   "params": {
+;     "newval": "Example folder!",
+;     "position": 2
+;   }
+; }
 
-#_(defn update-if
-  [es ^ValueObject vo id predicate &])
+  )
+(defn moveTo [client index vo id path options]
+; {
+;   "script": "var folders = ctx._source['1806']; var tmpval = folders.get(from); folders.remove(from); folders.add(to, tmpval); ctx._source['1806'] = folders",
+;   "params": {
+;     "from": 2,
+;     "to": 0
+;   }
+; }
 
-(defn delete [es ^ValueObject vo index {:as options :keys []}]
-  {:pre [(instance? ValueObject vo)]}
-  (assert index ":index required")
-  (assert (prime.vo/has-id? vo) (str "vo: " (prn-str vo) " requires an id"))
-  (ces/delete-doc es (conj options {
-    :index  index
-    :id     (prime.types/to-String (.. ^ID vo _id))
-    :type   (Integer/toHexString (.. vo voManifest ID))
-  })))
+  )
+(defn replaceAt [client index vo id path options]
+; {
+;   "script": "var folders = ctx._source['1806']; folders.set(position, newval); ctx._source['1806'] = folders",
+;   "params": {
+;     "newval": "Example folder!",
+;     "position": 2
+;   }
+; }
+  )
+(defn removeFrom [client index vo id path options]
+; {
+;   "script": "var folders = ctx._source['1806']; folders.remove(newval); ctx._source['1806'] = folders",
+;   "params": {
+;     "newval": "Test subject",
+;     "position": 4
+;   }
+; }
+  )
 
 
 ;

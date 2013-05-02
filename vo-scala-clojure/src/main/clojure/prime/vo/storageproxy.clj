@@ -50,6 +50,12 @@
   (search [vo] [proxy vo] [proxy vo options])
 )
 
+(defprotocol VOHistoryProxy
+  ; GetSlice
+  ; Get latest slice of history of a VO. Can be limited to a certain amount.
+  (get-slice [proxy] [proxy vo] [proxy vo options])
+  )
+
 (deftype ElasticSearchVOProxy [^String index ^org.elasticsearch.client.transport.TransportClient client]
   ;ElasticSearchMapped
   ;(index-name   [this] index)
@@ -104,12 +110,13 @@
 
   (search [this vo options]
     (es/search client index vo options))
+
 )
 
 (deftype MessagePackVOProxy [^String directory]
   VOProxy
   (get-vo [this vo] 
-  	(mp/get directory vo))
+    (mp/get directory vo))
 
   (put-vo [this vo]
     (mp/put directory vo {}))
@@ -121,7 +128,7 @@
     (mp/update directory vo id {}))
 
   (update [this vo id options] 
-  	(mp/update directory vo id options))
+    (mp/update directory vo id options))
   
   (delete [this vo]
     (mp/delete directory vo {}))
@@ -157,6 +164,13 @@
 
   (delete [this vo options]
     (ch/delete cluster vo options))
+
+  VOHistoryProxy
+  (get-slice [this vo]
+    (ch/get-slice cluster vo {}))
+  
+  (get-slice [this vo options]
+    (ch/get-slice cluster vo options))
 )
 
 (defn symbolize [sym appendix] (let [sym (if (keyword? sym) (.sym sym) sym)] (symbol (str sym appendix))))

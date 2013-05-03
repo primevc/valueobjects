@@ -49,7 +49,7 @@ object VORef {
 }
 
 protected[prime] object VORefImpl {
-  RT.loadResourceScript("prime/vo.clj");
+  RT.load("prime/vo");
   val derefVar = RT.`var`("prime.vo", "*deref-map*");
 }
 

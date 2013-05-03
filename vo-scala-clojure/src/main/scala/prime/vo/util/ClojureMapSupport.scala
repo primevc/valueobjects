@@ -33,7 +33,7 @@ object ClojureSupport {
   }
 
 
-  RT.loadResourceScript("prime/vo.clj");
+  RT.load("prime/vo");
   val seqFieldFn = RT.`var`("prime.vo", "*voseq-key-fn*");
 }
 

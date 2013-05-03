@@ -104,7 +104,7 @@ trait Updateable {
 object ValueSource
 {
   import clojure.lang._
-  RT.loadResourceScript("prime/vo/source.clj");
+  RT.load("prime/vo/source");
   protected[prime] val asValueSource : IFn = RT.`var`("prime.vo.source", "as-source");
 
   def   apply(any : Any, kind : Any) : ValueSource = any match {

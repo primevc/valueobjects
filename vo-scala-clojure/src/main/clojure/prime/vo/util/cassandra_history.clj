@@ -79,7 +79,7 @@
   :delete (int 3)
   :appendTo (int 5)
   :moveTo (int 4)
-  :remove (int 6)
+  :removeFrom (int 6)
   :insertAt (int 7)
   :replace (int 8)
   })
@@ -161,14 +161,14 @@
 (defn appendTo [cluster vo id options]
   (put cluster (conj vo {:id id}) (conj options {:action :appendTo})))
 
-(defn insertAt [this vo id path options]
+(defn insertAt [cluster vo id path options]
   (put cluster (conj vo {:id id}) (conj options {:action :insertAt})))
 
-(defn moveTo [this vo id path options]
+(defn moveTo [cluster vo id path options]
   (put cluster (conj vo {:id id}) (conj options {:action :moveTo})))
 
-(defn replaceAt [this vo id path options]
+(defn replaceAt [cluster vo id path options]
   (put cluster (conj vo {:id id}) (conj options {:action :replaceAt})))
 
-(defn remove [this vo id path options]
-  (put cluster (conj vo {:id id}) (conj options {:action :remove})))
+(defn removeFrom [cluster vo id path options]
+  (put cluster (conj vo {:id id}) (conj options {:action :removeFrom})))

@@ -3,13 +3,13 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.vo.storageproxy
-	(:require 
+  (:require 
     [prime.vo.util.elasticsearch      :as es]
     [prime.vo.util.msgpack            :as mp]
     [prime.vo.util.cassandra-history   :as ch]))
 
 (defprotocol VOProxy
-  "Doc string"
+  "WARNING: Proxy cannot guarantee consistency!"
   ; Get
   ; Get will get you a VO based on ID
   (get-vo [vo] [proxy vo])
@@ -23,25 +23,26 @@
   ; Updating will add the new VO to the extisting one. Replacing data if it already exists
   (update [vo] [proxy vo] [proxy vo id] [proxy vo id options] "Updates a VO")
 
+  ; Delete
+  ; Deletes a VO. Use with care :-)
+  (delete [vo] [proxy vo] [proxy vo options])
+
   ; Update-if
   ; Same as update but only executes when certain requirements are met.
   #_(update-if [proxy predicate options])
 
-  ; [es vo path value pos]
-  (insertAt [vo] [proxy vo])
+  ; VECTOR-BASED
+  (insertAt [vo id path] [vo id path options] [proxy vo id path options])
 
-  ; [es vo path pos]
-  (moveTo [vo] [proxy vo])
+  (moveTo [vo id path] [vo id path options] [proxy vo id path options])
 
-  ; [es ^ValueObject vo id & {:as options :keys [index]}]
-  (appendTo [vo] [proxy vo] [proxy vo id] [proxy vo id options])
+  (appendTo [proxy vo] [proxy vo id] [proxy vo id options])
 
-  ; [es vo pos value]
-  (replaceAt [vo] [proxy vo])
+  (replaceAt [vo id path] [vo id path options] [proxy vo id path options])
 
-  ; Delete
-  ; Deletes a VO. Use with care :-)
-  (delete [vo] [proxy vo] [proxy vo options])
+  (removeFrom [vo id path] [vo id path options] [proxy vo id path options])
+  ;(remove (publication/Publication{:spreads [{:locked false :id 1}]}) [:spreads])
+  ;(remove (account/Organization{:folders ["Example folder"]}) [:folders 4])
 )
 
 (defprotocol VOSearchProxy
@@ -52,9 +53,9 @@
 
 (defprotocol VOHistoryProxy
   ; GetSlice
-  ; Get latest slice of history of a VO. Can be limited to a certain amount.
-  (get-slice [proxy] [proxy vo] [proxy vo options])
-  )
+  ; Get latest slice of history of a VO. Can be limited to a certain amount of :slices.
+  (get-slice [proxy vo] [proxy vo options])
+)
 
 (deftype ElasticSearchVOProxy [^String index ^org.elasticsearch.client.transport.TransportClient client]
   ;ElasticSearchMapped
@@ -66,42 +67,53 @@
   (get-vo [this vo] 
     (es/get client index vo))
 
-  ; [es ^ValueObject vo & {:as options :keys [index]}]
   (put-vo [this vo]
-    (es/put client vo index {}))
+    (es/put client index vo {}))
 
   (put-vo [this vo options]
-    (es/put client vo index options))
+    (es/put client index vo options))
 
-  ; [es ^ValueObject vo id & {:as options :keys [index]}]
   (update [this vo id]
-    (es/update client vo id index {}))
+    (es/update client index vo id {}))
 
   (update [this vo id options] 
-    (es/update client vo id index options))
+    (es/update client index vo id options))
   
-  ; [es vo path value pos]
-  (insertAt [vo] vo)
-
-  ; [es vo path pos]
-  (moveTo [vo] vo)
-
-  ; [es ^ValueObject vo id & {:as options :keys [index]}]
-  (appendTo [this vo id]
-    (es/appendTo client vo id index {}))
-
-  (appendTo [this vo id options]
-    (es/appendTo client vo id index options))
-
-  ; [es vo pos value]
-  (replaceAt [vo] vo)
-
-  ; [es ^ValueObject vo & {:as options :keys [index]}]
   (delete [this vo]
-    (es/delete client vo index {}))
+    (es/delete client index vo {}))
 
   (delete [this vo options]
-    (es/delete client vo index options))
+    (es/delete client index vo options))
+
+  (appendTo [this vo id]
+    (es/appendTo client index vo id {}))
+
+  (appendTo [this vo id options]
+    (es/appendTo client index vo id options))
+
+  (insertAt [this vo id path]
+    (es/insertAt client index vo id path {}))
+
+  (insertAt [this vo id path options]
+    (es/insertAt client index vo id path options))
+
+  (moveTo [this vo id path]
+    (es/moveTo client index vo id path {}))
+
+  (moveTo [this vo id path options]
+    (es/moveTo client index vo id path options))
+
+  (replaceAt [this vo id path]
+    (es/replaceAt client index vo id path {}))
+
+  (replaceAt [this vo id path options]
+    (es/replaceAt client index vo id path options))
+
+  (removeFrom [this vo id path]
+    (es/removeFrom client index vo id path {}))
+
+  (removeFrom [this vo id path options]
+    (es/removeFrom client index vo id path options))
 
   VOSearchProxy
   ; [es ^ValueObject vo indices & {:as options :keys [ query filter from size types sort highlighting only exclude script-fields preference facets named-filters boost explain version min-score listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source]}]
@@ -154,16 +166,41 @@
   (update [this vo id options]
     (ch/update cluster vo id options))
 
-  (appendTo [this vo id]
-    (ch/appendTo cluster vo id {}))
-
-  (appendTo [this vo id options]
-    (ch/appendTo cluster vo id options))
   (delete [this vo]
     (ch/delete cluster vo {}))
 
   (delete [this vo options]
     (ch/delete cluster vo options))
+
+  (appendTo [this vo id]
+    (ch/appendTo cluster vo id {}))
+
+  (appendTo [this vo id options]
+    (ch/appendTo cluster vo id options))
+
+  (insertAt [this vo id path]
+    (ch/insertAt cluster vo id {}))
+
+  (insertAt [this vo id path options]
+    (ch/insertAt cluster vo id options))
+
+  (moveTo [this vo id path]
+    (ch/moveTo cluster vo id path {}))
+
+  (moveTo [this vo id path options]
+    (ch/moveTo cluster vo id path options))
+
+  (replaceAt [this vo id path]
+    (ch/replaceAt cluster vo id path {}))
+
+  (replaceAt [this vo id path options]
+    (ch/replaceAt cluster vo id path options))
+
+  (removeFrom [this vo id path]
+    (ch/removeFrom cluster vo id path {}))
+
+  (removeFrom [this vo id path options]
+    (ch/removeFrom cluster vo id path options))
 
   VOHistoryProxy
   (get-slice [this vo]

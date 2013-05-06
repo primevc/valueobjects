@@ -15,7 +15,7 @@
            org.elasticsearch.action.search.SearchResponse, [org.elasticsearch.search SearchHit, SearchHitField],
            org.elasticsearch.action.get.GetResponse))
 
-(set! *warn-on-reflection* true)
+;(set! *warn-on-reflection* true)
 
 ;(defonce es-client (ces/make-client :transport {:hosts ["127.0.0.1:9300"] :cluster-name (str "elasticsearch_" (System/getenv "USER"))}))
 
@@ -421,7 +421,7 @@
 
 (defn put
   "options: see clj-elasticsearch.client/index-doc"
-  [es ^ValueObject index vo options]
+  [es index ^ValueObject vo options]
   (assert index ":index required")
   (assert (prime.vo/has-id? vo) (str "vo: " (prn-str vo) " requires an id"))
   (ces/index-doc es (conj options {
@@ -531,7 +531,7 @@
     })))
 
 (defn update
-  [es ^ValueObject index vo id {:as options :keys [fields]}]
+  [es index ^ValueObject vo id {:as options :keys [fields]}]
   {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
   (let [type    (Integer/toHexString (.. vo voManifest ID))
         id      (prime.types/to-String id)
@@ -540,7 +540,7 @@
 
 
 
-(defn delete [es ^ValueObject index vo {:as options :keys []}]
+(defn delete [es index ^ValueObject vo {:as options :keys []}]
   {:pre [(instance? ValueObject vo)]}
   (assert index ":index required")
   (assert (prime.vo/has-id? vo) (str "vo: " (prn-str vo) " requires an id"))
@@ -550,25 +550,61 @@
     :type   (Integer/toHexString (.. vo voManifest ID))
   })))
 
-(defn appendTo "Add something to the end of an array" [es ^ValueObject index vo id options]
-  {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
+
+(defn desolve-path [vo path {:as options :keys [ignore-last-num]}]
+  (if (> (count path) 0)
+    (loop [i 0 r "ctx._source" s []]
+      (let [step (nth path i nil)]
+        (if (nil? step)
+          {:result r :steps s} ; Return result
+          (let [
+            r 
+              (if (keyword? step) 
+                (str r "['" (name step) "']")
+                r)
+            s 
+              (if (keyword? step) 
+                (conj s step) 
+                s)
+            ]
+            (prn r)
+            (recur (inc i) r s)))))
+    nil
+    ))
+
+(defn script-query [client index vo id script params options]
   (let [type (Integer/toHexString (.. vo voManifest ID))
         id   (prime.types/to-String id)]
-    (ces/update-doc es (patched-update-options type id (assoc options
+    (ces/update-doc client (patched-update-options type id (assoc options
       :index index
       :source (json/encode-smile
         (binding [prime.vo/*voseq-key-fn* field-hexname] {
-          :script (apply str (map #(str "ctx._source['" % "'] += v" % ";") (keys vo)))
-          :params (into  {}  (map #(let [[k v] %1] [(str "v" k) v]) vo))
-        }))))
-    )))
+          :script script
+          :params params
+        })))))))
 
-(defn desolve-path [vo path]
-  (prn (-> vo .voManifest (.apply :keyword) .id))
-  vo path)
+;TODO convert names!
+(defn appendTo "Add something to the end of an array" [client index ^ValueObject vo id options]
+  {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
+  (script-query client index vo id 
+    (apply str (map #(str "ctx._source['" % "'] += v" % ";") (keys vo))) 
+    (into  {}  (map #(let [[k v] %1] [(str "v" k) v]) vo)) options))
 
 (defn insertAt [client index vo id path options]
-  {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
+  ;{:pre [(instance? ValueObject vo) (not (nil? id)) index]}
+  (assert (number? (last path)) "Last step of the path has to be a number")
+  (binding [prime.vo/*voseq-key-fn* field-hexname]
+    (let [
+      desolved-path (desolve-path vo path {:ignore-last-num true})
+      scripts 
+        (apply str "var tmp = " (:result desolved-path) "; tmp.add(position, newval); " (:result desolved-path) " = tmp;")
+      newval (get-in vo (:steps desolved-path))
+      parameters {:position (last path) :newval (if (vector? newval) (first newval) newval)}
+      ]
+    (prn desolved-path)
+    (prn scripts)
+    (prn parameters)
+    )))
 ; {
 ;   "script": "var folders = ctx._source['1806']; folders.add(position, newval); ctx._source['1806'] = folders",
 ;   "params": {
@@ -577,8 +613,22 @@
 ;   }
 ; }
 
-  )
 (defn moveTo [client index vo id path options]
+  ;{:pre [(instance? ValueObject vo) (not (nil? id)) index]}
+  (assert (number? (last path)) "Last step of the path has to be a number")
+  (assert (number? (:to options)) ":to in options is required and has to be a number!")
+  (binding [prime.vo/*voseq-key-fn* field-hexname] 
+    (let [
+      desolved-path (desolve-path vo path {:ignore-last-num true})
+      scripts 
+        (apply str "var tmp = " (:result desolved-path) "; var tmpval = tmp.get(from); tmp.remove(from); tmp.add(to, tmpval); " (:result desolved-path) " = tmp;")
+      newval (get-in vo (:steps desolved-path))
+      parameters {:from (last path) :to (:to options)}
+      ]
+    (prn desolved-path)
+    (prn scripts)
+    (prn parameters)
+    )))
 ; {
 ;   "script": "var folders = ctx._source['1806']; var tmpval = folders.get(from); folders.remove(from); folders.add(to, tmpval); ctx._source['1806'] = folders",
 ;   "params": {
@@ -587,7 +637,6 @@
 ;   }
 ; }
 
-  )
 (defn replaceAt [client index vo id path options]
 ; {
 ;   "script": "var folders = ctx._source['1806']; folders.set(position, newval); ctx._source['1806'] = folders",

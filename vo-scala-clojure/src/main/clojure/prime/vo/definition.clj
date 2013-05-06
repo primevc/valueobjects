@@ -114,18 +114,42 @@
 ;
 
 (defn intern-vo-expr "Creates a var using (intern ..) and returns the symbol of it" [^ValueObject vo construct-expr]
+  (if (empty? vo)
+    (list '.empty (companion-object-symbol vo))
+  #_else
+    construct-expr))
+
+; Attempt at initializing at runtime, almost defeating the purpose. Generated code is buggy somehow.
+#_(defn intern-vo-expr "Creates a var using (intern ..) and returns the symbol of it" [^ValueObject vo construct-expr]
+  (trace (prn-str "Possibly interning: " vo ":" construct-expr))
+  (if (empty? vo)
+    (list '.empty (companion-object-symbol vo))
+  #_else
+    (let [intern-name (str (.. vo getClass getSimpleName) (.hashCode vo))
+          obj-ns-sym  (symbol (str (.. vo getClass getPackage getName) ".-interned"))]
+      `(let [obj-ns# (.getName ^clojure.lang.Namespace (create-ns '~obj-ns-sym))
+             vo-sym# (resolve '~(symbol (name obj-ns-sym) intern-name))]
+        (debug ~(str "interning: " #_[construct-expr " => "] vo " in: " (name obj-ns-sym) "/" intern-name))
+        (if (and vo-sym# (bound? vo-sym#))
+          vo-sym#
+          (do
+            (intern obj-ns# '~(symbol intern-name) ~construct-expr)
+            vo-sym#))))))
+
+; Initialization at macro time: doesn't work with AOT compilation
+#_(defn intern-vo-expr "Creates a var using (intern ..) and returns the symbol of it" [^ValueObject vo construct-expr]
   (trace (prn-str "Possibly interning: " vo ":" construct-expr))
   (if (empty? vo)
     (list '.empty (companion-object-symbol vo))
   #_else
     (let [obj-ns-sym  (.getName ^clojure.lang.Namespace (create-ns (symbol (str (.. vo getClass getPackage getName) ".-interned"))))
-          intern-name (str (.. vo getClass getSimpleName) (.hashCode vo))
-          ^clojure.lang.Var
-          interned    (or
-            (resolve (symbol (.getName obj-ns-sym) intern-name))
-            (do (debug "interning:" #_[construct-expr " => "] vo "in:" (str obj-ns-sym "/" intern-name))
-              (intern obj-ns-sym (symbol intern-name) vo)))]
-      (symbol (str (.ns interned)) (str (.sym interned))))))
+          intern-name# (str (.. vo getClass getSimpleName) (.hashCode vo))
+         ]
+      (or
+        (if-let [vo-sym# (resolve (symbol (.getName obj-ns-sym) intern-name))] (if (bound? vo-sym#) vo-sym#))
+        (do (debug (str "interning: " #_[construct-expr " => "] vo " in: " obj-ns-sym "/" intern-name))
+          (binding [*ns* (the-ns obj-ns-sym)] (eval `(def ~(symbol intern-name) ~construct-expr)))))
+      )))
 
 (defn defvo-body
   "The argument to the constructor macro has to be stable before interning is considered.

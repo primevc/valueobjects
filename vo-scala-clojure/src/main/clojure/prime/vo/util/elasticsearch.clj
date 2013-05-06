@@ -417,7 +417,7 @@
     (let [resp ^GetResponse
           (ces/get-doc es (assoc options, :type (Integer/toHexString (.. vo voManifest ID)), :index es-index, :format :java, :id (.. ^ID vo _id toString)))]
       (.apply (. vo voCompanion)
-              (ElasticSearch-ValueSource. (.. vo voManifest ID) (.sourceAsMap resp) resp)))))
+              (ElasticSearch-ValueSource. (.. vo voManifest ID) (.getSourceAsMap resp) resp)))))
 
 (defn put
   "options: see clj-elasticsearch.client/index-doc"
@@ -443,11 +443,11 @@
     (ElasticSearch-ValueSource. (Integer/parseInt (.type hit) 16) (source-fn hit) hit)))
 
 (defn scroll-seq [es, ^SearchResponse scroll-req keep-alive, from]
-  (let [ ^SearchResponse response (ces/scroll es {:scroll-id (.scrollId scroll-req) :scroll keep-alive, :format :java})
-          hits     (.. response hits hits)
-          num-hits (.. response hits totalHits)
+  (let [ ^SearchResponse response (ces/scroll es {:scroll-id (.getScrollId scroll-req) :scroll keep-alive, :format :java})
+          hits     (.. response getHits hits)
+          num-hits (.. response getHits totalHits)
           last-hit (+  from (count hits)) ]
-    (if (and (.scrollId response) (< last-hit num-hits))
+    (if (and (.getScrollId response) (< last-hit num-hits))
       (concat hits (lazy-seq (scroll-seq es response keep-alive last-hit)))
     #_else    hits)))
 
@@ -505,7 +505,7 @@
       (with-meta
         (map
           (partial SearchHit->ValueObject (if fields SearchHit->fields #_else SearchHit->source) (. vo voCompanion))
-          (if-not scroll (.. response hits hits) #_else (scroll-seq es response scroll 0)))
+          (if-not scroll (.. response getHits hits) #_else (scroll-seq es response scroll 0)))
         {:request es-options, :response response})))
 
 (defn ^org.elasticsearch.action.index.IndexRequest ->IndexRequest [^String index ^String type ^String id, input options]

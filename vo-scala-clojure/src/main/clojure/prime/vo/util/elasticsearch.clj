@@ -9,7 +9,7 @@
             [clj-elasticsearch.client :as ces])
   (:use [prime.vo.source :only [def-valuesource]])
   (:import [prime.types VORef EnumValue package$ValueType package$ValueTypes$Tdef package$ValueTypes$Tarray package$ValueTypes$Tenum]
-           [prime.vo IDField ValueObject ValueObjectField ValueObjectCompanion ID]
+           [prime.vo IDField ValueObject ValueObjectManifest ValueObjectField ValueObjectCompanion ID]
            [com.fasterxml.jackson.core JsonGenerator]
 
            org.elasticsearch.action.search.SearchResponse, [org.elasticsearch.search SearchHit, SearchHitField],
@@ -170,6 +170,36 @@
 
 (defn ^String field-hexname [^ValueObjectField field]
   (Integer/toHexString (.id field)))
+
+(defn hexify-path "Recursively walks path.
+  Maps keywords to hex-names (for JSON access) and keeps all other values as they are."
+  [^ValueObject vo path]
+  (assert (instance? ValueObject vo) (print-str vo "is not a ValueObject (possibly a VO leaf node). path =" path))
+  (if-let [step (first path)]
+    (if-not (keyword? step)
+      (cons step (hexify-path vo (rest path))) ; leave step as is
+    #_else
+      (let [manifest (.voManifest vo)
+            field (.findOrNull manifest step)
+            ^ValueObjectField field
+            (if field field
+            #_else
+              (let [fields (remove nil? (map #(.findOrNull ^ValueObjectManifest % step) (.subtypes manifest)))
+                    fcount (count fields)]
+                (assert (<= fcount 1) (print-str "Ambiguous keyword: "    step ", maps to multiple fields: " fields))
+                (assert (=  fcount 1) (print-str "No field found named: " step " in " manifest " or subtypes."))
+                (first fields)))
+            inner (.. field defaultValue)
+            inner (if (instance? scala.collection.immutable.Vector inner)
+                    (let [^package$ValueTypes$Tarray atype
+                          (.. field valueType)]
+                      (if (instance? package$ValueTypes$Tdef (.. atype innerType))
+                        (.empty ^package$ValueTypes$Tdef (.innerType atype))
+                      #_else nil))
+                  #_else inner)]
+        (assert field (str step " not found in " vo))
+        (cons (field-hexname field)
+              (hexify-path inner (rest path)))))))
 
 (defn keyword->hex-field   [^prime.vo.ValueObject vo, ^clojure.lang.Named key]
   (let [path (prime.vo/fields-path-seq vo (clojure.string/split (name key) #"[.]"))]

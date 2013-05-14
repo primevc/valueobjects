@@ -19,12 +19,27 @@ trait FileRefOutputStream extends OutputStream {
   def ref: FileRef
 }
 
+/** The public functions of any FileRepository. File repositories that want
+  * to have garbage collection, should implement GarbageCollectableFR below.
+  */
 trait FileRepository {
 
-  /** Test whether the specified FileReference exists in the repository.
+  /** Test whether the specified FileRef exists in the repository. If the
+    * repository implements GarbageCollectableFR, it uses the garbage collection
+    * Storm topology. Otherwise, it calls `existsImpl` directly.
     * @param ref The FileRef to test.
     */
-  def exists(ref: FileRef): Boolean
+  final def exists(ref: FileRef): Boolean = this match {
+    case gc: GarbageCollectableFR => { println("GARBAGE!!!!!!!!!!!!"); false } // invoke Storm
+    case fr: FileRepository       => existsImpl(ref)
+  }
+
+  /** The implementation that actually checks whether the file as specified
+    * by the supplied FileRef exists. Do not call this function directly, but
+    * use `exists`!
+    * @param ref The FileRef to check.
+    */
+  def existsImpl(ref: FileRef): Boolean
 
   /** Create an URI for the specified URI.
     * @param fileRef The FileRef to get the URI from.
@@ -68,6 +83,19 @@ trait FileRepository {
   }
 }
 
+/** This trait must be implemented by file repositories that want to support
+  * garbage collection. The functions in this trait should not be called
+  * directly! The garbage collector uses these functions. See the
+  * wiki page on GitHub for more details.
+  */
+trait GarbageCollectableFR extends FileRepository {
+
+  /** Delete the specified FileRef.
+    * @param ref The FileRef to delete.
+    */
+  def delete(ref: FileRef): Unit
+}
+
 
 /* Helper classes. */
 
@@ -104,7 +132,7 @@ trait LocalFileRepository extends FileRepository {
   def apply(instance: FileRef) = getFile(instance)
 
   def stream(instance: FileRef) = new FileInputStream(getFile(instance))
-  def exists(instance: FileRef) = getFile(instance).exists
+  def existsImpl(instance: FileRef) = getFile(instance).exists
 
   def absorb(is: InputStream) = {
     val fileRefOS = this.create

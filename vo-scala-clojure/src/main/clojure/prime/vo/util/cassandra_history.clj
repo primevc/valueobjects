@@ -140,23 +140,51 @@
     ;TODO: Create a custom ValueSource for history data, keeping the UUID and action around.
     (take slices (byte-array->VOChange ((last result) "data") vo))))
 
+(defn- insert [cluster vo id action data]
+  (alia/with-session cluster 
+      (alia/execute (alia/prepare 
+        (apply str "INSERT INTO " (get-table-name vo) " (version, id, action, data) VALUES ( ? , ? , ? , ? )")) 
+        :values [(tardis/unique-time-uuid (.getTime (java.util.Date.))) id action data])))
+
 (defn put [cluster vo options]
   ; TODO: If action is put, save version into immutant cache.
   (assert (:id vo) "vo requires an id")
-  (let [action (or (-> options :action) :put)]
-    (alia/with-session cluster 
-      (alia/execute (alia/prepare 
-        (apply str "INSERT INTO " (get-table-name vo) " (version, id, action, data) VALUES ( ? , ? , ? , ? )")) 
-        :values [ (tardis/unique-time-uuid (.getTime (java.util.Date.))) 
-                  (idconv vo) ; Convert id to proper type.
-                  (-> actions action) 
-                  (java.nio.ByteBuffer/wrap (VOChange->byte-array  vo (:path options)))]))))
+  (insert 
+    cluster vo
+    (idconv vo)
+    :put
+    (java.nio.ByteBuffer/wrap (VOChange->byte-array  vo))))
 
 (defn update [cluster vo id options]
-  (put cluster (conj vo {:id id}) (conj options {:action :update})))
+  (insert 
+    cluster vo
+    (idconv vo)
+    :update
+    (java.nio.ByteBuffer/wrap (VOChange->byte-array (dissoc vo :id)))))
 
 (defn delete [cluster vo options]
   (put cluster vo (conj options {:action :delete})))
+
+(defn appendTo [cluster vo path path-vars value options]
+  (put cluster vo path path-vars value options))
+
+(defn insertAt [cluster vo path path-vars value options]
+  (put cluster vo path path-vars value options))
+
+(defn moveTo [cluster vo path path-vars to options]
+  (put cluster vo path path-vars to options))
+
+(defn replaceAt [cluster vo path path-vars value options]
+  (put cluster vo path path-vars value options))
+
+(defn mergeAt [cluster vo path path-vars value options]
+  (put cluster vo path path-vars value options))
+
+(defn removeFrom [cluster vo path path-vars options]
+  (put cluster vo path path-vars options))
+
+
+
 
 (defn appendTo [cluster vo id options]
   (put cluster (conj vo {:id id}) (conj options {:action :appendTo})))

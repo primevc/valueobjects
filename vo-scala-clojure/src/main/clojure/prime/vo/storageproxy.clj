@@ -32,15 +32,17 @@
   #_(update-if [proxy predicate options])
 
   ; VECTOR-BASED
-  (insertAt [vo id path] [vo id path options] [proxy vo id path options])
+  (appendTo [vo path path-vars value] [this vo path path-vars value] [this vo path path-vars value options])
 
-  (moveTo [vo id path] [vo id path options] [proxy vo id path options])
+  (insertAt [vo path path-vars value] [proxy vo path path-vars value] [proxy vo path path-vars value options])
 
-  (appendTo [proxy vo] [proxy vo id] [proxy vo id options])
+  (moveTo [vo path path-vars to] [proxy vo path path-vars to] [proxy vo path path-vars to options])
 
-  (replaceAt [vo id path] [vo id path options] [proxy vo id path options])
+  (replaceAt [vo path path-vars value] [proxy vo path path-vars value] [proxy vo path path-vars value options])
 
-  (removeFrom [vo id path] [vo id path options] [proxy vo id path options])
+  (mergeAt [vo path path-vars value] [prxoy vo path path-vars value] [proxy vo path path-vars value options])
+
+  (removeFrom [vo path path-vars] [proxy vo path path-vars] [proxy vo path path-vars options])
   ;(remove (publication/Publication{:spreads [{:locked false :id 1}]}) [:spreads])
   ;(remove (account/Organization{:folders ["Example folder"]}) [:folders 4])
 )
@@ -85,35 +87,41 @@
   (delete [this vo options]
     (es/delete client index vo options))
 
-  (appendTo [this vo id]
-    (es/appendTo client index vo id {}))
+  (appendTo [this vo path path-vars value]
+    (es/appendTo client index vo path path-vars value {}))
 
-  (appendTo [this vo id options]
-    (es/appendTo client index vo id options))
+  (appendTo [this vo path path-vars value options]
+    (es/appendTo client index vo path path-vars value options))
 
-  (insertAt [this vo id path]
-    (es/insertAt client index vo id path {}))
+  (insertAt [this vo path path-vars value]
+    (es/insertAt client index vo path path-vars value {}))
 
-  (insertAt [this vo id path options]
-    (es/insertAt client index vo id path options))
+  (insertAt [this vo path path-vars value options]
+    (es/insertAt client index vo path path-vars value options))
 
-  (moveTo [this vo id path]
-    (es/moveTo client index vo id path {}))
+  (moveTo [this vo path path-vars to]
+    (es/moveTo client index vo path path-vars to {}))
 
-  (moveTo [this vo id path options]
-    (es/moveTo client index vo id path options))
+  (moveTo [this vo path path-vars to options]
+    (es/moveTo client index vo path path-vars to options))
 
-  (replaceAt [this vo id path]
-    (es/replaceAt client index vo id path {}))
+  (replaceAt [this vo path path-vars value]
+    (es/replaceAt client index vo path path-vars value {}))
 
-  (replaceAt [this vo id path options]
-    (es/replaceAt client index vo id path options))
+  (replaceAt [this vo path path-vars value options]
+    (es/replaceAt client index vo path path-vars value options))
 
-  (removeFrom [this vo id path]
-    (es/removeFrom client index vo id path {}))
+  (mergeAt [this vo path path-vars value]
+    (es/mergeAt client index vo path path-vars value {}))
 
-  (removeFrom [this vo id path options]
-    (es/removeFrom client index vo id path options))
+  (mergeAt [this vo path path-vars value options]
+    (es/mergeAt client index vo path path-vars value options))
+
+  (removeFrom [this vo path path-vars]
+    (es/removeFrom client index vo path path-vars {}))
+
+  (removeFrom [this vo path path-vars options]
+    (es/removeFrom client index vo path path-vars options))
 
   VOSearchProxy
   ; [es ^ValueObject vo indices & {:as options :keys [ query filter from size types sort highlighting only exclude script-fields preference facets named-filters boost explain version min-score listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source]}]
@@ -172,35 +180,41 @@
   (delete [this vo options]
     (ch/delete cluster vo options))
 
-  (appendTo [this vo id]
-    (ch/appendTo cluster vo id {}))
+  (appendTo [this vo path path-vars value]
+    (ch/appendTo cluster vo path path-vars value {}))
 
-  (appendTo [this vo id options]
-    (ch/appendTo cluster vo id options))
+  (appendTo [this vo path path-vars value options]
+    (ch/appendTo cluster vo path path-vars value options))
 
-  (insertAt [this vo id path]
-    (ch/insertAt cluster vo id {}))
+  (insertAt [this vo path path-vars value]
+    (ch/insertAt cluster vo path path-vars value {}))
 
-  (insertAt [this vo id path options]
-    (ch/insertAt cluster vo id options))
+  (insertAt [this vo path path-vars value options]
+    (ch/insertAt cluster vo path path-vars value options))
 
-  (moveTo [this vo id path]
-    (ch/moveTo cluster vo id path {}))
+  (moveTo [this vo path path-vars to]
+    (ch/moveTo cluster vo path path-vars to {}))
 
-  (moveTo [this vo id path options]
-    (ch/moveTo cluster vo id path options))
+  (moveTo [this vo path path-vars to options]
+    (ch/moveTo cluster vo path path-vars to options))
 
-  (replaceAt [this vo id path]
-    (ch/replaceAt cluster vo id path {}))
+  (replaceAt [this vo path path-vars value]
+    (ch/replaceAt cluster vo path path-vars value {}))
 
-  (replaceAt [this vo id path options]
-    (ch/replaceAt cluster vo id path options))
+  (replaceAt [this vo path path-vars value options]
+    (ch/replaceAt cluster vo path path-vars value options))
 
-  (removeFrom [this vo id path]
-    (ch/removeFrom cluster vo id path {}))
+  (mergeAt [this vo path path-vars value]
+    (ch/mergeAt cluster vo path path-vars value {}))
 
-  (removeFrom [this vo id path options]
-    (ch/removeFrom cluster vo id path options))
+  (mergeAt [this vo path path-vars value options]
+    (ch/mergeAt cluster vo path path-vars value options))
+
+  (removeFrom [this vo path path-vars]
+    (ch/removeFrom cluster vo path path-vars {}))
+
+  (removeFrom [this vo path path-vars options]
+    (ch/removeFrom cluster vo path path-vars options))
 
   VOHistoryProxy
   (get-slice [this vo]
@@ -231,14 +245,34 @@
     [ [['this 'vo 'id] ['this 'vo 'id 'options]]
       [:pre-update :proxies :post-update]
       all-proxies]
-  `appendTo
-    [ [['this 'vo 'id] ['this 'vo 'id 'options]]
-      [:pre-appendTo :proxies :post-appendTo]
-      all-proxies]
   `delete
     [ [['this 'vo] ['this 'vo 'options]]
       [:pre-delete :proxies :post-delete]
-      all-proxies]  
+      all-proxies]
+  `appendTo
+    [ [['this 'vo 'path 'path-vars 'value] ['this 'vo 'path 'path-vars 'value 'options]]
+      [:pre-appendTo :proxies :post-appendTo]
+      all-proxies]
+  `insertAt 
+    [ [['this 'vo 'path 'path-vars 'value] ['this 'vo 'path 'path-vars 'options]]
+      [:pre-insertAt :proxies :post-insertAt]
+      all-proxies]
+  `moveTo 
+    [ [['this 'vo 'path 'path-vars 'to] ['this 'vo 'path 'path-vars 'to 'options]]
+      [:pre-moveTo :proxies :post-moveTo]
+      all-proxies]
+  `replaceAt
+    [ [['this 'vo 'path 'path-vars 'value] ['this 'vo 'path 'path-vars 'value 'options]]
+      [:pre-replaceAt :proxies :post-replaceAt]
+      all-proxies]
+  `mergeAt 
+    [ [['this 'vo 'path 'path-vars 'value] ['this 'vo 'path 'path-vars 'value 'options]]
+      [:pre-mergeAt :proxies :post-mergeAt]
+      all-proxies]
+  `removeFrom
+    [ [['this 'vo 'path 'path-vars] ['this 'vo 'path 'path-vars 'options]]
+      [:pre-removeFrom :proxies :post-removeFrom]
+      all-proxies]
   ; 'search 
   ;   [ [['this 'vo] ['this 'vo 'options]]
   ;     [:pre-search :proxies :post-search]
@@ -297,12 +331,27 @@
   `update 
     [ [['vo 'id] ['vo 'id 'options]]
       'update]
-  `appendTo
-    [ [['vo 'id] ['vo 'id 'options]]
-      'appendTo]
   `delete
     [ [['vo] ['vo 'options]]
       'delete]
+  `appendTo
+    [ [['vo 'path 'path-vars 'value] ['vo 'path 'path-vars 'value 'options]]
+      'appendTo]
+  `insertAt 
+    [ [['vo 'path 'path-vars 'value] ['vo 'path 'path-vars 'options]]
+      'insertAt]
+  `moveTo 
+    [ [['vo 'path 'path-vars 'to] ['vo 'path 'path-vars 'to 'options]]
+      'moveTo]
+  `replaceAt
+    [ [['vo 'path 'path-vars 'value] ['vo 'path 'path-vars 'value 'options]]
+      'replaceAt]
+  `mergeAt 
+    [ [['vo 'path 'path-vars 'value] ['vo 'path 'path-vars 'value 'options]]
+      'mergeAt]
+  `removeFrom
+    [ [['vo 'path 'path-vars] ['vo 'path 'path-vars 'options]]
+      'removeFrom]
   })
 
 (defn is-published? [vo]

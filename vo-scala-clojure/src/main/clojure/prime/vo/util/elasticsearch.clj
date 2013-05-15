@@ -174,10 +174,17 @@
 (defn hexify-path "Recursively walks path.
   Maps keywords to hex-names (for JSON access) and keeps all other values as they are."
   [^ValueObject vo path]
-  (assert (instance? ValueObject vo) (print-str vo "is not a ValueObject (possibly a VO leaf node). path =" path))
+  (assert (or (empty? path) (instance? ValueObject vo))
+              (print-str vo "is not a ValueObject (possibly a VO leaf node). path =" path))
   (if-let [step (first path)]
     (if-not (keyword? step)
-      (cons step (hexify-path vo (rest path))) ; leave step as is
+      (cons 
+        (if (map? step)
+          (let [[k v] (first step)]
+            (assert (= 1 (count step)))
+            { (first (hexify-path vo [k])) v })
+        #_else step)
+        (hexify-path vo (rest path))) ; leave step as is
     #_else
       (let [manifest (.voManifest vo)
             field (.findOrNull manifest step)
@@ -512,7 +519,7 @@
         (clojure.core/filter val {
           :listener listener, :ignore-indices ignore-indices, :routing routing, :listener_threaded? listener-threaded?, :search-type search-type
           :operation-threading operation-threading, :query-hint query-hint, :scroll scroll, :source source
-          :extra-source (json/encode (into {} (clojure.core/filter val {
+          :extra-source (json/encode-smile (into {} (clojure.core/filter val {
             :query            (map-keywords->hex-fields vo query),
             :filter           filter,
             :from             from,
@@ -581,26 +588,31 @@
     :type   (Integer/toHexString (.. vo voManifest ID))
   })))
 
-(defn desolve-path-simple [vo path]
-  (loop [i 0 r "var path = ctx._source"]
+(defn- get-pos [step varname]
+  (let [[k v] (first step)]
+    (assert (string? k) k)
+    (apply str "var pos = -1; for (var i = 0; (i < path.size() && pos == -1); i++) { if(path[i]['" k "'] == n" varname ") { pos = i; }}")))
+
+(defn- get-pos-for-str [step]
+  (apply str "var pos = -1; for (var i = 0; (i < path.size() && pos == -1); i++) { if(path[i] == " (json/encode step) ") { pos = i; }}"))
+
+(defn resolve-path-simple [path]
+  (loop [i 0 r "var path = ctx._source" varnum -1]
     (let [step (nth path i nil)]
       (if (nil? step)
-        r ; Return result
-        (let [r 
+        [r varnum] ; Return result
+        (let [varnum (if (map? step) (inc varnum) #_else varnum)
+          r
           (cond
-            (keyword? step) (str r "['" (.. vo voManifest (findOrNull step)) "']")
-            (number? step) (str r "[" step "]")
-            (map? step) (str r "; var pos = -1; for (var i = 0; (i < path.size() && pos == -1); i++) { if(path[i]['" (keyword->hex-field vo (key (first step))) "'] == '" (prime.types/to-String (val (first step))) "') { pos = i; }} path = path[pos]")
+            (map? step) (str r "; " (get-pos step varnum) " path = path[pos]")
+            :else (str r "[" step "]")
           )]
-          (recur (inc i) r))))))
-;(keyword? step) (str r "path = path['" (String/toHexString (.. vo voManifest (findOrNull step))) "'];")
-;if(path[i]['" (String/toHexString (.. vo voManifest (findOrNull (first step)))) "'] == '" (second step) "'') {
+          (recur (inc i) r varnum))))))
 
-(defn desolve-path [vo path]
+(defn resolve-path [vo path]
   (if (empty? path)
     nil
-    (desolve-path-simple vo path)
-    ))
+    (resolve-path-simple (hexify-path vo path))))
 
 (defn script-query [client index vo id script params options]
   (let [type (Integer/toHexString (.. vo voManifest ID))
@@ -615,104 +627,73 @@
 
 ;TODO convert names!
 ; TODO -> Use insertAt script for this. Except leave position in .add(newval).
-(defn appendTo "Add something to the end of an array" [client index ^ValueObject vo id options]
-  {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
-  (script-query client index vo id 
-    (apply str (map #(str "ctx._source['" % "'] += v" % ";") (keys vo))) 
-    (into  {}  (map #(let [[k v] %1] [(str "v" k) v]) vo)) options))
-
-; (insertAt (Publication{:id 12}) [:spreads {:id 12} :frames 12] {:id 14 :x 300 :y 100})
-(defn insertAt [client index vo path value options]
-  ;{:pre [(instance? ValueObject vo) (not (nil? id)) index (not (vector? value))]}
-  (binding [prime.vo/*voseq-key-fn* field-hexname]
+(defn appendTo "Add something to the end of an array" 
+  [client index vo path path-vars value options]
+  {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
   (let [
-    desolved-path (desolve-path vo (pop path))
-    scripts (apply str desolved-path ".add(position, newval);")
-    parameters {:position (last path) :newval value}
+    [resolved-path varnum]  (resolve-path vo (pop path))
+    script                  (apply str resolved-path ".add( newval);")
+    parameters              (into {} (cons [:to (last path) :newval value] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
     ]
-  (prn desolved-path)
-  (prn scripts)
-  (prn parameters)
-  )))
-; {
-;   "script": "var folders = ctx._source['1806']; folders.add(position, newval); ctx._source['1806'] = folders",
-;   "params": {
-;     "newval": "Example folder!",
-;     "position": 2
-;   }
-; }
-; Deeplinked
-; {"script":"var path = ctx._source['3f02']['4200']; foreach (sub : path){if(sub['1d00'] == '518a0d163e4a217c54610946'){sub['4301'].add(0, {'1d00': 1});}}"}
+    (script-query client index vo (:id vo) script parameters options)))
 
-(defn moveTo [client index vo id path options]
+(defn insertAt [client index vo path path-vars value options]
+  {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
+  (let [
+    [resolved-path varnum]  (resolve-path vo (pop path))
+    script                  (apply str resolved-path ".add(to, newval);")
+    parameters              (into {} (cons [:to (last path) :newval value] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
+    ]
+    (script-query client index vo (:id vo) script parameters options)))
+
+(defn moveTo [client index vo path path-vars to options]
   ;{:pre [(instance? ValueObject vo) (not (nil? id)) index]}
-  (assert (number? (last path)) "Last step of the path has to be a number")
-  (assert (number? (:to options)) ":to in options is required and has to be a number!")
-  (binding [prime.vo/*voseq-key-fn* field-hexname] 
-    (let [
-      desolved-path (desolve-path vo path {:ignore-last-num true})
-      scripts 
-        (apply str "var tmp = " (:result desolved-path) "; var tmpval = tmp.get(from); tmp.remove(from); tmp.add(to, tmpval); " (:result desolved-path) " = tmp;")
-      newval (get-in vo (:steps desolved-path))
-      parameters {:from (last path) :to (:to options)}
-      ]
-    (prn desolved-path)
-    (prn scripts)
-    (prn parameters)
-    )))
-; {
-;   "script": "var folders = ctx._source['1806']; var tmpval = folders.get(from); folders.remove(from); folders.add(to, tmpval); ctx._source['1806'] = folders",
-;   "params": {
-;     "from": 2,
-;     "to": 0
-;   }
-; }
+  (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
+  (let [
+    [resolved-path varnum] (resolve-path vo (pop path))
+    last-pathnode (first (hexify-path vo [(last path)]))
+    from-pos-loop (cond
+      (string? last-pathnode) (get-pos-for-str last-pathnode)
+      (map? last-pathnode) (get-pos last-pathnode (inc varnum))
+      (number? last-pathnode) (apply str "var pos = " last-pathnode ";"))
+    script 
+      (apply str resolved-path "; " from-pos-loop "; var from = pos; var tmpval = path.get(from); path.remove(from); if( to < 0 ) { to = path.size() + to; } if (to < 0 ) {to = 0; } if (to > path.size() ) { to = path.size()-1 } path.add(to, tmpval);")
+    newval (get-in vo (:steps resolved-path))
+    parameters (into {} (cons [:to to] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
+    ]
+    (script-query client index vo (:id vo) script parameters options)))
 
-(defn replaceAt [client index vo id path options]
+(defn replaceAt [client index vo path path-vars value options]
   (assert (number? (last path)) "Last step of the path has to be a number")
-  (assert (number? (:to options)) ":to in options is required and has to be a number!")
-  (binding [prime.vo/*voseq-key-fn* field-hexname] 
-    (let [
-      desolved-path (desolve-path vo path {:ignore-last-num true})
-      scripts 
-        (apply str "var tmp = " (:result desolved-path) "; tmp.set(position, newval);" (:result desolved-path) " = tmp;")
-      newval (get-in vo (:steps desolved-path))
-      parameters {:from (last path) :to (:to options)}
-      ]
-    (prn desolved-path)
-    (prn scripts)
-    (prn parameters)
-    )))
-; {
-;   "script": "var folders = ctx._source['1806']; folders.set(position, newval); ctx._source['1806'] = folders",
-;   "params": {
-;     "newval": "Example folder!",
-;     "position": 2
-;   }
-; }
+  (let [
+    [resolved-path varnum]  (resolve-path vo path)
+    script                  (apply str resolved-path " = newval;")
+    parameters              (into {} (cons [:newval value] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
+    ]
+    (script-query client index vo (:id vo) script parameters options)))
 
-(defn removeFrom [client index vo id path options]
+(defn mergeAt [client index vo path path-vars options]
   (assert (number? (last path)) "Last step of the path has to be a number")
-  (assert (number? (:to options)) ":to in options is required and has to be a number!")
-  (binding [prime.vo/*voseq-key-fn* field-hexname] 
-    (let [
-      desolved-path (desolve-path vo path {:ignore-last-num true})
-      scripts 
-        (apply str "var tmp = " (:result desolved-path) "; tmp.remove(from); " (:result desolved-path) " = tmp;")
-      newval (get-in vo (:steps desolved-path))
-      parameters {:from (:from options)}
-      ]
-    (prn desolved-path)
-    (prn scripts)
-    (prn parameters)
-    )))
-; {
-;   "script": "var folders = ctx._source['1806']; folders.remove(position); ctx._source['1806'] = folders",
-;   "params": {
-;     "newval": "Test subject",
-;     "position": 4
-;   }
-; }
+  (let [
+    [resolved-path varnum]  (resolve-path vo path)
+    script                  (apply str resolved-path "; foreach (x : values) { path[x] = values[x]; }")
+    parameters              (into {} (cons  [:values (get-in vo (map #(if-not (keyword? %) 0 %) path))] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
+    ]
+    (script-query client index vo (:id vo) script parameters options)))
+
+(defn removeFrom [client index vo path path-vars options]
+  (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
+  (let [
+    [resolved-path varnum]  (resolve-path vo (pop path))
+    last-pathnode           (first (hexify-path vo [(last path)]))
+    from-pos-loop           (cond
+                              (string? last-pathnode) (get-pos-for-str last-pathnode)
+                              (map? last-pathnode) (get-pos last-pathnode (inc varnum))
+                              (number? last-pathnode) (apply str "var pos = " last-pathnode ";"))
+    script                  (apply str resolved-path "; " from-pos-loop "; path.remove(pos);")
+    parameters              (into {}  (map-indexed #(do [(str "n" %1) %2]) path-vars))
+    ]
+    (script-query client index vo (:id vo) script parameters options)))
 
 ;
 ; Query helpers

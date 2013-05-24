@@ -136,8 +136,8 @@ class MessagePackResource <Data> implements IDisposable
 			e   = events.receive,
 			uri = uriSuffix == null? uriPrefix : new URI(uriPrefix.string + uriSuffix);
 		
-		onComplete.handler	= handleGET;
-		onError.handler		= events.receive.error.send;
+		onComplete.setArgsHandler(handleGET);
+		onError.setArgsHandler(events.receive.error.send);
 		
 #if debug getStarted = prime.utils.TimerUtil.stamp(); #end
 		l.requestBinary(uri, method);
@@ -164,8 +164,8 @@ class MessagePackResource <Data> implements IDisposable
 		l.bytes		 		= bytes;
 		bytesSending 		= l.bytesTotal;
 		// Send
-		onComplete.handler	= handlePOST;
-		onError.handler		= cast(events.send.error, Signal1<Dynamic>).send;
+		onComplete.setArgsHandler(handlePOST);
+		onError.setArgsHandler(cast(events.send.error, Signal1<Dynamic>).send);
 #if debug getStarted 		= prime.utils.TimerUtil.stamp(); #end
 		l.sendBinary(uri);
 		e.started.send();
@@ -182,8 +182,8 @@ class MessagePackResource <Data> implements IDisposable
 		data = deserialize( loader.data, reader );
 		events.receive.completed.send();
 		
-		onComplete.handler	= doNothing;
-		onError.handler		= cast doNothing;
+		onComplete.setVoidHandler(doNothing);
+		onError.setVoidHandler(doNothing);
 	}
 	
 
@@ -196,8 +196,8 @@ class MessagePackResource <Data> implements IDisposable
 		bytesSending = 0;
 		events.send.completed.send();
 		
-		onComplete.handler	= doNothing;
-		onError.handler		= cast doNothing;
+		onComplete.setVoidHandler(doNothing);
+		onError.setVoidHandler(doNothing);
 	}
 
 	

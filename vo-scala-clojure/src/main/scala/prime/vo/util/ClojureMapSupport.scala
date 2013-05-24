@@ -1,15 +1,37 @@
 package prime.vo.util
  import prime.vo._
  import prime.vo.source._
- import clojure.lang.{Var, RT, Util, IFn, Keyword, MapEntry, MapEquivalence}
+ import clojure.lang.{Var, RT, Util, IFn, IKeywordLookup, ILookupThunk, Keyword, MapEntry, MapEquivalence}
  import clojure.lang.{ASeq, ISeq, Counted, IPersistentCollection, IPersistentMap, IPersistentVector, IPending, Indexed}
 
 object ClojureSupport {
-  /** Executes field.get and wraps the result if it is a Scala Seq type */
-  def get[T <: ValueObject](field : ValueObjectField[T], obj : T): AnyRef = field(obj) match {
-    case v:scala.collection.Seq[Any] => ScalaSeqWrapper(v)(field.valueType.convert,null);
+  /** Wraps the obj if it is a Scala Seq type */
+  def clojurify[T <: ValueObject](field : ValueObjectField[T], value : Any): AnyRef = value match {
+    case v:scala.collection.Seq[_] => ClojureVectorSupport.asClojure(v.asInstanceOf[scala.collection.Seq[Any]])(field.valueType.convert,null);
     case v:AnyRef => v;
   }
+
+  /** Returns the value, or wrapped Scala collection value when given field is set, or notFound if field is not set. */
+  final def valAt[T <: ValueObject](f : ValueObjectField[T], obj : T, notFound: AnyRef): AnyRef = {
+    if (f in obj) clojurify(f, f(obj));
+    else notFound;
+  }
+
+  /** Returns
+    - the value (or wrapped Scala collection) when given field is set,
+    - or empty value-object instance if field is not set and is a ValueObject field
+    - or null if field is not set, and it is a simple value field.
+  */
+  final def valAt[T <: ValueObject](f : ValueObjectField[T], obj : T) : AnyRef = f match {
+    case f : VOValueObjectField[_,_] => f(obj);
+    case f : ValueObjectField[_]     => {
+      if      (f in obj)           clojurify(f, f(obj))
+      else if (f.valueType.isLazy) clojurify(f, f.defaultValue)
+      else                         null;
+    }
+    case null => null;
+  }
+
 
   RT.loadResourceScript("prime/vo.clj");
   val seqFieldFn = RT.`var`("prime.vo", "*voseq-key-fn*");
@@ -20,12 +42,15 @@ trait ClojureMapSupport extends IPersistentMap
  with ClojureFn
  with Indexed
  with IPending
+ with IKeywordLookup
  with JavaMapSupport[Keyword] {
   this: ValueObject =>
 
-  protected var _hash : Int = -1;
+  import ClojureSupport.clojurify;
+
+  private[this] var _hash : Int = -1;
   override def hashCode = if(_hash != -1) _hash else {
-    _hash = clojure.lang.APersistentMap.mapHash(this);
+    _hash = this.getClass.hashCode ^ clojure.lang.APersistentMap.mapHash(this);
     _hash
   }
 
@@ -53,7 +78,7 @@ trait ClojureMapSupport extends IPersistentMap
   final def entryAt(key: Any) = try {
     val f = voManifest.findOrNull(key);
     if (f != null && (f in self))
-      new MapEntry(f.keyword, ClojureSupport.get(f,self));
+      new MapEntry(f.keyword, clojurify(f, f(self)));
     else
       null;
   }
@@ -74,19 +99,6 @@ trait ClojureMapSupport extends IPersistentMap
     //TODO: Benchmark if typecheck before unapply matters
     case v : ValueSource => conj(v);
     case ValueSource(v)  => conj(v);
-
-    case _ =>
-       //FIXME: pretty inefficient!
-      var ret : IPersistentMap = this;
-      var es = RT.seq(o);
-      while (es != null)
-      {
-        val e = es.first.asInstanceOf[java.util.Map.Entry[_,_]];
-        ret = ret.assoc(e.getKey(), e.getValue());
-
-        es = es.next();
-      }
-      ret;
   }
 
   protected def hasSameKeysAndValues(m : java.util.Map[_,_]) : Boolean = {
@@ -152,7 +164,7 @@ trait ClojureMapSupport extends IPersistentMap
     def field = voManifest(index);
     def first = {
       val f = field;
-      new MapEntry(if (seqFieldFn == null) f.keyword else seqFieldFn.invoke(f), ClojureSupport.get(f,self));
+      new MapEntry(if (seqFieldFn == null) f.keyword else seqFieldFn.invoke(f), clojurify(f, f(self)));
     }
 
     def next  = if (remainingBits != 0) {
@@ -169,14 +181,14 @@ trait ClojureMapSupport extends IPersistentMap
     def withMeta(meta : IPersistentMap) = new Seq(seqFieldFn, remainingBits, index, meta);
   }
 
-  def seq = {
-    val bits  = voIndexSet;
+  def seq(bits : Int) = {
     if (bits != 0) {
       val index = java.lang.Integer.numberOfTrailingZeros(bits);
       new Seq(ClojureSupport.seqFieldFn.deref.asInstanceOf[IFn], bits >>> (1 + index), index)
     }
     else null;
   }
+  def seq = this.seq(voIndexSet);
 
   // ---
   // IPersistentMap
@@ -185,14 +197,20 @@ trait ClojureMapSupport extends IPersistentMap
   
   // IPersistentMap interfaces
   // ILookup
-  final def valAt (key: Any, notFound: AnyRef): AnyRef = {
-    val f  = voManifest.findOrNull(key);
-    if (f != null && (f in self))
-      ClojureSupport.get(f,self);
-    else
-      notFound;
+  final def valAt (key: Any) : AnyRef = voManifest.findOrNull(key) match {
+    case null => null;
+    case f    => ClojureSupport.valAt(f, self);
   }
-  final def valAt (key: Any) : AnyRef = valAt(key, null);
+  final def valAt (key: Any, notFound: AnyRef): AnyRef = voManifest.findOrNull(key) match {
+    case null => null;
+    case f    => ClojureSupport.valAt(f, self, notFound);
+  }
+
+  // IKeywordLookup
+  final def getLookupThunk(key: Keyword): ILookupThunk = voManifest.findOrNull(key) match {
+    case null => throw new ValueObjectManifest.NoSuchFieldException(this, key.toString);
+    case f    => f.asInstanceOf[ILookupThunk];
+  }
 
   // Iterable
   /**
@@ -208,10 +226,13 @@ trait ClojureMapSupport extends IPersistentMap
   // ---
   // IFn: VO as function from key to value
   // ---
-  override final def invoke  (key: AnyRef)                   : AnyRef = invoke(key, null)
+  override final def invoke  (key: AnyRef)                   : AnyRef = voManifest.findOrNull(key) match {
+    case null => throw new ValueObjectManifest.NoSuchFieldException(this, key.toString);
+    case f    => ClojureSupport.valAt(f, self)
+  }
   override final def invoke  (key: AnyRef, notFound: AnyRef) : AnyRef = voManifest.findOrNull(key) match {
-    case null => throw new ValueObjectManifest.NoSuchFieldException(voManifest, key.toString);
-    case f    => if (f in self) ClojureSupport.get(f, self) else notFound;
+    case null => throw new ValueObjectManifest.NoSuchFieldException(this, key.toString);
+    case f    => ClojureSupport.valAt(f, self, notFound)
   }
 
   final def applyTo (arglist: ISeq) = RT.boundedLength(arglist, 20) match {
@@ -223,12 +244,6 @@ trait ClojureMapSupport extends IPersistentMap
   // ---
   // Indexed
   // ---
-  final def nth(index : Int) = ClojureSupport.get(voManifest(index), self);
-  final def nth(index : Int, notFound:AnyRef) = {
-    val f  = voManifest.findOrNull(index);
-    if (f != null && (f in self))
-      ClojureSupport.get(f,self);
-    else
-      notFound;
-  }
+  final def nth(index : Int)                  = ClojureSupport.valAt(voManifest(index), self);
+  final def nth(index : Int, notFound:AnyRef) = ClojureSupport.valAt(voManifest(index), self, notFound);
 }

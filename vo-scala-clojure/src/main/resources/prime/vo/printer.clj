@@ -76,6 +76,7 @@
   (print-vo vo pr-on w))
 
 (prefer-method print-method ValueObject clojure.lang.IPersistentMap)
+(prefer-method print-method ValueObject java.util.Map)
 
 ;; BROKEN!
 ;; - http://stackoverflow.com/questions/6427967/clojure-reader-macro

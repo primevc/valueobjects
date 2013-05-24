@@ -27,12 +27,9 @@
  *  Danny Wilson	<danny @ prime.vc>
  */
 package prime.bindable.collections;
- import prime.bindable.collections.RevertableArrayList;
  import prime.signals.Signal1;
- import prime.core.traits.IValueObject;
  import prime.tools.valueobjects.ObjectChangeSet;
  import prime.tools.valueobjects.ValueObjectBase;
- import prime.utils.FastArray;
   using prime.utils.FastArray;
   using prime.utils.IfUtil;
   using prime.utils.TypeUtil;
@@ -46,7 +43,7 @@ package prime.bindable.collections;
  * @author Danny Wilson
  * @creation-date Dec 20, 2010
  */
-class VOArrayList<DataType : IValueObject> extends ArrayList<DataType>, implements haxe.rtti.Generic
+@:generic class VOArrayList<DataType : prime.core.traits.IValueObject> extends ArrayList<DataType>
 {
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;

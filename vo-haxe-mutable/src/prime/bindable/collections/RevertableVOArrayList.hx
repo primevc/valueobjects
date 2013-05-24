@@ -27,24 +27,18 @@
  *  Danny Wilson	<danny @ prime.vc>
  */
 package prime.bindable.collections;
- import prime.bindable.collections.RevertableArrayList;
- import prime.bindable.collections.VOArrayList;
+ import prime.bindable.collections.VOArrayList;	//imports VOArrayListUtil
  import prime.signals.Signal1;
- import prime.core.traits.IValueObject;
- import prime.bindable.RevertableBindableFlags;
-
  import prime.tools.valueobjects.ObjectChangeSet;
  import prime.tools.valueobjects.ValueObjectBase;
- import prime.utils.FastArray;
   using prime.utils.BitUtil;
-  using prime.tools.valueobjects.ChangesUtil;
+  using prime.bindable.collections.ListChange;
   using prime.utils.FastArray;
   using prime.utils.IfUtil;
-  using prime.bindable.collections.ListChange;
 
 
-private typedef ListFlags = RevertableArrayListFlags;
-private typedef BindFlags = RevertableBindableFlags;
+private typedef ListFlags = prime.bindable.collections.RevertableArrayList.RevertableArrayListFlags;
+private typedef BindFlags = prime.bindable.RevertableBindableFlags;
 
 
 /**
@@ -57,9 +51,7 @@ private typedef BindFlags = RevertableBindableFlags;
  * @author Danny Wilson
  * @creation-date Dec 20, 2010
  */
-class RevertableVOArrayList<DataType : IValueObject>
-   extends ReadOnlyArrayList < DataType >, implements IRevertableList < DataType >, implements IReadOnlyList < DataType >, implements haxe.rtti.Generic
-// extends RevertableArrayList<DataType>, implements haxe.rtti.Generic, implements IRevertableList < DataType >
+@:generic class RevertableVOArrayList <DataType:prime.core.traits.IValueObject> extends ReadOnlyArrayList <DataType>, implements IRevertableList <DataType>
 {
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;

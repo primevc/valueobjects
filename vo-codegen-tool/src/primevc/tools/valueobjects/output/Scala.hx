@@ -168,7 +168,7 @@ private class ScalaBase
 	}
 }
 
-class Scala extends ScalaBase, implements CodeGenerator
+class Scala extends ScalaBase implements CodeGenerator
 {
 	//private static var writelist = new List<Scala>();
 
@@ -916,7 +916,7 @@ object ${def.name} extends Enum {
 }
 
 
-class MutableScala extends ScalaBase, implements CodeGenerator
+class MutableScala extends ScalaBase implements CodeGenerator
 {
 	//private static var writelist = new List<MutableScala>();
 

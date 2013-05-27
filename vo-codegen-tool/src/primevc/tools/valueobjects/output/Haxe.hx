@@ -282,8 +282,8 @@ class Haxe implements CodeGenerator
 			a(" implements "); a(def.module.fullName); a(".I"); a(def.name); a("VO,");
 			a(" implements primevc.core.traits.IEditableValueObject");
 			if (!def.isMixin && def.superClass == null) {
-				a(", implements primevc.core.traits.IClonable < " + def.name + "VO >");
-				a(", implements primevc.core.traits.IDuplicatable < " + def.name + "VO >");
+				a(" implements primevc.core.traits.IClonable < " + def.name + "VO >");
+				a(" implements primevc.core.traits.IDuplicatable < " + def.name + "VO >");
 			}
 		}
 		else
@@ -292,7 +292,7 @@ class Haxe implements CodeGenerator
 				a(" implements "); addFullName(t, true); a(",");
 			}
 			
-			a(" implements IEditEnabledValueObject, implements IMessagePackable");
+			a(" implements IEditEnabledValueObject implements IMessagePackable");
 		}
 		
 		a("\n{\n");

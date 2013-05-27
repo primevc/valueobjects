@@ -51,7 +51,7 @@ private typedef BindFlags = primevc.core.RevertableBindableFlags;
  * @author Danny Wilson
  * @creation-date Dec 20, 2010
  */
-@:generic class RevertableVOArrayList <DataType:primevc.core.traits.IValueObject> extends ReadOnlyArrayList <DataType>, implements IRevertableList <DataType>
+@:generic class RevertableVOArrayList <DataType:primevc.core.traits.IValueObject> extends ReadOnlyArrayList <DataType> implements IRevertableList <DataType>
 {
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;

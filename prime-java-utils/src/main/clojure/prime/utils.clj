@@ -13,3 +13,38 @@
     (mapify foo))    ; => {:foo \"bar\"}"
   [& symbols]
   `(into {} (filter second ~(into [] (for [item symbols] [(keyword item) item])))))
+
+
+(defmacro try-let
+  "Behaves like try except the symbols in bindings are available to the catch
+  and finally clauses. The bindings' values are evaluated sequentially. If an
+  exception is thrown while evaluating a binding value, it and every subsequent
+  binding value will be nil.  The catch clauses handle exceptions thrown by the
+  body of the try and by the evaluation of binding values.
+
+  Example:
+  (try-let [from (API/open from-addr)
+            to   (API/open to-addr)]
+    (do-stuff from to)
+    (finally
+      (if to (doto to .flush .close))
+      (if from (.close from))))"
+  {:arglists '([[bindings*] try-expr* catch-clause* finally-clause?])}
+  [bindings & exprs]
+  (let [ts (gensym)
+        names# (take-nth 2 bindings)
+        valex# (take-nth 2 (drop 1 bindings))
+        [body# cf#] (split-with (comp not #{'catch 'finally} first) exprs)]
+    `(let [~ts nil
+           ~@(interleave names# (repeat nil))
+           ~@(interleave
+               (map vector names# (repeat ts))
+               (for [v valex#]
+                 `(if ~ts [nil ~ts]
+                   (try [~v nil]
+                     (catch Throwable t# [nil t#])))))]
+      (try
+        (if ~ts
+          (throw ~ts)
+          (do ~@body#))
+        ~@cf#))))

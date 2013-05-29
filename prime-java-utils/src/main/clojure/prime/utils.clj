@@ -48,3 +48,19 @@
           (throw ~ts)
           (do ~@body#))
         ~@cf#))))
+
+
+(defmacro with-resource
+  "Use a resource, of which one can supply the clean-up function
+  oneself. For example:
+
+  (with-resource [c (start-cassandra)] #(stop-cassandra %)
+    (do-stuff-with c))"
+  [binding clean-fn & body]
+  (let [bindsym (gensym "binding")]
+    `(let [~bindsym ~(second binding)
+           ~(first binding) ~bindsym]
+       (try
+         ~@body
+         (finally
+           (~clean-fn ~bindsym))))))

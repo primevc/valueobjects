@@ -30,7 +30,7 @@ trait FileRepository {
     * @param ref The FileRef to test.
     */
   final def exists(ref: FileRef): Boolean = this match {
-    case gc: GarbageCollectableFR => existsImpl(rnf) // TODO: invoke Storm
+    case gc: GarbageCollectableFR => existsImpl(ref) // TODO: invoke Storm
     case fr: FileRepository       => existsImpl(ref)
   }
 

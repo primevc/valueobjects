@@ -594,6 +594,7 @@
     (apply str "var pos = -1; for (var i = 0; (i < path.size() && pos == -1); i++) { if(path[i]['" k "'] == n" varname ") { pos = i; }}")))
 
 (defn- get-pos-for-str [step]
+  (prn "Step: " step)
   (apply str "var pos = -1; for (var i = 0; (i < path.size() && pos == -1); i++) { if(path[i] == " (json/encode step) ") { pos = i; }}"))
 
 (defn resolve-path-simple [path]
@@ -605,7 +606,7 @@
           r
           (cond
             (map? step) (str r "; " (get-pos step varnum) " path = path[pos]")
-            :else (str r "[" step "]")
+            :else (str r "['" step "']")
           )]
           (recur (inc i) r varnum))))))
 
@@ -621,6 +622,7 @@
       :index index
       :source (json/encode-smile
         (binding [prime.vo/*voseq-key-fn* field-hexname] {
+          :p (prn script params)
           :script script
           :params params
         })))))))
@@ -630,11 +632,13 @@
 (defn appendTo "Add something to the end of an array" 
   [client index vo path path-vars value options]
   {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
+  (prn vo path path-vars value options)
   (let [
-    [resolved-path varnum]  (resolve-path vo (pop path))
-    script                  (apply str resolved-path ".add( newval);")
-    parameters              (into {} (cons [:to (last path) :newval value] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
+    [resolved-path varnum]  (resolve-path vo path)
+    script                  (apply str resolved-path ".add(newval);")
+    parameters              (into {} (cons [:newval value] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
     ]
+    (prn script parameters)
     (script-query client index vo (:id vo) script parameters options)))
 
 (defn insertAt [client index vo path path-vars value options]
@@ -642,37 +646,43 @@
   (let [
     [resolved-path varnum]  (resolve-path vo (pop path))
     script                  (apply str resolved-path ".add(to, newval);")
-    parameters              (into {} (cons [:to (last path) :newval value] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
+    parameters              (into {} (merge {:to (last path) :newval value} (map-indexed #(do {(str "n" %1) %2}) path-vars)))
     ]
     (script-query client index vo (:id vo) script parameters options)))
 
 (defn moveTo [client index vo path path-vars to options]
-  ;{:pre [(instance? ValueObject vo) (not (nil? id)) index]}
+  {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
   (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
   (let [
-    [resolved-path varnum] (resolve-path vo (pop path))
-    last-pathnode (first (hexify-path vo [(last path)]))
-    from-pos-loop (cond
-      (string? last-pathnode) (get-pos-for-str last-pathnode)
-      (map? last-pathnode) (get-pos last-pathnode (inc varnum))
-      (number? last-pathnode) (apply str "var pos = " last-pathnode ";"))
-    script 
-      (apply str resolved-path "; " from-pos-loop "; var from = pos; var tmpval = path.get(from); path.remove(from); if( to < 0 ) { to = path.size() + to; } if (to < 0 ) {to = 0; } if (to > path.size() ) { to = path.size()-1 } path.add(to, tmpval);")
-    newval (get-in vo (:steps resolved-path))
-    parameters (into {} (cons [:to to] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
+    [resolved-path varnum]  (resolve-path vo (pop path))
+    last-pathnode           (first (hexify-path vo [(last path)]))
+    from-pos-loop           (cond
+                              (string? last-pathnode) (get-pos-for-str last-pathnode)
+                              (map? last-pathnode) (get-pos last-pathnode (inc varnum))
+                              (number? last-pathnode) (apply str "var pos = " last-pathnode ";"))
+    script                  (apply str resolved-path "; " from-pos-loop "; var from = pos; var tmpval = path.get(from); path.remove(from); if( to < 0 ) { to = path.size() + to; } if (to < 0 ) {to = 0; } if (to > path.size() ) { to = path.size()-1 } path.add(to, tmpval);")
+    newval                  (get-in vo (:steps resolved-path))
+    parameters              (into {} (merge {:to to} (map-indexed #(do {(str "n" %1) %2}) path-vars)))
     ]
     (script-query client index vo (:id vo) script parameters options)))
 
 (defn replaceAt [client index vo path path-vars value options]
-  (assert (number? (last path)) "Last step of the path has to be a number")
+  {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
+  (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
   (let [
-    [resolved-path varnum]  (resolve-path vo path)
-    script                  (apply str resolved-path " = newval;")
+    [resolved-path varnum]  (resolve-path vo (pop path))
+    last-pathnode           (first (hexify-path vo [(last path)]))
+    from-pos-loop           (cond 
+                              (string? last-pathnode) (get-pos-for-str last-pathnode)
+                              (map? last-pathnode) (get-pos last-pathnode (inc varnum))
+                              (number? last-pathnode) (apply str "var pos = " last-pathnode ";"))
+    script                  (apply str resolved-path "; " from-pos-loop "; path[pos] = newval;")
     parameters              (into {} (cons [:newval value] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
     ]
     (script-query client index vo (:id vo) script parameters options)))
 
 (defn mergeAt [client index vo path path-vars options]
+  {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
   (assert (number? (last path)) "Last step of the path has to be a number")
   (let [
     [resolved-path varnum]  (resolve-path vo path)
@@ -682,6 +692,7 @@
     (script-query client index vo (:id vo) script parameters options)))
 
 (defn removeFrom [client index vo path path-vars options]
+  {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
   (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
   (let [
     [resolved-path varnum]  (resolve-path vo (pop path))

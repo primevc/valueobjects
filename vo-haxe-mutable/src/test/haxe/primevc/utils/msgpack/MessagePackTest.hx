@@ -1,13 +1,13 @@
-package primevc.utils.msgpack;
+package prime.utils.msgpack;
  import haxe.unit.TestCase;
  import haxe.io.Input;
  import haxe.io.Output;
  import haxe.io.BytesInput;
  import haxe.io.BytesOutput;
- import primevc.types.Number;
- import primevc.utils.FastArray;
- import primevc.utils.msgpack.Reader;
-  using primevc.utils.msgpack.Format;
+ import prime.types.Number;
+ import prime.utils.FastArray;
+ import prime.utils.msgpack.Reader;
+  using prime.utils.msgpack.Format;
 
 class MessagePackTest extends TestCase
 {
@@ -256,7 +256,7 @@ class MessagePackTest extends TestCase
 
 #if flash9
 
-	function test__uint32()	checkUInt(5, 0xce, primevc.types.Number.UINT_MAX)
+	function test__uint32()	checkUInt(5, 0xce, prime.types.Number.UINT_MAX)
 	function test2_uint32()	checkUInt(1, 0x00, 0)
 	function test3_uint32()	checkUInt(2, 0xcc, 255)
 	function test4_uint32()	checkUInt(3, 0xcd, 256)

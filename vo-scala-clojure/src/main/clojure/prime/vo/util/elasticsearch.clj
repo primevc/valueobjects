@@ -9,15 +9,24 @@
             [clj-elasticsearch.client :as ces])
   (:use [prime.vo.source :only [def-valuesource]])
   (:import [prime.types VORef EnumValue package$ValueType package$ValueTypes$Tdef package$ValueTypes$Tarray package$ValueTypes$Tenum]
-           [prime.vo IDField ValueObject ValueObjectField ValueObjectCompanion ID]
+           [prime.vo IDField ValueObject ValueObjectManifest ValueObjectField ValueObjectCompanion ID]
            [com.fasterxml.jackson.core JsonGenerator]
 
            org.elasticsearch.action.search.SearchResponse, [org.elasticsearch.search SearchHit, SearchHitField],
            org.elasticsearch.action.get.GetResponse))
 
-(set! *warn-on-reflection* true)
+;(set! *warn-on-reflection* true)
 
 ;(defonce es-client (ces/make-client :transport {:hosts ["127.0.0.1:9300"] :cluster-name (str "elasticsearch_" (System/getenv "USER"))}))
+
+; If Immutant is available, daemonize TransportClient
+(try
+  (require 'immutant.daemons)
+  (eval '(extend-type org.elasticsearch.client.Client
+    immutant.daemons/Daemon
+    (start [this])
+    (stop  [this] (.close this))))
+  (catch Exception e))
 
 (defn create-client [hosts cluster-name & options]
   (ces/make-client :transport {:hosts hosts :cluster-name cluster-name}))
@@ -68,8 +77,12 @@
       :prime.types/FileRef    {:index "not_analyzed"}
       #_default
         (condp instance? valueType
+          package$ValueTypes$Tdef   (mapping-field-type-defaults (.. ^package$ValueTypes$Tdef  valueType empty))
           package$ValueTypes$Tenum  (mapping-field-type-defaults (.. ^package$ValueTypes$Tenum valueType t valueSet first))
           package$ValueTypes$Tarray (assert false "array should be mapped as it's contents"))))
+
+  prime.vo.ValueObject
+  (mapping-field-type-defaults [vo] nil)
 )
 
 (defn mapping-field-type-name
@@ -109,8 +122,9 @@
     (conj {:store "no"
            ;:index_name (name field-key)
            :type       (mapping-field-type-name value-type)}
-      (if
-        (instance? package$ValueTypes$Tdef  value-type)
+      (if (and
+            (nil? (mapping-field-type-defaults value-type))
+            (instance? package$ValueTypes$Tdef  value-type))
           (let [^package$ValueTypes$Tdef value-type value-type
                 ^ValueObject             empty      (.. value-type empty)]
             (conj
@@ -157,6 +171,43 @@
 (defn ^String field-hexname [^ValueObjectField field]
   (Integer/toHexString (.id field)))
 
+(defn hexify-path "Recursively walks path.
+  Maps keywords to hex-names (for JSON access) and keeps all other values as they are."
+  [^ValueObject vo path]
+  (assert (or (empty? path) (instance? ValueObject vo))
+              (print-str vo "is not a ValueObject (possibly a VO leaf node). path =" path))
+  (if-let [step (first path)]
+    (if-not (keyword? step)
+      (cons 
+        (if (map? step)
+          (let [[k v] (first step)]
+            (assert (= 1 (count step)))
+            { (first (hexify-path vo [k])) v })
+        #_else step)
+        (hexify-path vo (rest path))) ; leave step as is
+    #_else
+      (let [manifest (.voManifest vo)
+            field (.findOrNull manifest step)
+            ^ValueObjectField field
+            (if field field
+            #_else
+              (let [fields (remove nil? (map #(.findOrNull ^ValueObjectManifest % step) (.subtypes manifest)))
+                    fcount (count fields)]
+                (assert (<= fcount 1) (print-str "Ambiguous keyword: "    step ", maps to multiple fields: " fields))
+                (assert (=  fcount 1) (print-str "No field found named: " step " in " manifest " or subtypes."))
+                (first fields)))
+            inner (.. field defaultValue)
+            inner (if (instance? scala.collection.immutable.Vector inner)
+                    (let [^package$ValueTypes$Tarray atype
+                          (.. field valueType)]
+                      (if (instance? package$ValueTypes$Tdef (.. atype innerType))
+                        (.empty ^package$ValueTypes$Tdef (.innerType atype))
+                      #_else nil))
+                  #_else inner)]
+        (assert field (str step " not found in " vo))
+        (cons (field-hexname field)
+              (hexify-path inner (rest path)))))))
+
 (defn keyword->hex-field   [^prime.vo.ValueObject vo, ^clojure.lang.Named key]
   (let [path (prime.vo/fields-path-seq vo (clojure.string/split (name key) #"[.]"))]
     (if path
@@ -197,6 +248,16 @@
         (term-kv-pair [v# k# kv-pair#]  [k# (. v# ~string-method)])
         (mapping-field-type-defaults [value#] {:type "string"}) )))
 
+(defmacro map-as-string-type  [class, elasticsearch-type, to-string-fn]
+  `(do
+    (doseq [add-encoder# [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
+      (add-encoder# ~class
+        (fn [in# ^JsonGenerator out#]
+          (.writeString out# (~to-string-fn in#)))))
+      (extend-type ~class, TermFilter
+        (term-kv-pair [v# k# kv-pair#]  [k# (~to-string-fn v#)])
+        (mapping-field-type-defaults [value#] {:type ~elasticsearch-type}) )))
+
 
 ;
 ; ElasticSearch index management (mapping API)
@@ -218,6 +279,12 @@
       :type   type
       :source {type mapping}
     }))))
+
+(defn index-exists? [es indices]
+  {:pre [(or (string? indices) (vector? indices)) (not-empty indices)]}
+  (-> (ces/exists-index es
+        {:indices (if (instance? String indices) [indices] #_else indices)})
+      :exists))
 
 (defn create-index
   ([es index-name vo->options-map]
@@ -259,7 +326,11 @@
       (.writeFieldName out (field-hexname k))
       (cond
         (instance? ValueObject v)
-          (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID))
+          ; First try to find and call a protocol implementation for this type immediately.
+          (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable v))]
+            (to-json v out)
+          ; else: Regular VO, no protocol found
+            (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID)))
 
         (vector? v)
           (let [innerType (. ^package$ValueTypes$Tarray (. k valueType) innerType)
@@ -276,6 +347,8 @@
 
 (defn encode-voref [^JsonGenerator out, ^VORef in ^String date-format ^Exception ex]
   (cheshire.generate/generate out (._id in) date-format ex))
+
+; Protocol based encoders
 
 (defn encode-instant [^org.joda.time.ReadableInstant in ^JsonGenerator out]
   (.writeNumber out (.getMillis in)))
@@ -294,7 +367,6 @@
 
 (doseq [add-encoder [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
   (add-encoder prime.types.EnumValue                encode-enum)
-  (add-encoder prime.vo.ValueObject                 encode-vo)
   (add-encoder java.net.URI                         encode-uri)
   (add-encoder java.net.URL                         encode-url)
   (add-encoder org.joda.time.ReadableInstant        encode-instant)
@@ -305,9 +377,14 @@
   (fn [orig-generate]
     (fn [^JsonGenerator jg obj ^String date-format ^Exception ex]
       (binding [prime.vo/*voseq-key-fn* identity]
+        ; First try to find and call a protocol implementation for this type immediately.
+        (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable obj))]
+          (to-json obj jg)
+        ; else: No protocol found
         (if (instance? ValueObject obj) (encode-vo     jg obj date-format ex)
         #_else(if (instance? VORef obj) (encode-voref  jg obj date-format ex)
-        #_else                          (orig-generate jg obj date-format ex)))))))
+        #_else                          (orig-generate jg obj date-format ex)
+)))))))
 
 
 ;
@@ -377,11 +454,12 @@
     (let [resp ^GetResponse
           (ces/get-doc es (assoc options, :type (Integer/toHexString (.. vo voManifest ID)), :index es-index, :format :java, :id (.. ^ID vo _id toString)))]
       (.apply (. vo voCompanion)
-              (ElasticSearch-ValueSource. (.. vo voManifest ID) (.sourceAsMap resp) resp)))))
+              (ElasticSearch-ValueSource. (.. vo voManifest ID) (.getSourceAsMap resp) resp)))))
 
 (defn put
   "options: see clj-elasticsearch.client/index-doc"
-  [es ^ValueObject vo index options]
+  [es index ^ValueObject vo options]
+  (prn es index vo options)
   (assert index ":index required")
   (assert (prime.vo/has-id? vo) (str "vo: " (prn-str vo) " requires an id"))
   (ces/index-doc es (conj options {
@@ -403,11 +481,11 @@
     (ElasticSearch-ValueSource. (Integer/parseInt (.type hit) 16) (source-fn hit) hit)))
 
 (defn scroll-seq [es, ^SearchResponse scroll-req keep-alive, from]
-  (let [ ^SearchResponse response (ces/scroll es {:scroll-id (.scrollId scroll-req) :scroll keep-alive, :format :java})
-          hits     (.. response hits hits)
-          num-hits (.. response hits totalHits)
+  (let [ ^SearchResponse response (ces/scroll es {:scroll-id (.getScrollId scroll-req) :scroll keep-alive, :format :java})
+          hits     (.. response getHits hits)
+          num-hits (.. response getHits totalHits)
           last-hit (+  from (count hits)) ]
-    (if (and (.scrollId response) (< last-hit num-hits))
+    (if (and (.getScrollId response) (< last-hit num-hits))
       (concat hits (lazy-seq (scroll-seq es response keep-alive last-hit)))
     #_else    hits)))
 
@@ -429,6 +507,7 @@
     ; ces/search parameters
     listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source]}]
   {:pre [(instance? ValueObject vo) (or (string? indices) (vector? indices)) (not-empty indices)]}
+  (assert (not (and size scroll)) "Error: Cannot use size and scroll in same query!")
     (let [
       typefilter {:type {:value (vo-hexname vo)}}
       filter     (map-keywords->hex-fields vo filter)
@@ -440,7 +519,7 @@
         (clojure.core/filter val {
           :listener listener, :ignore-indices ignore-indices, :routing routing, :listener_threaded? listener-threaded?, :search-type search-type
           :operation-threading operation-threading, :query-hint query-hint, :scroll scroll, :source source
-          :extra-source (json/encode (into {} (clojure.core/filter val {
+          :extra-source (json/encode-smile (into {} (clojure.core/filter val {
             :query            (map-keywords->hex-fields vo query),
             :filter           filter,
             :from             from,
@@ -464,7 +543,7 @@
       (with-meta
         (map
           (partial SearchHit->ValueObject (if fields SearchHit->fields #_else SearchHit->source) (. vo voCompanion))
-          (if-not scroll (.. response hits hits) #_else (scroll-seq es response scroll 0)))
+          (if-not scroll (.. response getHits hits) #_else (scroll-seq es response scroll 0)))
         {:request es-options, :response response})))
 
 (defn ^org.elasticsearch.action.index.IndexRequest ->IndexRequest [^String index ^String type ^String id, input options]
@@ -490,40 +569,16 @@
     })))
 
 (defn update
-  [es ^ValueObject vo id index {:as options :keys [fields]}]
+  [es index ^ValueObject vo id {:as options :keys [fields]}]
   {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
   (let [type    (Integer/toHexString (.. vo voManifest ID))
         id      (prime.types/to-String id)
         fields  (map field-hexname fields)]
     (ces/update-doc es (patched-update-options type id (assoc options :index index :doc vo)))))
 
-(defn insertAt "Add something to an array with a specific position" [es vo path value pos])
 
-(defn moveTo "Change position of an item in an array" [es vo path pos])
 
-;TODO:
-;  Convert fieldnames
-(defn appendTo "Add something to the end of an array" [es ^ValueObject vo id index options]
-  {:pre [(instance? ValueObject vo) (not (nil? id)) index]}
-  (let [type (Integer/toHexString (.. vo voManifest ID))
-        id   (prime.types/to-String id)]
-    (ces/update-doc es (patched-update-options type id (assoc options
-      :index index
-      :source (json/encode-smile
-        (binding [prime.vo/*voseq-key-fn* field-hexname] {
-          :script (apply str (map #(str "ctx._source['" % "'] += v" % ";") (keys vo)))
-          :params (into  {}  (map #(let [[k v] %1] [(str "v" k) v]) vo))
-        }))))
-    )))
-
-(defn replaceAt "Replaces a value in an array at given position" [es vo pos value])
-
-(defn removeByValue "Removes an item from an array by value" [es vo val])
-
-#_(defn update-if
-  [es ^ValueObject vo id predicate &])
-
-(defn delete [es ^ValueObject vo index {:as options :keys []}]
+(defn delete [es index ^ValueObject vo {:as options :keys []}]
   {:pre [(instance? ValueObject vo)]}
   (assert index ":index required")
   (assert (prime.vo/has-id? vo) (str "vo: " (prn-str vo) " requires an id"))
@@ -533,6 +588,123 @@
     :type   (Integer/toHexString (.. vo voManifest ID))
   })))
 
+(defn- get-pos [step varname]
+  (let [[k v] (first step)]
+    (assert (string? k) k)
+    (apply str "var pos = -1; for (var i = 0; (i < path.size() && pos == -1); i++) { if(path[i]['" k "'] == n" varname ") { pos = i; }}")))
+
+(defn- get-pos-for-str [step]
+  (prn "Step: " step)
+  (apply str "var pos = -1; for (var i = 0; (i < path.size() && pos == -1); i++) { if(path[i] == " (json/encode step) ") { pos = i; }}"))
+
+(defn resolve-path-simple [path]
+  (loop [i 0 r "var path = ctx._source" varnum -1]
+    (let [step (nth path i nil)]
+      (if (nil? step)
+        [r varnum] ; Return result
+        (let [varnum (if (map? step) (inc varnum) #_else varnum)
+          r
+          (cond
+            (map? step) (str r "; " (get-pos step varnum) " path = path[pos]")
+            :else (str r "['" step "']")
+          )]
+          (recur (inc i) r varnum))))))
+
+(defn resolve-path [vo path]
+  (if (empty? path)
+    nil
+    (resolve-path-simple (hexify-path vo path))))
+
+(defn script-query [client index vo id script params options]
+  (let [type (Integer/toHexString (.. vo voManifest ID))
+        id   (prime.types/to-String id)]
+    (ces/update-doc client (patched-update-options type id (assoc options
+      :index index
+      :source (json/encode-smile
+        (binding [prime.vo/*voseq-key-fn* field-hexname] {
+          :p (prn script params)
+          :script script
+          :params params
+        })))))))
+
+;TODO convert names!
+; TODO -> Use insertAt script for this. Except leave position in .add(newval).
+(defn appendTo "Add something to the end of an array" 
+  [client index vo path path-vars value options]
+  {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
+  (prn vo path path-vars value options)
+  (let [
+    [resolved-path varnum]  (resolve-path vo path)
+    script                  (apply str resolved-path ".add(newval);")
+    parameters              (into {} (cons [:newval value] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
+    ]
+    (prn script parameters)
+    (script-query client index vo (:id vo) script parameters options)))
+
+(defn insertAt [client index vo path path-vars value options]
+  {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
+  (let [
+    [resolved-path varnum]  (resolve-path vo (pop path))
+    script                  (apply str resolved-path ".add(to, newval);")
+    parameters              (into {} (merge {:to (last path) :newval value} (map-indexed #(do {(str "n" %1) %2}) path-vars)))
+    ]
+    (script-query client index vo (:id vo) script parameters options)))
+
+(defn moveTo [client index vo path path-vars to options]
+  {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
+  (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
+  (let [
+    [resolved-path varnum]  (resolve-path vo (pop path))
+    last-pathnode           (first (hexify-path vo [(last path)]))
+    from-pos-loop           (cond
+                              (string? last-pathnode) (get-pos-for-str last-pathnode)
+                              (map? last-pathnode) (get-pos last-pathnode (inc varnum))
+                              (number? last-pathnode) (apply str "var pos = " last-pathnode ";"))
+    script                  (apply str resolved-path "; " from-pos-loop "; var from = pos; var tmpval = path.get(from); path.remove(from); if( to < 0 ) { to = path.size() + to; } if (to < 0 ) {to = 0; } if (to > path.size() ) { to = path.size()-1 } path.add(to, tmpval);")
+    newval                  (get-in vo (:steps resolved-path))
+    parameters              (into {} (merge {:to to} (map-indexed #(do {(str "n" %1) %2}) path-vars)))
+    ]
+    (script-query client index vo (:id vo) script parameters options)))
+
+(defn replaceAt [client index vo path path-vars value options]
+  {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
+  (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
+  (let [
+    [resolved-path varnum]  (resolve-path vo (pop path))
+    last-pathnode           (first (hexify-path vo [(last path)]))
+    from-pos-loop           (cond 
+                              (string? last-pathnode) (get-pos-for-str last-pathnode)
+                              (map? last-pathnode) (get-pos last-pathnode (inc varnum))
+                              (number? last-pathnode) (apply str "var pos = " last-pathnode ";"))
+    script                  (apply str resolved-path "; " from-pos-loop "; path[pos] = newval;")
+    parameters              (into {} (cons [:newval value] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
+    ]
+    (script-query client index vo (:id vo) script parameters options)))
+
+(defn mergeAt [client index vo path path-vars options]
+  {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
+  (assert (number? (last path)) "Last step of the path has to be a number")
+  (let [
+    [resolved-path varnum]  (resolve-path vo path)
+    script                  (apply str resolved-path "; foreach (x : values) { path[x] = values[x]; }")
+    parameters              (into {} (cons  [:values (get-in vo (map #(if-not (keyword? %) 0 %) path))] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
+    ]
+    (script-query client index vo (:id vo) script parameters options)))
+
+(defn removeFrom [client index vo path path-vars options]
+  {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
+  (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
+  (let [
+    [resolved-path varnum]  (resolve-path vo (pop path))
+    last-pathnode           (first (hexify-path vo [(last path)]))
+    from-pos-loop           (cond
+                              (string? last-pathnode) (get-pos-for-str last-pathnode)
+                              (map? last-pathnode) (get-pos last-pathnode (inc varnum))
+                              (number? last-pathnode) (apply str "var pos = " last-pathnode ";"))
+    script                  (apply str resolved-path "; " from-pos-loop "; path.remove(pos);")
+    parameters              (into {}  (map-indexed #(do [(str "n" %1) %2]) path-vars))
+    ]
+    (script-query client index vo (:id vo) script parameters options)))
 
 ;
 ; Query helpers

@@ -354,7 +354,7 @@ object Conversion
 object ClojureProtocolVars
 {
   import clojure.lang.{RT, IFn}
-  RT.loadResourceScript("prime/types.clj");
+  RT.load("prime/types");
 
   val object_id = RT.`var`("prime.types", "to-ObjectId" );
   val string    = RT.`var`("prime.types", "to-String"   );

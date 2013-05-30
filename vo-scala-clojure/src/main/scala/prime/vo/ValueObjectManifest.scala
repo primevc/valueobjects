@@ -348,7 +348,8 @@ abstract class VOValueObjectField[-VO <: ValueObject, T <: ValueObject] protecte
     case v if defaultValue.voManifest.VOType.erasure.isInstance(v) => v.asInstanceOf[T];
     case None => if (root eq self.voSource) /*lazy*/ lazyVar else /*eager*/ apply(self);
 
-    case ValueSource(vo) =>
+    case v =>
+      val vo = ValueSource(v, self);
       if (!(root eq src)) /*eager convert to T*/ voCompanion(vo);
       else /*lazy convert*/ if (self.voSource eq ValueSource.empty) null.asInstanceOf[T] else lazyVar;
   }

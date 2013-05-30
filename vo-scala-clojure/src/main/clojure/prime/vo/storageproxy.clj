@@ -3,13 +3,13 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.vo.storageproxy
-	(:require 
+  (:require 
     [prime.vo.util.elasticsearch      :as es]
     [prime.vo.util.msgpack            :as mp]
     [prime.vo.util.cassandra-history   :as ch]))
 
 (defprotocol VOProxy
-  "Doc string"
+  "WARNING: Proxy cannot guarantee consistency!"
   ; Get
   ; Get will get you a VO based on ID
   (get-vo [vo] [proxy vo])
@@ -23,31 +23,40 @@
   ; Updating will add the new VO to the extisting one. Replacing data if it already exists
   (update [vo] [proxy vo] [proxy vo id] [proxy vo id options] "Updates a VO")
 
+  ; Delete
+  ; Deletes a VO. Use with care :-)
+  (delete [vo] [proxy vo] [proxy vo options])
+
   ; Update-if
   ; Same as update but only executes when certain requirements are met.
   #_(update-if [proxy predicate options])
 
-  ; [es vo path value pos]
-  (insertAt [vo] [proxy vo])
+  ; VECTOR-BASED
+  (appendTo [vo path path-vars value] [this vo path path-vars value] [this vo path path-vars value options])
 
-  ; [es vo path pos]
-  (moveTo [vo] [proxy vo])
+  (insertAt [vo path path-vars value] [proxy vo path path-vars value] [proxy vo path path-vars value options])
 
-  ; [es ^ValueObject vo id & {:as options :keys [index]}]
-  (appendTo [vo] [proxy vo] [proxy vo id] [proxy vo id options])
+  (moveTo [vo path path-vars to] [proxy vo path path-vars to] [proxy vo path path-vars to options])
 
-  ; [es vo pos value]
-  (replaceAt [vo] [proxy vo])
+  (replaceAt [vo path path-vars value] [proxy vo path path-vars value] [proxy vo path path-vars value options])
 
-  ; Delete
-  ; Deletes a VO. Use with care :-)
-  (delete [vo] [proxy vo] [proxy vo options])
+  (mergeAt [vo path path-vars value] [prxoy vo path path-vars value] [proxy vo path path-vars value options])
+
+  (removeFrom [vo path path-vars] [proxy vo path path-vars] [proxy vo path path-vars options])
+  ;(remove (publication/Publication{:spreads [{:locked false :id 1}]}) [:spreads])
+  ;(remove (account/Organization{:folders ["Example folder"]}) [:folders 4])
 )
 
 (defprotocol VOSearchProxy
   ; Search
   ; Search elastic. Returns VO's
   (search [vo] [proxy vo] [proxy vo options])
+)
+
+(defprotocol VOHistoryProxy
+  ; GetSlice
+  ; Get latest slice of history of a VO. Can be limited to a certain amount of :slices.
+  (get-slice [proxy vo] [proxy vo options])
 )
 
 (deftype ElasticSearchVOProxy [^String index ^org.elasticsearch.client.transport.TransportClient client]
@@ -60,42 +69,59 @@
   (get-vo [this vo] 
     (es/get client index vo))
 
-  ; [es ^ValueObject vo & {:as options :keys [index]}]
   (put-vo [this vo]
-    (es/put client vo index {}))
+    (es/put client index vo {}))
 
   (put-vo [this vo options]
-    (es/put client vo index options))
+    (es/put client index vo options))
 
-  ; [es ^ValueObject vo id & {:as options :keys [index]}]
   (update [this vo id]
-    (es/update client vo id index {}))
+    (es/update client index vo id {}))
 
   (update [this vo id options] 
-    (es/update client vo id index options))
+    (es/update client index vo id options))
   
-  ; [es vo path value pos]
-  (insertAt [vo] vo)
-
-  ; [es vo path pos]
-  (moveTo [vo] vo)
-
-  ; [es ^ValueObject vo id & {:as options :keys [index]}]
-  (appendTo [this vo id]
-    (es/appendTo client vo id index {}))
-
-  (appendTo [this vo id options]
-    (es/appendTo client vo id index options))
-
-  ; [es vo pos value]
-  (replaceAt [vo] vo)
-
-  ; [es ^ValueObject vo & {:as options :keys [index]}]
   (delete [this vo]
-    (es/delete client vo index {}))
+    (es/delete client index vo {}))
 
   (delete [this vo options]
-    (es/delete client vo index options))
+    (es/delete client index vo options))
+
+  (appendTo [this vo path path-vars value]
+    (es/appendTo client index vo path path-vars value {}))
+
+  (appendTo [this vo path path-vars value options]
+    (es/appendTo client index vo path path-vars value options))
+
+  (insertAt [this vo path path-vars value]
+    (es/insertAt client index vo path path-vars value {}))
+
+  (insertAt [this vo path path-vars value options]
+    (es/insertAt client index vo path path-vars value options))
+
+  (moveTo [this vo path path-vars to]
+    (es/moveTo client index vo path path-vars to {}))
+
+  (moveTo [this vo path path-vars to options]
+    (es/moveTo client index vo path path-vars to options))
+
+  (replaceAt [this vo path path-vars value]
+    (es/replaceAt client index vo path path-vars value {}))
+
+  (replaceAt [this vo path path-vars value options]
+    (es/replaceAt client index vo path path-vars value options))
+
+  (mergeAt [this vo path path-vars value]
+    (es/mergeAt client index vo path path-vars value {}))
+
+  (mergeAt [this vo path path-vars value options]
+    (es/mergeAt client index vo path path-vars value options))
+
+  (removeFrom [this vo path path-vars]
+    (es/removeFrom client index vo path path-vars {}))
+
+  (removeFrom [this vo path path-vars options]
+    (es/removeFrom client index vo path path-vars options))
 
   VOSearchProxy
   ; [es ^ValueObject vo indices & {:as options :keys [ query filter from size types sort highlighting only exclude script-fields preference facets named-filters boost explain version min-score listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source]}]
@@ -104,12 +130,13 @@
 
   (search [this vo options]
     (es/search client index vo options))
+
 )
 
 (deftype MessagePackVOProxy [^String directory]
   VOProxy
   (get-vo [this vo] 
-  	(mp/get directory vo))
+    (mp/get directory vo))
 
   (put-vo [this vo]
     (mp/put directory vo {}))
@@ -121,7 +148,7 @@
     (mp/update directory vo id {}))
 
   (update [this vo id options] 
-  	(mp/update directory vo id options))
+    (mp/update directory vo id options))
   
   (delete [this vo]
     (mp/delete directory vo {}))
@@ -147,16 +174,54 @@
   (update [this vo id options]
     (ch/update cluster vo id options))
 
-  (appendTo [this vo id]
-    (ch/appendTo cluster vo id {}))
-
-  (appendTo [this vo id options]
-    (ch/appendTo cluster vo id options))
   (delete [this vo]
     (ch/delete cluster vo {}))
 
   (delete [this vo options]
     (ch/delete cluster vo options))
+
+  (appendTo [this vo path path-vars value]
+    (ch/appendTo cluster vo path path-vars value {}))
+
+  (appendTo [this vo path path-vars value options]
+    (ch/appendTo cluster vo path path-vars value options))
+
+  (insertAt [this vo path path-vars value]
+    (ch/insertAt cluster vo path path-vars value {}))
+
+  (insertAt [this vo path path-vars value options]
+    (ch/insertAt cluster vo path path-vars value options))
+
+  (moveTo [this vo path path-vars to]
+    (ch/moveTo cluster vo path path-vars to {}))
+
+  (moveTo [this vo path path-vars to options]
+    (ch/moveTo cluster vo path path-vars to options))
+
+  (replaceAt [this vo path path-vars value]
+    (ch/replaceAt cluster vo path path-vars value {}))
+
+  (replaceAt [this vo path path-vars value options]
+    (ch/replaceAt cluster vo path path-vars value options))
+
+  (mergeAt [this vo path path-vars value]
+    (ch/mergeAt cluster vo path path-vars value {}))
+
+  (mergeAt [this vo path path-vars value options]
+    (ch/mergeAt cluster vo path path-vars value options))
+
+  (removeFrom [this vo path path-vars]
+    (ch/removeFrom cluster vo path path-vars {}))
+
+  (removeFrom [this vo path path-vars options]
+    (ch/removeFrom cluster vo path path-vars options))
+
+  VOHistoryProxy
+  (get-slice [this vo]
+    (ch/get-slice cluster vo {}))
+  
+  (get-slice [this vo options]
+    (ch/get-slice cluster vo options))
 )
 
 (defn symbolize [sym appendix] (let [sym (if (keyword? sym) (.sym sym) sym)] (symbol (str sym appendix))))
@@ -180,14 +245,34 @@
     [ [['this 'vo 'id] ['this 'vo 'id 'options]]
       [:pre-update :proxies :post-update]
       all-proxies]
-  `appendTo
-    [ [['this 'vo 'id] ['this 'vo 'id 'options]]
-      [:pre-appendTo :proxies :post-appendTo]
-      all-proxies]
   `delete
     [ [['this 'vo] ['this 'vo 'options]]
       [:pre-delete :proxies :post-delete]
-      all-proxies]  
+      all-proxies]
+  `appendTo
+    [ [['this 'vo 'path 'path-vars 'value] ['this 'vo 'path 'path-vars 'value 'options]]
+      [:pre-appendTo :proxies :post-appendTo]
+      all-proxies]
+  `insertAt 
+    [ [['this 'vo 'path 'path-vars 'value] ['this 'vo 'path 'path-vars 'value 'options]]
+      [:pre-insertAt :proxies :post-insertAt]
+      all-proxies]
+  `moveTo 
+    [ [['this 'vo 'path 'path-vars 'to] ['this 'vo 'path 'path-vars 'to 'options]]
+      [:pre-moveTo :proxies :post-moveTo]
+      all-proxies]
+  `replaceAt
+    [ [['this 'vo 'path 'path-vars 'value] ['this 'vo 'path 'path-vars 'value 'options]]
+      [:pre-replaceAt :proxies :post-replaceAt]
+      all-proxies]
+  `mergeAt 
+    [ [['this 'vo 'path 'path-vars 'value] ['this 'vo 'path 'path-vars 'value 'options]]
+      [:pre-mergeAt :proxies :post-mergeAt]
+      all-proxies]
+  `removeFrom
+    [ [['this 'vo 'path 'path-vars] ['this 'vo 'path 'path-vars 'options]]
+      [:pre-removeFrom :proxies :post-removeFrom]
+      all-proxies]
   ; 'search 
   ;   [ [['this 'vo] ['this 'vo 'options]]
   ;     [:pre-search :proxies :post-search]
@@ -246,12 +331,27 @@
   `update 
     [ [['vo 'id] ['vo 'id 'options]]
       'update]
-  `appendTo
-    [ [['vo 'id] ['vo 'id 'options]]
-      'appendTo]
   `delete
     [ [['vo] ['vo 'options]]
       'delete]
+  `appendTo
+    [ [['vo 'path 'path-vars 'value] ['vo 'path 'path-vars 'value 'options]]
+      'appendTo]
+  `insertAt 
+    [ [['vo 'path 'path-vars 'value] ['vo 'path 'path-vars 'value 'options]]
+      'insertAt]
+  `moveTo 
+    [ [['vo 'path 'path-vars 'to] ['vo 'path 'path-vars 'to 'options]]
+      'moveTo]
+  `replaceAt
+    [ [['vo 'path 'path-vars 'value] ['vo 'path 'path-vars 'value 'options]]
+      'replaceAt]
+  `mergeAt 
+    [ [['vo 'path 'path-vars 'value] ['vo 'path 'path-vars 'value 'options]]
+      'mergeAt]
+  `removeFrom
+    [ [['vo 'path 'path-vars] ['vo 'path 'path-vars 'options]]
+      'removeFrom]
   })
 
 (defn is-published? [vo]

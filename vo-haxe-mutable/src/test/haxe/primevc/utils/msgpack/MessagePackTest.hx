@@ -27,7 +27,7 @@ class MessagePackTest extends TestCase
 		var b = out.getBytes();
 		inp	= new BytesInput(b);
 		inp.bigEndian = true;
-		r	= new Reader(new IntHash(), inp);
+		r	= new Reader(new Map(), inp);
 	
 		return b;
 	}
@@ -323,8 +323,8 @@ class MessagePackTest extends TestCase
 		Assert.that(b != null);
 		assertEquals(bytes, b.length);
 		
-		var map : Hash<Int> = r.readMsgPackValue();
-		assertTrue(Std.is(map, Hash));
+		var map : Map<String,Int> = r.readMsgPackValue();
+		assertTrue(Std.is(map, Map));
 		
 		for (i in 0 ... size) {
 			var key = "k" + i;
@@ -337,7 +337,7 @@ class MessagePackTest extends TestCase
 	
 	function makeMap(size:Int)
 	{
-		var m = new Hash<Int>();
+		var m = new Map<String,Int>();
 		var stringBytes = 0;
 		for (i in 0 ... size) {
 			var s = "k" + i;

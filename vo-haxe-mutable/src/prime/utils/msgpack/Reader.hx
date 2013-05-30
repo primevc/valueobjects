@@ -1,7 +1,6 @@
 package prime.utils.msgpack;
  import haxe.io.Input;
  import haxe.io.Eof;
- import prime.core.traits.IDisposable;
  import prime.core.traits.IValueObject;
  import prime.utils.FastArray;
  import prime.tools.valueobjects.PropertyID;
@@ -24,7 +23,7 @@ typedef ValueConverter = Dynamic -> PropertyID -> Dynamic -> Dynamic
  * @author Danny Wilson
  * @creation-date nov 22, 2010
  */
-class Reader implements IDisposable
+class Reader implements prime.core.traits.IDisposable
 {
 #if MessagePackDebug_Read
     public var verbose : Bool;
@@ -51,9 +50,9 @@ class Reader implements IDisposable
 	public var input : Input;
 #end
 
-	private var context	: IntHash<Class<Dynamic>>;
+	private var context	: Map<Int,Class<Dynamic>>;
 	
-	public function new(context_ : IntHash<Class<Dynamic>>, ?input_ : Input)
+	public function new(context_ : Map<Int,Class<Dynamic>>, ?input_ : Input)
 	{
 		Assert.notNull(context_);
 		this.context = context_;
@@ -108,7 +107,7 @@ class Reader implements IDisposable
 		return switch (b)
 		{
 			case 0xdc:	readUInt16();
-			case 0xdd:	readUInt30();
+			case 0xdd:	readInt32();
 			default:
 				if (b & 0xF0 == 0x90) b & 15;
 				else 1;
@@ -139,7 +138,7 @@ class Reader implements IDisposable
 			return v;
 		}
 		catch (e:Dynamic) {
-			trace("Could not convert: " + value + ", to: " + typeClass);// + " - stack: " + haxe.Stack.callStack().join("\n"));
+			trace("Could not convert: " + value + ", to: " + typeClass);// + " - stack: " + haxe.CallStack.callStack().join("\n"));
 			return null;
 		}
 		
@@ -151,7 +150,7 @@ class Reader implements IDisposable
 	{
 		case /* uint8  */		0xcc:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint8)"); #end      return readByte();
 		case /* uint16 */		0xcd:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint16)"); #end     return readUInt16();
-		case /* uint32 */		0xce:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint32)"); #end     #if neko return readUInt30(); #else var v:UInt = cast readInt32(); return v; #end
+		case /* uint32 */		0xce:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint32)"); #end     #if neko return readInt32(); #else var v:UInt = cast readInt32(); return v; #end
 		case /* uint64 */		0xcf:	#if MessagePackDebug_Read if (verbose) trace("readValue (uint64)"); #end     throw "uint64 not implemented: " + read(8);
 		
 		case /*  int8  */		0xd0:	#if MessagePackDebug_Read if (verbose) trace("readValue (int8)"); #end       return readInt8();
@@ -167,13 +166,13 @@ class Reader implements IDisposable
 		case /* double */		0xcb:	return readDouble();
 		
 		case /* raw16 */		0xda:	var len = readUInt16(); return readString(len);
-		case /* raw32 */		0xdb:	var len = readUInt30(); return readString(len);
+		case /* raw32 */		0xdb:	var len = readInt32(); return readString(len);
 		
 		case /* array 16 */		0xdc:	return readArray(readUInt16(), pid, itemType);
-		case /* array 32 */		0xdd:	return readArray(readUInt30(), pid, itemType);
+		case /* array 32 */		0xdd:	return readArray(readInt32(), pid, itemType);
 		
 		case /* map 16 */		0xde:	return readMap(readUInt16(), pid, itemType);
-		case /* map 32 */		0xdf:	return readMap(readUInt30(), pid, itemType);
+		case /* map 32 */		0xdf:	return readMap(readInt32(), pid, itemType);
 		
 		case /* ValueObject */	0xd7:
 			var header = readByte();
@@ -205,7 +204,7 @@ class Reader implements IDisposable
 	
 	private function readMap(elem:Int, pid : PropertyID, itemType : Dynamic)
 	{
-		var map:Hash<Dynamic> = new Hash();
+		var map:Map<String,Dynamic> = new Map();
 		
 		for (i in 0 ... elem)
 		{
@@ -436,32 +435,19 @@ class Reader implements IDisposable
             return flash.Memory.signExtend16( readUInt16() );
         #end
     }
-    
-    private inline function readUInt30()    : Int
-    {
-        #if MessagePackDebug_Read
-            var v = readInt32() & 0x3FFFFFFF;
-            bytes.position = addr - 4;
-            Assert.equal(bytes.readUnsignedInt(), v);
-            return v;
-        #else
-            return readInt32() & 0x3FFFFFFF;
-        #end
-    }
 
 #else
 
-	public  inline function readByte()		: Int		return input.readByte()
-	private inline function readUInt16()	: Int		return input.readUInt16()
-	private inline function readInt32()		: Int		return #if neko input.readInt31() #else cast input.readInt32() #end
-	private inline function readFloat()		: Float		return input.readFloat()
-	private inline function readDouble()	: Float		return input.readDouble()
+	public  inline function readByte()		: Int		return input.readByte();
+	private inline function readUInt16()	: Int		return input.readUInt16();
+	private inline function readFloat()		: Float		return input.readFloat();
+	private inline function readDouble()	: Float		return input.readDouble();
 
-	private inline function readString(n)	: String	return input.readString(n)
-	private inline function read(n)						return input.read(n)
-	private inline function readInt8()		: Int		return input.readInt8()
-	private inline function readInt16()		: Int		return input.readInt16()
-	private inline function readUInt30()	: Int		return input.readUInt30()
+	private inline function readString(n)	: String	return input.readString(n);
+	private inline function read(n)						return input.read(n);
+	private inline function readInt8()		: Int		return input.readInt8();
+	private inline function readInt16()		: Int		return input.readInt16();
+	private inline function readInt32()		: Int		return input.readInt32();
 	
 #end
 }

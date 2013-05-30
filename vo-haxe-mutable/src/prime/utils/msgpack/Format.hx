@@ -1,9 +1,16 @@
 package prime.utils.msgpack;
  import haxe.io.Output;
  import haxe.io.BytesOutput;
- import haxe.Int32;
  import prime.utils.FastArray;
   using prime.utils.NumberUtil;
+
+import prime.types.RGBA;
+import prime.types.EMail;
+import prime.types.URI;
+import prime.types.FileRef;
+import prime.types.DateInterval;
+import prime.types.ObjectId;
+
 
 /**
  * MessagePack values to bytes formatter
@@ -60,7 +67,7 @@ class Format
 		}
 		else { // Int32
 			o.writeByte(0xd2);
-			o.writeInt32(haxe.Int32.ofInt(value));
+			o.writeInt32(value);
 			/*return*/ 5;
 		}
 	}
@@ -124,7 +131,7 @@ class Format
 		else {
 			b = 5;
 			o.writeByte(0xdb);
-			o.writeUInt30(valueLength);
+			o.writeInt32(valueLength);
 		}
 		
 	#if flash9	
@@ -175,12 +182,12 @@ class Format
 		}
 		else {
 			o.writeByte(0xdd);
-			o.writeInt32(haxe.Int32.ofInt(arrayLength));
+			o.writeInt32(arrayLength);
 			return 5;
 		}
 	}
 	
-	static public function packMap(o : BytesOutput, map : Hash<Dynamic>)
+	static public function packMap(o : BytesOutput, map : Map<String,Dynamic>)
 	{
 		#if MessagePackDebug_Pack trace("packMap: "+map); #end
 		
@@ -200,7 +207,7 @@ class Format
 		}
 		else {
 			o.writeByte(0xdf);
-			o.writeInt32(haxe.Int32.ofInt(keyCount));
+			o.writeInt32(keyCount);
 			b = 5;
 		}
 		
@@ -228,7 +235,7 @@ class Format
 		case 1: o.writeByte(value);
 		case 2: o.writeInt16(value);
 		case 3: o.writeInt24(value);
-		case 4: o.writeInt32(haxe.Int32.ofInt(value));
+		case 4: o.writeInt32(value);
 		
 		default: Assert.that(false);
 	}
@@ -237,7 +244,7 @@ class Format
 	 	return if (v &     0xFF == v) 1
 		  else if (v &   0xFFFF == v) 2
 		  else if (v & 0xFFFFFF == v) 3
-		  else 4
+		  else 4;
 	
 	
 	/**
@@ -262,13 +269,6 @@ class Format
 		return 1;
 	}
 }
-
-import prime.types.RGBA;
-import prime.types.EMail;
-import prime.types.URI;
-import prime.types.FileRef;
-import prime.types.DateInterval;
-import prime.types.ObjectId;
 
 
 /**

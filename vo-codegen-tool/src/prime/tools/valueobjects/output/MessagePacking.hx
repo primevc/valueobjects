@@ -189,7 +189,7 @@ class MessagePacking
 					{
 						if (bit >= 8) while (bit >= 8)
 						{
-							     if (bit >= 32) { a("\n\t\to.writeInt31(0); b += 4;");	bit -= 32; }
+							     if (bit >= 32) { a("\n\t\to.writeInt32(0); b += 4;");	bit -= 32; }
 							else if (bit >= 24) { a("\n\t\to.writeInt24(0); b += 3;");	bit -= 24; }
 							else if (bit >= 16) { a("\n\t\to.writeInt16(0); b += 2;");	bit -= 16; }
 							else if (bit >=  8) { a("\n\t\t"); a_writeByte("0");		bit -=  8; }
@@ -304,7 +304,7 @@ class MessagePacking
 	}
 	
 	
-	var fieldIndexOffset : IntHash<Bool>;
+	var fieldIndexOffset : Map<Int,Bool>;
 	
 	private function genFieldOffsetCases(t:TypeDefinition)
 	{

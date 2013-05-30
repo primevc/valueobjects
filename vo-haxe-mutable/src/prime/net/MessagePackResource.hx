@@ -33,7 +33,6 @@ package prime.net;
  import haxe.io.BytesOutput;
 
  import prime.core.events.CommunicationEvents;
- import prime.core.traits.IDisposable;
  import prime.core.traits.IMessagePackable;
  import prime.net.URLLoader;
  import prime.signals.Signals;
@@ -55,7 +54,7 @@ package prime.net;
  * @author	Danny Wilson
  * @since	Jan 20, 2011
  */  
-class MessagePackResource <Data> implements IDisposable
+class MessagePackResource <Data> implements prime.core.traits.IDisposable
 {
 	public var events			(default, null) : DataServiceEvents;
 	public var bytesSending 	(default, null) : Int;
@@ -71,12 +70,12 @@ class MessagePackResource <Data> implements IDisposable
 	
 	private var reader			: Reader;
 	private var bytes			: Bytes;
-	private var typeMap			: IntHash<Class<Dynamic>>;
+	private var typeMap			: Map<Int,Class<Dynamic>>;
 	private var onComplete  	: Wire<Void   -> Void>;
 	private var onError			: Wire<String -> Void>;
 		
 
-	public function new(uriPrefix : URI, typeMap : IntHash<Class<Dynamic>>)
+	public function new(uriPrefix : URI, typeMap : Map<Int,Class<Dynamic>>)
 	{
 		this.typeMap   = typeMap;
 		this.uriPrefix = uriPrefix;
@@ -117,7 +116,7 @@ class MessagePackResource <Data> implements IDisposable
 	}
 	
 
-	private function doNothing () { throw "impossible " + uriPrefix; }
+	private function doNothing () throw "impossible " + uriPrefix;
 
 
 #if debug
@@ -149,7 +148,7 @@ class MessagePackResource <Data> implements IDisposable
 	 * @param uriSuffix Required to prevent accidental overwriting of an entire resource.
 	 */
 	public inline function send (uriSuffix:String, obj:IMessagePackable)
-		sendBytes( uriSuffix, serialize(obj).getData() )
+		sendBytes( uriSuffix, serialize(obj).getData() );
 	
 
 	

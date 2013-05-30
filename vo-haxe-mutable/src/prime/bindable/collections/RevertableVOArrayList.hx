@@ -26,8 +26,8 @@
  * Authors:
  *  Danny Wilson	<danny @ prime.vc>
  */
-package prime.bindables.collections;
- import prime.bindables.collections.VOArrayList;	//imports VOArrayListUtil
+package prime.bindable.collections;
+ import prime.bindable.collections.VOArrayList;	//imports VOArrayListUtil
  import prime.signals.Signal1;
  import prime.tools.valueobjects.ObjectChangeSet;
  import prime.tools.valueobjects.ValueObjectBase;
@@ -37,8 +37,8 @@ package prime.bindables.collections;
   using prime.utils.IfUtil;
 
 
-private typedef ListFlags = prime.bindables.collections.RevertableArrayList.RevertableArrayListFlags;
-private typedef BindFlags = prime.core.RevertableBindableFlags;
+private typedef ListFlags = prime.bindable.collections.RevertableArrayList.RevertableArrayListFlags;
+private typedef BindFlags = prime.bindable.RevertableBindableFlags;
 
 
 /**
@@ -51,7 +51,7 @@ private typedef BindFlags = prime.core.RevertableBindableFlags;
  * @author Danny Wilson
  * @creation-date Dec 20, 2010
  */
-@:generic class RevertableVOArrayList <DataType:prime.core.traits.IValueObject> extends ReadOnlyArrayList <DataType> implements IRevertableList <DataType>
+@:generic class RevertableVOArrayList<DataType:prime.core.traits.IValueObject> extends ReadOnlyArrayList<DataType> implements IRevertableList<DataType>
 {
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;
@@ -98,7 +98,7 @@ private typedef BindFlags = prime.core.RevertableBindableFlags;
 
 #if debug
 	@:keep public inline function readFlags ()
-		return BindFlags.readProperties(flags)
+		return BindFlags.readProperties(flags);
 #end
 	
 	
@@ -106,8 +106,8 @@ private typedef BindFlags = prime.core.RevertableBindableFlags;
 	
 	
 	
-	@:keep public inline function rememberChanges (enabled:Bool = true)				{ flags = enabled ? flags.set(ListFlags.REMEMBER_CHANGES) : flags.unset(ListFlags.REMEMBER_CHANGES); }
-	@:keep public inline function dispatchChangesBeforeCommit (enabled:Bool = true)	{ flags = enabled ? flags.set(BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT) : flags.unset(BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT); }
+	@:keep public inline function rememberChanges (enabled:Bool = true)				flags = enabled ? flags.set(ListFlags.REMEMBER_CHANGES) : flags.unset(ListFlags.REMEMBER_CHANGES);
+	@:keep public inline function dispatchChangesBeforeCommit (enabled:Bool = true)	flags = enabled ? flags.set(BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT) : flags.unset(BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT);
 	
 	
 	//
@@ -273,7 +273,7 @@ private typedef BindFlags = prime.core.RevertableBindableFlags;
 	
 	
 	
-	override public function clone () : prime.bindables.collections.IReadOnlyList<DataType>
+	override public function clone () : prime.bindable.collections.IReadOnlyList<DataType>
 	{
 		var l = new RevertableVOArrayList<DataType>( list.clone() );
 		l.flags = flags;
@@ -281,7 +281,7 @@ private typedef BindFlags = prime.core.RevertableBindableFlags;
 	}
 	
 	
-	override public function duplicate () : prime.bindables.collections.IReadOnlyList<DataType>
+	override public function duplicate () : prime.bindable.collections.IReadOnlyList<DataType>
 	{
 		var l = new RevertableVOArrayList<DataType>( list.duplicate() );
 		l.flags = flags;

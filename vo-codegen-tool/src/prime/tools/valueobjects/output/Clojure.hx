@@ -8,10 +8,10 @@ package prime.tools.valueobjects.output;
 class ClojureDefVO implements CodeGenerator
 {
 	var file : sys.io.FileOutput;
-	var map  : IntHash<Bool>;
+	var map  : Map<Int,Bool>;
 
 	public function new(file : sys.io.FileOutput) {
-		map       = new IntHash();
+		map       = new Map();
 		this.file = file;
 	}
 

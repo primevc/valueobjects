@@ -42,7 +42,7 @@ class XMLString
 	
 	
 	static public function toString(v:String) {
-		return ~/&#(.*)?;/.customReplace(v, fromEntityCodeRegex);
+		return ~/&#(.*)?;/.map(v, fromEntityCodeRegex);
 	}
 	static private function fromEntityCodeRegex(e:EReg) {
 		return String.fromCharCode(Std.parseInt("0" + e.matched(1)));

@@ -8,13 +8,13 @@ package prime.tools.valueobjects.output;
 class ScalaTypeMap implements CodeGenerator
 {
 	public var list    : List   <String>;
-	public var map     : IntHash<String>;
-	public var enumMap : IntHash<String>;
+	public var map     : Map<Int,String>;
+	public var enumMap : Map<Int,String>;
 
 	public function new() {
 		list    = new List();
-		map     = new IntHash();
-		enumMap = new IntHash();
+		map     = new Map();
+		enumMap = new Map();
 	}
 
 	function strippedName(def : TypeDefinition) return def.fullName.substr(def.module.getPackageRoot().fullName.length + 1)
@@ -773,7 +773,7 @@ trait ")); a(def.name); a(" extends ");
 		write(def.module.fullName, def);
 	}
 
-	function addSubtypeCases(types : Hash<BaseTypeDefinition>) {
+	function addSubtypeCases(types : Map<String,BaseTypeDefinition>) {
 		for (subType in types) {
 			addSubtypeCases(subType.implementedBy);
 			a("    case "); a(subType.index + " => "); a(subType.fullName); a(";\n");
@@ -1549,7 +1549,7 @@ import prime.vo.mutable._
 		a("\n  def -(key: A): This = ");
 */	}
 	
-	static public function addComponentDependencies(code:StringBuf, dependencies:Hash<Bool>, suffix:String)
+	static public function addComponentDependencies(code:StringBuf, dependencies:Map<String,Bool>, suffix:String)
 	{
 		var a = code.add;
 		var first = true;
@@ -1842,8 +1842,8 @@ class XMLProxyGenerator
 	var root	: XMLMapNode;
 	var addSuperClassMapping : Bool;
 	
-	var xmlConverters : Hash<String>;
-	var dependencies: Hash<Bool>;
+	var xmlConverters : Map<String,String>;
+	var dependencies: Map<String,Bool>;
 	
 	public function new(code:StringBuf, def:ClassDef, map:XMLMapping)
 	{
@@ -1857,8 +1857,8 @@ class XMLProxyGenerator
 		
 		if (root.children.length == 0) throw "no child?!";
 		
-		this.xmlConverters = new Hash();
-		dependencies = new Hash();
+		this.xmlConverters = new Map();
+		dependencies = new Map();
 		findDependencies(map.root);
 		
 		if (def.superClass != null && def.superClass.defaultXMLMap != null && !def.superClass.defaultXMLMap.root.isXMLTypeMap()) {
@@ -2051,7 +2051,7 @@ class XMLProxyGenerator
 			case XM_typeMap(map):
 				if (code_added) throw "Error: multiple type-maps found";
 				
-				var added = new Hash<Bool>();
+				var added = new Map<String,Bool>();
 				var clname = null;
 				
 				a("vo match {");
@@ -2538,7 +2538,7 @@ class ScalaMessagePacking extends MessagePacking
 	
 	override private function genDeSerialization(lastProp)
 	{
-		fieldIndexOffset = new IntHash();
+		fieldIndexOffset = new Map();
 		
 		a("\n  def defaultVOCompanionMap = ");
 		var pkgroot = def.module.getPackageRoot();

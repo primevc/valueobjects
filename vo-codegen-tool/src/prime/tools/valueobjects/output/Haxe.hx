@@ -5,10 +5,10 @@ package prime.tools.valueobjects.output;
 
 class HaxeTypeMap implements CodeGenerator
 {
-	var map : IntHash<String>;
+	var map : Map<Int,String>;
 	
 	public function new() {
-		map = new IntHash();
+		map = new Map();
 		map.set(0x1D, "prime.core.traits.ObjectId");
 	}
 	
@@ -28,10 +28,10 @@ class HaxeTypeMap implements CodeGenerator
 		file.writeString("
 class VO
 {
-	static public var typeMap : IntHash<Class<Dynamic>>;
+	static public var typeMap : Map<Int,Class<Dynamic>>;
 	static function __init__ ()
 	{
-		var map : IntHash<Class<Dynamic>> = typeMap = new IntHash();
+		var map : Map<Int,Class<Dynamic>> = typeMap = new Map();
 ");
 
 		for (typeID in map.keys()) {
@@ -106,7 +106,7 @@ class HaxeMessagePacking extends MessagePacking
 	
 	override private function definePackerFunction()
 	{
-		fieldIndexOffset = new IntHash();
+		fieldIndexOffset = new Map();
 		if (!def.isMixin) {
 			a("\n\toverride private function _fieldOffset(typeID:Int) return switch(typeID) {");
 			genFieldOffsetCases(def);
@@ -155,7 +155,7 @@ class HaxeMessagePacking extends MessagePacking
 		a("\t\t");
 		
 	/*	if (!p.isArray() && p.isBindable()) {
-			a("(cast(obj."); a(p.name); a(", prime.core.Bindable<"); a(HaxeUtil.haxeType(p.type, true)); a(">).value = ");
+			a("(cast(obj."); a(p.name); a(", prime.bindable.Bindable<"); a(HaxeUtil.haxeType(p.type, true)); a(">).value = ");
 		}
 		else
 		{*/
@@ -174,7 +174,7 @@ class HaxeMessagePacking extends MessagePacking
 				a(".value");
 			}
 //			if (p.isBindable()) {
-//				a("new prime.core.RevertableBindable<"); a(HaxeUtil.haxeType(p.type, true)); a(">(");
+//				a("new prime.bindable.RevertableBindable<"); a(HaxeUtil.haxeType(p.type, true)); a(">(");
 //			}
 			a(" = ");
 		}
@@ -1278,7 +1278,7 @@ class Haxe implements CodeGenerator
 		if (def.module.name.length > 0) {
 			a("package "); a(def.module.fullName); a(";\n");
 		}
-		a(" import prime.bindables.collections.ReadOnlyArrayList;\n");
+		a(" import prime.bindable.collections.ReadOnlyArrayList;\n");
 		a("  using prime.utils.FastArray;\n\n\n");
 		a("class "); a(def.utilClassName); a("\n{\n");
 		
@@ -1634,7 +1634,7 @@ private class HaxeUtil
 			case Tarray(type, min, max):
 				return if (!constructorArg)
 				{
-					'prime.bindables.collections.' +
+					'prime.bindable.collections.' +
 						(sortable
 						? 'Sort<'
 						: readonly
@@ -1652,7 +1652,7 @@ private class HaxeUtil
 		if (bindable)
 		{
 			// Check for Bindable
-			type = transient ? "prime.core.Bindable<"+type+">" : "prime.core.RevertableBindable<"+type+">";
+			type = transient ? "prime.bindable.Bindable<"+type+">" : "prime.bindable.RevertableBindable<"+type+">";
 		}
 		
 		return type;

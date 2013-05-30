@@ -5,8 +5,8 @@ package prime.tools.valueobjects.output;
 
 class HTML implements CodeGenerator
 {
-	private static var codegen = new Hash<CodeGenerator>();
-	private static var modules = new Hash<HTML>();
+	private static var codegen = new Map<String,CodeGenerator>();
+	private static var modules = new Map<String,HTML>();
 	
 	public static function generate(file:String)
 	{

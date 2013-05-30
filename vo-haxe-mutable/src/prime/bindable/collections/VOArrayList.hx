@@ -26,7 +26,7 @@
  * Authors:
  *  Danny Wilson	<danny @ prime.vc>
  */
-package prime.bindables.collections;
+package prime.bindable.collections;
  import prime.tools.valueobjects.ObjectChangeSet;
  import prime.tools.valueobjects.ValueObjectBase;
  import prime.signals.Signal1;

@@ -25,7 +25,7 @@ class Module
 	
 	static public var root		(default,null)	: Module;
 	static public var traits	(default,null)	: Module;
-	static public var types		(default,null)	: IntHash<TypeDefinition>;
+	static public var types		(default,null)	: Map<Int,TypeDefinition>;
 	
 	static public function declare(path:String, isPackageRoot = false):Module
 	{
@@ -40,7 +40,7 @@ class Module
 	static public function reinitialize() {
 		pkgRoots = new List();
 		root     = new Module("", null);
-		types    = new IntHash();
+		types    = new Map();
 		traits   = declare("prime.core.traits", true);
 	}
 	static var initialize = reinitialize();
@@ -81,7 +81,7 @@ class Module
 	
 	public  var packageRoot (default,null)		: Bool;
 	public  var name		(default,null)		: String;
-	private var members		(default,null)		: Hash<ModuleMember>;
+	private var members		(default,null)		: Map<String,ModuleMember>;
 	public  var parent		(default,null)		: Module;
 	public  var fullName		(getFullName,null) : String;
 	public  var mutableFullName	(getMutableFullName,null) : String;
@@ -92,7 +92,7 @@ class Module
 	private function new(name:String, parent:Module) {
 		this.name = name;
 		this.parent = parent;
-		members = new Hash();
+		members = new Map();
 	}
 	
 	private function get(pkg:String)
@@ -693,8 +693,8 @@ class PropertyTypeResolver
 				for (f in Reflect.fields(def)) { var val = Reflect.field(def, f);
 					switch(f) {
 					case "desc", "description":	prop.description = val;
-					case "min":					todo.tryOrQueue(callback(this.handleAttr.min, val));
-					case "max":					todo.tryOrQueue(callback(this.handleAttr.max, val));
+					case "min":					todo.tryOrQueue(this.handleAttr.min.bind(val));
+					case "max":					todo.tryOrQueue(this.handleAttr.max.bind(val));
 				}}
 			
 			case TClass(cl):
@@ -1065,7 +1065,7 @@ class Enumeration
 {
 	public var name : String;
 	public var parent : EnumDef;
-	public var conversions : Hash<String>;
+	public var conversions : Map<String,String>;
 	public var description : String;
 	public var type : PType;
 	public var intValue (default, null) : Int;
@@ -1075,7 +1075,7 @@ class Enumeration
 		this.description = "";
 		this.name = name;
 		this.parent = parent;
-		this.conversions = new Hash();
+		this.conversions = new Map();
 		this.conversions.set("toString", name);
 	}
 	
@@ -1091,7 +1091,7 @@ class Enumeration
 		return s;
 	}
 	
-	public function addConversions(map:Hash<String>) {
+	public function addConversions(map:Map<String,String>) {
 		for (key in map.keys()) if (!this.conversions.exists(key)) this.conversions.set(key, map.get(key));
 	}
 	
@@ -1189,9 +1189,9 @@ class EnumDef implements TypeDefinitionWithProperties
 	public var module		(default,null)		: Module;
 	public var description						: String;
 	
-	public var enumerations	(default,null)		: Hash<Enumeration>;
+	public var enumerations	(default,null)		: Map<String,Enumeration>;
 	public var catchAll							: Enumeration;
-	public var conversions	(default,null)		: Hash<EnumConversionProperty>;
+	public var conversions	(default,null)		: Map<String,EnumConversionProperty>;
 	public var finalized	(default,null)		: Bool;
 	
 	public var fullName			(getFullName,null) : String;
@@ -1201,7 +1201,7 @@ class EnumDef implements TypeDefinitionWithProperties
 	private function getFullName():String { return fullName != null? fullName : fullName = module.fullName +'.'+ name; }
 	private function getMutableFullName():String return getFullName()
 	
-	public var property		(default,null)		: Hash<Property>;
+	public var property		(default,null)		: Map<String,Property>;
 	public var propTodo		(default,null)		: TodoList;
 	
 	public var defaultXMLMap(default,null)		: XMLMapping;
@@ -1234,9 +1234,9 @@ class EnumDef implements TypeDefinitionWithProperties
 		this.description = "";
 		this.module = module;
 		this.name = name;
-		this.enumerations = new Hash();
+		this.enumerations = new Map();
 		this.supertypes = new List();
-		this.property = cast this.conversions = new Hash();
+		this.property = cast this.conversions = new Map();
 		this.propTodo = new TodoList();
 	}
 	
@@ -1437,7 +1437,7 @@ enum XMLMapValue
 	XM_concat	(values:Array<XMLMapValue>);
 	XM_child	(path:String, from:Property);
 	XM_children	(path:String, from:Property);
-	XM_typeMap	(valueToType:Hash<ClassDef>);
+	XM_typeMap	(valueToType:Map<String,ClassDef>);
 }
 
 class XMLMapStringParser
@@ -1459,7 +1459,7 @@ class XMLMapStringParser
 		var values:Array<XMLMapValue> = [];
 		var brackets = this.brackets;
 		
-		~/{([^}]+)}/.customReplace(str, function(e:EReg) {
+		~/{([^}]+)}/.map(str, function(e:EReg) {
 			var p = e.matchedPos();
 			lastpos += p.len + p.pos;
 			values.push( XM_String(e.matchedLeft()) );
@@ -1560,7 +1560,7 @@ class XMLMapNode
 	}*/
 	
 	public var nodeName		: String;
-	public var attributes	: Hash<XMLMapValue>;
+	public var attributes	: Map<String,XMLMapValue>;
 	
 	public var valuePath	: String;
 	public var value		: XMLMapValue;
@@ -1638,14 +1638,14 @@ class XMLMapNode
 			if (this.attributes == null)
 			{
 				if (targetNode.attributes != null) {
-					node.attributes = new Hash();
+					node.attributes = new Map();
 					for (a in targetNode.attributes.keys())
 					 	node.attributes.set(a, targetNode.attributes.get(a));
 				}
 			}
 			else // this map has no attributes
 			{
-				node.attributes = new Hash();
+				node.attributes = new Map();
 				
 				if (targetNode.attributes != null)
 				  for (att in targetNode.attributes.keys()) if (!this.attributes.exists(att))
@@ -1738,7 +1738,7 @@ class XMLMapNode
 				obj.value = XM_empty;
 			
 			case attributes(map):
-				if (obj.attributes == null) obj.attributes = new Hash();
+				if (obj.attributes == null) obj.attributes = new Map();
 				for (f in Reflect.fields(map))
 				{
 					var val = Reflect.field(map, f);
@@ -1794,7 +1794,7 @@ class XMLMapNode
 		if ((arr.length & 1) != 0) throw "Array map should be have an even length:  1 slot for value, 1 slot for target class";
 		
 		var key:String = null;
-		var map:Hash<ClassDef> = new Hash();
+		var map:Map<String,ClassDef> = new Map();
 		
 		for (i in 0 ... arr.length) if (i & 1 == 0)
 			key = arr[i];
@@ -1892,9 +1892,9 @@ class XMLMapping implements IClassOption
 	}
 }
 
-interface TypeDefinitionWithProperties implements TypeDefinition
+interface TypeDefinitionWithProperties extends TypeDefinition
 {
-	public var property			(default,null) : Hash<Property>;
+	public var property			(default,null) : Map<String,Property>;
 	public var propTodo			(default,null) : TodoList;
 	public var defaultXMLMap	(default,null) : XMLMapping;
 	
@@ -1909,8 +1909,8 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	public var name			(default,null)		: String;
 	public var module		(default,null)		: Module;
 	public var description						: String;
-	public var property		(default,null)		: Hash<Property>;
-	public var propertyByNum(default,null)		: IntHash<Property>;
+	public var property		(default,null)		: Map<String,Property>;
+	public var propertyByNum(default,null)		: Map<Int,Property>;
 	public var supertypes	(default,null)		: List<BaseTypeDefinition>;
 	public var fullName			(getFullName,null)	: String;
 	public var mutableFullName	(getMutableFullName,null)	: String;
@@ -1918,10 +1918,10 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	public var options		(default,null)		: List<ClassOption>;
 	public var defaultXMLMap(default,null)		: XMLMapping;
 	
-	public var implementedBy(default,null)		: Hash<BaseTypeDefinition>;
+	public var implementedBy(default,null)		: Map<String,BaseTypeDefinition>;
 	public var imports		(getImports,null)	: List<TypeDefinition>;
 	
-	public var propertiesDefined(getPropertiesDefined, null) : IntHash<Property>; // key is property.index
+	public var propertiesDefined(getPropertiesDefined, null) : Map<Int,Property>; // key is property.index
 	public var numPropertiesDefined(getNumPropertiesDefined, null) : Int; // Count(propertiesDefined)
 	public var maxPropertyIndexNonTransient(getMaxPropertyIndexNonTransient, null) : Int; // Count(propertiesDefined)
 	public var maxDefinedPropertyIndex(getMaxDefinedPropertyIndex, null) : Int; // max(propertiesDefined.index) non-transient
@@ -1942,7 +1942,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	}
 	
 	
-	var propertyBitIndex : Hash<Int>;
+	var propertyBitIndex : Map<String,Int>;
 	var lastPropertyBitIndex : Int;
 	
 	private function genPropertyBitIndex(t:TypeDefinition)
@@ -1972,7 +1972,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		
 		if (propertyBitIndex == null) {
 			lastPropertyBitIndex = 0;
-			propertyBitIndex = new Hash();
+			propertyBitIndex = new Map();
 			genPropertyBitIndex(this);
 		}
 		
@@ -2002,7 +2002,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		if (propertiesDefined != null) return propertiesDefined;
 		
 		var n = maxDefinedPropertyIndex = -1;
-		propertiesDefined = new IntHash();
+		propertiesDefined = new Map();
 		for (p in this.property)
 		{
 			if (!p.hasOption(transient) && bitIndex(p) > maxPropertyIndexNonTransient) maxPropertyIndexNonTransient = bitIndex(p);
@@ -2060,9 +2060,9 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		this.name = name;
 		this.numPropertiesDefined = 0;
 		this.maxPropertyIndexNonTransient = 0;
-		this.property = new Hash();
-		this.propertyByNum = new IntHash();
-		this.implementedBy = new Hash();
+		this.property = new Map();
+		this.propertyByNum = new Map();
+		this.implementedBy = new Map();
 		this.options = new List();
 		this.supertypes = new List();
 		this.todo = new TodoList();
@@ -2139,7 +2139,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 					 case Err_UndefinedType(name):
 						trace(this.fullName + " -> couldn't implement type: '"+name+"' because it was not defined.");
 					}
-					trace(haxe.Stack.exceptionStack());
+					trace(haxe.CallStack.exceptionStack());
 					throw err;
 				}
 			}
@@ -2250,7 +2250,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 			case xmlmap(map):
 				var xmap = new XMLMapping();
 				this.defaultXMLMap = xmap;
-				optionsTodo.addSubtask(callback(xmap.apply, this, map));
+				optionsTodo.addSubtask(xmap.apply.bind(this, map));
 				this.options.add(xmlmap(xmap));
 		}
 	}

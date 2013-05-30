@@ -254,7 +254,7 @@
       [:pre-appendTo :proxies :post-appendTo]
       all-proxies]
   `insertAt 
-    [ [['this 'vo 'path 'path-vars 'value] ['this 'vo 'path 'path-vars 'options]]
+    [ [['this 'vo 'path 'path-vars 'value] ['this 'vo 'path 'path-vars 'value 'options]]
       [:pre-insertAt :proxies :post-insertAt]
       all-proxies]
   `moveTo 
@@ -338,7 +338,7 @@
     [ [['vo 'path 'path-vars 'value] ['vo 'path 'path-vars 'value 'options]]
       'appendTo]
   `insertAt 
-    [ [['vo 'path 'path-vars 'value] ['vo 'path 'path-vars 'options]]
+    [ [['vo 'path 'path-vars 'value] ['vo 'path 'path-vars 'value 'options]]
       'insertAt]
   `moveTo 
     [ [['vo 'path 'path-vars 'to] ['vo 'path 'path-vars 'to 'options]]

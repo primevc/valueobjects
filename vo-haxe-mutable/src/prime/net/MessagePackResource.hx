@@ -134,8 +134,8 @@ class MessagePackResource <Data> implements prime.core.traits.IDisposable
 			e   = events.receive,
 			uri = uriSuffix == null? uriPrefix : new URI(uriPrefix.string + uriSuffix);
 		
-		onComplete.setArgsHandler(handleGET);
-		onError.setArgsHandler(events.receive.error.send);
+		onComplete.handler = handleGET;
+		onError   .handler = events.receive.error.send;
 		
 #if debug getStarted = prime.utils.TimerUtil.stamp(); #end
 		l.requestBinary(uri, method);
@@ -162,8 +162,8 @@ class MessagePackResource <Data> implements prime.core.traits.IDisposable
 		l.bytes		 		= bytes;
 		bytesSending 		= l.bytesTotal;
 		// Send
-		onComplete.setArgsHandler(handlePOST);
-		onError.setArgsHandler(cast(events.send.error, Signal1<Dynamic>).send);
+		onComplete.handler  = handlePOST;
+		onError   .handler  = cast(events.send.error, Signal1<Dynamic>).send;
 #if debug getStarted 		= prime.utils.TimerUtil.stamp(); #end
 		l.sendBinary(uri);
 		e.started.send();

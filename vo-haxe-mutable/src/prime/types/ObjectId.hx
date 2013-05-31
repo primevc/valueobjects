@@ -127,7 +127,7 @@ class ObjectId
     
 	public function writeBytes(out : haxe.io.Output)
 	{
-		out.writeInt32(haxe.Int32.ofInt( cast timestamp ));
+		out.writeInt32(Std.int(timestamp));
 		out.writeUInt24(machine);
 		out.writeUInt16(pid);
 		out.writeUInt24(increment);

@@ -375,13 +375,7 @@ extern class VOFormat
 		#if MessagePackDebug_Pack trace("packRGBA: "+value); #end
 		
 		o.writeByte(0xce);
-		
-	#if neko
-		o.writeByte(value.a);
-		o.writeUInt24(value.color);
-	#else
-		o.writeInt32(Int32.ofInt(value));
-	#end
+		o.writeInt32(value);
 		return 5;
 	}
 	

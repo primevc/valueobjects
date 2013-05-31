@@ -51,14 +51,14 @@ private typedef BindFlags = prime.bindable.RevertableBindableFlags;
  * @author Danny Wilson
  * @creation-date Dec 20, 2010
  */
-@:generic class RevertableVOArrayList<DataType:prime.core.traits.IValueObject> extends ReadOnlyArrayList<DataType> implements IRevertableList<DataType>
+class RevertableVOArrayList<DataType:prime.core.traits.IValueObject> extends ReadOnlyArrayList<DataType> implements IRevertableList<DataType>
 {
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;
 	
-	public function new( wrapAroundList:FastArray<DataType> = null )
+	public function new( wrapAroundList:FastArray<Dynamic> = null )
 	{
-		super(wrapAroundList);
+		super(if (wrapAroundList == null) null else #if flash10 flash.Vector.convert #end(wrapAroundList));
 		itemChange = new Signal1();
 		flags = ListFlags.REMEMBER_CHANGES;
 	}

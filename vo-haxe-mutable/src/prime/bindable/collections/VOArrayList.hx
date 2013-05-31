@@ -43,15 +43,15 @@ package prime.bindable.collections;
  * @author Danny Wilson
  * @creation-date Dec 20, 2010
  */
-@:generic class VOArrayList<DataType : prime.core.traits.IValueObject> extends ArrayList<DataType>
+class VOArrayList<DataType : prime.core.traits.IValueObject> extends ArrayList<DataType>
 {
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;
 	
 
-	public function new ( wrapAroundList:FastArray<DataType> = null )
+	public function new ( wrapAroundList:FastArray<Dynamic> = null )
 	{
-		super(wrapAroundList);
+		super(if (wrapAroundList == null) null else #if flash10 flash.Vector.convert #end(wrapAroundList));
 		itemChange = new Signal1();
 	}
 	
@@ -131,7 +131,7 @@ package prime.bindable.collections;
  */
 class VOArrayListUtil
 {
-	static inline public function setChangeHandler<T>(owner:Dynamic, list:FastArray<T>, changeHandler : ObjectChangeSet -> Void)
+	static public function setChangeHandler<T>(owner:Dynamic, list:FastArray<T>, changeHandler : ObjectChangeSet -> Void)
 	{
 		if (changeHandler.notNull())
 			for (i in 0...list.length) {

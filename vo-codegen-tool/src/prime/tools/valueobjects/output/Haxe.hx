@@ -291,10 +291,10 @@ class Haxe implements CodeGenerator
 		else
 		{	
 			for (t in def.supertypes) {
-				a(" implements "); addFullName(t, true);
+				a(" extends "); addFullName(t, true);
 			}
 			
-			a(" implements IEditEnabledValueObject implements IMessagePackable");
+			a(" extends IEditEnabledValueObject extends IMessagePackable");
 		}
 		
 		a("\n{\n");

@@ -170,7 +170,7 @@ class HaxeMessagePacking extends MessagePacking
 			a("((untyped obj)."); a(p.name);
 			if (!p.isBindable()) a('(');
 			
-//			a("(untyped obj).set"); code.addCapitalized(p.name); a("(");
+//			a("(untyped obj).set_"); a(p.name); a("(");
 			if (p.isBindable() && Util.isSingleValue(p.type)) {
 				a(".value");
 			}
@@ -1133,10 +1133,10 @@ class Haxe implements CodeGenerator
 		var genSetterFn = !immutable && p.shouldHaveSetter();
 		var transient   = !immutable && p.isTransient();
 		
-		if 		(genGetterFn)		{ a("\t(get"); code.addCapitalized(p.name); }
+		if 		(genGetterFn)		{ a("\t(get_"); a(p.name); }
 		else						{ a("\t(default"); }
 		
-		if 		(genSetterFn)		{ a(", set");  code.addCapitalized(p.name); }
+		if 		(genSetterFn)		{ a(", set_");  a(p.name); }
 		else if (transient)			{ a(", default"); }
 		else						{ a(", null"); }
 		
@@ -1149,7 +1149,7 @@ class Haxe implements CodeGenerator
 		}
 
 		if (!immutable && genGetterFn) {
-			a("\tprivate function get"); code.addCapitalized(p.name); a(" () { return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = ");
+			a("\tprivate function get_"); a(p.name); a(" () { return this."); a(p.name); a(".notNull()? this."); a(p.name); a(" : this."); a(p.name); a(" = ");
 			a(HaxeUtil.getConstructorCall(p.type, p.isBindable(), HaxeUtil.getConstructorInitializer(p.type), transient, p.isReadOnly(), p.isSortable())); a(";");
 			a(" }\n\n");
 		}
@@ -1166,7 +1166,7 @@ class Haxe implements CodeGenerator
 		var isSingleValue 		= Util.isSingleValue(p.type);
 		
 		
-		a("\tpublic function set"); code.addCapitalized(p.name); a("(newV:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.isTransient(), p.isReadOnly(), p.isSortable())); a(")\n\t{\n");
+		a("\tpublic function set_"); a(p.name); a("(newV:"); a(HaxeUtil.haxeType(p.type, true, p.isBindable(), false, p.isTransient(), p.isReadOnly(), p.isSortable())); a(")\n\t{\n");
 		
 	//	a("\t\treturn if (v == "); a(name); a(") v;\n");
 	//	a("\t\telse\n\t\t{\n\t\t\tif (isEditable()) _changedFlags |= "); a(hexBitflag(p.bitIndex())); a(";\n");
@@ -1290,8 +1290,8 @@ class Haxe implements CodeGenerator
 		for (e in def.enumerations)
 			values.push(def.name+"."+e.name);
 
-		a("\tstatic public  var list (getList, null) : "); a(listType); a(";\n");
-		a("\t\tstatic private function getList ()\n\t\t{\n");
+		a("\tstatic public  var list (get_list, null) : "); a(listType); a(";\n");
+		a("\t\tstatic private function get_list ()\n\t\t{\n");
 		a("\t\t\tif (list == null)\n");
 		a("\t\t\t\tlist = new "); a(listType); a("(["); a(values.join(', ')); a("].toVector());\n");
 		a("\t\t\treturn list;\n");

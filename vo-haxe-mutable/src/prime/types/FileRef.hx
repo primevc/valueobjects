@@ -42,7 +42,7 @@ class FileRef extends prime.types.URI
 	 * By not adding the prefix to the URI itself we can make sure the data
 	 * isn't saved with a prefix
 	 */
-	public static var prefix (default, setPrefix) : String;
+	public static var prefix (default, set_prefix) : String;
 	
 	
 	override public function toString ()
@@ -51,7 +51,7 @@ class FileRef extends prime.types.URI
 	}
 	
 	
-	private static inline function setPrefix (v:String)
+	private static inline function set_prefix (v:String)
 	{
 		return prefix = (v != null && v != "") ? v + "/" : v;
 	}

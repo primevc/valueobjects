@@ -30,9 +30,9 @@ class Reader implements prime.core.traits.IDisposable
 #end
 
 #if flash10
-    public var bytes(default,setBytes) : flash.utils.ByteArray;
+    public var bytes(default,set_bytes) : flash.utils.ByteArray;
 
-    private function setBytes(b : flash.utils.ByteArray)
+    private function set_bytes(b : flash.utils.ByteArray)
     {
         Assert.isEqual(b.endian, flash.utils.Endian.BIG_ENDIAN, "MessagePack integers must be read big-endian.");
         
@@ -204,7 +204,7 @@ class Reader implements prime.core.traits.IDisposable
 	
 	private function readMap(elem:Int, pid : PropertyID, itemType : Dynamic)
 	{
-		var map:Map<String,Dynamic> = new Map();
+		var map = new Map<String,Dynamic>();
 		
 		for (i in 0 ... elem)
 		{

@@ -2,6 +2,10 @@ package prime.tools.valueobjects.output;
  import prime.tools.valueobjects.VODefinition;
   using prime.utils.TypeUtil;
 
+#if haxe3
+private typedef IntHash<T> = Map<Int,T>;
+#end
+
 /**
  * Helper functions to generate VO message packing functions.
  * IMPORTANT: Method in this class not overridden by Scala.hx::ScalaMessagePacking - generate valid Scala code.
@@ -18,8 +22,8 @@ class MessagePacking
 	var totalPropsToPack	: Int;
 	var totalProps			: Int;
 	
-	private inline function ac(char:Int)   code.addChar(char)
-	private inline function a (str:String) code.add(str)
+	private inline function ac(char:Int)   { code.addChar(char); }
+	private inline function a (str:String) { code.add(str);      }
 	
 	public function new(code:StringBuf, def:ClassDef)
 	{
@@ -27,17 +31,18 @@ class MessagePacking
 		this.def  = def;
 	}
 	
-	private function definePackerFunction()		Assert.abstractMethod()
-	private function defineUnPackerFunction()	Assert.abstractMethod()
+	private function definePackerFunction()		{ Assert.abstractMethod(); }
+	private function defineUnPackerFunction()	{ Assert.abstractMethod(); }
 	
-	private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)	Assert.abstractMethod()
-	private function a_unpackProperty(p:Property) 									Assert.abstractMethod()
+	private function addPropertyPackerCall(path:String, pType:PType, bindable:Bool)	{ Assert.abstractMethod(); }
+	private function a_unpackProperty(p:Property) 									{ Assert.abstractMethod(); }
 	
-	private function expr_incrementMixinCount()		return "++mixin"
-	private function expr_decrementPropertyBytes()	return 
+	private function expr_incrementMixinCount()		{ return "++mixin"; }
+	private function expr_decrementPropertyBytes()	{ return
 		"(untyped obj)._propertiesSet |= (bits << fieldOffset);" +
 		"\n\t\tfieldOffset += 8;" +
-		"\n\t\t--propertyBytes;"
+		"\n\t\t--propertyBytes;";
+	}
 	
 	private function a_maskByte(mask:Int, byte:String) {
 		return if (mask > 0xFF) a(byte); else { a(byte); a(" & 0x"); a(StringTools.hex(mask, 2)); }
@@ -47,7 +52,7 @@ class MessagePacking
 		a("{ #if MessagePackDebug_Pack trace('packVO byte: 0x' + StringTools.hex("); a_maskByte(mask, byte); a(")); #end o.writeByte("); a(byte); a("); ++b; }");
 	}
 	
-	private function a_return() a("return b;")
+	private function a_return() { a("return b;"); }
 	
 	private function a_not0(v:String) {
 		a("("); a(v); a(").not0()");

@@ -5,6 +5,10 @@ package prime.tools.valueobjects.output;
   using prime.tools.valueobjects.output.ScalaUtil;
   using prime.tools.valueobjects.VODefinition;
 
+#if haxe3
+private typedef IntHash<T> = Map<Int,T>;
+#end
+
 class ClojureDefVO implements CodeGenerator
 {
 	var file : sys.io.FileOutput;

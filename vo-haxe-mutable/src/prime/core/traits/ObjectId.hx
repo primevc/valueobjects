@@ -11,8 +11,8 @@ class ObjectId
 	
 	@:keep static public function msgpack_packVO(o : BytesOutput, obj : IObjectId, propertyBits : Int, prependMsgpackType : Bool = false) : Int
 	{
-		Assert.notNull(o);
-		Assert.notNull(obj);
+		Assert.isNotNull(o);
+		Assert.isNotNull(obj);
 		
 		var b /* bytes written */ : Int;
 		if (prependMsgpackType) {
@@ -33,9 +33,9 @@ class ObjectId
 	
 	@:keep static public function msgpack_unpackVO(reader : Reader, obj : IObjectId, propertyBytes : Int) : Void
 	{
-		Assert.notNull(reader);
-		Assert.notNull(obj);
-		Assert.equal(propertyBytes, 1);
+		Assert.isNotNull(reader);
+		Assert.isNotNull(obj);
+		Assert.isEqual(propertyBytes, 1);
 
 		var fieldOffset:Int = (untyped obj)._fieldOffset(TYPE_ID);
 #if debug

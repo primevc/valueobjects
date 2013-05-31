@@ -33,13 +33,13 @@ class ObjectId
 	static public function __init__() { // Run selftest at startup
 		var str = "47cc67093475061e3d95369d";
 		var o = fromString(str);
-		Assert.equal(str, o.toString().toLowerCase());
+		Assert.isEqual(str, o.toString().toLowerCase());
 	#if !neko
-		Assert.equal(o.timestamp,	0x47cc6709);
+		Assert.isEqual(o.timestamp,	0x47cc6709);
 	#end
-		Assert.equal(o.machine,	    0x347506  );
-		Assert.equal(o.pid,		    0x1e3d    );
-		Assert.equal(o.increment,	0x95369d  );
+		Assert.isEqual(o.machine,	    0x347506  );
+		Assert.isEqual(o.pid,		    0x1e3d    );
+		Assert.isEqual(o.increment,	0x95369d  );
 		
 		var bytes = new haxe.io.BytesOutput();
 		bytes.bigEndian = true;
@@ -49,10 +49,10 @@ class ObjectId
 		input.bigEndian = true;
 		var copy1 = fromInput(input);
 		
-		Assert.equal(copy1.timestamp, o.timestamp);
-		Assert.equal(copy1.machine,   o.machine);
-		Assert.equal(copy1.pid,       o.pid);
-		Assert.equal(copy1.increment, o.increment);
+		Assert.isEqual(copy1.timestamp, o.timestamp);
+		Assert.isEqual(copy1.machine,   o.machine);
+		Assert.isEqual(copy1.pid,       o.pid);
+		Assert.isEqual(copy1.increment, o.increment);
 		
 	#if flash10
 		var b:flash.utils.ByteArray = (untyped byteArr).b;
@@ -61,10 +61,10 @@ class ObjectId
 		flash.Memory.select(b);
 		var copy2 = fromMemory(0);
 		
-		Assert.equal(copy2.timestamp, o.timestamp);
-		Assert.equal(copy2.machine,   o.machine);
-		Assert.equal(copy2.pid,       o.pid);
-		Assert.equal(copy2.increment, o.increment);
+		Assert.isEqual(copy2.timestamp, o.timestamp);
+		Assert.isEqual(copy2.machine,   o.machine);
+		Assert.isEqual(copy2.pid,       o.pid);
+		Assert.isEqual(copy2.increment, o.increment);
 	#end
 	}
 #end

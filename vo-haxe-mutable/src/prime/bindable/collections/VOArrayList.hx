@@ -27,9 +27,9 @@
  *  Danny Wilson	<danny @ prime.vc>
  */
 package prime.bindable.collections;
+ import prime.signals.Signal1;
  import prime.tools.valueobjects.ObjectChangeSet;
  import prime.tools.valueobjects.ValueObjectBase;
- import prime.signals.Signal1;
   using prime.utils.FastArray;
   using prime.utils.IfUtil;
   using prime.utils.TypeUtil;
@@ -57,7 +57,7 @@ package prime.bindable.collections;
 	
 	override public function dispose()
 	{
-		Assert.notNull(itemChange);
+		Assert.isNotNull(itemChange);
 
 		if (changeHandlerFn != null)
 			setChangeHandler(null);
@@ -136,14 +136,14 @@ class VOArrayListUtil
 		if (changeHandler.notNull())
 			for (i in 0...list.length) {
 				var obj = cast(list[i], ValueObjectBase);
-				Assert.notNull(obj, "VOArrayList item " + i + "is null!");
+				Assert.isNotNull(obj, "VOArrayList item " + i + "is null!");
 				obj.change.bind(owner, changeHandler);
 			}
 		
 		else
 			for (i in 0...list.length) {
 				var obj = cast(list[i], ValueObjectBase);
-				Assert.notNull(obj, "VOArrayList item " + i + "is null!");
+				Assert.isNotNull(obj, "VOArrayList item " + i + "is null!");
 				if (!obj.isDisposed())
 					obj.change.unbind(owner);
 			}

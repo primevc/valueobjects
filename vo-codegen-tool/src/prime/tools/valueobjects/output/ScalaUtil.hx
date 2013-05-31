@@ -3,8 +3,8 @@ package prime.tools.valueobjects.output;
   using prime.tools.valueobjects.VODefinition;
 
 class ScalaPropUtil {
-	static public function scalaType(p:Property) return ScalaUtil.scalaType(p.type, p.isReference()? "VORef" : null).name
-	static public function lazyInit (p:Property) return !p.isReference() && lazyInitType(p.type)
+	static public function scalaType(p:Property) { return ScalaUtil.scalaType(p.type, p.isReference()? "VORef" : null).name; }
+	static public function lazyInit (p:Property) { return !p.isReference() && lazyInitType(p.type);                          }
 
 	static public function lazyInitType(t:PType) return switch(t)
 	{

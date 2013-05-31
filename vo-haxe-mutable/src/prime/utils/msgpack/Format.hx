@@ -1,16 +1,9 @@
 package prime.utils.msgpack;
  import haxe.io.Output;
  import haxe.io.BytesOutput;
+ import prime.types.*;
  import prime.utils.FastArray;
   using prime.utils.NumberUtil;
-
-import prime.types.RGBA;
-import prime.types.EMail;
-import prime.types.URI;
-import prime.types.FileRef;
-import prime.types.DateInterval;
-import prime.types.ObjectId;
-
 
 /**
  * MessagePack values to bytes formatter

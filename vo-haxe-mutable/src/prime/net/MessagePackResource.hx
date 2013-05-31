@@ -79,7 +79,7 @@ class MessagePackResource <Data> implements prime.core.traits.IDisposable
 	{
 		this.typeMap   = typeMap;
 		this.uriPrefix = uriPrefix;
-		Assert.notNull(typeMap);
+		Assert.isNotNull(typeMap);
 		
 		reader = new prime.utils.msgpack.Reader(typeMap);
 		loader = new URLLoader();
@@ -129,7 +129,7 @@ class MessagePackResource <Data> implements prime.core.traits.IDisposable
 	 */
 	public function request (uriSuffix:String = null, method:RequestMethod = null)
 	{
-		Assert.notNull(uriPrefix);
+		Assert.isNotNull(uriPrefix);
 		var l   = loader,
 			e   = events.receive,
 			uri = uriSuffix == null? uriPrefix : new URI(uriPrefix.string + uriSuffix);
@@ -154,7 +154,7 @@ class MessagePackResource <Data> implements prime.core.traits.IDisposable
 	
 	public function sendBytes (uriSuffix:String, bytes:BytesData)
 	{
-		Assert.notNull(uriPrefix);
+		Assert.isNotNull(uriPrefix);
 		var l   = loader,
 			e   = events.send,
 			uri = uriSuffix == null ? uriPrefix : new URI(uriPrefix.string + uriSuffix);
@@ -224,7 +224,7 @@ class MessagePackResource <Data> implements prime.core.traits.IDisposable
 		var b			= out.getBytes();
 
 #if debug
-		Assert.equal(b.length, origLen);
+		Assert.isEqual(b.length, origLen);
 		trace("serialized data in "+(prime.utils.TimerUtil.stamp() - start)+" ms");
 #end
 		return b;
@@ -281,7 +281,7 @@ class MessagePackResource <Data> implements prime.core.traits.IDisposable
 		
 	/*	// Test to make sure the serialized string contains the same bytes after deserializing again as the original data
 		var d2 = stringToBytes( o.toString() );
-		Assert.equal(d.length, d2.length);
+		Assert.isEqual(d.length, d2.length);
 		
 		trace(o.toString());
 		d.position = 0;
@@ -290,7 +290,7 @@ class MessagePackResource <Data> implements prime.core.traits.IDisposable
 			var j1 = d.readByte();
 			var j2 = d2.readByte();
 			trace(StringTools.hex(j1, 2)+" / "+StringTools.hex(j1, 2));
-			Assert.equal( j1, j2 );
+			Assert.isEqual( j1, j2 );
 		} //*/
 		
 /*		return o.toString();

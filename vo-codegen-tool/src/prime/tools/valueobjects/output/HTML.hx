@@ -3,6 +3,11 @@ package prime.tools.valueobjects.output;
   using prime.utils.ArrayUtils;
   using StringTools;
 
+#if haxe3
+private typedef Hash<T>    = Map<String,T>;
+private typedef IntHash<T> = Map<Int,T>;
+#end
+
 class HTML implements CodeGenerator
 {
 	private static var codegen = new Map<String,CodeGenerator>();
@@ -27,7 +32,7 @@ class HTML implements CodeGenerator
 		
 		var body = t_page.execute({modules: mods});
 		
-		neko.io.File.write(file, false).writeString(body);
+		#if haxe3 sys #else neko #end.io.File.write(file, false).writeString(body);
 	}
 	
 	private function new() {

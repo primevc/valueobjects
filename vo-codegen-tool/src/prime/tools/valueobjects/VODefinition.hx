@@ -1,7 +1,15 @@
 package prime.tools.valueobjects;
+ import haxe.macro.Expr;
+#if !macro
  import prime.utils.ArrayUtils;
  import Type;
+ import #if !haxe3 neko.FileSystem #else sys.FileSystem #end;
   using prime.utils.NumberUtil;
+
+#if haxe3
+private typedef Hash<T>    = Map<String,T>;
+private typedef IntHash<T> = Map<Int,T>;
+#end
 
 enum ModuleMember {
 	MModule(m:Module);
@@ -18,9 +26,27 @@ interface CodeGenerator
 	public function genClass	(def:ClassDef)	: Void;
 	public function genEnum		(def:EnumDef)	: Void;
 }
+#end
 
 class Module
 {
+	macro public function _class(self:Expr, index:ExprOf<Int>, name:ExprOf<String>, metadata:Expr, definition:Expr, ?options:ExprOf<Array<ClassOption>>) return macro {
+		var meta : Dynamic = untyped $metadata;
+		var props : Dynamic<Array<Dynamic>> = untyped $definition;
+		var def : ClassDef = (untyped $self).addPendingDefition($index, Tclass(null), $name, meta, props, $options);
+	//	trace("Defined class: "+ def.fullName);
+		def;
+	}
+	
+	macro public function mixin(self:Expr, index:ExprOf<Int>, name:ExprOf<String>, definition:Expr) return macro {
+		var props : Dynamic<Array<Dynamic>> = untyped $definition;
+		var def : ClassDef = (untyped $self).addPendingDefition($index, Tclass(null), $name, {}, props, []);
+		def.isMixin = true;
+	//	trace("Defined mixin: "+ def.fullName);
+		def;
+	}
+	
+#if !macro
 	static public var pkgRoots	(default,null)	: List<Module>;
 	
 	static public var root		(default,null)	: Module;
@@ -42,6 +68,7 @@ class Module
 		root     = new Module("", null);
 		types    = new Map();
 		traits   = declare("prime.core.traits", true);
+		return null;
 	}
 	static var initialize = reinitialize();
 	
@@ -60,8 +87,8 @@ class Module
 			for (m in fullName.split(".")) {
 				buf.add(m);
 				dir = buf.toString();
-				if (!neko.FileSystem.exists(dir)) try
-					neko.FileSystem.createDirectory(dir)
+				if (!FileSystem.exists(dir)) try
+					FileSystem.createDirectory(dir)
 					catch (e:Dynamic) throw "Failed creating directory: "+dir;
 				
 				buf.add("/");
@@ -74,8 +101,8 @@ class Module
 		if (fullName.length < 1) return "";
 		
 		dir = fullName;
-		if (!neko.FileSystem.exists(dir))
-			neko.FileSystem.createDirectory(dir);
+		if (!FileSystem.exists(dir))
+			FileSystem.createDirectory(dir);
 		return dir;
 	}
 	
@@ -83,11 +110,11 @@ class Module
 	public  var name		(default,null)		: String;
 	private var members		(default,null)		: Map<String,ModuleMember>;
 	public  var parent		(default,null)		: Module;
-	public  var fullName		(getFullName,null) : String;
-	public  var mutableFullName	(getMutableFullName,null) : String;
+	public  var fullName		(get_fullName,null) : String;
+	public  var mutableFullName	(get_mutableFullName,null) : String;
 	
-	private function getFullName():String { return fullName != null? fullName : fullName = (parent == null || parent == Module.root ? name : parent.getFullName() + '.' + name); }
-	private function getMutableFullName():String { return mutableFullName != null? mutableFullName : mutableFullName = (parent == null || parent == Module.root ? name : parent.getMutableFullName() + "." + (packageRoot? name + ".mutable" : name)); }
+	private function get_fullName():String { return fullName != null? fullName : fullName = (parent == null || parent == Module.root ? name : parent.get_fullName() + '.' + name); }
+	private function get_mutableFullName():String { return mutableFullName != null? mutableFullName : mutableFullName = (parent == null || parent == Module.root ? name : parent.get_mutableFullName() + "." + (packageRoot? name + ".mutable" : name)); }
 	
 	private function new(name:String, parent:Module) {
 		this.name = name;
@@ -187,7 +214,7 @@ class Module
 	}
 	
 	public function toString():String {
-		var s = "\n\n<Module name='"+getFullName()+"'>";
+		var s = "\n\n<Module name='"+get_fullName()+"'>";
 		
 		for (m in this.members) switch(m) {
 			case MModule(t):		s += "\n"+ t.toString();
@@ -248,19 +275,6 @@ class Module
 		return def;
 	}
 	
-	public function _class(index:Int, name:String, metadata:Dynamic, definition:Dynamic, ?options:Array<ClassOption>) : ClassDef {
-		var def = this.addPendingDefition(index, Tclass(null), name,metadata,definition,options);
-	//	trace("Defined class: "+ def.fullName);
-		return cast def;
-	}
-	
-	public function mixin(index:Int, name:String, definition:Dynamic) : ClassDef {
-		var def : ClassDef = cast this.addPendingDefition(index, Tclass(null), name, {}, definition, []);
-		def.isMixin = true;
-	//	trace("Defined mixin: "+ def.fullName);
-		return def;
-	}
-	
 	public function _enum(index:Int, name:String, metadata:Dynamic, definition:Dynamic) {
 	//	trace("Defining enum "+name);
 		return cast this.addPendingDefition(index, Tenum(null), name, metadata, definition, []);
@@ -309,8 +323,10 @@ class Module
 				target.finalizeOptions();
 		}
 	}
+#end
 }
 
+#if !macro
 class Util
 {
 	static public function addFullName(code:StringBuf, t:TypeDefinition, interfaceT = false)
@@ -524,8 +540,9 @@ class Util
 		}
 	}
 	
-	static public inline function isDefinedInSuperClassOf(def:ClassDef, p:Property)
-		return def.extendsType(p.parent) || (def.superClass != null && def.superClass.property.exists(p.name))
+	static public inline function isDefinedInSuperClassOf(def:ClassDef, p:Property) {
+		return def.extendsType(p.parent) || (def.superClass != null && def.superClass.property.exists(p.name));
+	}
 }
 
 enum MetadataError {
@@ -583,9 +600,9 @@ class TodoList
 	/** List of tasks put aside for later. Should return true when completed and should be removed from list. **/
 	private var todo : List<Bool->Bool>;
 	
-	public var hasPending (checkForPending,null) : Bool;
+	public var hasPending (get_hasPending,null) : Bool;
 	
-	private function checkForPending() {
+	private function get_hasPending() {
 		return todo != null && todo.length > 0;
 	}
 	
@@ -760,7 +777,7 @@ class PropertyTypeResolver
 	}
 
 	
-	private function handleAbstractPType(value:AbstractPType)
+	private function handleAbstractPType(value:AbstractPType) : Void
 	{
 		type = switch(value)
 		{
@@ -799,7 +816,7 @@ class PropertyTypeResolver
 					case is(path):
 						switch(prop.parent.module.find(path)) {
 							case MType(t):			Tdef(t);
-							case MPending(t,m,m,o):	Tdef(t);
+							case MPending(t,_,_,_):	Tdef(t);
 							
 							case MModule(m):		throw Err_ModuleInsteadOfType(this, path);
 							case MUndefined(n,m):	throw Err_UndefinedType(path);
@@ -923,27 +940,27 @@ class Property
 		return p;
 	}
 	
-	public 		  function bitIndex()						return if (Std.is(parent, BaseTypeDefinition)) cast(parent,BaseTypeDefinition).bitIndex(this) else this.index
-	public inline function propertyID()						return definedIn.index << 8 | this.index
+	public 		  function bitIndex()						{ return if (Std.is(parent, BaseTypeDefinition)) cast(parent,BaseTypeDefinition).bitIndex(this) else this.index; }
+	public inline function propertyID()						{ return definedIn.index << 8 | this.index; }
 
-	public inline function isBindable() 					return hasOption(PropertyOption.bindable)
-	public inline function isReference() 					return hasOption(PropertyOption.reference)
-	public inline function isUnique()	 					return hasOption(PropertyOption.unique)
-	public inline function isReadOnly() 					return hasOption(PropertyOption.readonly)
-	public inline function isSortable() 					return hasOption(PropertyOption.sortable)
-	public inline function isTransient()					return hasOption(PropertyOption.transient)
-	public inline function isOptional ()					return hasOption(PropertyOption.optional)
-	public inline function isMappedTo(t:MappingType) 		return Lambda.has(mappings, t)
-	public inline function isMixin ()						return Std.is(definedIn, ClassDef) && cast(definedIn, ClassDef).isMixin
+	public inline function isBindable() 					{ return hasOption(PropertyOption.bindable);                               }
+	public inline function isReference() 					{ return hasOption(PropertyOption.reference);                              }
+	public inline function isUnique()	 					{ return hasOption(PropertyOption.unique);                                 }
+	public inline function isReadOnly() 					{ return hasOption(PropertyOption.readonly);                               }
+	public inline function isSortable() 					{ return hasOption(PropertyOption.sortable);                               }
+	public inline function isTransient()					{ return hasOption(PropertyOption.transient);                              }
+	public inline function isOptional ()					{ return hasOption(PropertyOption.optional);                               }
+	public inline function isMappedTo(t:MappingType) 		{ return Lambda.has(mappings, t);                                          }
+	public inline function isMixin ()						{ return Std.is(definedIn, ClassDef) && cast(definedIn, ClassDef).isMixin; }
 
 	public inline function setDefaultValue(val:Dynamic) 	{ checkDefaultValue(val); this.defaultValue = val; }
-	public 		  function toString():String 				return "\n\t\t<Property idx='"+index+"' name='"+name+"' defined-in='"+ this.definedIn.fullName +"' parent='"+parent.fullName+"'>"+Std.string(type)+"</Property>"
-	public 		  function copyOptions(prop:Property) 		trace("copyOptions not implemented ("+ this.definedIn.fullName +"."+ prop.name +")")
+	public 		  function toString():String 				{ return "\n\t\t<Property idx='"+index+"' name='"+name+"' defined-in='"+ this.definedIn.fullName +"' parent='"+parent.fullName+"'>"+Std.string(type)+"</Property>"; }
+	public 		  function copyOptions(prop:Property) 		{ trace("copyOptions not implemented ("+ this.definedIn.fullName +"."+ prop.name +")"); }
 
-	public inline function shouldHaveGetter ()		 		return !isTransient() && !Util.isPTypeBuiltin(type) && !Util.isEnum(type) && !isBindable()
-	public inline function shouldHaveSetter ()		 		return !isTransient() && !isBindable() && !isArray()
+	public inline function shouldHaveGetter ()		 		{ return !isTransient() && !Util.isPTypeBuiltin(type) && !Util.isEnum(type) && !isBindable(); }
+	public inline function shouldHaveSetter ()		 		{ return !isTransient() && !isBindable() && !isArray(); }
 
-	public inline function isType (type:PType)				return this.type == type
+	public inline function isType (type:PType)				{ return this.type == type; }
 	
 		
 	public function isArray ()			return switch (this.type) {
@@ -1044,8 +1061,8 @@ interface TypeDefinition
 {
 	public var index		(default,null)		: Int;
 	public var name			(default,null)		: String;
-	public var fullName			(getFullName,null) : String;
-	public var mutableFullName	(getMutableFullName,null) : String;
+	public var fullName			(get_fullName,null) : String;
+	public var mutableFullName	(get_mutableFullName,null) : String;
 	public var module		(default,null)		: Module;
 	public var description						: String;
 	public var finalized	(default,null)		: Bool;
@@ -1194,12 +1211,12 @@ class EnumDef implements TypeDefinitionWithProperties
 	public var conversions	(default,null)		: Map<String,EnumConversionProperty>;
 	public var finalized	(default,null)		: Bool;
 	
-	public var fullName			(getFullName,null) : String;
-	public var mutableFullName	(getMutableFullName,null) : String;
+	public var fullName			(get_fullName,null) : String;
+	public var mutableFullName	(get_mutableFullName,null) : String;
 	private var supertypes	(default,null)		: List<EnumDef>;
 	
-	private function getFullName():String { return fullName != null? fullName : fullName = module.fullName +'.'+ name; }
-	private function getMutableFullName():String return getFullName()
+	private function get_fullName():String { return fullName != null? fullName : fullName = module.fullName +'.'+ name; }
+	private function get_mutableFullName():String { return get_fullName(); }
 	
 	public var property		(default,null)		: Map<String,Property>;
 	public var propTodo		(default,null)		: TodoList;
@@ -1207,8 +1224,8 @@ class EnumDef implements TypeDefinitionWithProperties
 	public var defaultXMLMap(default,null)		: XMLMapping;
 	public var index		(default,null)		: Int;
 	
-	public var propertiesSorted	(getPropertiesSorted,null) : Array<Property>;	
-	private function getPropertiesSorted()
+	public var propertiesSorted	(get_propertiesSorted,null) : Array<Property>;	
+	private function get_propertiesSorted()
 	{
 		if (propertiesSorted != null) return propertiesSorted;
 		
@@ -1218,14 +1235,14 @@ class EnumDef implements TypeDefinitionWithProperties
 		return propertiesSorted = nameSorted;
 	}
 	
-	public var utilClassName (getUtilClassName, null) : String;
-		private function getUtilClassName() {
+	public var utilClassName (get_utilClassName, null) : String;
+		private function get_utilClassName() {
 			return name + "_utils";
 		}
 	
-	public var utilClassPath (getUtilClassPath, null) : String;
-		private function getUtilClassPath() {
-			return getFullName() + "_utils";
+	public var utilClassPath (get_utilClassPath, null) : String;
+		private function get_utilClassPath() {
+			return get_fullName() + "_utils";
 		}
 	
 	public function new(index:Int, name:String, module:Module) {
@@ -1898,7 +1915,7 @@ interface TypeDefinitionWithProperties extends TypeDefinition
 	public var propTodo			(default,null) : TodoList;
 	public var defaultXMLMap	(default,null) : XMLMapping;
 	
-	public var propertiesSorted	(getPropertiesSorted,null) : Array<Property>;
+	public var propertiesSorted	(get_propertiesSorted,null) : Array<Property>;
 }
 
 class BaseTypeDefinition implements TypeDefinitionWithProperties
@@ -1912,20 +1929,20 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 	public var property		(default,null)		: Map<String,Property>;
 	public var propertyByNum(default,null)		: Map<Int,Property>;
 	public var supertypes	(default,null)		: List<BaseTypeDefinition>;
-	public var fullName			(getFullName,null)	: String;
-	public var mutableFullName	(getMutableFullName,null)	: String;
+	public var fullName			(get_fullName,null)	: String;
+	public var mutableFullName	(get_mutableFullName,null)	: String;
 	
 	public var options		(default,null)		: List<ClassOption>;
 	public var defaultXMLMap(default,null)		: XMLMapping;
 	
 	public var implementedBy(default,null)		: Map<String,BaseTypeDefinition>;
-	public var imports		(getImports,null)	: List<TypeDefinition>;
+	public var imports		(get_imports,null)	: List<TypeDefinition>;
 	
-	public var propertiesDefined(getPropertiesDefined, null) : Map<Int,Property>; // key is property.index
-	public var numPropertiesDefined(getNumPropertiesDefined, null) : Int; // Count(propertiesDefined)
-	public var maxPropertyIndexNonTransient(getMaxPropertyIndexNonTransient, null) : Int; // Count(propertiesDefined)
-	public var maxDefinedPropertyIndex(getMaxDefinedPropertyIndex, null) : Int; // max(propertiesDefined.index) non-transient
-	public var propertiesSorted	(getPropertiesSorted,  null) : Array<Property>;
+	public var propertiesDefined            (get_propertiesDefined,            null) : Map<Int,Property>; // key is property.index
+	public var numPropertiesDefined         (get_numPropertiesDefined,         null) : Int; // Count(propertiesDefined)
+	public var maxPropertyIndexNonTransient (get_maxPropertyIndexNonTransient, null) : Int; // Count(propertiesDefined)
+	public var maxDefinedPropertyIndex      (get_maxDefinedPropertyIndex,      null) : Int; // max(propertiesDefined.index) non-transient
+	public var propertiesSorted	            (get_propertiesSorted,             null) : Array<Property>;
 	
 	public var settings		(default, null)	: {
 		var mongo_proxied: MongoProxyType;
@@ -1979,25 +1996,25 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		return propertyBitIndex.get(prop.name);
 	}
 	
-	private function getMaxPropertyIndexNonTransient()
+	private function get_maxPropertyIndexNonTransient()
 	{
-		getPropertiesDefined();
+		get_propertiesDefined();
 		return maxPropertyIndexNonTransient;
 	}
 	
-	private function getNumPropertiesDefined()
+	private function get_numPropertiesDefined()
 	{
-		getPropertiesDefined();
+		get_propertiesDefined();
 		return numPropertiesDefined;
 	}
 	
-	private function getMaxDefinedPropertyIndex()
+	private function get_maxDefinedPropertyIndex()
 	{
-		getPropertiesDefined();
+		get_propertiesDefined();
 		return maxDefinedPropertyIndex;
 	}
 	
-	private function getPropertiesDefined()
+	private function get_propertiesDefined()
 	{
 		if (propertiesDefined != null) return propertiesDefined;
 		
@@ -2018,7 +2035,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		return propertiesDefined;
 	}
 	
-	private function getPropertiesSorted()
+	private function get_propertiesSorted()
 	{
 		if (propertiesSorted != null) return propertiesSorted;
 		
@@ -2028,7 +2045,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		return propertiesSorted = nameSorted;
 	}
 	
-	private function getImports() {
+	private function get_imports() {
 		var l = new List<TypeDefinition>();
 		for (p in this.property) if(p.type != null) switch(p.type)
 		{
@@ -2044,8 +2061,8 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 		return l;
 	}
 	
-	private function getFullName():String { return fullName != null? fullName : fullName = module.fullName +'.'+ name; }
-	private function getMutableFullName():String { return mutableFullName != null? mutableFullName : mutableFullName = module.mutableFullName +'.'+ name; }
+	private function get_fullName():String { return fullName != null? fullName : fullName = module.fullName +'.'+ name; }
+	private function get_mutableFullName():String { return mutableFullName != null? mutableFullName : mutableFullName = module.mutableFullName +'.'+ name; }
 	
 	private var todo		: TodoList;
 	private var optionsTodo	: TodoList;
@@ -2342,7 +2359,7 @@ class ClassDef extends BaseTypeDefinition
 		super(index,name,module);
 	}
 	
-	override function getPropertiesSorted()
+	override function get_propertiesSorted()
 	{
 		if (this.propertiesSorted != null) return propertiesSorted;
 		
@@ -2533,7 +2550,7 @@ class UniqueIDTrait extends MagicClassDef
 {
 	public static var type (default,null) : UniqueIDTrait;
 	
-	static var init = function(){ type = new UniqueIDTrait(); }();
+	static var init = function(){ return type = new UniqueIDTrait(); }();
 	
 	private function new() {
 		super(0x1D, "ObjectId", Module.traits);
@@ -2642,12 +2659,6 @@ enum Platform
 	scala;
 }
 
-enum ClassOption
-{
-	editable;
-	xmlmap(mapping:Dynamic);
-}
-
 enum SpecialValue
 {
 	staticurl(uri:String);
@@ -2673,4 +2684,11 @@ enum MongoProxyType
 	typeCast;
 	/** Generate a proxy which only takes this VO into account */
 	singleType;
+}
+#end
+
+enum ClassOption
+{
+	editable;
+	xmlmap(mapping:Dynamic);
 }

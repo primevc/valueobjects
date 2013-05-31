@@ -1,4 +1,4 @@
-package primevc.core.traits;
+package prime.core.traits;
  import prime.types._
  import prime.types.ValueTypes._
  import prime.utils.msgpack.MutableVOPacker

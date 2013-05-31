@@ -1,5 +1,6 @@
 package prime.tools.valueobjects.output;
  import prime.tools.valueobjects.VODefinition;
+ import sys.io.File;
   using prime.tools.valueobjects.output.Util;
   using prime.utils.TypeUtil;
 
@@ -21,7 +22,7 @@ class HaxeTypeMap implements CodeGenerator
 		var dir = module.mkdir();
 		var filename = dir + "/VO.hx";
 		
-		var file = neko.io.File.write(filename, false);
+		var file = File.write(filename, false);
 
 		file.writeString("package " +module.fullName+";\n");
 
@@ -200,6 +201,7 @@ class Haxe implements CodeGenerator
 	
 	static public function reinitialize() { 
 		haxeModules = new List();
+		return null;
 	}
 	static var initialize = reinitialize();
 	
@@ -274,12 +276,12 @@ class Haxe implements CodeGenerator
 		
 		if (!immutable) {
 			if (def.superClass != null) {
-				a(" extends "); a(def.superClass.fullName); a("VO,");
+				a(" extends "); a(def.superClass.fullName); a("VO");
 			}
 			else
-				a(" extends ValueObjectBase,");
+				a(" extends ValueObjectBase");
 			
-			a(" implements "); a(def.module.fullName); a(".I"); a(def.name); a("VO,");
+			a(" implements "); a(def.module.fullName); a(".I"); a(def.name); a("VO");
 			a(" implements prime.core.traits.IEditableValueObject");
 			if (!def.isMixin && def.superClass == null) {
 				a(" implements prime.core.traits.IClonable < " + def.name + "VO >");
@@ -289,7 +291,7 @@ class Haxe implements CodeGenerator
 		else
 		{	
 			for (t in def.supertypes) {
-				a(" implements "); addFullName(t, true); a(",");
+				a(" implements "); addFullName(t, true);
 			}
 			
 			a(" implements IEditEnabledValueObject implements IMessagePackable");
@@ -388,15 +390,15 @@ class Haxe implements CodeGenerator
 		return dummyMagic;
 	}
 	
-	inline function a(str:String) code.add(str)
+	inline function a(str:String) { code.add(str); }
 	inline function addLineComment (str:String)
 	{
 		openComment();
 		addCommentLine(str);
 		closeComment();
 	}
-	inline function openComment ()					  a("\t/**\n")
-	inline function closeComment ()					  a("\t */\n")
+	inline function openComment ()					{ a("\t/**\n"); }
+	inline function closeComment ()					{ a("\t */\n"); }
 	inline function addCommentLine (str:String)		{ a("\t * "); a(str); a("\n"); }
 	inline function addComment (str:String)
 	{
@@ -489,7 +491,7 @@ class Haxe implements CodeGenerator
 		return "0x" + StringTools.hex(mask, 4);
 	}
 	
-	private inline function ac(char:Int) code.addChar(char)
+	private inline function ac(char:Int) { code.addChar(char); }
 	
 	/** Returns true when no if statement was added  (Property is always set) */
 	private function addIfPropertyIsSetExpr(propPrefix:String, p:Property, expr:String)
@@ -897,7 +899,7 @@ class Haxe implements CodeGenerator
 	{
 		var filename = dir +"/"+ name + ".hx";
 		
-		var file = neko.io.File.write(filename, false);
+		var file = File.write(filename, false);
 		file.writeString(code.toString());
 		file.close();
 	}
@@ -1046,7 +1048,7 @@ class Haxe implements CodeGenerator
 			a("\t\t_propertiesSet"); a(genSuperCall ? " |= " : " = "); a(setProperties.join(" | ")); a(";\n");
 		}
 
-		a("#if debug\tAssert.equal(_changedFlags, 0); #end\n");
+		a("#if debug\tAssert.isEqual(_changedFlags, 0); #end\n");
 	//	a("\t\t_changedFlags = 0;\n");
 		a("\t}\n");
 

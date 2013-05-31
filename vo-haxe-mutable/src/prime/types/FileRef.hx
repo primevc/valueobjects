@@ -35,7 +35,7 @@ package prime.types;
  *
  * TODO: Implement mostly the same functionality as the Scala version.
  */
-class FileRef extends URI
+class FileRef extends prime.types.URI
 {
 	/**
 	 * prefix that will be added before every URI.toString

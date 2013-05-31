@@ -34,7 +34,7 @@ class Reader implements prime.core.traits.IDisposable
 
     private function setBytes(b : flash.utils.ByteArray)
     {
-        Assert.equal(b.endian, flash.utils.Endian.BIG_ENDIAN, "MessagePack integers must be read big-endian.");
+        Assert.isEqual(b.endian, flash.utils.Endian.BIG_ENDIAN, "MessagePack integers must be read big-endian.");
         
         b.position = 0;
 		if (b.length < 1024)
@@ -54,7 +54,7 @@ class Reader implements prime.core.traits.IDisposable
 	
 	public function new(context_ : Map<Int,Class<Dynamic>>, ?input_ : Input)
 	{
-		Assert.notNull(context_);
+		Assert.isNotNull(context_);
 		this.context = context_;
 	#if flash10
 	    if (input_ != null)
@@ -75,7 +75,7 @@ class Reader implements prime.core.traits.IDisposable
 	public function readMsgPackValue(?pid : PropertyID, ?itemType : Dynamic) : Dynamic
 	{
 	    #if MessagePackDebug_Read if (verbose) trace("readMsgPackValue(pid: "+pid+", itemType: "+ itemType +")"); #end
-		Assert.notNull(#if flash10 this.bytes #else this.input #end);
+		Assert.isNotNull(#if flash10 this.bytes #else this.input #end);
 		
 		var value = null;
 		try {
@@ -263,14 +263,14 @@ class Reader implements prime.core.traits.IDisposable
 				trace("deserializeVO { typeID: "+ typeID + ", superTypeCount: "+ superTypeCount + ", fieldsSetBytes: " + fieldsSetBytes + ", target: "+target);
 #end
 		    var clazz = this.context.get(typeID);
-#if debug	Assert.notNull(clazz, "voHeader: " + StringTools.hex(typeID, 2) + ", type: " + typeID + " not found..."); #end
+#if debug	Assert.isNotNull(clazz, "voHeader: " + StringTools.hex(typeID, 2) + ", type: " + typeID + " not found..."); #end
 		
 			if (target == null) {
 #if MessagePackDebug_Read
 					trace("                create Instance: "+ clazz);
 #end
 				target = Type.createEmptyInstance(clazz);
-				Assert.notNull(target);
+				Assert.isNotNull(target);
 			//	target.beginEdit();
 			}
 		
@@ -323,7 +323,7 @@ class Reader implements prime.core.traits.IDisposable
         
             bytes.position = addr - 1;
             var b:Int = bytes.readUnsignedByte();
-            Assert.equal(b, v, "addr="+addr);
+            Assert.isEqual(b, v, "addr="+addr);
         
             return v;
         #else
@@ -360,7 +360,7 @@ class Reader implements prime.core.traits.IDisposable
         
         #if MessagePackDebug_Read
             bytes.position = a;
-            Assert.equal(bytes.readUnsignedShort(), v, "addr="+a);
+            Assert.isEqual(bytes.readUnsignedShort(), v, "addr="+a);
             return v;
         #end
     }
@@ -379,7 +379,7 @@ class Reader implements prime.core.traits.IDisposable
         
         #if MessagePackDebug_Read
             bytes.position = a;
-            Assert.equal(bytes.readInt(), v);
+            Assert.isEqual(bytes.readInt(), v);
             return v;
         #end
     }
@@ -419,7 +419,7 @@ class Reader implements prime.core.traits.IDisposable
 
         #if MessagePackDebug_Read
             bytes.position = addr - 1;
-            Assert.equal(bytes.readByte(), n);
+            Assert.isEqual(bytes.readByte(), n);
         #end
         return n;
     }
@@ -429,10 +429,22 @@ class Reader implements prime.core.traits.IDisposable
         #if MessagePackDebug_Read
             var n = flash.Memory.signExtend16( readUInt16() );
             bytes.position = addr - 2;
-            Assert.equal(bytes.readShort(), n);
+            Assert.isEqual(bytes.readShort(), n);
             return n;
         #else
             return flash.Memory.signExtend16( readUInt16() );
+        #end
+    }
+    
+    private inline function readUInt30()    : Int
+    {
+        #if MessagePackDebug_Read
+            var v = readInt32() & 0x3FFFFFFF;
+            bytes.position = addr - 4;
+            Assert.isEqual(bytes.readUnsignedInt(), v);
+            return v;
+        #else
+            return readInt32() & 0x3FFFFFFF;
         #end
     }
 

@@ -31,8 +31,8 @@ package prime.bindable.collections;
  import prime.signals.Signal1;
  import prime.tools.valueobjects.ObjectChangeSet;
  import prime.tools.valueobjects.ValueObjectBase;
-  using prime.tools.valueobjects.ChangesUtil;
   using prime.utils.BitUtil;
+  using prime.bindable.collections.ListChange;
   using prime.utils.FastArray;
   using prime.utils.IfUtil;
 
@@ -65,7 +65,7 @@ private typedef BindFlags = prime.bindable.RevertableBindableFlags;
 	
 	override public function dispose()
 	{
-		Assert.notNull(itemChange);
+		Assert.isNotNull(itemChange);
 
 		if (changeHandlerFn != null)
 			setChangeHandler(null);
@@ -138,7 +138,7 @@ private typedef BindFlags = prime.bindable.RevertableBindableFlags;
 		if (changes != null && flags.has(ListFlags.REMEMBER_CHANGES) && flags.hasNone( BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT ))
 			while (changes.length > 0) {
 				var listChange = changes.shift();
-				Assert.notNull( listChange );
+				Assert.isNotNull( listChange );
 				change.send( listChange );
 			}
 		

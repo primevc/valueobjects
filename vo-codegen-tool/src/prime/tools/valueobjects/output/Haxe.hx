@@ -111,6 +111,7 @@ class HaxeMessagePacking extends MessagePacking
 		if (!def.isMixin) {
 			a("\n\toverride private function _fieldOffset(typeID:Int) return switch(typeID) {");
 			genFieldOffsetCases(def);
+			a("\n\t\tdefault: -1;");
 			a("\n\t}");
 		}
 		a("\n");
@@ -427,6 +428,7 @@ class Haxe implements CodeGenerator
 		for (p in def.propertiesSorted) if (!p.hasOption(transient)) {
 			a("\n\t\t\tcase "); a(p.name.toUpperCase()); a(": '"); a(p.name); a("';");
 		}
+		a("\n\t\t\tdefault: 'UNKNOWN';");
 		a("\n\t\t}");
 		a("\n\t}");
 		a("\n\n");
@@ -441,6 +443,7 @@ class Haxe implements CodeGenerator
 			for (p in def.propertiesSorted) if (!p.hasOption(transient)) {
 				a("\n\t\t\tcase "); a(p.name.toUpperCase()); a(": untyped "); a("this."); a(p.name); a(";");
 			}
+			a("\n\t\t\tdefault: null;");
 			a("\n\t\t}");
 			a("\n\t}");
 			a("\n\n");
@@ -458,6 +461,7 @@ class Haxe implements CodeGenerator
 					a("this."); a(p.name); a(" = v;");
 				}
 			}
+			a("\n\t\t\tdefault:");
 			a("\n\t\t}");
 			a("\n\t}");
 			a("\n\t\n\t");
@@ -1323,6 +1327,7 @@ class Haxe implements CodeGenerator
 			if (e.type != null) a("(null)");
 			a(";");
 		}
+		a("\n\t\tdefault: null;");
 		a("\n\t\t}\n\t}\n");
 		
 		
@@ -1343,21 +1348,25 @@ class Haxe implements CodeGenerator
 			}
 			var requiresDefaultCase = conv.enums.length < Lambda.count({iterator: def.enumerations.keys});
 			if (requiresDefaultCase)
-				a("\n\t\t  default: toString(e);");
+				a("\n\t\tdefault: toString(e);");
 			
 			a("\n\t\t}\n\t}\n");
 			
 			//from method
+			var hasDefaultCase = false;
 			a("\tstatic public function from"); a(conv.name.substr(2)); a("(str:String) : "); a(def.fullName); a("\n\t{\n\t\t");
 			a("return switch (str) {");
 			for (e in conv.enums) if (e != def.catchAll)
 			{
 				a('\n\t\t  case "'); a(e.conversions.get(conv.name)); a('": '); a(def.fullName); a("."); a(e.name); a(";");
 			} else {
+				hasDefaultCase = true;
 				a("\n\t\t  default: if (str != null) "); a(def.fullName); a("."); a(e.name); a('(str);');
 			}
 			if (requiresDefaultCase)
-				a("\n\t\t  default: fromString(str);");
+				a("\n\t\tdefault: fromString(str);");
+			else if (!hasDefaultCase)
+				a("\n\t\tdefault: null;");
 			
 			a("\n\t\t}\n\t}\n");
 		}

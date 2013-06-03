@@ -202,10 +202,9 @@ class Haxe implements CodeGenerator
 	
 	static public function reinitialize() { 
 		haxeModules = new List();
+		return null;
 	}
-	static public function __init__() {
-		reinitialize();
-	}
+	static var initialize = reinitialize();
 	
 	public static function generate()
 	{

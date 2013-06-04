@@ -64,3 +64,20 @@
          ~@body
          (finally
            (~clean-fn ~bindsym))))))
+
+
+(defmacro guard-let
+  "Like the if-let, except one supplies the predicate oneself. The binding
+  takes the form of [symbol value-expression guard-type predicate], where
+  guard-type can be :when or :when-not. For example:
+
+  (guard-let [foo (some-string-function) :when-not clojure.string/blank?]
+    (do-stuff-with foo)
+    (do-else))"
+  [[sym val grd-type grd] when else]
+  (let [grd-fn (condp = grd-type
+                 :when `(~grd ~sym)
+                 :when-not `(not (~grd ~sym))
+                 (throw (IllegalArgumentException. (str "unsupported guard type: " grd-type))))]
+    `(let [~sym ~val]
+       (if ~grd-fn ~when ~else))))

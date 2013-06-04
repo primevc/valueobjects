@@ -32,20 +32,26 @@ class Module
 {
 	macro public function _class(self:Expr, index:ExprOf<Int>, name:ExprOf<String>, metadata:Expr, definition:Expr, ?options:ExprOf<Array<ClassOption>>) return macro {
 		var meta : Dynamic = untyped $metadata;
+		var opts : Dynamic = untyped $options;
 		var props : Dynamic<Array<Dynamic>> = untyped $definition;
-		var def : ClassDef = (untyped $self).addPendingDefition($index, Tclass(null), $name, meta, props, $options);
-	//	trace("Defined class: "+ def.fullName);
+		var def : ClassDef = (untyped $self).addPendingDefition($index, Tclass(null), $name, meta, props, opts);
 		def;
 	}
 	
+	macro public function _enum(self:Expr, index:ExprOf<Int>, name:ExprOf<String>, metadata:Expr, definition:Expr) return macro {
+		var meta : Dynamic = untyped $metadata;
+		var props : Dynamic<Array<Dynamic>> = untyped $definition;
+		var def : ClassDef = (untyped $self).addPendingDefition($index, Tenum(null), $name, meta, props, []);
+		def;
+	}
+
 	macro public function mixin(self:Expr, index:ExprOf<Int>, name:ExprOf<String>, definition:Expr) return macro {
 		var props : Dynamic<Array<Dynamic>> = untyped $definition;
 		var def : ClassDef = (untyped $self).addPendingDefition($index, Tclass(null), $name, {}, props, []);
 		def.isMixin = true;
-	//	trace("Defined mixin: "+ def.fullName);
 		def;
 	}
-	
+
 #if !macro
 	static public var pkgRoots	(default,null)	: List<Module>;
 	
@@ -273,11 +279,6 @@ class Module
 		defineTypeIndex(index, def);
 		
 		return def;
-	}
-	
-	public function _enum(index:Int, name:String, metadata:Dynamic, definition:Dynamic) {
-	//	trace("Defining enum "+name);
-		return cast this.addPendingDefition(index, Tenum(null), name, metadata, definition, []);
 	}
 	
 	public function finalize()

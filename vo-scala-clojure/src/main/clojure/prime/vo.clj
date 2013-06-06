@@ -4,7 +4,7 @@
 
 (ns prime.vo
   (:require [clojure.set     :as    s])
-  (:import  [prime.vo IDField ValueObject ValueObjectField ValueObjectManifest ValueObjectManifest_0 ValueObjectManifest_1 ValueObjectManifest_N ID]
+  (:import  [prime.vo IDField ValueObject ValueObjectField VOValueObjectField ValueObjectManifest ValueObjectManifest_0 ValueObjectManifest_1 ValueObjectManifest_N ID]
             [prime.types package$ValueType package$ValueTypes$Tarray package$ValueTypes$Tdef]))
 
 (set! *warn-on-reflection* true)
@@ -34,9 +34,14 @@
     (binding [*voseq-key-fn* #(.id ^ValueObjectField %)] (map name vo))
   " nil)
 
-(defn fields [in]
+(defn ^ValueObjectManifest manifest [in]
   (condp instance? in
-    ValueObject           (fields (.. ^ValueObject in voManifest))
+    ValueObjectManifest  in
+    ValueObject          (.voManifest ^ValueObject in)
+  ))
+
+(defn fields [in]
+  (condp instance? (manifest in)
     ValueObjectManifest_N (remove nil? (.. ^ValueObjectManifest_N in fields))
     ValueObjectManifest_1 (remove nil? (cons (.. ^ValueObjectManifest_1 in first) nil))
     ValueObjectManifest_0 nil))
@@ -56,22 +61,83 @@
       #(field-keys (.keyword ^ValueObjectField %))
       (fields vo-or-manifest))))
 
-(defn type-default-vo [^package$ValueType field]
-  (condp instance? field
-    package$ValueTypes$Tdef   (.empty ^package$ValueTypes$Tdef field)
-    package$ValueTypes$Tarray (type-default-vo (.innerType ^package$ValueTypes$Tarray field))
+(defn ^ValueObjectField find-own-field
+  "Searches for a field by key. Returns nil if not found within the given ValueObject(manifest) type."
+  [vo-or-manifest key]
+  (.findOrNull (manifest vo-or-manifest) key))
+
+(defn ^ValueObjectField field-or-subtype-field
+  "Searches for a field by key in the given ValueObject(manifest) type and all known subtypes.
+
+  - Throws if no ValueObject which extends the given type, has a field known by 'key.
+  - Throws when the given key is ambiguous."
+  [vo-or-manifest key]
+  {:pre [key]}
+  (or (find-own-field vo-or-manifest key)
+      (let [manifest (manifest vo-or-manifest)
+            fields   (remove nil? (map #(.findOrNull ^ValueObjectManifest % key) (.subtypes manifest)))
+            fcount   (count fields)]
+          (assert (<= fcount 1) (print-str "Ambiguous: `" key "` maps to multiple fields: " fields))
+          (assert (=  fcount 1) (print-str "No field found `" key "` in " manifest " or subtypes."))
+              (first fields))))
+
+(defn vo-field? [field]
+  (or (instance? VOValueObjectField) (instance? package$ValueTypes$Tdef field)))
+
+(defn array-field? [field]
+  (or (instance? package$ValueTypes$Tarray field)
+      (and (instance? ValueObjectField field) (array-field? (.valueType ^ValueObjectField field)))))
+
+(defn ^ValueObject type-default-vo [^package$ValueType field-type]
+  (condp instance? field-type
+    ValueObjectField          (type-default-vo (.valueType ^ValueObjectField field-type))
+    package$ValueTypes$Tdef   (.empty ^package$ValueTypes$Tdef field-type)
+    package$ValueTypes$Tarray (type-default-vo (.innerType ^package$ValueTypes$Tarray field-type))
     nil))
 
-(defn fields-path-seq [vo [first-field-name & path]]
-  (let [^ValueObjectManifest voManifest (if (instance? ValueObject vo) (.voManifest ^ValueObject vo) #_else vo)
-        field (. voManifest (findOrNull first-field-name))]
-    (if field
-      (if path
-        (let [inner-vo    (type-default-vo (.valueType field))
-              next-fields (fields-path-seq inner-vo path)]
-          (if next-fields (cons field next-fields)))
-      #_else
-        (cons field nil)))))
+(defn fields-path-seq
+  "Recursively walks a 'path seq and translates: keywords, numbers and strings to: ValueObjectFields.
+   Applies the optional field-transform to each found field.
+
+   Returns anything not found as ValueObjectField as is.
+
+   Valid paths to ValueObject fields within arrays are:
+    [:booklet :spreads {:id \"asdf\"} :tags]
+    [:booklet :spreads 0 :tags]
+    [:booklet :spreads \"*\" :tags]
+    [:booklet :spreads * :tags]"
+
+  ([vo path] (fields-path-seq vo path identity))
+
+  ([^ValueObject vo [first-step next-step & path :as full-path] field-transform]
+    (assert (or (empty? full-path) (instance? ValueObject vo))
+              (print-str vo "is not a ValueObject (possibly a VO leaf node). full-path = " full-path))
+    (if-let [field (if first-step (field-or-subtype-field vo first-step))]
+      (cons (field-transform field)
+        (if next-step
+          (if (array-field? field)
+            (do (assert (or (integer? next-step) (map? next-step) (= * next-step) (= "*" next-step))
+                        (print-str "\n  A path-node poiting inside a vector should be: * (for any), an integer index  or an {:id map} -- Instead " next-step " was given."))
+                (if-let [inner-vo (type-default-vo field)]
+                  ; This is an array of VOs.
+                  (cons (cond
+                          (= "*" next-step)
+                            *
+                          (map?  next-step)
+                            (let [[k v] (first next-step)]
+                              (assert (= 1 (count next-step)) (print-str "Search in array path " field " only supported for 1 key. Instead: " next-step))
+                              { (field-transform (field-or-subtype-field inner-vo k)) v })
+                          :else
+                            next-step)
+                        (if path (fields-path-seq inner-vo path field-transform) #_else nil))
+                ; else, if not a ValueObject array field, path should end now.
+                  (do (assert (empty? path) (print-str "Trailing path elements: " (next full-path) " cannot be followed. " first-step " is not an array of ValueObjects."))
+                      (next full-path))))
+          ; else, if not an array field:
+            (fields-path-seq (.defaultValue field) (next full-path) field-transform)
+       )))
+    #_else
+        (next full-path)))) ; No field found, return the rest of the path as is.
 
 (defn has-id? [^ValueObject vo]
   (and vo (instance? IDField (. vo voManifest))

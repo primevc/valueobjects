@@ -174,45 +174,11 @@
 (defn hexify-path "Recursively walks path.
   Maps keywords to hex-names (for JSON access) and keeps all other values as they are."
   [^ValueObject vo path]
-  (assert (or (empty? path) (instance? ValueObject vo))
-              (print-str vo "is not a ValueObject (possibly a VO leaf node). path =" path))
-  (if-let [step (first path)]
-    (if-not (keyword? step)
-      (cons 
-        (if (map? step)
-          (let [[k v] (first step)]
-            (assert (= 1 (count step)))
-            { (first (hexify-path vo [k])) v })
-        #_else step)
-        (hexify-path vo (rest path))) ; leave step as is
-    #_else
-      (let [manifest (.voManifest vo)
-            field (.findOrNull manifest step)
-            ^ValueObjectField field
-            (if field field
-            #_else
-              (let [fields (remove nil? (map #(.findOrNull ^ValueObjectManifest % step) (.subtypes manifest)))
-                    fcount (count fields)]
-                (assert (<= fcount 1) (print-str "Ambiguous keyword: "    step ", maps to multiple fields: " fields))
-                (assert (=  fcount 1) (print-str "No field found named: " step " in " manifest " or subtypes."))
-                (first fields)))
-            inner (.. field defaultValue)
-            inner (if (instance? scala.collection.immutable.Vector inner)
-                    (let [^package$ValueTypes$Tarray atype
-                          (.. field valueType)]
-                      (if (instance? package$ValueTypes$Tdef (.. atype innerType))
-                        (.empty ^package$ValueTypes$Tdef (.innerType atype))
-                      #_else nil))
-                  #_else inner)]
-        (assert field (str step " not found in " vo))
-        (cons (field-hexname field)
-              (hexify-path inner (rest path)))))))
+  (prime.vo/fields-path-seq vo path field-hexname))
 
 (defn keyword->hex-field   [^prime.vo.ValueObject vo, ^clojure.lang.Named key]
-  (let [path (prime.vo/fields-path-seq vo (clojure.string/split (name key) #"[.]"))]
-    (if path
-      (clojure.string/join "."
-        (map field-hexname path)))))
+  (if-let [path (prime.vo/fields-path-seq vo (clojure.string/split (name key) #"[.]") field-hexname)]
+    (clojure.string/join "." (filter string? path))))
 
 (defn map-keywords->hex-fields [^prime.vo.ValueObject vo, expr]
   (cond

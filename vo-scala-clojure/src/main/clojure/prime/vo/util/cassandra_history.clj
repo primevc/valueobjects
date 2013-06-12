@@ -4,12 +4,12 @@
 
 (ns prime.vo.util.cassandra-history
   (:refer-clojure :exclude [get])
-  (require 
+  (require
     [qbits.alia               :as alia]
     [qbits.tardis             :as tardis]
     [immutant.cache           :as cache]
     )
-  (:import 
+  (:import
     [prime.utils.msgpack.VOPacker]
     [prime.utils.msgpack.VOUnpacker]
     [java.io.ByteArrayOutputStream]
@@ -49,13 +49,13 @@
 (defn VOChange->byte-array [value & options]
   (let [
     out (java.io.ByteArrayOutputStream.)
-    msgpack 
+    msgpack
       (doto (prime.utils.msgpack.VOPacker. out)
         (.pack value))
     ]
     (prn options)
-    (doseq [option options] 
-      (do 
+    (doseq [option options]
+      (do
         (prn option)
         (.pack msgpack option)))
     (.close out)
@@ -63,7 +63,7 @@
 
 (defn byte-array->VOChange [bytes vo]
   ; (apply prn (map #(Integer/toHexString (.get bytes %)) (range (.position bytes) (.capacity bytes))))
-  (let [ 
+  (let [
     bytes (.slice bytes)
     ;pp (apply prn (map #(Integer/toHexString (.get bytes %)) (range (.position bytes) (.capacity bytes))))
     unpacker  (doto (org.msgpack.Unpacker. (org.apache.cassandra.utils.ByteBufferUtil/inputStream bytes))
@@ -71,8 +71,8 @@
     pp (prn "hasNext?: " (.. unpacker iterator hasNext))
     vosource (when (.. unpacker iterator hasNext) (.. unpacker next getData))]
     (prn "vosource: " vosource)
-    (flatten 
-      (into [] 
+    (flatten
+      (into []
         [[(.. vo voCompanion (valueOf vosource))]
         (loop [option (when (.. unpacker iterator hasNext) (.. unpacker next getData)) result []]
           (prn "Option: " option)
@@ -90,12 +90,12 @@
   :put (int 1)
   :update (int 2)
   :delete (int 3)
-  :appendTo (int 5)
-  :moveTo (int 4)
-  :removeFrom (int 6)
-  :insertAt (int 7)
-  :replaceAt (int 8)
-  :mergeAt (int 9)
+  :append-to (int 5)
+  :move-to (int 4)
+  :remove-from (int 6)
+  :insert-at (int 7)
+  :replace-at (int 8)
+  :merge-at (int 9)
   })
 
 (defn get-table-name [vo]
@@ -113,49 +113,49 @@
     (let [row (nth res i {})]
       (prn row)
       (let [c
-        (cond 
+        (cond
           (= (:action row) (:put actions))
             (first (byte-array->VOChange (:data row) vo))
           (= (:action row) (:update actions))
             (conj c (first (byte-array->VOChange (:data row) vo)))
           (= (:action row) (:delete actions))
             (empty c)
-          (= (:action row) (:appendTo actions))
+          (= (:action row) (:append-to actions))
             (do (prn (:action row)) (prn (byte-array->VOChange (:data row) vo)))
-          (= (:action row) (:moveTo actions))
+          (= (:action row) (:move-to actions))
             (do (prn (:action row)) (prn (byte-array->VOChange (:data row) vo)))
-          (= (:action row) (:removeFrom actions))
+          (= (:action row) (:remove-from actions))
             (do (prn (:action row)) (prn (byte-array->VOChange (:data row) vo)))
-          (= (:action row) (:insertAt actions))
+          (= (:action row) (:insert-at actions))
             (do (prn (:action row)) (prn (byte-array->VOChange (:data row) vo)))
-          (= (:action row) (:replaceAt actions))
+          (= (:action row) (:replace-at actions))
             (do (prn (:action row)) (prn (byte-array->VOChange (:data row) vo)))
-          (= (:action row) (:mergeAt actions))
+          (= (:action row) (:merge-at actions))
             (do (prn (:action row)) (prn (byte-array->VOChange (:data row) vo)))
           :else
             c
           )
         ]
-      (if-not (empty? row) 
-        (recur (inc i) c) 
-        #_else 
+      (if-not (empty? row)
+        (recur (inc i) c)
+        #_else
         (if (empty? c) nil c))))))
 
-(defn get [cluster vo] 
-  ; This should send a merge of all records since the last put.  
+(defn get [cluster vo]
+  ; This should send a merge of all records since the last put.
   (let [
     last-put (or (:version ((keyword (str (:id vo))) latest-history-put)) (:version (get-latest-put vo cluster)))
-    result 
+    result
       (alia/with-session cluster
-        (alia/execute 
+        (alia/execute
           (alia/prepare (apply str "SELECT * FROM " (get-table-name vo) " WHERE id = ? and version >= ?;")) :values [(idconv vo) last-put]))]
       (build-vo result vo)))
 
 (defn get-slice [cluster vo options]
   ; This should just send all records.
   (let [
-        result (alia/with-session cluster 
-                (alia/execute 
+        result (alia/with-session cluster
+                (alia/execute
                   (alia/prepare (apply str "SELECT * FROM " (get-table-name vo) " WHERE id = ?")) :values [(idconv vo)]))
         slices (or (:slices options) 1)]
     ;TODO: Create a custom ValueSource for history data, keeping the UUID and action around.
@@ -163,15 +163,15 @@
 
 (defn- insert [cluster vo id action data]
   (prn "Data: " data)
-  (alia/with-session cluster 
-      (alia/execute (alia/prepare 
-        (apply str "INSERT INTO " (get-table-name vo) " (version, id, action, data) VALUES ( ? , ? , ? , ? )")) 
+  (alia/with-session cluster
+      (alia/execute (alia/prepare
+        (apply str "INSERT INTO " (get-table-name vo) " (version, id, action, data) VALUES ( ? , ? , ? , ? )"))
         :values [(tardis/unique-time-uuid (.getTime (java.util.Date.))) id (actions action) (java.nio.ByteBuffer/wrap data)])))
 
 (defn put [cluster vo options]
   ; TODO: If action is put, save version into immutant cache.
   (assert (:id vo) "vo requires an id")
-  (insert 
+  (insert
     cluster
     vo
     (idconv vo)
@@ -180,7 +180,7 @@
 
 (defn update [cluster vo id options]
   (prn cluster vo id options)
-  (insert 
+  (insert
     cluster
     vo
     (idconv (conj vo {:id id}))
@@ -188,57 +188,57 @@
     (VOChange->byte-array vo)))
 
 (defn delete [cluster vo options]
-  (insert 
+  (insert
     cluster
     vo
     (idconv vo)
     :delete
     nil))
 
-(defn appendTo [cluster vo path path-vars value options]
-  (insert 
-    cluster 
-    vo 
-    (idconv vo)
-    :appendTo 
-    (VOChange->byte-array vo path path-vars value options)))
-
-(defn insertAt [cluster vo path path-vars value options]
-  (insert 
-    cluster 
-    vo
-    (idconv vo)
-    :insertAt 
-    (VOChange->byte-array vo path path-vars value options)))
-
-(defn moveTo [cluster vo path path-vars to options]
+(defn append-to [cluster vo path path-vars value options]
   (insert
     cluster
     vo
     (idconv vo)
-    :moveTo 
+    :append-to
+    (VOChange->byte-array vo path path-vars value options)))
+
+(defn insert-at [cluster vo path path-vars value options]
+  (insert
+    cluster
+    vo
+    (idconv vo)
+    :insert-at
+    (VOChange->byte-array vo path path-vars value options)))
+
+(defn move-to [cluster vo path path-vars to options]
+  (insert
+    cluster
+    vo
+    (idconv vo)
+    :move-to
     (VOChange->byte-array vo path path-vars to options)))
 
-(defn replaceAt [cluster vo path path-vars value options]
+(defn replace-at [cluster vo path path-vars value options]
   (insert
     cluster
     vo
     (idconv vo)
-    :replaceAt
+    :replace-at
     (VOChange->byte-array vo path path-vars value options)))
 
-(defn mergeAt [cluster vo path path-vars value options]
+(defn merge-at [cluster vo path path-vars value options]
   (insert
     cluster
     vo
     (idconv vo)
-    :mergeAt
+    :merge-at
     (VOChange->byte-array vo path path-vars value options)))
 
-(defn removeFrom [cluster vo path path-vars options]
+(defn remove-from [cluster vo path path-vars options]
   (insert
     cluster
     vo
     (idconv vo)
-    :removeFrom
+    :remove-from
     (VOChange->byte-array vo path path-vars options)))

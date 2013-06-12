@@ -293,7 +293,7 @@
       (cond
         (instance? ValueObject v)
           ; First try to find and call a protocol implementation for this type immediately.
-          (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable v))]
+          (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.custom/JSONable v))]
             (to-json v out)
           ; else: Regular VO, no protocol found
             (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID)))
@@ -331,7 +331,7 @@
 (defn encode-objectId [^org.bson.types.ObjectId in ^JsonGenerator out]
   (.writeString out (.toString in)))
 
-(doseq [add-encoder [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
+(doseq [add-encoder [cheshire.custom/add-encoder, cheshire.custom/add-encoder]]
   (add-encoder prime.types.EnumValue                encode-enum)
   (add-encoder java.net.URI                         encode-uri)
   (add-encoder java.net.URL                         encode-url)
@@ -344,7 +344,7 @@
     (fn [^JsonGenerator jg obj ^String date-format ^Exception ex]
       (binding [prime.vo/*voseq-key-fn* identity]
         ; First try to find and call a protocol implementation for this type immediately.
-        (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable obj))]
+        (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.custom/JSONable obj))]
           (to-json obj jg)
         ; else: No protocol found
         (if (instance? ValueObject obj) (encode-vo     jg obj date-format ex)
@@ -594,8 +594,8 @@
         })))))))
 
 ;TODO convert names!
-; TODO -> Use insertAt script for this. Except leave position in .add(newval).
-(defn appendTo "Add something to the end of an array" 
+; TODO -> Use insert-at script for this. Except leave position in .add(newval).
+(defn append-to "Add something to the end of an array"
   [client index vo path path-vars value options]
   {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
   (prn vo path path-vars value options)
@@ -607,7 +607,7 @@
     (prn script parameters)
     (script-query client index vo (:id vo) script parameters options)))
 
-(defn insertAt [client index vo path path-vars value options]
+(defn insert-at [client index vo path path-vars value options]
   {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
   (let [
     [resolved-path varnum]  (resolve-path vo (pop path))
@@ -616,7 +616,7 @@
     ]
     (script-query client index vo (:id vo) script parameters options)))
 
-(defn moveTo [client index vo path path-vars to options]
+(defn move-to [client index vo path path-vars to options]
   {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
   (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
   (let [
@@ -632,13 +632,13 @@
     ]
     (script-query client index vo (:id vo) script parameters options)))
 
-(defn replaceAt [client index vo path path-vars value options]
+(defn replace-at [client index vo path path-vars value options]
   {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
   (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
   (let [
     [resolved-path varnum]  (resolve-path vo (pop path))
     last-pathnode           (first (hexify-path vo [(last path)]))
-    from-pos-loop           (cond 
+    from-pos-loop           (cond
                               (string? last-pathnode) (get-pos-for-str last-pathnode)
                               (map? last-pathnode) (get-pos last-pathnode (inc varnum))
                               (number? last-pathnode) (apply str "var pos = " last-pathnode ";"))
@@ -647,7 +647,7 @@
     ]
     (script-query client index vo (:id vo) script parameters options)))
 
-(defn mergeAt [client index vo path path-vars options]
+(defn merge-at [client index vo path path-vars options]
   {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
   (assert (number? (last path)) "Last step of the path has to be a number")
   (let [
@@ -657,7 +657,7 @@
     ]
     (script-query client index vo (:id vo) script parameters options)))
 
-(defn removeFrom [client index vo path path-vars options]
+(defn remove-from [client index vo path path-vars options]
   {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
   (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
   (let [

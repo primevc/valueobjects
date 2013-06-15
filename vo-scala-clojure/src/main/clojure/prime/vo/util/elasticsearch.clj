@@ -241,6 +241,7 @@
   ;else
   (let [[type mapping] (vo-index-mapping-pair vo-options-pair)]
     (ces/put-mapping es, {
+      :ignore-conflicts? true
       :index  index-name
       :type   type
       :source {type mapping}

@@ -85,7 +85,7 @@ protected[prime] final class VORefImpl[V <: ValueObject with ID](val _id:V#IDTyp
 
   def deref = if (isDefined) _cached else {
     val vo = derefFn.invoke(_id).asInstanceOf[V];
-    apply(vo);
+    if (vo != null) apply(vo);
     vo;
   }
 

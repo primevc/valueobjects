@@ -88,40 +88,40 @@
     (es/delete client index vo options))
 
   (appendTo [this vo path path-vars value]
-    (es/appendTo client index vo path path-vars value {}))
+    (es/appendTo client index vo path (or path-vars ()) value {}))
 
   (appendTo [this vo path path-vars value options]
-    (es/appendTo client index vo path path-vars value options))
+    (es/appendTo client index vo path (or path-vars ()) value options))
 
   (insertAt [this vo path path-vars value]
-    (es/insertAt client index vo path path-vars value {}))
+    (es/insertAt client index vo path (or path-vars ()) value {}))
 
   (insertAt [this vo path path-vars value options]
-    (es/insertAt client index vo path path-vars value options))
+    (es/insertAt client index vo path (or path-vars ()) value options))
 
   (moveTo [this vo path path-vars to]
-    (es/moveTo client index vo path path-vars to {}))
+    (es/moveTo client index vo path (or path-vars ()) to {}))
 
   (moveTo [this vo path path-vars to options]
-    (es/moveTo client index vo path path-vars to options))
+    (es/moveTo client index vo path (or path-vars ()) to options))
 
   (replaceAt [this vo path path-vars value]
-    (es/replaceAt client index vo path path-vars value {}))
+    (es/replaceAt client index vo path (or path-vars ()) value {}))
 
   (replaceAt [this vo path path-vars value options]
-    (es/replaceAt client index vo path path-vars value options))
+    (es/replaceAt client index vo path (or path-vars ()) value options))
 
   (mergeAt [this vo path path-vars value]
-    (es/mergeAt client index vo path path-vars value {}))
+    (es/mergeAt client index vo path (or path-vars ()) value {}))
 
   (mergeAt [this vo path path-vars value options]
-    (es/mergeAt client index vo path path-vars value options))
+    (es/mergeAt client index vo path (or path-vars ()) value options))
 
   (removeFrom [this vo path path-vars]
-    (es/removeFrom client index vo path path-vars {}))
+    (es/removeFrom client index vo path (or path-vars ()) {}))
 
   (removeFrom [this vo path path-vars options]
-    (es/removeFrom client index vo path path-vars options))
+    (es/removeFrom client index vo path (or path-vars ()) options))
 
   VOSearchProxy
   ; [es ^ValueObject vo indices & {:as options :keys [ query filter from size types sort highlighting only exclude script-fields preference facets named-filters boost explain version min-score listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source]}]
@@ -181,40 +181,40 @@
     (ch/delete cluster vo options))
 
   (appendTo [this vo path path-vars value]
-    (ch/appendTo cluster vo path path-vars value {}))
+    (ch/appendTo cluster vo path (or path-vars ()) value {}))
 
   (appendTo [this vo path path-vars value options]
-    (ch/appendTo cluster vo path path-vars value options))
+    (ch/appendTo cluster vo path (or path-vars ()) value options))
 
   (insertAt [this vo path path-vars value]
-    (ch/insertAt cluster vo path path-vars value {}))
+    (ch/insertAt cluster vo path (or path-vars ()) value {}))
 
   (insertAt [this vo path path-vars value options]
-    (ch/insertAt cluster vo path path-vars value options))
+    (ch/insertAt cluster vo path (or path-vars ()) value options))
 
   (moveTo [this vo path path-vars to]
-    (ch/moveTo cluster vo path path-vars to {}))
+    (ch/moveTo cluster vo path (or path-vars ()) to {}))
 
   (moveTo [this vo path path-vars to options]
-    (ch/moveTo cluster vo path path-vars to options))
+    (ch/moveTo cluster vo path (or path-vars ()) to options))
 
   (replaceAt [this vo path path-vars value]
-    (ch/replaceAt cluster vo path path-vars value {}))
+    (ch/replaceAt cluster vo path (or path-vars ()) value {}))
 
   (replaceAt [this vo path path-vars value options]
-    (ch/replaceAt cluster vo path path-vars value options))
+    (ch/replaceAt cluster vo path (or path-vars ()) value options))
 
   (mergeAt [this vo path path-vars value]
-    (ch/mergeAt cluster vo path path-vars value {}))
+    (ch/mergeAt cluster vo path (or path-vars ()) value {}))
 
   (mergeAt [this vo path path-vars value options]
-    (ch/mergeAt cluster vo path path-vars value options))
+    (ch/mergeAt cluster vo path (or path-vars ()) value options))
 
   (removeFrom [this vo path path-vars]
-    (ch/removeFrom cluster vo path path-vars {}))
+    (ch/removeFrom cluster vo path (or path-vars ()) {}))
 
   (removeFrom [this vo path path-vars options]
-    (ch/removeFrom cluster vo path path-vars options))
+    (ch/removeFrom cluster vo path (or path-vars ()) options))
 
   VOHistoryProxy
   (get-slice [this vo]

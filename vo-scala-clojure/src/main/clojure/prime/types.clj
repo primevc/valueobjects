@@ -30,7 +30,7 @@
 (defprotocol To-Vector    (^IndexedSeq      ^:pure  to-Vector    [in converter]                  ))
 (defprotocol To-VORef     (^VORef                   to-VORef     [in] [in ref-target--companion] ))
 
-(defn ^:pure to-URL [uri] (Conversion/URL (to-URI uri)))
+(defn ^:pure ^URL to-URL [uri] (Conversion/URL (to-URI uri)))
 
 (extend-type prime.vo.ID To-VORef
   (^VORef to-VORef [in] (prime.types.Conversion/vo2ref in)))

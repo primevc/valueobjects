@@ -8,6 +8,7 @@
     [qbits.alia               :as alia]
     [qbits.tardis             :as tardis]
     [immutant.cache           :as cache]
+    [prime.vo.util.elasticsearch :as es]
     )
   (:import 
     [prime.utils.msgpack.VOPacker]
@@ -54,10 +55,9 @@
         (.pack value))
     ]
     (prn options)
-    (doseq [option options] 
-      (do 
-        (prn option)
-        (.pack msgpack option)))
+    (doseq [option options]
+      (prn option)
+      (.pack msgpack option))
     (.close out)
     (.toByteArray out)))
 
@@ -68,17 +68,11 @@
     ;pp (apply prn (map #(Integer/toHexString (.get bytes %)) (range (.position bytes) (.capacity bytes))))
     unpacker  (doto (org.msgpack.Unpacker. (org.apache.cassandra.utils.ByteBufferUtil/inputStream bytes))
                 (.setVOHelper prime.utils.msgpack.VOUnpacker$/MODULE$))
-    pp (prn "hasNext?: " (.. unpacker iterator hasNext))
-    vosource (when (.. unpacker iterator hasNext) (.. unpacker next getData))]
-    (prn "vosource: " vosource)
-    (flatten 
-      (into [] 
-        [[(.. vo voCompanion (valueOf vosource))]
-        (loop [option (when (.. unpacker iterator hasNext) (.. unpacker next getData)) result []]
-          (prn "Option: " option)
-          (if-not (or option (.. unpacker iterator hasNext))
-            result
-            (recur (.. unpacker next getData) (conj result option))))]))))
+    vosource (.next unpacker)
+    [whut & options] (iterator-seq (.. unpacker iterator))]
+    (prn "vosource: " vosource options)
+    (cons (.. vo voCompanion (apply (.getData vosource))) options)
+  ))
 
 (defn idconv [vo]
   ((second (simple-prime-type->cql-type (.. vo voManifest _id valueType keyword))) (:id vo)))
@@ -142,9 +136,10 @@
         (if (empty? c) nil c))))))
 
 (defn get [cluster vo] 
-  ; This should send a merge of all records since the last put.  
+  ; This should send a merge of all records since the last put.
   (let [
     last-put (or (:version ((keyword (str (:id vo))) latest-history-put)) (:version (get-latest-put vo cluster)))
+    pp (prn "Last-put: " last-put)
     result 
       (alia/with-session cluster
         (alia/execute 
@@ -179,7 +174,7 @@
     (VOChange->byte-array vo)))
 
 (defn update [cluster vo id options]
-  (prn cluster vo id options)
+  (prn "Update!")
   (insert 
     cluster
     vo
@@ -201,7 +196,7 @@
     vo 
     (idconv vo)
     :appendTo 
-    (VOChange->byte-array vo path path-vars value options)))
+    (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
 (defn insertAt [cluster vo path path-vars value options]
   (insert 
@@ -209,7 +204,7 @@
     vo
     (idconv vo)
     :insertAt 
-    (VOChange->byte-array vo path path-vars value options)))
+    (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
 (defn moveTo [cluster vo path path-vars to options]
   (insert
@@ -217,7 +212,7 @@
     vo
     (idconv vo)
     :moveTo 
-    (VOChange->byte-array vo path path-vars to options)))
+    (VOChange->byte-array vo (es/hexify-path vo path) path-vars to options)))
 
 (defn replaceAt [cluster vo path path-vars value options]
   (insert
@@ -225,7 +220,7 @@
     vo
     (idconv vo)
     :replaceAt
-    (VOChange->byte-array vo path path-vars value options)))
+    (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
 (defn mergeAt [cluster vo path path-vars value options]
   (insert
@@ -233,7 +228,7 @@
     vo
     (idconv vo)
     :mergeAt
-    (VOChange->byte-array vo path path-vars value options)))
+    (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
 (defn removeFrom [cluster vo path path-vars options]
   (insert
@@ -241,4 +236,4 @@
     vo
     (idconv vo)
     :removeFrom
-    (VOChange->byte-array vo path path-vars options)))
+    (VOChange->byte-array vo (es/hexify-path vo path) path-vars options)))

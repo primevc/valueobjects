@@ -43,7 +43,7 @@
     (eval (list 'immutant.cache/cache (str (get-table-name vo) "-last-put") :locking :pessimistic))
   (catch Exception e)))
 
-(def last-put-cache (memoize mk-last-put-cache))
+(def last-put-cache (memoize #'mk-last-put-cache))
 
 ;
 ; Column serialization
@@ -163,7 +163,7 @@
 (defn get [cluster vo] 
   ; This should send a merge of all records since the last put.
   (let [
-    last-put (:version (or (get (last-put-cache vo) (str (:id vo))) (get-latest-put vo cluster)))
+    last-put (:version (or (get (last-put-cache (empty vo)) (str (:id vo))) (get-latest-put vo cluster)))
     pp (prn "Last-put: " last-put)
     result 
       (alia/with-session cluster

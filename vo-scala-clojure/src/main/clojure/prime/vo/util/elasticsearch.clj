@@ -190,6 +190,9 @@
       (vec (map (partial map-keywords->hex-fields vo) expr))
     (empty expr)
       (into (empty expr) (map (partial map-keywords->hex-fields vo) expr))
+    (= expr <=)  "lte"  (= expr <)   "lt"
+    (= expr >=)  "gte"  (= expr >)   "gt"
+    (= expr not) "not"
     :else expr))
 
 (defn vo-hexname [^ValueObject vo] (Integer/toHexString (.. vo voManifest ID)))

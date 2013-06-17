@@ -20,7 +20,34 @@
     )
 )
 
-(defonce latest-history-put (cache/cache "latest-history-put" :locking :pessimistic))
+(defn get-table-name [vo]
+  (str "t" (Integer/toHexString (.. vo voManifest ID))))
+
+;
+; PUT version caching
+;
+
+(defn ^:dynamic mk-last-put-cache "
+  Called and memoized by last-put-cache.
+
+  This fn creates a cache (map)
+    wherein the last version id of a PUT operation per VO-id is stored
+    to speed up retrieval of VO changes since the last put.
+
+  This should improve speed of VOProxy/get: replaying only the VO changes since the last PUT.
+
+  If running on immutant, the default implementation returns an immutant.cache named: `${VO table name}-last-put`."
+  [vo]
+  (try
+    (require 'immutant.cache)
+    (eval (list 'immutant.cache/cache (str (get-table-name vo) "-last-put") :locking :pessimistic))
+  (catch Exception e)))
+
+(def last-put-cache (memoize mk-last-put-cache))
+
+;
+; Column serialization
+;
 
 (defn ObjectId->byte-buffer [^org.bson.types.ObjectId oid] (java.nio.ByteBuffer/wrap (.toByteArray oid)))
 
@@ -80,6 +107,7 @@
 (defn keyword-keys [m]
   (into (empty m) (for [[k v] m] [(keyword (.toLowerCase k)) v])))
 
+; TODO: VOAction enum definition
 (def actions {
   :put (int 1)
   :update (int 2)
@@ -91,9 +119,6 @@
   :replaceAt (int 8)
   :mergeAt (int 9)
   })
-
-(defn get-table-name [vo]
-  (str "t" (Integer/toHexString (.. vo voManifest ID))))
 
 (defn get-latest-put [vo cluster]
   (let [result (alia/with-session cluster
@@ -138,7 +163,7 @@
 (defn get [cluster vo] 
   ; This should send a merge of all records since the last put.
   (let [
-    last-put (or (:version ((keyword (str (:id vo))) latest-history-put)) (:version (get-latest-put vo cluster)))
+    last-put (:version (or (get (last-put-cache vo) (str (:id vo))) (get-latest-put vo cluster)))
     pp (prn "Last-put: " last-put)
     result 
       (alia/with-session cluster

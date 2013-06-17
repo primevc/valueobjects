@@ -4,7 +4,7 @@
 
 (ns prime.vo.util.cassandra-history
   (:refer-clojure :exclude [get])
-  (require 
+  (require prime.vo
     [qbits.alia               :as alia]
     [qbits.tardis             :as tardis]
     [immutant.cache           :as cache]
@@ -21,14 +21,14 @@
 )
 
 (defn get-table-name [vo]
-  (str "t" (Integer/toHexString (.. vo voManifest ID))))
+  (str "t" (Integer/toHexString (.ID (prime.vo/manifest vo)))))
 
 ;
 ; PUT version caching
 ;
 
 (defn ^:dynamic mk-last-put-cache "
-  Called and memoized by last-put-cache.
+  Create a cache per VO type: called and memoized by last-put-cache.
 
   This fn creates a cache (map)
     wherein the last version id of a PUT operation per VO-id is stored
@@ -43,7 +43,10 @@
     (eval (list 'immutant.cache/cache (str (get-table-name vo) "-last-put") :locking :pessimistic))
   (catch Exception e)))
 
-(def last-put-cache (memoize #'mk-last-put-cache))
+(def ^:private mk-last-put-cache-memoized (memoize #'mk-last-put-cache))
+
+(defn last-put-cache [vo]
+  (mk-last-put-cache-memoized (prime.vo/manifest vo)))
 
 ;
 ; Column serialization
@@ -163,7 +166,7 @@
 (defn get [cluster vo] 
   ; This should send a merge of all records since the last put.
   (let [
-    last-put (:version (or (get (last-put-cache (empty vo)) (str (:id vo))) (get-latest-put vo cluster)))
+    last-put (:version (or (get (last-put-cache vo) (str (:id vo))) (get-latest-put vo cluster)))
     pp (prn "Last-put: " last-put)
     result 
       (alia/with-session cluster

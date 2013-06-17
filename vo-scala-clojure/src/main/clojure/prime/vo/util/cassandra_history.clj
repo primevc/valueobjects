@@ -7,7 +7,6 @@
   (require prime.vo
     [qbits.alia               :as alia]
     [qbits.tardis             :as tardis]
-    [immutant.cache           :as cache]
     [prime.vo.util.elasticsearch :as es]
     )
   (:import 

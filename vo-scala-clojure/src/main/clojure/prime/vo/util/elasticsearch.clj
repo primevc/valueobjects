@@ -302,12 +302,12 @@
           (let [innerType (. ^package$ValueTypes$Tarray (. k valueType) innerType)
                 voType    (if (instance? package$ValueTypes$Tdef innerType) (.. ^package$ValueTypes$Tdef innerType empty voManifest ID) #_else -1)]
             (if (> voType 0)
-              (binding [*vo-baseTypeID* voType] (cheshire.generate/generate-array out v date-format ex))
+              (binding [*vo-baseTypeID* voType] (cheshire.generate/generate-array out v date-format ex nil))
             #_else
-              (cheshire.generate/generate-array out v date-format ex)))
+              (cheshire.generate/generate-array out v date-format ex nil)))
 
         :else
-          (cheshire.generate/generate out v date-format ex)))
+          (cheshire.generate/generate out v date-format ex nil)))
 
     (.writeEndObject out)))
 

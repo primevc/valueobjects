@@ -339,18 +339,19 @@
   (add-encoder org.bson.types.ObjectId              encode-objectId)
   (add-encoder javax.mail.internet.InternetAddress  encode-internetAddress))
 
-(alter-var-root #'cheshire.generate/generate
-  (fn [orig-generate]
-    (fn [^JsonGenerator jg obj ^String date-format ^Exception ex]
-      (binding [prime.vo/*voseq-key-fn* identity]
-        ; First try to find and call a protocol implementation for this type immediately.
-        (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.custom/JSONable obj))]
-          (to-json obj jg)
-        ; else: No protocol found
-        (if (instance? ValueObject obj) (encode-vo     jg obj date-format ex)
-        #_else(if (instance? VORef obj) (encode-voref  jg obj date-format ex)
-        #_else                          (orig-generate jg obj date-format ex)
-)))))))
+(alter-var-root
+ #'cheshire.generate/generate
+ (fn [orig-generate]
+   (fn [^JsonGenerator jg obj ^String date-format ^Exception ex key-fn]
+     (binding [prime.vo/*voseq-key-fn* identity]
+       ;; First try to find and call a protocol implementation for this type immediately.
+       (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.custom/JSONable obj))]
+         (to-json obj jg)
+         ;; else: No protocol found
+         (condp instance? obj
+           ValueObject (encode-vo jg obj date-format ex)
+           VORef (encode-voref jg obj date-format ex)
+           (orig-generate jg obj date-format ex key-fn)))))))
 
 
 ;

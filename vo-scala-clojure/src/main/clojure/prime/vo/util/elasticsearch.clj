@@ -3,23 +3,22 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.vo.util.elasticsearch
-  (:refer-clojure :exclude [get])
-  (:require [prime.vo        :as   vo]
-            [cheshire.core   :as json], cheshire.generate, cheshire.custom, cheshire.factory
-            [clj-elasticsearch.client :as ces])
-  (:use [prime.vo.source :only [def-valuesource]])
-  (:import [prime.types VORef EnumValue package$ValueType package$ValueTypes$Tdef package$ValueTypes$Tarray package$ValueTypes$Tenum]
+  (:refer-clojure :exclude (get))
+  (:require [prime.vo :as vo]
+            [cheshire [core :as json] [generate :as gen] factory]
+            [clj-elasticsearch.client :as ces]
+            [prime.vo.source :refer (def-valuesource)])
+  (:import [prime.types VORef EnumValue package$ValueType package$ValueTypes$Tdef
+            package$ValueTypes$Tarray package$ValueTypes$Tenum]
            [prime.vo IDField ValueObject ValueObjectManifest ValueObjectField ValueObjectCompanion ID]
            [com.fasterxml.jackson.core JsonGenerator]
+           [org.elasticsearch.action.get GetResponse]
+           [org.elasticsearch.action.search SearchResponse]
+           [org.elasticsearch.search SearchHit SearchHitField]))
 
-           org.elasticsearch.action.search.SearchResponse, [org.elasticsearch.search SearchHit, SearchHitField],
-           org.elasticsearch.action.get.GetResponse))
 
-;(set! *warn-on-reflection* true)
+;;; Demonize TransportClient, if Immutant is available.
 
-;(defonce es-client (ces/make-client :transport {:hosts ["127.0.0.1:9300"] :cluster-name (str "elasticsearch_" (System/getenv "USER"))}))
-
-; If Immutant is available, daemonize TransportClient
 (try
   (require 'immutant.daemons)
   (eval '(extend-type org.elasticsearch.client.Client
@@ -32,10 +31,7 @@
   (ces/make-client :transport {:hosts hosts :cluster-name cluster-name}))
 
 
-
-;
-; Generate ElasticSearch mapping from VO:
-;
+;;; Generate ElasticSearch mapping from VO.
 
 (defprotocol TermFilter "Used while creating mappings and term-filter queries from a ValueObject."
   (term-kv-pair [value key kv-pair] "Returns a vector of [^String key, value] which gets appended to the term-filter map.")
@@ -194,40 +190,38 @@
 
 (defn vo-hexname [^ValueObject vo] (Integer/toHexString (.. vo voManifest ID)))
 
-(defmacro map-enum-as-integer [enum-class]
+(defmacro map-enum-as-integer
+  [enum-class]
   `(do
-    (doseq [add-encoder# [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
-      (add-encoder# ~enum-class
-        (fn [^prime.types.EnumValue in# ^JsonGenerator out#]
-          (.writeNumber out# (. in# value)))))
-      (extend-type ~enum-class, TermFilter
-        (term-kv-pair [v# k# kv-pair#]  [k# (. v# value)])
-        (mapping-field-type-defaults [value#] {:type "integer"}) )))
+     (gen/add-encoder ~enum-class
+                  (fn [^prime.types.EnumValue in# ^JsonGenerator out#]
+                    (.writeNumber out# (. in# value))))
+     (extend-type ~enum-class, TermFilter
+                  (term-kv-pair [v# k# kv-pair#] [k# (. v# value)])
+                  (mapping-field-type-defaults [value#] {:type "integer"}) )))
 
-(defmacro map-enum-as-string  [enum-class, string-method]
+(defmacro map-enum-as-string
+  [enum-class string-method]
   `(do
-    (doseq [add-encoder# [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
-      (add-encoder# ~enum-class
-        (fn [^prime.types.EnumValue in# ^JsonGenerator out#]
-          (.writeString out# (. in# ~string-method)))))
-      (extend-type ~enum-class, TermFilter
-        (term-kv-pair [v# k# kv-pair#]  [k# (. v# ~string-method)])
-        (mapping-field-type-defaults [value#] {:type "string"}) )))
+     (gen/add-encoder# ~enum-class
+                   (fn [^prime.types.EnumValue in# ^JsonGenerator out#]
+                     (.writeString out# (. in# ~string-method))))
+     (extend-type ~enum-class, TermFilter
+                  (term-kv-pair [v# k# kv-pair#] [k# (. v# ~string-method)])
+                  (mapping-field-type-defaults [value#] {:type "string"}) )))
 
-(defmacro map-as-string-type  [class, elasticsearch-type, to-string-fn]
+(defmacro map-as-string-type
+  [class elasticsearch-type to-string-fn]
   `(do
-    (doseq [add-encoder# [cheshire.generate/add-encoder, cheshire.custom/add-encoder]]
-      (add-encoder# ~class
-        (fn [in# ^JsonGenerator out#]
-          (.writeString out# (~to-string-fn in#)))))
-      (extend-type ~class, TermFilter
-        (term-kv-pair [v# k# kv-pair#]  [k# (~to-string-fn v#)])
-        (mapping-field-type-defaults [value#] {:type ~elasticsearch-type}) )))
+     (gen/add-encoder ~class
+                      (fn [in# ^JsonGenerator out#]
+                        (.writeString out# (~to-string-fn in#))))
+     (extend-type ~class, TermFilter
+                  (term-kv-pair [v# k# kv-pair#] [k# (~to-string-fn v#)])
+                  (mapping-field-type-defaults [value#] {:type ~elasticsearch-type}) )))
 
 
-;
-; ElasticSearch index management (mapping API)
-;
+;;; ElasticSearch index management (mapping API).
 
 (defn vo-index-mapping-pair [[^ValueObject vo, options]]
   (assert options)
@@ -265,9 +259,7 @@
       (put-mapping es index-name vo->options-map)))))
 
 
-;
-; ValueObjects and valuetypes JSON encoding
-;
+;;; ValueObjects and valuetypes JSON encoding.
 
 (defn encode-enum [^EnumValue in ^JsonGenerator out]
   (.writeStartObject out)
@@ -284,6 +276,7 @@
     (encode-vo out vo date-format ex (or *vo-baseTypeID* (.. vo voManifest ID))))
 
   ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex ^Integer baseTypeID]
+     (prn "e" vo)
     (.writeStartObject out)
     (if (not (== baseTypeID (.. vo voManifest ID)))
       (.writeNumberField out "t" (.. vo voManifest ID)))
@@ -293,7 +286,7 @@
       (cond
         (instance? ValueObject v)
           ; First try to find and call a protocol implementation for this type immediately.
-          (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.custom/JSONable v))]
+          (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable v))]
             (to-json v out)
           ; else: Regular VO, no protocol found
             (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID)))
@@ -331,22 +324,22 @@
 (defn encode-objectId [^org.bson.types.ObjectId in ^JsonGenerator out]
   (.writeString out (.toString in)))
 
-(doseq [add-encoder [cheshire.custom/add-encoder, cheshire.custom/add-encoder]]
-  (add-encoder prime.types.EnumValue                encode-enum)
-  (add-encoder java.net.URI                         encode-uri)
-  (add-encoder java.net.URL                         encode-url)
-  (add-encoder org.joda.time.ReadableInstant        encode-instant)
-  (add-encoder org.bson.types.ObjectId              encode-objectId)
-  (add-encoder javax.mail.internet.InternetAddress  encode-internetAddress))
+(gen/add-encoder prime.types.EnumValue                encode-enum)
+(gen/add-encoder java.net.URI                         encode-uri)
+(gen/add-encoder java.net.URL                         encode-url)
+(gen/add-encoder org.joda.time.ReadableInstant        encode-instant)
+(gen/add-encoder org.bson.types.ObjectId              encode-objectId)
+(gen/add-encoder javax.mail.internet.InternetAddress  encode-internetAddress)
 
 (alter-var-root
  #'cheshire.generate/generate
  (fn [orig-generate]
    (fn [^JsonGenerator jg obj ^String date-format ^Exception ex key-fn]
+     (prn obj)
      (binding [prime.vo/*voseq-key-fn* identity]
        ;; First try to find and call a protocol implementation for this type immediately.
-       (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.custom/JSONable obj))]
-         (to-json obj jg)
+       (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable obj))]
+         (do (prn to-json  "toJSON!") (to-json obj jg))
          ;; else: No protocol found
          (condp instance? obj
            ValueObject (encode-vo jg obj date-format ex)
@@ -354,9 +347,7 @@
            (orig-generate jg obj date-format ex key-fn)))))))
 
 
-;
-; ElasticSearch ValueSource
-;
+;;; ElasticSearch ValueSource.
 
 (declare convert-search-result)
 
@@ -387,9 +378,7 @@
   item))
 
 
-;
-; ElasticSearch querying API
-;
+;;; ElasticSearch querying API.
 
 (defn vo->term-filter
   ([vo]
@@ -436,9 +425,8 @@
     :source (json/encode-smile vo)
   })))
 
-;
-; Search
-;
+
+;;; Search.
 
 (defn SearchHit->fields [^SearchHit sh] (.fields sh)     )
 (defn SearchHit->source [^SearchHit sh] (.sourceAsMap sh))
@@ -673,9 +661,8 @@
     ]
     (script-query client index vo (:id vo) script parameters options)))
 
-;
-; Query helpers
-;
+
+;;; Query helpers
 
 (defn has-child-vo
   "Construct a 'has_child' query for the given VO type and optional query.

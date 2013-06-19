@@ -61,7 +61,7 @@
 
 (defn- encode-voref
   [^JsonGenerator out ^VORef in ^String date-format ^Exception ex]
-  (cheshire.generate/generate out (._id in) date-format ex))
+  (cheshire.generate/generate out (._id in) date-format ex nil))
 
 (defn- encode-instant
   [^org.joda.time.ReadableInstant in ^JsonGenerator out]

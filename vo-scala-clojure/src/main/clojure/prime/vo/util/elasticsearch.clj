@@ -5,9 +5,10 @@
 (ns prime.vo.util.elasticsearch
   (:refer-clojure :exclude (get))
   (:require [prime.vo :as vo]
-            [cheshire [core :as json] [generate :as gen] factory]
+            [cheshire [core :as json] [generate :as gen]]
             [clj-elasticsearch.client :as ces]
-            [prime.vo.source :refer (def-valuesource)])
+            [prime.vo.source :refer (def-valuesource)]
+            [prime.vo.util.json]) ; For loading the right VO encoders in Cheshire.
   (:import [prime.types VORef EnumValue package$ValueType package$ValueTypes$Tdef
             package$ValueTypes$Tarray package$ValueTypes$Tenum]
            [prime.vo IDField ValueObject ValueObjectManifest ValueObjectField ValueObjectCompanion ID]
@@ -259,92 +260,6 @@
       (put-mapping es index-name vo->options-map)))))
 
 
-;;; ValueObjects and valuetypes JSON encoding.
-
-(defn encode-enum [^EnumValue in ^JsonGenerator out]
-  (.writeStartObject out)
-  (if (not (.isInstance scala.Product in))
-    (.writeNumberField out "v", (.value in))
-    #_else
-    (.writeObjectField out "x", (.toString in)))
-  (.writeEndObject out))
-
-(def ^:dynamic *vo-baseTypeID* nil)
-
-(defn encode-vo
-  ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex]
-    (encode-vo out vo date-format ex (or *vo-baseTypeID* (.. vo voManifest ID))))
-
-  ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex ^Integer baseTypeID]
-    (.writeStartObject out)
-    (if (not (== baseTypeID (.. vo voManifest ID)))
-      (.writeNumberField out "t" (.. vo voManifest ID)))
-
-    (doseq [[^ValueObjectField k v] vo]
-      (.writeFieldName out (field-hexname k))
-      (cond
-        (instance? ValueObject v)
-          ; First try to find and call a protocol implementation for this type immediately.
-          (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable v))]
-            (to-json v out)
-          ; else: Regular VO, no protocol found
-            (encode-vo out v date-format ex (.. ^package$ValueTypes$Tdef (. k valueType) empty voManifest ID)))
-
-        (vector? v)
-          (let [innerType (. ^package$ValueTypes$Tarray (. k valueType) innerType)
-                voType    (if (instance? package$ValueTypes$Tdef innerType) (.. ^package$ValueTypes$Tdef innerType empty voManifest ID) #_else -1)]
-            (if (> voType 0)
-              (binding [*vo-baseTypeID* voType] (cheshire.generate/generate-array out v date-format ex nil))
-            #_else
-              (cheshire.generate/generate-array out v date-format ex nil)))
-
-        :else
-          (cheshire.generate/generate out v date-format ex nil)))
-
-    (.writeEndObject out)))
-
-(defn encode-voref [^JsonGenerator out, ^VORef in ^String date-format ^Exception ex]
-  (cheshire.generate/generate out (._id in) date-format ex))
-
-; Protocol based encoders
-
-(defn encode-instant [^org.joda.time.ReadableInstant in ^JsonGenerator out]
-  (.writeNumber out (.getMillis in)))
-
-(defn encode-uri [^java.net.URI in ^JsonGenerator out]
-  (.writeString out (.toString in)))
-
-(defn encode-url [^java.net.URL in ^JsonGenerator out]
-  (.writeString out (.toString in)))
-
-(defn encode-internetAddress [^javax.mail.internet.InternetAddress in ^JsonGenerator out]
-  (.writeString out (.toString in)))
-
-(defn encode-objectId [^org.bson.types.ObjectId in ^JsonGenerator out]
-  (.writeString out (.toString in)))
-
-(gen/add-encoder prime.types.EnumValue                encode-enum)
-(gen/add-encoder java.net.URI                         encode-uri)
-(gen/add-encoder java.net.URL                         encode-url)
-(gen/add-encoder org.joda.time.ReadableInstant        encode-instant)
-(gen/add-encoder org.bson.types.ObjectId              encode-objectId)
-(gen/add-encoder javax.mail.internet.InternetAddress  encode-internetAddress)
-
-(alter-var-root
- #'cheshire.generate/generate
- (fn [orig-generate]
-   (fn [^JsonGenerator jg obj ^String date-format ^Exception ex key-fn]
-     (binding [prime.vo/*voseq-key-fn* identity]
-       ;; First try to find and call a protocol implementation for this type immediately.
-       (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable obj))]
-         (to-json obj jg)
-         ;; else: No protocol found
-         (condp instance? obj
-           ValueObject (encode-vo jg obj date-format ex)
-           VORef (encode-voref jg obj date-format ex)
-           (orig-generate jg obj date-format ex key-fn)))))))
-
-
 ;;; ElasticSearch ValueSource.
 
 (declare convert-search-result)
@@ -361,22 +276,28 @@
 
 (defn convert-search-result [item]
   (condp instance? item
-  SearchHitField
+    SearchHitField
     (convert-search-result (.value ^SearchHitField item))
 
-  java.util.Map
+    java.util.Map
     (let [item ^java.util.Map item]
-      (if-let [x (.get item "x")] x
-      (if-let [v (.get item "v")] v
-      (ElasticSearch-ValueSource. (or (.get item "t") -1), item, nil))))
+      (if-let [x (.get item "x")]
+        x
+        (if-let [v (.get item "v")]
+          v
+          (ElasticSearch-ValueSource. (or (.get item "t") -1), item, nil))))
 
-  java.util.List
+    java.util.List
     (map convert-search-result item)
 
-  item))
+    item))
 
 
 ;;; ElasticSearch querying API.
+
+(defn- generate-hexed-fields-smile [obj]
+  (binding [prime.vo/*voseq-key-fn* field-hexname]
+    (json/generate-smile obj)))
 
 (defn vo->term-filter
   ([vo]
@@ -420,8 +341,7 @@
     :index  index
     :id     (prime.types/to-String (.. ^ID vo _id))
     :type   (Integer/toHexString (.. vo voManifest ID))
-    :source (json/encode-smile vo)
-  })))
+    :source (generate-hexed-fields-smile vo)})))
 
 
 ;;; Search.
@@ -472,7 +392,7 @@
         (clojure.core/filter val {
           :listener listener, :ignore-indices ignore-indices, :routing routing, :listener_threaded? listener-threaded?, :search-type search-type
           :operation-threading operation-threading, :query-hint query-hint, :scroll scroll, :source source
-          :extra-source (json/encode-smile (into {} (clojure.core/filter val {
+          :extra-source (generate-hexed-fields-smile (into {} (clojure.core/filter val {
             :query            (map-keywords->hex-fields vo query),
             :filter           filter,
             :from             from,
@@ -500,7 +420,7 @@
         {:request es-options, :response response})))
 
 (defn ^org.elasticsearch.action.index.IndexRequest ->IndexRequest [^String index ^String type ^String id, input options]
-  (let [^"[B" input (if (instance? ValueObject input) (json/encode-smile input) input)
+  (let [^"[B" input (if (instance? ValueObject input) (generate-hexed-fields-smile input) input)
             request (new org.elasticsearch.action.index.IndexRequest index type id)
         {:keys [routing parent timestamp ttl version versionType]} options]
     (. request source input)
@@ -515,7 +435,7 @@
 (defn- patched-update-options [type id options]
   (let [ {:keys [upsert doc]} options
         options (if upsert (assoc options :upsert (->IndexRequest (:index options) type id, upsert options)) #_else options)
-        options (if doc    (assoc options :doc    (json/encode-smile doc)                                  ) #_else options) ]
+        options (if doc    (assoc options :doc    (generate-hexed-fields-smile doc)                                  ) #_else options) ]
     (conj options {
       :type   type
       :id     id
@@ -573,7 +493,7 @@
         id   (prime.types/to-String id)]
     (ces/update-doc client (patched-update-options type id (assoc options
       :index index
-      :source (json/encode-smile
+      :source (generate-hexed-fields-smile
         (binding [prime.vo/*voseq-key-fn* field-hexname] {
           :p (prn script params)
           :script script

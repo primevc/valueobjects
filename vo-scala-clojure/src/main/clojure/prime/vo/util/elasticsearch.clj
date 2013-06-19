@@ -276,7 +276,6 @@
     (encode-vo out vo date-format ex (or *vo-baseTypeID* (.. vo voManifest ID))))
 
   ([^JsonGenerator out, ^prime.vo.ValueObject vo ^String date-format ^Exception ex ^Integer baseTypeID]
-     (prn "e" vo)
     (.writeStartObject out)
     (if (not (== baseTypeID (.. vo voManifest ID)))
       (.writeNumberField out "t" (.. vo voManifest ID)))
@@ -335,11 +334,10 @@
  #'cheshire.generate/generate
  (fn [orig-generate]
    (fn [^JsonGenerator jg obj ^String date-format ^Exception ex key-fn]
-     (prn obj)
      (binding [prime.vo/*voseq-key-fn* identity]
        ;; First try to find and call a protocol implementation for this type immediately.
        (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable obj))]
-         (do (prn to-json  "toJSON!") (to-json obj jg))
+         (to-json obj jg)
          ;; else: No protocol found
          (condp instance? obj
            ValueObject (encode-vo jg obj date-format ex)

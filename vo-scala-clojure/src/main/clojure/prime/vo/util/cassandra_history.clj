@@ -210,40 +210,40 @@
   (insert cluster
           vo
           (idconv vo)
-          :appendTo
+          :append-to
           (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
 (defn insert-at [cluster vo path path-vars value options]
   (insert cluster
           vo
           (idconv vo)
-          :insertAt
+          :insert-at
           (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
 (defn move-to [cluster vo path path-vars to options]
   (insert cluster
           vo
           (idconv vo)
-          :moveTo
+          :move-to
           (VOChange->byte-array vo (es/hexify-path vo path) path-vars to options)))
 
 (defn replace-at [cluster vo path path-vars value options]
   (insert cluster
           vo
           (idconv vo)
-          :replaceAt
+          :replace-at
           (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
 (defn merge-at [cluster vo path path-vars value options]
   (insert cluster
           vo
           (idconv vo)
-          :mergeAt
+          :merge-at
           (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
 (defn remove-from [cluster vo path path-vars options]
   (insert cluster
           vo
           (idconv vo)
-          :removeFrom
+          :remove-from
           (VOChange->byte-array vo (es/hexify-path vo path) path-vars options)))

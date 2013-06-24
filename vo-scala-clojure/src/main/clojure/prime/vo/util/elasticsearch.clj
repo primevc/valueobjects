@@ -8,7 +8,7 @@
             [cheshire [core :as json] [generate :as gen]]
             [clj-elasticsearch.client :as ces]
             [prime.vo.source :refer (def-valuesource)]
-            [prime.vo.util.json]) ; For loading the right VO encoders in Cheshire.
+            [prime.vo.util.json :as json]) ; For loading the right VO encoders in Cheshire.
   (:import [prime.types VORef EnumValue package$ValueType package$ValueTypes$Tdef
             package$ValueTypes$Tarray package$ValueTypes$Tenum]
            [prime.vo IDField ValueObject ValueObjectManifest ValueObjectField ValueObjectCompanion ID]
@@ -165,8 +165,15 @@
     }))
 )
 
-(defn ^String field-hexname [^ValueObjectField field]
+(defn- ^String field-hexname [^ValueObjectField field]
   (Integer/toHexString (.id field)))
+
+(defn- encode-enum [^EnumValue in ^JsonGenerator]
+  (.writeStartObject out)
+  (if-not (.isInstance scala.Product in)
+    (.writeNumberField out "v", (.value in))
+    (.writeObjectField out "x", (.toString in)))
+  (.writeEndObject out))
 
 (defn hexify-path "Recursively walks path.
   Maps keywords to hex-names (for JSON access) and keeps all other values as they are."
@@ -296,7 +303,8 @@
 ;;; ElasticSearch querying API.
 
 (defn- generate-hexed-fields-smile [obj]
-  (binding [prime.vo/*voseq-key-fn* field-hexname]
+  (binding [json/*field-transform-fn* field-hexname
+            json/*encode-enum-fn* encode-enum]
     (json/generate-smile obj)))
 
 (defn vo->term-filter

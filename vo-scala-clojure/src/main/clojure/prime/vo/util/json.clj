@@ -5,7 +5,8 @@
 (ns prime.vo.util.json
   "Namespace for adding encoders to Cheshire for ValueObjects. This
   namespace does not contain any public functions of interest; it just
-  needs to be required."
+  needs to be required. It does have dynamic vars that influence the
+  resulting encoding."
   (:require [prime.vo :as vo]
             [cheshire.generate :refer (add-encoder)])
   (:import [prime.types VORef EnumValue package$ValueType package$ValueTypes$Tdef
@@ -14,14 +15,22 @@
            [com.fasterxml.jackson.core JsonGenerator]))
 
 
-;;; Encoders.
+;;; Configuration options for encoding.
 
-(defn- encode-enum [^EnumValue in ^JsonGenerator out]
-  (.writeStartObject out)
-  (if-not (.isInstance scala.Product in)
-    (.writeNumberField out "v", (.value in))
-    (.writeObjectField out "x", (.toString in)))
-  (.writeEndObject out))
+;; Bind the following var to another function if the field names of the VOs need
+;; to be encoded differently than the standard behaviour (writing out the full
+;; name of the field name). The function takes a ValueObjectField and should
+;; return a String.
+(def ^:dynamic *field-transform-fn*  (fn [^ValueObjectField vof] (.name vof)))
+
+;; Bind the following var to another function if the enumerations in VOs need to
+;; be encoded diffently than the standard behaviour (writing out the name of the
+;; enumerator). The functions takes an EnumValue and a JsonGenerator, what it
+;; returns is unimportant.
+(def ^:dynamic *encode-enum-fn* (fn [^EnumValue in ^JsonGenerator out] (.writeString out (str in))))
+
+
+;;; Encoders.
 
 (def ^:dynamic ^:private *vo-baseTypeID* nil)
 
@@ -35,7 +44,7 @@
        (.writeNumberField out "t" (.. vo voManifest ID)))
 
      (doseq [[k v] vo]                  ; Note that prime.vo/*voseq-key-fn* is used here.
-       (.writeFieldName out k)
+       (.writeFieldName out (*field-transform-fn* k))
        (cond
         (instance? ValueObject v)
         ;; First try to find and call a protocol implementation for this type immediately.
@@ -58,6 +67,10 @@
         (cheshire.generate/generate out v date-format ex nil)))
 
      (.writeEndObject out)))
+
+
+(defn- encode-enum [^EnumValue in ^JsonGenerator out]
+  (*encode-enum-fn* in out))
 
 (defn- encode-voref
   [^JsonGenerator out ^VORef in ^String date-format ^Exception ex]
@@ -97,11 +110,12 @@
  #'cheshire.generate/generate
  (fn [orig-generate]
    (fn [^JsonGenerator jg obj ^String date-format ^Exception ex key-fn]
-     ;; First try to find and call a protocol implementation for this type immediately.
-     (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable obj))]
-       (to-json obj jg)
-       ;; else: No protocol found
-       (condp instance? obj
-         ValueObject (encode-vo jg obj date-format ex)
-         VORef (encode-voref jg obj date-format ex)
-         (orig-generate jg obj date-format ex key-fn))))))
+     (binding [prime.vo/*voseq-key-fn* identity]
+       ;; First try to find and call a protocol implementation for this type immediately.
+       (if-let [to-json (:to-json (clojure.core/find-protocol-impl cheshire.generate/JSONable obj))]
+         (to-json obj jg)
+         ;; else: No protocol found
+         (condp instance? obj
+           ValueObject (encode-vo jg obj date-format ex)
+           VORef (encode-voref jg obj date-format ex)
+           (orig-generate jg obj date-format ex key-fn)))))))

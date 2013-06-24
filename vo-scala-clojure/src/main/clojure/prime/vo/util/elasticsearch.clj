@@ -5,7 +5,7 @@
 (ns prime.vo.util.elasticsearch
   (:refer-clojure :exclude (get))
   (:require [prime.vo :as vo]
-            [cheshire [core :as json] [generate :as gen]]
+            [cheshire [core :as core] [generate :as gen]]
             [clj-elasticsearch.client :as ces]
             [prime.vo.source :refer (def-valuesource)]
             [prime.vo.util.json :as json]) ; For loading the right VO encoders in Cheshire.
@@ -168,7 +168,7 @@
 (defn- ^String field-hexname [^ValueObjectField field]
   (Integer/toHexString (.id field)))
 
-(defn- encode-enum [^EnumValue in ^JsonGenerator]
+(defn- encode-enum [^EnumValue in ^JsonGenerator out]
   (.writeStartObject out)
   (if-not (.isInstance scala.Product in)
     (.writeNumberField out "v", (.value in))
@@ -309,7 +309,7 @@
 (defn- generate-hexed-fields-smile [obj]
   (binding [json/*field-transform-fn* field-hexname
             json/*encode-enum-fn* encode-enum]
-    (json/generate-smile obj)))
+    (core/generate-smile obj)))
 
 (defn vo->term-filter
   ([vo]
@@ -480,7 +480,7 @@
 
 (defn- get-pos-for-str [step]
   (prn "Step: " step)
-  (apply str "var pos = -1; for (var i = 0; (i < path.size() && pos == -1); i++) { if(path[i] == " (json/encode step) ") { pos = i; }}"))
+  (apply str "var pos = -1; for (var i = 0; (i < path.size() && pos == -1); i++) { if(path[i] == " (core/encode step) ") { pos = i; }}"))
 
 (defn resolve-path-simple [path]
   (loop [i 0 r "var path = ctx._source" varnum -1]

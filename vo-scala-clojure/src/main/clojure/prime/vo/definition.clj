@@ -163,7 +163,7 @@
   (let [args (vo-constructor-arglist-from-map votrait props)]
     `(cond
       (instance? ~votrait ~'value-map)
-        (intern-vo-expr ~'value-map nil)
+        (intern-vo-expr ~'value-map (list ~runtime-constructor ~'value-map))
 
       (map? ~'value-map)
         (let [~'construct-expr# (list '.apply '~(companion-object-symbol votrait) ~@args)

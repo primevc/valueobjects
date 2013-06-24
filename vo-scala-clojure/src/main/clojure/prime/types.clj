@@ -25,12 +25,12 @@
 (defprotocol To-DateTime  (^DateTime        ^:pure  to-DateTime  [in] [in formatter]             ))
 (defprotocol To-Interval  (^Interval        ^:pure  to-Interval  [in] [start end]                ))
 (defprotocol To-EmailAddr (^InternetAddress ^:pure  to-EmailAddr [in]                            ))
-(defprotocol To-URI       (^URI             ^:pure  to-URI       [in]                            ))
+(defprotocol To-URI       (^java.net.URI    ^:pure  to-URI       [in]                            ))
 (defprotocol To-FileRef   (^FileRef         ^:pure  to-FileRef   [in]                            ))
 (defprotocol To-Vector    (^IndexedSeq      ^:pure  to-Vector    [in converter]                  ))
 (defprotocol To-VORef     (^VORef                   to-VORef     [in] [in ref-target--companion] ))
 
-(defn ^:pure to-URL [uri] (Conversion/URL (to-URI uri)))
+(defn ^URL ^:pure to-URL [uri] (Conversion/URL (to-URI uri)))
 
 (extend-type prime.vo.ID To-VORef
   (^VORef to-VORef [in] (prime.types.Conversion/vo2ref in)))

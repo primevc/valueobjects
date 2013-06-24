@@ -4,22 +4,49 @@
 
 (ns prime.vo.util.cassandra-history
   (:refer-clojure :exclude [get])
-  (require
-    [qbits.alia               :as alia]
-    [qbits.tardis             :as tardis]
-    [immutant.cache           :as cache]
-    )
-  (:import
-    [prime.utils.msgpack.VOPacker]
-    [prime.utils.msgpack.VOUnpacker]
-    [java.io.ByteArrayOutputStream]
-    [java.io.ByteArrayInputStream]
-    [prime.vo ValueObject]
-    [org.msgpack.Unpacker]
-    )
-)
+  (require prime.vo
+           [qbits.alia :as alia]
+           [qbits.tardis :as tardis]
+           [prime.vo.util.elasticsearch :as es])
+  (:import [prime.utils.msgpack.VOPacker]
+           [prime.utils.msgpack.VOUnpacker]
+           [java.io.ByteArrayOutputStream]
+           [java.io.ByteArrayInputStream]
+           [prime.vo ValueObject]
+           [org.msgpack.Unpacker]))
 
-(defonce latest-history-put (cache/cache "latest-history-put" :locking :pessimistic))
+
+(defn get-table-name [vo]
+  (str "t" (Integer/toHexString (.ID (prime.vo/manifest vo)))))
+
+;
+; PUT version caching
+;
+
+(defn ^:dynamic mk-last-put-cache "
+  Create a cache per VO type: called and memoized by last-put-cache.
+
+  This fn creates a cache (map)
+    wherein the last version id of a PUT operation per VO-id is stored
+    to speed up retrieval of VO changes since the last put.
+
+  This should improve speed of VOProxy/get: replaying only the VO changes since the last PUT.
+
+  If running on immutant, the default implementation returns an immutant.cache named: `${VO table name}-last-put`."
+  [vo]
+  (try
+    (require 'immutant.cache)
+    (eval (list 'immutant.cache/cache (str (get-table-name vo) "-last-put") :locking :pessimistic))
+  (catch Exception e)))
+
+(def ^:private mk-last-put-cache-memoized (memoize #'mk-last-put-cache))
+
+(defn last-put-cache [vo]
+  (mk-last-put-cache-memoized (prime.vo/manifest vo)))
+
+;
+; Column serialization
+;
 
 (defn ObjectId->byte-buffer [^org.bson.types.ObjectId oid] (java.nio.ByteBuffer/wrap (.toByteArray oid)))
 
@@ -47,38 +74,26 @@
     (.toByteArray out)))
 
 (defn VOChange->byte-array [value & options]
-  (let [
-    out (java.io.ByteArrayOutputStream.)
-    msgpack
-      (doto (prime.utils.msgpack.VOPacker. out)
-        (.pack value))
-    ]
+  (let [out (java.io.ByteArrayOutputStream.)
+        msgpack (doto (prime.utils.msgpack.VOPacker. out)
+                  (.pack value))]
     (prn options)
     (doseq [option options]
-      (do
-        (prn option)
-        (.pack msgpack option)))
+      (prn option)
+      (.pack msgpack option))
     (.close out)
     (.toByteArray out)))
 
 (defn byte-array->VOChange [bytes vo]
   ; (apply prn (map #(Integer/toHexString (.get bytes %)) (range (.position bytes) (.capacity bytes))))
-  (let [
-    bytes (.slice bytes)
-    ;pp (apply prn (map #(Integer/toHexString (.get bytes %)) (range (.position bytes) (.capacity bytes))))
-    unpacker  (doto (org.msgpack.Unpacker. (org.apache.cassandra.utils.ByteBufferUtil/inputStream bytes))
-                (.setVOHelper prime.utils.msgpack.VOUnpacker$/MODULE$))
-    pp (prn "hasNext?: " (.. unpacker iterator hasNext))
-    vosource (when (.. unpacker iterator hasNext) (.. unpacker next getData))]
-    (prn "vosource: " vosource)
-    (flatten
-      (into []
-        [[(.. vo voCompanion (valueOf vosource))]
-        (loop [option (when (.. unpacker iterator hasNext) (.. unpacker next getData)) result []]
-          (prn "Option: " option)
-          (if-not (or option (.. unpacker iterator hasNext))
-            result
-            (recur (.. unpacker next getData) (conj result option))))]))))
+  (let [bytes (.slice bytes)
+        ;;pp (apply prn (map #(Integer/toHexString (.get bytes %)) (range (.position bytes) (.capacity bytes))))
+        unpacker  (doto (org.msgpack.Unpacker. (org.apache.cassandra.utils.ByteBufferUtil/inputStream bytes))
+                    (.setVOHelper prime.utils.msgpack.VOUnpacker$/MODULE$))
+        vosource (.next unpacker)
+        [whut & options] (iterator-seq (.. unpacker iterator))]
+    (prn "vosource: " vosource options)
+    (cons (.. vo voCompanion (apply (.getData vosource))) options)))
 
 (defn idconv [vo]
   ((second (simple-prime-type->cql-type (.. vo voManifest _id valueType keyword))) (:id vo)))
@@ -86,6 +101,7 @@
 (defn keyword-keys [m]
   (into (empty m) (for [[k v] m] [(keyword (.toLowerCase k)) v])))
 
+; TODO: VOAction enum definition
 (def actions {
   :put (int 1)
   :update (int 2)
@@ -97,9 +113,6 @@
   :replace-at (int 8)
   :merge-at (int 9)
   })
-
-(defn get-table-name [vo]
-  (str "t" (Integer/toHexString (.. vo voManifest ID))))
 
 (defn get-latest-put [vo cluster]
   (let [result (alia/with-session cluster
@@ -144,9 +157,10 @@
 (defn get [cluster vo]
   ; This should send a merge of all records since the last put.
   (let [
-    last-put (or (:version ((keyword (str (:id vo))) latest-history-put)) (:version (get-latest-put vo cluster)))
+    last-put (:version (or (get (last-put-cache vo) (str (:id vo))) (get-latest-put vo cluster)))
+    pp (prn "Last-put: " last-put)
     result
-      (alia/with-session cluster
+        (alia/with-session cluster
         (alia/execute
           (alia/prepare (apply str "SELECT * FROM " (get-table-name vo) " WHERE id = ? and version >= ?;")) :values [(idconv vo) last-put]))]
       (build-vo result vo)))
@@ -171,74 +185,65 @@
 (defn put [cluster vo options]
   ; TODO: If action is put, save version into immutant cache.
   (assert (:id vo) "vo requires an id")
-  (insert
-    cluster
-    vo
-    (idconv vo)
-    :put
-    (VOChange->byte-array vo)))
+  (insert cluster
+          vo
+          (idconv vo)
+          :put
+          (VOChange->byte-array vo)))
 
 (defn update [cluster vo id options]
-  (prn cluster vo id options)
-  (insert
-    cluster
-    vo
-    (idconv (conj vo {:id id}))
-    :update
-    (VOChange->byte-array vo)))
+  (prn "Update!")
+  (insert cluster
+          vo
+          (idconv (conj vo {:id id}))
+          :update
+          (VOChange->byte-array vo)))
 
 (defn delete [cluster vo options]
-  (insert
-    cluster
-    vo
-    (idconv vo)
-    :delete
-    nil))
+  (insert cluster
+          vo
+          (idconv vo)
+          :delete
+          nil))
 
 (defn append-to [cluster vo path path-vars value options]
-  (insert
-    cluster
-    vo
-    (idconv vo)
-    :append-to
-    (VOChange->byte-array vo path path-vars value options)))
+  (insert cluster
+          vo
+          (idconv vo)
+          :appendTo
+          (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
 (defn insert-at [cluster vo path path-vars value options]
-  (insert
-    cluster
-    vo
-    (idconv vo)
-    :insert-at
-    (VOChange->byte-array vo path path-vars value options)))
+  (insert cluster
+          vo
+          (idconv vo)
+          :insertAt
+          (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
 (defn move-to [cluster vo path path-vars to options]
-  (insert
-    cluster
-    vo
-    (idconv vo)
-    :move-to
-    (VOChange->byte-array vo path path-vars to options)))
+  (insert cluster
+          vo
+          (idconv vo)
+          :moveTo
+          (VOChange->byte-array vo (es/hexify-path vo path) path-vars to options)))
 
 (defn replace-at [cluster vo path path-vars value options]
-  (insert
-    cluster
-    vo
-    (idconv vo)
-    :replace-at
-    (VOChange->byte-array vo path path-vars value options)))
+  (insert cluster
+          vo
+          (idconv vo)
+          :replaceAt
+          (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
 (defn merge-at [cluster vo path path-vars value options]
-  (insert
-    cluster
-    vo
-    (idconv vo)
-    :merge-at
-    (VOChange->byte-array vo path path-vars value options)))
+  (insert cluster
+          vo
+          (idconv vo)
+          :mergeAt
+          (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
 (defn remove-from [cluster vo path path-vars options]
-  (insert
-    cluster
-    vo
-    (idconv vo)
-    :remove-from
-    (VOChange->byte-array vo path path-vars options)))
+  (insert cluster
+          vo
+          (idconv vo)
+          :removeFrom
+          (VOChange->byte-array vo (es/hexify-path vo path) path-vars options)))

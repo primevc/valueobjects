@@ -32,40 +32,40 @@
     (ch/delete cluster vo options))
 
   (append-to [this vo path path-vars value]
-    (ch/append-to cluster vo path path-vars value {}))
+    (ch/append-to cluster vo path (or path-vars ()) value {}))
 
   (append-to [this vo path path-vars value options]
-    (ch/append-to cluster vo path path-vars value options))
+    (ch/append-to cluster vo path (or path-vars ()) value options))
 
   (insert-at [this vo path path-vars value]
-    (ch/insert-at cluster vo path path-vars value {}))
+    (ch/insert-at cluster vo path (or path-vars ()) value {}))
 
   (insert-at [this vo path path-vars value options]
-    (ch/insert-at cluster vo path path-vars value options))
+    (ch/insert-at cluster vo path (or path-vars ()) value options))
 
   (move-to [this vo path path-vars to]
-    (ch/move-to cluster vo path path-vars to {}))
+    (ch/move-to cluster vo path (or path-vars ()) to {}))
 
   (move-to [this vo path path-vars to options]
-    (ch/move-to cluster vo path path-vars to options))
+    (ch/move-to cluster vo path (or path-vars ()) to options))
 
   (replace-at [this vo path path-vars value]
-    (ch/replace-at cluster vo path path-vars value {}))
+    (ch/replace-at cluster vo path (or path-vars ()) value {}))
 
   (replace-at [this vo path path-vars value options]
-    (ch/replace-at cluster vo path path-vars value options))
+    (ch/replace-at cluster vo path (or path-vars ()) value options))
 
   (merge-at [this vo path path-vars value]
-    (ch/merge-at cluster vo path path-vars value {}))
+    (ch/merge-at cluster vo path (or path-vars ()) value {}))
 
   (merge-at [this vo path path-vars value options]
-    (ch/merge-at cluster vo path path-vars value options))
+    (ch/merge-at cluster vo path (or path-vars ()) value options))
 
   (remove-from [this vo path path-vars]
-    (ch/remove-from cluster vo path path-vars {}))
+    (ch/remove-from cluster vo path (or path-vars ()) {}))
 
   (remove-from [this vo path path-vars options]
-    (ch/remove-from cluster vo path path-vars options))
+    (ch/remove-from cluster vo path (or path-vars ()) options))
 
   VOHistoryProxy
   (get-slice [this vo]

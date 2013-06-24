@@ -35,40 +35,40 @@
     (es/delete client index vo options))
 
   (append-to [this vo path path-vars value]
-    (es/append-to client index vo path path-vars value {}))
+    (es/append-to client index vo path (or path-vars ()) value {}))
 
   (append-to [this vo path path-vars value options]
-    (es/append-to client index vo path path-vars value options))
+    (es/append-to client index vo path (or path-vars ()) value options))
 
   (insert-at [this vo path path-vars value]
-    (es/insert-at client index vo path path-vars value {}))
+    (es/insert-at client index vo path (or path-vars ()) value {}))
 
   (insert-at [this vo path path-vars value options]
-    (es/insert-at client index vo path path-vars value options))
+    (es/insert-at client index vo path (or path-vars ()) value options))
 
   (move-to [this vo path path-vars to]
-    (es/move-to client index vo path path-vars to {}))
+    (es/move-to client index vo path (or path-vars ()) to {}))
 
   (move-to [this vo path path-vars to options]
-    (es/move-to client index vo path path-vars to options))
+    (es/move-to client index vo path (or path-vars ()) to options))
 
   (replace-at [this vo path path-vars value]
-    (es/replace-at client index vo path path-vars value {}))
+    (es/replace-at client index vo path (or path-vars ()) value {}))
 
   (replace-at [this vo path path-vars value options]
-    (es/replace-at client index vo path path-vars value options))
+    (es/replace-at client index vo path (or path-vars ()) value options))
 
   (merge-at [this vo path path-vars value]
-    (es/merge-at client index vo path path-vars value {}))
+    (es/merge-at client index vo path (or path-vars ()) value {}))
 
   (merge-at [this vo path path-vars value options]
-    (es/merge-at client index vo path path-vars value options))
+    (es/merge-at client index vo path (or path-vars ()) value options))
 
   (remove-from [this vo path path-vars]
-    (es/remove-from client index vo path path-vars {}))
+    (es/remove-from client index vo path (or path-vars ()) {}))
 
   (remove-from [this vo path path-vars options]
-    (es/remove-from client index vo path path-vars options))
+    (es/remove-from client index vo path (or path-vars ()) options))
 
   VOSearchProxy
   ;; [es ^ValueObject vo indices & {:as options :keys [ query filter from size types sort highlighting only exclude script-fields preference facets named-filters boost explain version min-score listener ignore-indices routing listener-threaded? search-type operation-threading query-hint scroll source]}]

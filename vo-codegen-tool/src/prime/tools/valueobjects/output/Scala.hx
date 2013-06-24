@@ -659,7 +659,7 @@ trait "); a(def.name); a(" extends ");
 			for (p in fields)
 			{
 				a(", ");
-				if (p.isReference())
+				if (p.type.isTclass() && p.isReference())
 					a("null");
 				else if (!p.type.isTclass())
 					writeValueLiteral(p.type, p.defaultValue);

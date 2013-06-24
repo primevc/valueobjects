@@ -41,10 +41,11 @@
   ))
 
 (defn fields [in]
-  (condp instance? (manifest in)
+  (let [in (manifest in)] (condp instance? in
     ValueObjectManifest_N (remove nil? (.. ^ValueObjectManifest_N in fields))
     ValueObjectManifest_1 (remove nil? (cons (.. ^ValueObjectManifest_1 in first) nil))
-    ValueObjectManifest_0 nil))
+    ValueObjectManifest_0 nil)
+  ))
 
 (defn field-set [vo-or-manifest]
   (set (map #(.keyword ^ValueObjectField %) (fields vo-or-manifest))))

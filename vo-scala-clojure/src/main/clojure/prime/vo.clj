@@ -83,7 +83,7 @@
               (first fields))))
 
 (defn vo-field? [field]
-  (or (instance? VOValueObjectField) (instance? package$ValueTypes$Tdef field)))
+  (or (instance? VOValueObjectField field) (instance? package$ValueTypes$Tdef field)))
 
 (defn array-field? [field]
   (or (instance? package$ValueTypes$Tarray field)

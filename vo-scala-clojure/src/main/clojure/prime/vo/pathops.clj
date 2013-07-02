@@ -37,14 +37,6 @@
     path-step))
 
 
-(defn- get-or-find [obj key]
-  (if (and (vector? obj) (map? key)) ; assert maybe
-    (let [[k v] (first key)]
-      (first (filter #(= (get % k) v) obj)))
-    #_else
-    (get obj key)))
-
-
 ;;; General functions, used by the other concrete path operations.
 
 (defn- update-in-vo
@@ -62,6 +54,14 @@
          (assoc m k (apply f (get m k) args))))))
 
 
+(defn- relative-vector-index [length i]
+  (if (>= i length)
+    (dec length)
+    #_else
+    (let [i (if (< i 0) (+ i length) #_else i)]
+      (if (< i 0) 0  #_else i))))
+
+
 ;;; Concrete opertion, append to.
 
 (defn append-to-vo
@@ -73,25 +73,10 @@
 
 ;;; Concrete opertion, insert at.
 
-(defn- relative-vector-index [length i]
-  (if (>= i length)
-    (dec length)
-    #_else
-    (let [i (if (< i 0) (+ i length) #_else i)]
-      (if (< i 0) 0  #_else i))))
-
-
 (defn- vector-insert-at [vec index value]
   {:pre [vector? vec]}
-  (let [length (count vec)]
-    (if (or (= -1 index) (>= index length))
-      (conj vec value) ; append
-      #_else
-      (let [index (relative-vector-index length index)]
-        (apply conj
-               (subvec vec 0 index)
-               value
-               (subvec vec index))))))
+  (let [index (relative-vector-index (count vec) index)]
+    (apply conj (subvec vec 0 index) value (subvec vec index))))
 
 
 (defn insert-at
@@ -134,9 +119,11 @@
 
 ;;; Concrete operation, replace at.
 
-(defn- vector-replace-at [vec at value]
-  {:pre [vector? vec]}
-  (assoc vec (relative-vector-index (count vec) at) value))
+(defn- update-with-replace
+  [container at value]
+  (if (vector? container)
+    (assoc container (relative-vector-index (count container) at) value)
+    (assoc container at value)))
 
 
 (defn replace-at
@@ -147,7 +134,7 @@
   [vo path value]
   (let [at (last path)
         path (pop path)]
-    (update-in-vo vo path vector-replace-at at value)))
+    (update-in-vo vo path update-with-replace at value)))
 
 
 ;;; Concrete opertion, merge at.

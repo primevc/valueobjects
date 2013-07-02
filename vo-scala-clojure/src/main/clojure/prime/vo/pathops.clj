@@ -44,14 +44,15 @@
   keys and f is a function that will take the old value and any
   supplied args and return the new value, and returns a new
   ValueObject. The added value of this function over the core
-  update-in is it understands our own type of paths."
-  {:added "1.0"
-   :static true}
-  ([m [k & ks] f & args]
-     (let [k (concrete-path-step m k)]
-       (if ks
-         (assoc m k (apply update-in-vo (get m k) ks f args))
-         (assoc m k (apply f (get m k) args))))))
+  update-in is it understands our own type of paths. It also supports
+  empty paths, unlike the core update-in."
+  [m [k & ks] f & args]
+  (let [k (concrete-path-step m k)]
+    (if ks
+      (assoc m k (apply update-in-vo (get m k) ks f args))
+      (if k
+        (assoc m k (apply f (get m k) args))
+        (apply f m args)))))
 
 
 (defn- relative-vector-index [length i]

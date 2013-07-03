@@ -75,7 +75,7 @@ trait ClojureMapSupport extends IPersistentMap
     require(!containsKey(k), "Index "+k+" (key="+key+") invalid or already present")
     assoc(k, value)
   }
-  
+
   final def entryAt(key: Any) = try {
     val f = voManifest.findOrNull(key);
     if (f != null && (f in self))
@@ -91,7 +91,7 @@ trait ClojureMapSupport extends IPersistentMap
   def cons (o: Any) : IPersistentCollection = o match
   {
     case e : java.util.Map.Entry[_,_] => this.assoc(e.getKey(), e.getValue());
-    
+
     case v : IPersistentVector =>
       if(v.count != 2)
         throw new IllegalArgumentException("Vector arg to map conj must be a pair");
@@ -100,6 +100,8 @@ trait ClojureMapSupport extends IPersistentMap
     //TODO: Benchmark if typecheck before unapply matters
     case v : ValueSource => conj(v);
     case ValueSource(v)  => conj(v);
+
+    case null => this;
   }
 
   protected def hasSameKeysAndValues(m : java.util.Map[_,_]) : Boolean = {
@@ -112,11 +114,11 @@ trait ClojureMapSupport extends IPersistentMap
                   if (m.containsKey(idx)) idx;
                   else null;
                 }
-      
+
       if(foundKey == null || value != m.get(foundKey))
         return false;
     }
-   
+
     true;
   }
 
@@ -195,7 +197,7 @@ trait ClojureMapSupport extends IPersistentMap
   // IPersistentMap
   // ---
   def without     (key: Any): this.type = without(voManifest.index_!(key));
-  
+
   // IPersistentMap interfaces
   // ILookup
   final def valAt (key: Any) : AnyRef = voManifest.findOrNull(key) match {

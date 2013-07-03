@@ -1,13 +1,14 @@
 package prime.vo.util
  import prime.vo._
  import prime.vo.source._
+ import prime.types.ValueTypes._
  import clojure.lang.{Var, RT, Util, IFn, IKeywordLookup, ILookupThunk, Keyword, MapEntry, MapEquivalence}
  import clojure.lang.{ASeq, ISeq, Counted, IPersistentCollection, IPersistentMap, IPersistentVector, IPending, Indexed}
 
 object ClojureSupport {
   /** Wraps the obj if it is a Scala Seq type */
   def clojurify[T <: ValueObject](field : ValueObjectField[T], value : Any): AnyRef = value match {
-    case v:scala.collection.Seq[_] => ClojureVectorSupport.asClojure(v.asInstanceOf[scala.collection.Seq[Any]])(field.valueType.convert,null);
+    case v:scala.collection.Seq[_] => ClojureVectorSupport.asClojure(v.asInstanceOf[scala.collection.Seq[Any]])(field.valueType.asInstanceOf[Tarray].innerType.convert,null);
     case v:AnyRef => v;
   }
 

@@ -5,9 +5,10 @@
 (ns prime.vo.util.cassandra-history
   (:refer-clojure :exclude [get])
   (require prime.vo
-    [qbits.alia               :as alia]
-    [qbits.tardis             :as tardis]
-    [prime.vo.util.elasticsearch :as es]
+    [qbits.alia                   :as alia]
+    [qbits.tardis                 :as tardis]
+    [prime.vo.util.elasticsearch  :as es]
+    [prime.vo.pathops             :as pathops]
     )
   (:import 
     [prime.utils.msgpack.VOPacker]
@@ -85,8 +86,11 @@
     ]
     (prn options)
     (doseq [option options]
-      (prn option)
-      (.pack msgpack option))
+      (let [option (if (and (empty? option) (map? option)) nil option)
+            option (if (coll? option) (apply list option) option)]
+          (prn (type option) option)
+        (.pack msgpack option)
+        ))
     (.close out)
     (.toByteArray out)))
 
@@ -97,10 +101,9 @@
     ;pp (apply prn (map #(Integer/toHexString (.get bytes %)) (range (.position bytes) (.capacity bytes))))
     unpacker  (doto (org.msgpack.Unpacker. (org.apache.cassandra.utils.ByteBufferUtil/inputStream bytes))
                 (.setVOHelper prime.utils.msgpack.VOUnpacker$/MODULE$))
-    vosource (.next unpacker)
-    [whut & options] (iterator-seq (.. unpacker iterator))]
-    (prn "vosource: " vosource options)
-    (cons (.. vo voCompanion (apply (.getData vosource))) options)
+    [vosource & options] (iterator-seq (.. unpacker iterator))]
+    (prn "vosource: " vosource)
+    (cons (.. vo voCompanion (apply vosource)) options)
   ))
 
 (defn idconv [vo]
@@ -132,27 +135,48 @@
 (defn build-vo [res vo]
   (loop [i 0 c nil] ; i = counter, c = current result.
     (let [row (nth res i {})]
-      (prn row)
+      (prn "ROW: " row)
       (let [c
         (cond 
           (= (:action row) (:put actions))
             (first (byte-array->VOChange (:data row) vo))
+          
           (= (:action row) (:update actions))
             (conj c (first (byte-array->VOChange (:data row) vo)))
+          
           (= (:action row) (:delete actions))
             (empty c)
+          
           (= (:action row) (:appendTo actions))
-            (do (prn (:action row)) (prn (byte-array->VOChange (:data row) vo)))
+            (let [  [vo path path-vars value options] (byte-array->VOChange (:data row) vo)
+                    path (pathops/fill-path path path-vars)]
+              (pathops/append-to-vo vo path value))
+          
           (= (:action row) (:moveTo actions))
-            (do (prn (:action row)) (prn (byte-array->VOChange (:data row) vo)))
+            (let [  [vo path path-vars to options] (byte-array->VOChange (:data row) vo)
+                    path (pathops/fill-path path path-vars)]
+              (pathops/move-vo-to vo path to))
+          
           (= (:action row) (:removeFrom actions))
-            (do (prn (:action row)) (prn (byte-array->VOChange (:data row) vo)))
+            (let [  [vo path path-vars options] (byte-array->VOChange (:data row) vo)
+                    path (pathops/fill-path path path-vars)]
+              (pathops/remove-from vo path))
+          
           (= (:action row) (:insertAt actions))
-            (do (prn (:action row)) (prn (byte-array->VOChange (:data row) vo)))
+            (let [  [vo path path-vars value options] (byte-array->VOChange (:data row) vo)
+                    path (pathops/fill-path path path-vars)]
+              (pathops/insert-at vo path value))
+          
           (= (:action row) (:replaceAt actions))
-            (do (prn (:action row)) (prn (byte-array->VOChange (:data row) vo)))
+            (let [  [vo path path-vars value options] (byte-array->VOChange (:data row) vo)
+                    path (pathops/fill-path path path-vars)]
+              (pathops/replace-at vo path value))
+          
           (= (:action row) (:mergeAt actions))
-            (do (prn (:action row)) (prn (byte-array->VOChange (:data row) vo)))
+            (let [  [vo path path-vars value options] (byte-array->VOChange (:data row) vo)
+                    path (pathops/fill-path path path-vars)]
+              (pathops/merge-at vo path value))
+          
           :else
             c
           )
@@ -163,9 +187,10 @@
         (if (empty? c) nil c))))))
 
 (defn get [cluster vo] 
+  (prn "vo: " vo)
   ; This should send a merge of all records since the last put.
   (let [
-    last-put (:version (or (get (last-put-cache vo) (str (:id vo))) (get-latest-put vo cluster)))
+    last-put (:version (or (clojure.core/get (last-put-cache vo) (str (:id vo))) (get-latest-put vo cluster)))
     pp (prn "Last-put: " last-put)
     result 
       (alia/with-session cluster

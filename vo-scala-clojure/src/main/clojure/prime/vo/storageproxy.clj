@@ -279,6 +279,8 @@
   ;     all-proxies]
   })
 
+(defn filtered [params keep] (prn "Filtered: " params keep))
+
 (defmacro def-vo-proxy-delegator [name & valueobject+options]
   (let [vo+opts (apply hash-map valueobject+options)]
     `(do
@@ -293,13 +295,16 @@
                   ~@(apply concat (for [[type opts] vo+opts]
                     `[(instance? ~type ~'vo)
                       (do (let [
-                      ~@(apply concat (for [function fncs]
-                          (if (= function :proxies)
-                             (all-or-try (opts :proxies) 'vo fnc (drop 2 param))
-                             `[~(symbolize function "-result") ~(opts function)
-                              ~@(if-not (nil? (opts function))
-                                ['vo 
-                                `(or ~(symbolize function "-result") ~'vo)])])))
+                        ~@(apply concat
+                         (when (opts :keep)
+                           `[~(into [] (next param)) (filtered ~(into [] (next param)) ~(opts :keep))])
+                        ; ~@(apply concat 
+                            (for [function fncs]
+                              (if (= function :proxies)
+                               (all-or-try (opts :proxies) 'vo fnc (drop 2 param))
+                               `[~(symbolize function "-result") (filtered ~(opts function))
+                                ~@(if-not (nil? (opts function))
+                                  ['vo `(or ~(symbolize function "-result") ~'vo)])])))
                         ] 
                         ~(let [
                           res          (if (= fnc `get-vo) ; Exception for a get.

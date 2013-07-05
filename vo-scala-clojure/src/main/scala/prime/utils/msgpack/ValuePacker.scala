@@ -4,6 +4,7 @@ import org.msgpack.Packer
 import java.lang.Math
 import java.io.OutputStream
 import org.bson.types.ObjectId
+import clojure.lang.{Associative, Seqable, IMapEntry, ISeq}
 import prime.types.{Conversion, VORef, Ref, RefArray, EmailAddr, EnumValue, RGBA, FileRef, URI, DateTime, Date}
 import prime.vo._
 import Util._
@@ -48,6 +49,30 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
     for (item <- voArray) pack(item);
   }
 
+  final def pack(map : Associative) {
+    val entries = map.seq;
+    packMap(entries.count);
+    var item = entries;
+    while (item != null) {
+      val entry = item.first.asInstanceOf[IMapEntry];
+      pack(entry.`key`);
+      pack(entry.`val`);
+      item = item.next;
+    }
+  }
+
+  final def pack(list : ISeq) {
+    packArray(list.count);
+    var item = list;
+    while (item != null) {
+      pack(item.first);
+      item = item.next;
+    }
+  }
+
+  final def pack(list : Seqable) {
+    pack(list.seq)
+  }
 
   final def writeByte(v : Int) {
     out.write(v.asInstanceOf[Byte]);
@@ -95,6 +120,8 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
     case v : EnumValue                => pack(v);
     case v : mutable.ValueObject      => pack(v);
     case v : IndexedSeq[_]            => pack(v);
+    case v : Associative              => pack(v);
+    case v : Seqable                  => pack(v);
     case null                         => packNil();
     case v                            => println("Fallback: " + v.getClass); super.pack(v);
   }; this }

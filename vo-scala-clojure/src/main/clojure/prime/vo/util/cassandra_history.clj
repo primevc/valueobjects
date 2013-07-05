@@ -78,12 +78,9 @@
     (.toByteArray out)))
 
 (defn VOChange->byte-array [value & options]
-  (let [
-    out (java.io.ByteArrayOutputStream.)
-    msgpack 
-      (doto (prime.utils.msgpack.VOPacker. out)
-        (.pack value))
-    ]
+  (let [out (java.io.ByteArrayOutputStream.)
+        msgpack (doto (prime.utils.msgpack.VOPacker. out)
+                  (.pack value))]
     (prn options)
     (doseq [option options]
       (let [option (if (and (empty? option) (map? option)) nil option)
@@ -117,12 +114,12 @@
   :put (int 1)
   :update (int 2)
   :delete (int 3)
-  :appendTo (int 5)
-  :moveTo (int 4)
-  :removeFrom (int 6)
-  :insertAt (int 7)
-  :replaceAt (int 8)
-  :mergeAt (int 9)
+  :append-to (int 5)
+  :move-to (int 4)
+  :remove-from (int 6)
+  :insert-at (int 7)
+  :replace-at (int 8)
+  :merge-at (int 9)
   })
 
 (defn get-latest-put [vo cluster]
@@ -137,7 +134,7 @@
     (let [row (nth res i {})]
       (prn "ROW: " row)
       (let [c
-        (cond 
+        (cond
           (= (:action row) (:put actions))
             (first (byte-array->VOChange (:data row) vo))
           
@@ -181,28 +178,27 @@
             c
           )
         ]
-      (if-not (empty? row) 
-        (recur (inc i) c) 
-        #_else 
+      (if-not (empty? row)
+        (recur (inc i) c)
+        #_else
         (if (empty? c) nil c))))))
 
-(defn get [cluster vo] 
-  (prn "vo: " vo)
+(defn get [cluster vo]
   ; This should send a merge of all records since the last put.
   (let [
     last-put (:version (or (clojure.core/get (last-put-cache vo) (str (:id vo))) (get-latest-put vo cluster)))
     pp (prn "Last-put: " last-put)
-    result 
-      (alia/with-session cluster
-        (alia/execute 
+    result
+        (alia/with-session cluster
+        (alia/execute
           (alia/prepare (apply str "SELECT * FROM " (get-table-name vo) " WHERE id = ? and version >= ?;")) :values [(idconv vo) last-put]))]
       (build-vo result vo)))
 
 (defn get-slice [cluster vo options]
   ; This should just send all records.
   (let [
-        result (alia/with-session cluster 
-                (alia/execute 
+        result (alia/with-session cluster
+                (alia/execute
                   (alia/prepare (apply str "SELECT * FROM " (get-table-name vo) " WHERE id = ?")) :values [(idconv vo)]))
         slices (or (:slices options) 1)]
     ;TODO: Create a custom ValueSource for history data, keeping the UUID and action around.
@@ -210,82 +206,73 @@
 
 (defn- insert [cluster vo id action data]
   (prn "Data: " data)
-  (alia/with-session cluster 
-      (alia/execute (alia/prepare 
-        (apply str "INSERT INTO " (get-table-name vo) " (version, id, action, data) VALUES ( ? , ? , ? , ? )")) 
+  (alia/with-session cluster
+      (alia/execute (alia/prepare
+        (apply str "INSERT INTO " (get-table-name vo) " (version, id, action, data) VALUES ( ? , ? , ? , ? )"))
         :values [(tardis/unique-time-uuid (.getTime (java.util.Date.))) id (actions action) (java.nio.ByteBuffer/wrap data)])))
 
 (defn put [cluster vo options]
   ; TODO: If action is put, save version into immutant cache.
   (assert (:id vo) "vo requires an id")
-  (insert 
-    cluster
-    vo
-    (idconv vo)
-    :put
-    (VOChange->byte-array vo)))
+  (insert cluster
+          vo
+          (idconv vo)
+          :put
+          (VOChange->byte-array vo)))
 
 (defn update [cluster vo id options]
   (prn "Update!")
-  (insert 
-    cluster
-    vo
-    (idconv (conj vo {:id id}))
-    :update
-    (VOChange->byte-array vo)))
+  (insert cluster
+          vo
+          (idconv (conj vo {:id id}))
+          :update
+          (VOChange->byte-array vo)))
 
 (defn delete [cluster vo options]
-  (insert 
-    cluster
-    vo
-    (idconv vo)
-    :delete
-    nil))
+  (insert cluster
+          vo
+          (idconv vo)
+          :delete
+          nil))
 
-(defn appendTo [cluster vo path path-vars value options]
-  (insert 
-    cluster 
-    vo 
-    (idconv vo)
-    :appendTo 
-    (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
+(defn append-to [cluster vo path path-vars value options]
+  (insert cluster
+          vo
+          (idconv vo)
+          :append-to
+          (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
-(defn insertAt [cluster vo path path-vars value options]
-  (insert 
-    cluster 
-    vo
-    (idconv vo)
-    :insertAt 
-    (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
+(defn insert-at [cluster vo path path-vars value options]
+  (insert cluster
+          vo
+          (idconv vo)
+          :insert-at
+          (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
-(defn moveTo [cluster vo path path-vars to options]
-  (insert
-    cluster
-    vo
-    (idconv vo)
-    :moveTo 
-    (VOChange->byte-array vo (es/hexify-path vo path) path-vars to options)))
+(defn move-to [cluster vo path path-vars to options]
+  (insert cluster
+          vo
+          (idconv vo)
+          :move-to
+          (VOChange->byte-array vo (es/hexify-path vo path) path-vars to options)))
 
-(defn replaceAt [cluster vo path path-vars value options]
-  (insert
-    cluster
-    vo
-    (idconv vo)
-    :replaceAt
-    (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
+(defn replace-at [cluster vo path path-vars value options]
+  (insert cluster
+          vo
+          (idconv vo)
+          :replace-at
+          (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
-(defn mergeAt [cluster vo path path-vars value options]
-  (insert
-    cluster
-    vo
-    (idconv vo)
-    :mergeAt
-    (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
+(defn merge-at [cluster vo path path-vars value options]
+  (insert cluster
+          vo
+          (idconv vo)
+          :merge-at
+          (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
 
-(defn removeFrom [cluster vo path path-vars options]
-  (insert
-    cluster
-    vo
-    (idconv vo)
-    :removeFrom
-    (VOChange->byte-array vo (es/hexify-path vo path) path-vars options)))
+(defn remove-from [cluster vo path path-vars options]
+  (insert cluster
+          vo
+          (idconv vo)
+          :remove-from
+          (VOChange->byte-array vo (es/hexify-path vo path) path-vars options)))

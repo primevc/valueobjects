@@ -9,6 +9,18 @@
 
 (set! *warn-on-reflection* true)
 
+(defn eval?
+ [expr]
+  "Returns the result of `(eval expr)` or :clojure.lang/eval-failed if any Exception is thrown."
+  (try (do (trace "About to eval:" (prn-str expr)) (eval expr))
+    (catch Exception e#
+      (trace e# "Tried to eval:" (let [w (java.io.StringWriter.)] (clojure.pprint/pprint expr w) (.toString w)))
+      :clojure.lang/eval-failed)))
+
+;
+;
+;
+
 (defn companion-object-symbol [votrait]
   (if (class? votrait)
     (symbol (str (.getName ^Class votrait) "$") "MODULE$")
@@ -95,18 +107,13 @@
 
 (defn vo-constructor-arglist-from-map [^Class votrait props]
   (map #(do
-    `(let [~'v (~'value-map ~%)]
-      (if  ~'v `(to-field-type ~~votrait ~~% ~~'v)
-        #_else '~(default-value-expr votrait %)
-      ))) props))
+    `(let [~'v (~'value-map ~% :prime.vo/default)
+           ~'x (if (not= :prime.vo/default ~'v) `(to-field-type ~~votrait ~~% ~~'v)
+                #_else '~(default-value-expr votrait %))
+           ~'e (if (and (not= :prime.vo/default ~'v) (stable-argument? ~'v)) (eval? ~'x) #_else :clojure.lang/eval-failed)]
+      (if-not (= :clojure.lang/eval-failed ~'e) ~'e #_else ~'x)))
+    props))
 
-(defn eval?
- [expr]
-  "Returns the result of `(eval expr)` or false if any Exception is thrown."
-  (try (do (trace "About to eval:" (prn-str expr)) (eval expr))
-    (catch Exception e#
-      (trace e# "Tried to eval:" (let [w (java.io.StringWriter.)] (clojure.pprint/pprint expr w) (.toString w)))
-      false)))
 
 
 ;
@@ -160,7 +167,9 @@
   (assert (symbol? runtime-constructor))
   (assert (or (empty? props) (sequential? props)))
   (assert (every? keyword? props))
+  (trace "defvo-body")
   (let [args (vo-constructor-arglist-from-map votrait props)]
+    (trace "vo-constructor-arglist-from-map:" (print-str args))
     `(cond
       (instance? ~votrait ~'value-map)
         (intern-vo-expr ~'value-map (list ~runtime-constructor ~'value-map))
@@ -170,7 +179,7 @@
               ~'instance#       (if ~'stable-value-map (eval? ~'construct-expr#))
               ~'undefined       (set/difference (set (map key ~'value-map)) ~(set props))]
           (assert (empty? ~'undefined), (str "\n  " ~votrait " defined fields,\n  are:   " (prn-str ~@props) ",\n  not! " ~'undefined))
-          (if ~'instance#
+          (if (not= :clojure.lang/eval-failed ~'instance#)
             (intern-vo-expr ~'instance# ~'construct-expr#)
           #_else
             ~'construct-expr#))

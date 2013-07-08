@@ -94,7 +94,7 @@
 (prefer-method print-dup ValueObject clojure.lang.IPersistentCollection)
 (prefer-method print-dup ValueObject java.util.Map)
 
-(defmethod print-dup EnumValue [^EnumValue v, ^Writer w] (print-method v w))
+(defmethod print-dup EnumValue [^EnumValue v, ^Writer w] (.write w "#=") (print-method v w))
 
 #_(
   (.write w (.getName ^Class (class o)))

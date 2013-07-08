@@ -121,7 +121,7 @@
 ;
 
 (defn intern-vo-expr "Creates a var using (intern ..) and returns the symbol of it" [^ValueObject vo construct-expr]
-  (if (empty? vo)
+  (if (and (empty? vo) (not (nil? vo)))
     (list '.empty (companion-object-symbol vo))
   #_else
     construct-expr))

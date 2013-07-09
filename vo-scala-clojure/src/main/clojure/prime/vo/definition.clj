@@ -215,7 +215,7 @@
           ([] ~converterfn-name)
           ([~'value-map-expr]
           (let [~'stable-value-map (stable-argument? ~'value-map-expr)
-                ~'value-map        (if (and ~'stable-value-map (list? ~'value-map-expr)) (eval ~'value-map-expr) ~'value-map-expr)]
+                ~'value-map        (if (and ~'stable-value-map (list? ~'value-map-expr)) (eval (eval ~'value-map-expr)) ~'value-map-expr)]
             ~macro-body)))
         (alter-meta! (var ~macroname) assoc :pure true)
       ))

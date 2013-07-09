@@ -81,3 +81,35 @@
                  (throw (IllegalArgumentException. (str "unsupported guard type: " grd-type))))]
     `(let [~sym ~val]
        (if ~grd-fn ~when ~else))))
+
+
+(defmacro memoize-form
+  "Memoize-form is like memoize, but takes a form instead of a function, and
+  evaluates to a value, not a function per se. By having a form, one can
+  preprocess arguments, both around memoize-form as well as inside the form. For
+  example:
+
+  (defn format-name* [s]
+    (println \"Not cached!\")
+    (clojure.string/capitalize s)) ; pretend this is expensive.
+
+  (defn format-name [s]
+    (let [lowercase (clojure.string/lower-case s)]
+      (memoize-form (format-name* (.trim lowercase)))))
+
+  (format-name \"nemo\")
+  Not cached
+  ;=> \"Nemo\"
+
+  (format-name \"   NEMO\")
+  ;=> \"Nemo\"
+
+  Note that the form should be calling a named function, not a macro. Anonymous
+  functions are not supported yet."
+  [form]
+  (let [sym (gensym (str "memoized-"
+                         (clojure.string/replace (str (first form)) #"[/\.]" "-")
+                         "-"))]
+    (eval `(def ~(with-meta sym (assoc (meta sym) :private true)) ; ^:private does not seem to work
+             (memoize ~(first form))))
+    `(~sym ~@(rest form))))

@@ -111,7 +111,8 @@
            ~'x (if (not= :prime.vo/default ~'v) `(to-field-type ~~votrait ~~% ~~'v)
                 #_else '~(default-value-expr votrait %))
            ~'e (if (and (not= :prime.vo/default ~'v) (stable-argument? ~'v)) (eval? ~'x) #_else :clojure.lang/eval-failed)]
-      (if-not (or (= :clojure.lang/eval-failed ~'e) (not (or (literal-value? ~'e) (instance? prime.types.EnumValue ~'e))))
+      (if (and (not= :clojure.lang/eval-failed ~'e)
+               (or (literal-value? ~'e) (instance? prime.types.EnumValue ~'e)))
         ~'e #_else ~'x)))
     props))
 

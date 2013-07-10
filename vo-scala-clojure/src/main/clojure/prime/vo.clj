@@ -3,6 +3,7 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.vo
+  (:refer-clojure :exclude [keyword])
   (:require [clojure.set     :as    s])
   (:import  [prime.vo IDField ValueObject ValueObjectField VOValueObjectField ValueObjectManifest ValueObjectManifest_0 ValueObjectManifest_1 ValueObjectManifest_N ID]
             [prime.types package$ValueType package$ValueTypes$Tarray package$ValueTypes$Tdef]))
@@ -40,6 +41,9 @@
     ValueObject          (.voManifest ^ValueObject in)
   ))
 
+(defn keyword "Returns the :keyword of a ValueObjectField" [^ValueObjectField field]
+  (.keyword field))
+
 (defn fields [in]
   (let [in (manifest in)] (condp instance? in
     ValueObjectManifest_N (remove nil? (.. ^ValueObjectManifest_N in fields))
@@ -47,20 +51,31 @@
     ValueObjectManifest_0 nil)
   ))
 
-(defn field-set [vo-or-manifest]
-  (set (map #(.keyword ^ValueObjectField %) (fields vo-or-manifest))))
+(defn subtypes [vo-or-manifest]
+  (.subtypes (manifest vo-or-manifest)))
+
+(defn field-set
+  "Returns a set of field keywords known for the given `VO or Manifest`"
+  [vo-or-manifest]
+  (set (map keyword (fields vo-or-manifest))))
+
+(defn field-or-subtype-field-set
+  "Returns a set of field keywords known for the given `VO or Manifest` and all of it's subtypes."
+  [vo-or-manifest]
+  (set
+    (concat
+      (map keyword (fields vo-or-manifest))
+      (mapcat field-or-subtype-field-set (subtypes vo-or-manifest)))))
 
 (defn field-filtered-seq [vo-or-manifest, only, exclude]
   (let [only       (set only   )
         exclude    (set exclude)
-        all-keys   (field-set vo-or-manifest)
+        all-keys   (field-or-subtype-field-set vo-or-manifest)
         field-keys (if-not (empty? only)    (s/select     only       all-keys) all-keys)
         field-keys (if-not (empty? exclude) (s/difference field-keys exclude)  field-keys)]
-    (assert (empty? (s/difference only    all-keys)) (str ":only    contains key not present in VO field-set: " all-keys))
-    (assert (empty? (s/difference exclude all-keys)) (str ":exclude contains key not present in VO field-set: " all-keys))
-    (filter
-      #(field-keys (.keyword ^ValueObjectField %))
-      (fields vo-or-manifest))))
+    (assert (empty? (s/difference only    all-keys)) (str vo-or-manifest ":only    " only    " contains key not present in VO (or subtype) field-set: " all-keys))
+    (assert (empty? (s/difference exclude all-keys)) (str vo-or-manifest ":exclude " exclude " contains key not present in VO (or subtype) field-set: " all-keys))
+    (filter (comp field-keys keyword) (fields vo-or-manifest))))
 
 (defn ^ValueObjectField find-own-field
   "Searches for a field by key. Returns nil if not found within the given ValueObject(manifest) type."

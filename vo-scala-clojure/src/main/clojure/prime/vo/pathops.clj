@@ -3,7 +3,8 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.vo.pathops
-  "Operations (add, update, ...) for ValueObject using value-paths.")
+  "Operations (add, update, ...) for ValueObject using value-paths."
+  (:use prime.utils))
 
 
 ;;; Path helper functions.

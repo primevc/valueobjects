@@ -16,7 +16,7 @@
   ([pred x] x)
   ([pred x & next]
       `(let [or# ~x]
-         (if-not (~pred or#) or# (or ~@next)))))
+         (if-not (~pred or#) or# (or-not ~pred ~@next)))))
 
 (defmacro mapify
   "Given some symbols, construct a map with the symbols as keys, and the value

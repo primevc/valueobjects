@@ -126,7 +126,7 @@
                 ^ValueObject             empty      (.. value-type empty)]
             (conj
               (if (.. value-type ref)
-                {:type (mapping-field-type-name (.valueType (._id ^IDField (. empty voManifest))))}
+                {:type (mapping-field-type-name (.valueType (._id ^IDField (. empty voManifest)))) :index "not_analyzed"}
               #_else
                 (vo-mapping empty (or option-map {})))
 

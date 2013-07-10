@@ -4,6 +4,20 @@
 
 (ns prime.utils)
 
+(defmacro or-not
+  "Evaluates exprs one at a time, from left to right. If a form
+  returns a falsey value for the supplied predicate, it returns that value,
+  otherwise it returns the value of the last expression.
+
+  Example:
+  (or-not nil? nil :a :b) => :a
+  (or-not nil? nil)       => nil
+  (or-not map? {})        => {}"
+  ([pred x] x)
+  ([pred x & next]
+      `(let [or# ~x]
+         (if-not (~pred or#) or# (or ~@next)))))
+
 (defmacro mapify
   "Given some symbols, construct a map with the symbols as keys, and the value
   of the symbols as the map values. Unbound symbols or those with nil values are

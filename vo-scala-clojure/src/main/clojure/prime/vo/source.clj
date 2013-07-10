@@ -4,7 +4,7 @@
 
 (ns prime.vo.source
   (:require prime.types)
-  (:use clojure.lang))
+  (:use clojure.lang, prime.utils))
 
 (def-existing-protocol ValueSource
   (^int     typeID   [this, ^int baseTypeID])
@@ -47,7 +47,7 @@
      http://clojure.github.com/clojure/clojure.core-api.html#clojure.core/contains?"
     (or (contains? clj-map name) (contains? clj-map (keyword name)) (contains? clj-map idx)))
 
-  (anyAt [this, name idx notFound] (or (clj-map name) (clj-map (keyword name)) (clj-map idx) notFound)))
+  (anyAt [this, name idx notFound] (or-not nil? (clj-map name) (clj-map (keyword name)) (clj-map idx) notFound)))
 
 (extend-type clojure.lang.IPersistentMap
   ValueSourceable

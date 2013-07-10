@@ -11,9 +11,9 @@
 (defn- fill-path-step [step var]
   (if (map? step)
     (let [[k v] (first step)]
-      (if v step #_else {k var}))
+      (if-not (nil? v) step #_else {k var}))
     #_else
-    (or step var)))
+    (or-not nil? step var)))
 
 
 (defn fill-path

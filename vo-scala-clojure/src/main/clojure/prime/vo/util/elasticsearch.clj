@@ -5,6 +5,7 @@
 (ns prime.vo.util.elasticsearch
   (:refer-clojure :exclude (get))
   (:require [prime.vo :as vo]
+            [clojure.set     :as set]
             [cheshire [core :as core] [generate :as gen]]
             [clj-elasticsearch.client :as ces]
             [prime.vo.source :refer (def-valuesource)]
@@ -151,7 +152,14 @@
   ([^ValueObject vo] (vo-mapping vo {}))
 
   ([^ValueObject vo, option-map]
-   (let [id-field (if (instance? IDField (. vo voManifest)) (._id ^IDField (. vo voManifest)))]
+   (let [id-field  (if (instance? IDField (. vo voManifest)) (._id ^IDField (. vo voManifest)))
+         field-set (vo/field-filtered-seq vo (:only option-map) (:exclude option-map))]
+    (let [unknown-options
+          (set/difference
+            (set (keys option-map))
+            (set (map vo/keyword field-set))
+            #{ :exclude :only } )]
+      (assert (empty? unknown-options) (print-str "\n\tMapping non-existant field(s):" unknown-options "\n\t")))
     { :type       "object"
       :dynamic    "strict"
       :properties
@@ -160,7 +168,7 @@
           {"t" {:type "integer", :store "no"}},
           (map
             (fn [^ValueObjectField field] (field-mapping (option-map (.keyword field)) field (if id-field (identical? id-field field))))
-            (mapcat #(vo/field-filtered-seq % (:only option-map) (:exclude option-map)) (vo/vo+subtypes-manifests-seq (.voManifest vo))))
+            field-set)
           ))
     }))
 )

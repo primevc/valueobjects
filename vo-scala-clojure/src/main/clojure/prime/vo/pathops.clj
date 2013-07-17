@@ -31,8 +31,11 @@
 
 (defn- concrete-path-step [obj path-step]
   (if (and (vector? obj) (not (number? path-step))) ; assert maybe
-    (let [[k v] (first path-step)]
-      (first (keep-indexed (fn [i item] (if (= (get item k) v) i)) obj)))
+    (let [[k v] (first path-step)
+          result (first (keep-indexed (fn [i item] (when (= (get item k) v) i)) obj))]
+      (if-not result
+        (throw (IllegalArgumentException. (str "Could not find a match for '" path-step "'.")))
+        result))
     #_else
     path-step))
 
@@ -102,7 +105,8 @@
 
 (defn- vector-move-item [vec from to]
   {:pre [vector? vec]}
-  (let [from (relative-vector-index (count vec) from)
+  (let [from (concrete-path-step vec from)
+        from (relative-vector-index (count vec) from)
         to (relative-vector-index (count vec) to)]
     (if (= from to) vec
         #_else

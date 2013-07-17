@@ -3,7 +3,8 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.vo.pathops
-  "Operations (add, update, ...) for ValueObject using value-paths.")
+  "Operations (add, update, ...) for ValueObject using value-paths."
+  (:use prime.utils))
 
 
 ;;; Path helper functions.
@@ -11,9 +12,9 @@
 (defn- fill-path-step [step var]
   (if (map? step)
     (let [[k v] (first step)]
-      (if v step #_else {k var}))
+      (if-not (nil? v) step #_else {k var}))
     #_else
-    (or step var)))
+    (or-not nil? step var)))
 
 
 (defn fill-path

@@ -59,12 +59,21 @@
         (apply f m args)))))
 
 
-(defn- relative-vector-index [length i]
-  (if (>= i length)
-    (dec length)
-    #_else
-    (let [i (if (< i 0) (+ i length) #_else i)]
-      (if (< i 0) 0  #_else i))))
+(defn- relative-vector-index [length i & options]
+  "Calculates the index relative to a vector length. Optionally, one
+  can specify that an extra index at the end is allowed, using the
+  :allow-index-after-last keyword. Examples:
+
+  (relative-vector-index 3 2)  ;=> 2
+  (relative-vector-index 3 4)  ;=> 2
+  (relative-vector-index 3 -1) ;=> 2
+  (relative-vector-index 3 -3) ;=> 0
+  (relative-vector-index 3 -4) ;=> 0
+  (relative-vector-index 3 4 :allow-index-after-last)  ;=> 3
+  (relative-vector-index 3 -1 :allow-index-after-last) ;=> 3"
+  (let [options (zipmap options (repeat true))
+        div (if (:allow-index-after-last options) (inc length) length)]
+    (if (>= i div) (dec div) (mod (max i (- div)) div))))
 
 
 ;;; Concrete opertion, append to.
@@ -78,9 +87,9 @@
 
 ;;; Concrete opertion, insert at.
 
-(defn- vector-insert-at [vec index value]
+(defn- vector-insert-at [vec index value & options]
   {:pre [vector? vec]}
-  (let [index (relative-vector-index (count vec) index)]
+  (let [index (apply relative-vector-index (count vec) index options)]
     (apply conj (subvec vec 0 index) value (subvec vec index))))
 
 
@@ -106,12 +115,13 @@
 
 (defn- vector-move-item [vec from to]
   {:pre [vector? vec]}
-  (let [from (concrete-path-step vec from)
-        from (relative-vector-index (count vec) from)
-        to (relative-vector-index (count vec) to)]
+  (let [vec (clojure.core/vec vec) ; Hack: subvec behaves different on Scala vectors vs Clojure's.
+        from (relative-vector-index (count vec) (concrete-path-step vec from))
+        to (relative-vector-index (count vec) to :allow-index-after-last)
+        to-after-remove (if (< from to) (dec to) to)]
     (if (= from to) vec
-        #_else
-        (vector-insert-at (vector-remove vec from) to (nth vec from)))))
+        (vector-insert-at (vector-remove vec from) to-after-remove
+                          (nth vec from) :allow-index-after-last))))
 
 
 (defn move-vo-to

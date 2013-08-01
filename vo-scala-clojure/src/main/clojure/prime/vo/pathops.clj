@@ -43,6 +43,17 @@
 
 ;;; General functions, used by the other concrete path operations.
 
+(defn get-in-vo
+  "Returns the value in the VO following the path steps. The added
+  value of this function over the core `get-in` function is that this
+  function understands our own type of paths."
+  [m [k & ks]]
+  (let [k (concrete-path-step m k)]
+    (if ks
+      (recur (get m k) ks)
+      (get m k))))
+
+
 (defn- update-in-vo
   "'Updates' a value in a nested ValueObject, where ks is a sequence of
   keys and f is a function that will take the old value and any

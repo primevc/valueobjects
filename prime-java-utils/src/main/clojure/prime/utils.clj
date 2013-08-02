@@ -127,3 +127,26 @@
     (eval `(def ~(with-meta sym (assoc (meta sym) :private true)) ; ^:private does not seem to work
              (memoize ~(first form))))
     `(~sym ~@(rest form))))
+
+
+(defmacro if-let*
+  "Have multiple bindings, which must all be truthy for the then form
+  to evaluate. As soon as one binding is falsey, the else form is
+  evaluated. The if-let* does not support leaving out the else form,
+  where the core if and if-let do. This is because I believe using
+  when/when-let/when-let* over if/if-let/if-let* without an else
+  clause increases readability."
+  [[var expr & bindings] then else]
+  (when-not (even? (count bindings))
+    (throw (IllegalArgumentException. "must have even numbers of forms in binding vector.")))
+  `(if-let [~var ~expr]
+     ~(if (seq bindings)
+        `(if-let* ~bindings ~then ~else)
+        `~then)
+     ~else))
+
+(defmacro when-let*
+  "Have multiple bindings, which must all be truthy for the body to
+  evaluate. As soon as one binding is falsey, nil is returned."
+  [bindings & body]
+  `(if-let* ~bindings (do ~@body) nil))

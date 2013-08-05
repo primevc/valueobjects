@@ -5,7 +5,10 @@
 (ns prime.vo.proxy
   "This namespace defines the VOProxy, VOSearchProxy and VOHistoryProxy
   protocols. The namespace also includes helper functions for easy
-  creation of implementations of these protocols.")
+  creation of implementations of these protocols."
+  (:require [clojure.zip :as zip]
+            [prime.vo :refer (vo-zipper)]
+            [prime.utils :refer (guard-let)]))
 
 
 ;;; Protocol definitions.
@@ -52,7 +55,79 @@
     "Get latest slice of history of a VO. Can be limited to a certain amount of :slices."))
 
 
-;;; Helper functions.
+;;; A filter for value objects.
+
+(declare ^:private vo-keep-vo)
+
+(defn- vo-keep-array
+  "Iterates over an array in a value object field (using the zipper
+  pointing to the field)."
+  [vz keep-map]
+  (if-let [in-array (zip/down vz)]
+    (if (zip/branch? in-array)
+      (loop [former nil
+             next in-array]
+        (if next
+          (let [new (vo-keep-vo next keep-map)]
+            (recur new (zip/right new)))
+          (zip/up former)))
+      vz)
+    vz))
+
+
+(defn- vo-keep-vo
+  "Filters out a value object zipper, based on a map holding the keys
+  to keep."
+  [vz keep-map]
+  (if-let [in-fields (zip/down vz)]
+    (loop [former nil
+           next in-fields]
+      (if next
+        (let [field-key (first (zip/node next))
+              keep-item (get keep-map field-key)
+              new (if-not keep-item
+                    (zip/edit next (constantly nil))
+                    (if-not (map? keep-item)
+                      next
+                      ;; Check whether the value of the current key-value pair is a
+                      ;; vector or a value object. If so, recurse!
+                      (guard-let [value-vz (-> next zip/down zip/right) :when zip/branch?]
+                        (zip/up (if (vector? (zip/node value-vz))
+                                  (vo-keep-array value-vz (get keep-map field-key))
+                                  (vo-keep-vo value-vz (get keep-map field-key))))
+                        next)))]
+          (recur new (zip/right new)))
+        (zip/up former)))
+    vz))
+
+
+(defn vo-keep
+  "Filter out (possibly nested) fields from a value object. The
+  keep-map should contain truthful values for the keys on whishes to
+  keep. Keep-maps are recursive, in that one can specify a keep-map as
+  a value for a key. If the value for a key is not a map, all nested
+  fields are kept. For example:
+
+  (vo-keep (Publication {:name \"greta\"
+                         :tags [\"foo\" \"bar\"]
+                         :booklet (Booklet {:isZoomable false
+                                            :spreads [(Spread {:width 1
+                                                               :height 100})
+                                                      (Spread {:width 2})]})})
+               {:tags true
+                :booklet {:spreads {:width true}}})
+  => (Publication {:booklet (Booklet {:spreads [(Spread{:width 1})
+                                                (Spread{:width 2})]}),
+                   :tags [\"foo\" \"bar\"]})"
+  [vo keep-map]
+  ;; The keep filtering uses a zipper for efficiency.
+  (let [vz (vo-zipper vo)]
+    ;; One could also call zip/root, but the zipper should already be at the root if everything
+    ;; went correct.
+    (zip/node (vo-keep-vo vz keep-map))))
+
+
+;;; Delegation and default proxies.
 
 (defn symbolize [sym appendix] (symbol (str (name sym) appendix)))
 

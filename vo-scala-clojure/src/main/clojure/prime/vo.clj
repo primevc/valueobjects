@@ -4,7 +4,8 @@
 
 (ns prime.vo
   (:refer-clojure :exclude [keyword])
-  (:require [clojure.set     :as    s])
+  (:require [clojure.set :as s]
+            [clojure.zip :as zip])
   (:import  [prime.vo IDField ValueObject ValueObjectField VOValueObjectField ValueObjectManifest ValueObjectManifest_0 ValueObjectManifest_1 ValueObjectManifest_N ID]
             [prime.types package$ValueType package$ValueTypes$Tarray package$ValueTypes$Tdef]))
 
@@ -161,3 +162,19 @@
 
 (defn vo+subtypes-manifests-seq "Builds a seq of all subtype manifests." [^ValueObjectManifest voManifest]
   (cons voManifest (mapcat vo+subtypes-manifests-seq (.subtypes voManifest))))
+
+
+;;; A zipper definition for value objects.
+
+(defn vo-zipper [vo]
+  "Creates a zipper for a value object. Children of a value object
+  node are represented by a sequence of key-value pairs."
+  (zip/zipper (fn [node]           ; branch?
+                (or (instance? ValueObject node)
+                    (vector? node)))
+              seq                  ; children
+              (fn [node children]  ; make-node
+                (if (instance? ValueObject node)
+                  (into (.empty node) children)
+                  (vec children)))
+              vo))

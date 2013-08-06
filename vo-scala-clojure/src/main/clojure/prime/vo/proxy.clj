@@ -169,6 +169,7 @@
                             meta-proxy (:with-meta opts)
                             proxy-result-sym (gensym "proxy-result-")
                             meta-result-sym (gensym "meta-result-")
+                            keep-map (:keep opts)
                             proxy-forms (vo-proxy-delegator-proxy-forms name arglist proxies
                                                                         result-proxy
                                                                         proxy-result-sym
@@ -185,10 +186,11 @@
                         (assert (not= meta-proxy result-proxy)
                                 (str ":meta-proxy cannot be the same as :return-result-of for " type))
                         `[(instance? ~type ~'vo)
-                          (let ~(vec (concat ['_ pre-form] proxy-forms ['_ post-form]))
-                            ~(if (and meta-proxy (not= name 'get-vo))
-                               `(with-meta ~proxy-result-sym ~meta-result-sym)
-                               `~proxy-result-sym))]))
+                          (let [~'vo ~(if keep-map `(vo-keep ~'vo ~keep-map) 'vo)]
+                            (let ~(vec (concat ['_ pre-form] proxy-forms ['_ post-form]))
+                              ~(if (and meta-proxy (not= name 'get-vo))
+                                 `(with-meta ~proxy-result-sym ~meta-result-sym)
+                                 `~proxy-result-sym)))]))
                     vo-opts-pairs)]
     `(~name ~arglist
             (cond ~@conditions
@@ -196,6 +198,8 @@
                                 (str "Attempting to use a proxy delegator that does not support "
                                      ~'vo)))))))
 
+
+;; ---TODO: Maybe having a keep filter per proxy in :proxies is also an option?
 
 (defmacro vo-proxy-delegator [delegations]
   "Given a sequence of pairs of value object types and their delegation
@@ -221,6 +225,10 @@
   :with-meta - one of the symbols in the :proxies option, telling the
   delegator to add the result of that proxy as meta data to the actual
   result.
+
+  :keep - a map that is used with the `keep-vo` function. It is used
+  on the vo argument of the VOProxy function, before that function is
+  called on the actual :proxies.
 
   Note that, when a `gev-vo` function is executed, the proxies in
   :proxies are executed in order, and as soon as one returns a result,

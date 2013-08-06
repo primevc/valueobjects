@@ -202,8 +202,8 @@
 ;; ---TODO: Maybe having a keep filter per proxy in :proxies is also an option?
 
 (defmacro vo-proxy-delegator [delegations]
-  "Given a sequence of pairs of value object types and their delegation
-  options map, returns a reified VOProxy supporting the delegations.
+  "Given a sequence alternating value object types and their delegation
+  options maps, returns a reified VOProxy supporting the delegations.
 
   The following options exist:
 
@@ -230,7 +230,7 @@
   on the vo argument of the VOProxy function, before that function is
   called on the actual :proxies.
 
-  Note that, when a `gev-vo` function is executed, the proxies in
+  Note that, when a `get-vo` function is executed, the proxies in
   :proxies are executed in order, and as soon as one returns a result,
   that result is returned and the other proxies are not executed. The
   :with-meta option has no effect on `get-vo` calls either."

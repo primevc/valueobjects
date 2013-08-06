@@ -160,8 +160,8 @@
   [name arglist vo-opts-pairs]
   (let [conditions (mapcat
                     (fn [[type opts]]
-                      (let [pre-form (get opts (keyword (str "pre" name)))
-                            post-form (get opts (keyword (str "post" name)))
+                      (let [pre-form (get opts (keyword (str "pre-" name)))
+                            post-form (get opts (keyword (str "post-" name)))
                             proxies (:proxies opts)
                             result-proxy (get proxies (if (:return-result-of opts)
                                                         (index-of (:return-result-of opts) proxies)

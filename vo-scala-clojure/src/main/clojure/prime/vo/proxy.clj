@@ -186,7 +186,7 @@
                                 (str ":meta-proxy cannot be the same as :return-result-of for " type))
                         `[(instance? ~type ~'vo)
                           (let ~(vec (concat ['_ pre-form] proxy-forms ['_ post-form]))
-                            ~(if (and meta-proxy (not= name `get-vo))
+                            ~(if (and meta-proxy (not= name 'get-vo))
                                `(with-meta ~proxy-result-sym ~meta-result-sym)
                                `~proxy-result-sym))]))
                     vo-opts-pairs)]

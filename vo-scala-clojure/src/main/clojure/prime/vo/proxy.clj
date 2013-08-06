@@ -8,7 +8,7 @@
   creation of implementations of these protocols."
   (:require [clojure.zip :as zip]
             [prime.vo :refer (vo-zipper)]
-            [prime.utils :refer (guard-let)]))
+            [prime.utils :refer (guard-let index-of)]))
 
 
 ;;; Protocol definitions.
@@ -103,7 +103,7 @@
 
 (defn vo-keep
   "Filter out (possibly nested) fields from a value object. The
-  keep-map should contain truthful values for the keys on whishes to
+  keep-map should contain truthful values for the keys one whishes to
   keep. Keep-maps are recursive, in that one can specify a keep-map as
   a value for a key. If the value for a key is not a map, all nested
   fields are kept. For example:
@@ -127,108 +127,120 @@
     (zip/node (vo-keep-vo vz keep-map))))
 
 
-;;; Delegation and default proxies.
+;;; Delegator proxies.
 
-(defn symbolize [sym appendix] (symbol (str (name sym) appendix)))
-
-
-(defn try-proxies [proxies vo fnc options] ; Does not require options. Try is for get only.
-  `[~'result (or ~@(map #(list fnc % vo) proxies))])
-
-
-(defn all-proxies [proxies vo fnc options]
-  (mapcat #(list (symbolize % "-result") (concat (list fnc % vo) options)) proxies))
-
-
-(def delegator-opts {
-  `get-vo
-    [ [['this 'vo]]
-      [:pre-get :proxies :post-get]
-      try-proxies]
-  `put-vo
-    [ [['this 'vo] ['this 'vo 'options]]
-      [:pre-put :proxies :post-put]
-      all-proxies]
-  `update
-    [ [['this 'vo 'id] ['this 'vo 'id 'options]]
-      [:pre-update :proxies :post-update]
-      all-proxies]
-  `delete
-    [ [['this 'vo] ['this 'vo 'options]]
-      [:pre-delete :proxies :post-delete]
-      all-proxies]
-  `append-to
-    [ [['this 'vo 'path 'path-vars 'value] ['this 'vo 'path 'path-vars 'value 'options]]
-      [:pre-append-to :proxies :post-append-to]
-      all-proxies]
-  `insert-at
-    [ [['this 'vo 'path 'path-vars 'value] ['this 'vo 'path 'path-vars 'value 'options]]
-      [:pre-insert-at :proxies :post-insert-at]
-      all-proxies]
-  `move-to
-    [ [['this 'vo 'path 'path-vars 'to] ['this 'vo 'path 'path-vars 'to 'options]]
-      [:pre-move-to :proxies :post-move-to]
-      all-proxies]
-  `replace-at
-    [ [['this 'vo 'path 'path-vars 'value] ['this 'vo 'path 'path-vars 'value 'options]]
-      [:pre-replace-at :proxies :post-replace-at]
-      all-proxies]
-  `merge-at
-    [ [['this 'vo 'path 'path-vars 'value] ['this 'vo 'path 'path-vars 'value 'options]]
-      [:pre-merge-at :proxies :post-merge-at]
-      all-proxies]
-  `remove-from
-    [ [['this 'vo 'path 'path-vars] ['this 'vo 'path 'path-vars 'options]]
-      [:pre-remove-from :proxies :post-remove-from]
-      all-proxies]
-  ; 'search
-  ;   [ [['this 'vo] ['this 'vo 'options]]
-  ;     [:pre-search :proxies :post-search]
-  ;     all-proxies]
-  })
+(defn- vo-proxy-delegator-proxy-forms
+  "Returns a sequence alternating binding symbols and proxy function
+  calls. The function calls are to the `name` function of the VOProxy,
+  using the given `arglist`. If `name` is \"get-vo\", then the
+  supplied `proxies` are tried in order, and the result of the first
+  to succeed is bound to the `proxy-result-sym`. Otherwise, all
+  `proxies` are called, `proxy-result-sym` is bound to the result of
+  the call to the `result-proxy`, and `meta-result-sym` is bound to
+  the result of the call to the `meta-proxy`."
+  [name arglist proxies result-proxy proxy-result-sym meta-proxy meta-result-sym]
+  (let [proxy-calls (for [proxy proxies]
+                      `(~(symbol "prime.vo.proxy" (str name)) ~proxy ~@(rest arglist)))]
+    (if (= 'get-vo name)
+      `[~proxy-result-sym (or ~@proxy-calls)]
+      (mapcat (fn [proxy-index]
+                (let [proxy (get proxies proxy-index)]
+                  `[~(condp = proxy
+                       result-proxy `~proxy-result-sym
+                       meta-proxy `~meta-result-sym
+                       '_)
+                    ~(get (vec proxy-calls) proxy-index)]))
+              (range (count proxies))))))
 
 
-(defmacro def-vo-proxy-delegator [name & valueobject+options]
-  (let [vo+opts (apply hash-map valueobject+options)]
-    `(do
-       ; (doall (for [[type# opts#] ~vo+opts]
-       ;   (prn type# opts#)))
-      (def ~name
-        (reify VOProxy
-          ~@(for [[fnc [params fncs all-or-try]] delegator-opts
-                   param params]
-              `(~fnc ~param
-                (cond
-                  ~@(apply concat (for [[type opts] vo+opts]
-                    `[(instance? ~type ~'vo)
-                      (do (let [
-                      ~@(apply concat (for [function fncs]
-                          (if (= function :proxies)
-                             (all-or-try (opts :proxies) 'vo fnc (drop 2 param))
-                             `[~(symbolize function "-result") ~(opts function)
-                              ~@(if-not (nil? (opts function))
-                                ['vo
-                                `(or ~(symbolize function "-result") ~'vo)])])))
-                        ]
-                        ~(let [
-                          res          (if (= fnc `get-vo) ; Exception for a get.
-                                        (symbolize :result "")
-                                        #_else (if (opts :return-result-of)
-                                          (symbolize (opts :return-result-of) "-result")
-                                          (symbolize (first (opts :proxies)) "-result")))
-                          meta-build  (when (opts :with-meta)
-                                        (apply concat
-                                          (for [meta-prox (opts :with-meta)]
-                                            (let [result-sym (symbolize meta-prox "-result")
-                                                  has-result (or (first (filter #(= result-sym (.sym %)) fncs))
-                                                                 (first (filter #(= meta-prox %) (opts :proxies)))) ]
-                                              (if has-result
-                                                [(keyword meta-prox) (symbolize meta-prox "-result")])))))
-                          ]
-                          (if (and (opts :with-meta) (not= fnc `get-vo))
-                            `(with-meta ~res ~meta-build)
-                            res))))])))))))
-      '~name)))
+(defn- vo-proxy-delegator-fn
+  "Given a VOProxy function `name`, its arguments list, and a sequence
+  of pairs of value object types and their delegation options, returns
+  a spec for reifying the `name` function in the VOProxy."
+  [name arglist vo-opts-pairs]
+  (let [conditions (mapcat
+                    (fn [[type opts]]
+                      (let [pre-form (get opts (keyword (str "pre" name)))
+                            post-form (get opts (keyword (str "post" name)))
+                            proxies (:proxies opts)
+                            result-proxy (get proxies (if (:return-result-of opts)
+                                                        (index-of (:return-result-of opts) proxies)
+                                                        0))
+                            meta-proxy (:with-meta opts)
+                            proxy-result-sym (gensym "proxy-result-")
+                            meta-result-sym (gensym "meta-result-")
+                            proxy-forms (vo-proxy-delegator-proxy-forms name arglist proxies
+                                                                        result-proxy
+                                                                        proxy-result-sym
+                                                                        meta-proxy
+                                                                        meta-result-sym)]
+                        (assert (not (empty? proxies))
+                                (str "need to specify at least one value in :proxies for " type))
+                        (assert result-proxy
+                                (str ":return-result-of option must specify one of the values in "
+                                     ":proxies for " type))
+                        (assert (when meta-proxy (index-of meta-proxy proxies))
+                                (str ":with-meta option must specify one of the values in :proxies "
+                                     "for " type))
+                        (assert (not= meta-proxy result-proxy)
+                                (str ":meta-proxy cannot be the same as :return-result-of for " type))
+                        `[(instance? ~type ~'vo)
+                          (let ~(vec (concat ['_ pre-form] proxy-forms ['_ post-form]))
+                            ~(if (and meta-proxy (not= name `get-vo))
+                               `(with-meta ~proxy-result-sym ~meta-result-sym)
+                               `~proxy-result-sym))]))
+                    vo-opts-pairs)]
+    `(~name ~arglist
+            (cond ~@conditions
+                  :else (throw (IllegalArgumentException.
+                                (str "Attempting to use a proxy delegator that does not support "
+                                     ~'vo)))))))
+
+
+(defmacro vo-proxy-delegator [delegations]
+  "Given a sequence of pairs of value object types and their delegation
+  options map, returns a reified VOProxy supporting the delegations.
+
+  The following options exist:
+
+  :proxies - a vector of symbols evaluating to existing VOProx
+  implementations. This option is required and at least one proxy must
+  be specified.
+
+  :pre-<VOProxy function> - a form that is evaluated before the
+  VOProxy function is executed for all the specifend :proxies. For
+  example, one could specify :pre-update (log \"update requested\").
+
+  :post-<VOProxy function> - a form that is evaluated after the
+  VOProxy function is executed for all specifend :proxies.
+
+  :return-result-of - one of the symbols in the :proxies option,
+  telling the delegator which result should be returned. By default,
+  the result of the first proxy is returned.
+
+  :with-meta - one of the symbols in the :proxies option, telling the
+  delegator to add the result of that proxy as meta data to the actual
+  result.
+
+  Note that, when a `gev-vo` function is executed, the proxies in
+  :proxies are executed in order, and as soon as one returns a result,
+  that result is returned and the other proxies are not executed. The
+  :with-meta option has no effect on `get-vo` calls either."
+  (let [vo-opts-pairs (partition 2 delegations)]
+    `(reify VOProxy
+       ~@(for [{:keys [name arglists]} (vals (:sigs VOProxy))
+               arglist arglists
+               :when (< 1 (count arglist))]
+           (vo-proxy-delegator-fn name arglist vo-opts-pairs)))))
+
+
+(defmacro def-vo-proxy-delegator
+  "Convenience macro to create and define a vo-proxy-delegator."
+  [name & delegations]
+  `(def ~name (vo-proxy-delegator ~delegations)))
+
+
+;;; Default proxies.
 
 (def vo-default-opts {
   `get-vo

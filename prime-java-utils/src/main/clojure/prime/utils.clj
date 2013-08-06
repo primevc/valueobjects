@@ -150,3 +150,10 @@
   evaluate. As soon as one binding is falsey, nil is returned."
   [bindings & body]
   `(if-let* ~bindings (do ~@body) nil))
+
+
+(defn index-of
+  "Returns the index of a value in a sequence, or nil if it is not
+  found."
+  [value sequence]
+  (first (keep-indexed (fn [index item] (when (= value item) index)) sequence)))

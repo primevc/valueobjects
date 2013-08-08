@@ -5,7 +5,7 @@
 (ns prime.vo
   (:refer-clojure :exclude [keyword])
   (:require [clojure.set :as s]
-            [clojure.zip :as zip])
+            [fast-zip.core :as zip])
   (:import  [prime.vo IDField ValueObject ValueObjectField VOValueObjectField ValueObjectManifest ValueObjectManifest_0 ValueObjectManifest_1 ValueObjectManifest_N ID]
             [prime.types package$ValueType package$ValueTypes$Tarray package$ValueTypes$Tdef]))
 

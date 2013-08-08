@@ -6,7 +6,7 @@
   "This namespace defines the VOProxy, VOSearchProxy and VOHistoryProxy
   protocols. The namespace also includes helper functions for easy
   creation of implementations of these protocols."
-  (:require [clojure.zip :as zip]
+  (:require [fast-zip.core :as zip]
             [prime.vo :refer (vo-zipper)]
             [prime.utils :refer (guard-let index-of forcat)]))
 

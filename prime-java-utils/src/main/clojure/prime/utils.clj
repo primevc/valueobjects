@@ -145,6 +145,7 @@
         `~then)
      ~else))
 
+
 (defmacro when-let*
   "Have multiple bindings, which must all be truthy for the body to
   evaluate. As soon as one binding is falsey, nil is returned."
@@ -157,3 +158,9 @@
   found."
   [value sequence]
   (first (keep-indexed (fn [index item] (when (= value item) index)) sequence)))
+
+
+(defmacro forcat
+  "For's analog of mapcat. Equivalent to (apply concat (for [...] ...))."
+  [seq-exprs body-expr]
+  `(apply concat (for ~seq-exprs ~body-expr)))

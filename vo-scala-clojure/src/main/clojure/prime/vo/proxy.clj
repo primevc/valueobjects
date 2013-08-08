@@ -8,7 +8,7 @@
   creation of implementations of these protocols."
   (:require [clojure.zip :as zip]
             [prime.vo :refer (vo-zipper)]
-            [prime.utils :refer (guard-let index-of)]))
+            [prime.utils :refer (guard-let index-of forcat)]))
 
 
 ;;; Protocol definitions.
@@ -129,6 +129,13 @@
 
 ;;; Delegator proxies.
 
+(defn- mk-proxy-call
+  "Returns a call to VOProxy function `name` using the supplied proxy
+  and argumentlist."
+  [name arglist proxy]
+  `(~(symbol "prime.vo.proxy" (str name)) ~proxy ~@(rest arglist)))
+
+
 (defn- vo-proxy-delegator-proxy-forms
   "Returns a sequence alternating binding symbols and proxy function
   calls. The function calls are to the `name` function of the VOProxy,
@@ -139,18 +146,15 @@
   the call to the `result-proxy`, and `meta-result-sym` is bound to
   the result of the call to the `meta-proxy`."
   [name arglist proxies result-proxy proxy-result-sym meta-proxy meta-result-sym]
-  (let [proxy-calls (for [proxy proxies]
-                      `(~(symbol "prime.vo.proxy" (str name)) ~proxy ~@(rest arglist)))]
+  (let [proxy-calls (into {} (map (juxt identity (partial mk-proxy-call name arglist)) proxies))]
     (if (= 'get-vo name)
-      `[~proxy-result-sym (or ~@proxy-calls)]
-      (mapcat (fn [proxy-index]
-                (let [proxy (get proxies proxy-index)]
-                  `[~(condp = proxy
-                       result-proxy `~proxy-result-sym
-                       meta-proxy `~meta-result-sym
-                       '_)
-                    ~(get (vec proxy-calls) proxy-index)]))
-              (range (count proxies))))))
+      [proxy-result-sym `(or ~@(vals proxy-calls))]
+      (forcat [proxy proxies]
+        [(condp = proxy
+           result-proxy proxy-result-sym
+           meta-proxy meta-result-sym
+           '_)
+         (proxy-calls proxy)]))))
 
 
 (defn- vo-proxy-delegator-fn
@@ -158,40 +162,38 @@
   of pairs of value object types and their delegation options, returns
   a spec for reifying the `name` function in the VOProxy."
   [name arglist vo-opts-pairs]
-  (let [conditions (mapcat
-                    (fn [[type opts]]
-                      (let [pre-form (get opts (keyword (str "pre-" name)))
-                            post-form (get opts (keyword (str "post-" name)))
-                            proxies (:proxies opts)
-                            result-proxy (get proxies (if (:return-result-of opts)
-                                                        (index-of (:return-result-of opts) proxies)
-                                                        0))
-                            meta-proxy (:with-meta opts)
-                            proxy-result-sym (gensym "proxy-result-")
-                            meta-result-sym (gensym "meta-result-")
-                            keep-map (:keep opts)
-                            proxy-forms (vo-proxy-delegator-proxy-forms name arglist proxies
-                                                                        result-proxy
-                                                                        proxy-result-sym
-                                                                        meta-proxy
-                                                                        meta-result-sym)]
-                        (assert (not (empty? proxies))
-                                (str "need to specify at least one value in :proxies for " type))
-                        (assert result-proxy
-                                (str ":return-result-of option must specify one of the values in "
-                                     ":proxies for " type))
-                        (assert (when meta-proxy (index-of meta-proxy proxies))
-                                (str ":with-meta option must specify one of the values in :proxies "
-                                     "for " type))
-                        (assert (not= meta-proxy result-proxy)
-                                (str ":meta-proxy cannot be the same as :return-result-of for " type))
-                        `[(instance? ~type ~'vo)
-                          (let [~'vo ~(if keep-map `(vo-keep ~'vo ~keep-map) 'vo)]
-                            (let ~(vec (concat ['_ pre-form] proxy-forms ['_ post-form]))
-                              ~(if (and meta-proxy (not= name 'get-vo))
-                                 `(with-meta ~proxy-result-sym ~meta-result-sym)
-                                 `~proxy-result-sym)))]))
-                    vo-opts-pairs)]
+  (let [conditions (forcat [[type opts] vo-opts-pairs]
+                     (let [pre-form (get opts (keyword (str "pre-" name)))
+                           post-form (get opts (keyword (str "post-" name)))
+                           proxies (:proxies opts)
+                           result-proxy (get proxies (if (:return-result-of opts)
+                                                       (index-of (:return-result-of opts) proxies)
+                                                       0))
+                           meta-proxy (:with-meta opts)
+                           proxy-result-sym (gensym "proxy-result-")
+                           meta-result-sym (gensym "meta-result-")
+                           keep-map (:keep opts)
+                           proxy-forms (vo-proxy-delegator-proxy-forms name arglist proxies
+                                                                       result-proxy
+                                                                       proxy-result-sym
+                                                                       meta-proxy
+                                                                       meta-result-sym)]
+                       (assert (not (empty? proxies))
+                               (str "need to specify at least one value in :proxies for " type))
+                       (assert result-proxy
+                               (str ":return-result-of option must specify one of the values in "
+                                    ":proxies for " type))
+                       (assert (if meta-proxy (index-of meta-proxy proxies) true)
+                               (str ":with-meta option must specify one of the values in :proxies "
+                                    "for " type))
+                       (assert (not= meta-proxy result-proxy)
+                               (str ":with-meta cannot be the same as :return-result-of for " type))
+                       `[(instance? ~type ~'vo)
+                         (let [~'vo ~(if keep-map `(vo-keep ~'vo ~keep-map) 'vo)]
+                           (let ~(vec (concat ['_ pre-form] proxy-forms ['_ post-form]))
+                             ~(if (and meta-proxy (not= name 'get-vo))
+                                `(with-meta ~proxy-result-sym ~meta-result-sym)
+                                `~proxy-result-sym)))]))]
     `(~name ~arglist
             (cond ~@conditions
                   :else (throw (IllegalArgumentException.

@@ -50,8 +50,8 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
   }
 
   final def pack(map : IPersistentMap) {
-    val entries = map.seq;
-    packMap(entries.count);
+    val entries = if (map != null) map.seq else null;
+    packMap(if (entries != null) entries.count else 0);
     var item = entries;
     while (item != null) {
       val entry = item.first.asInstanceOf[IMapEntry];
@@ -62,7 +62,7 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
   }
 
   final def pack(list : ISeq) {
-    packArray(list.count);
+    packArray(if (list != null) list.count else 0);
     var item = list;
     while (item != null) {
       pack(item.first);
@@ -71,7 +71,7 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
   }
 
   final def pack(list : Seqable) {
-    pack(list.seq)
+    if (list != null) pack(list.seq) else packNil();
   }
 
   final def writeByte(v : Int) {

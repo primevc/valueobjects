@@ -228,7 +228,7 @@
   delegator to add the result of that proxy as meta data to the actual
   result.
 
-  :keep - a map that is used with the `keep-vo` function. It is used
+  :keep - a map that is used by the `vo-keep` function. It is used
   on the vo argument of the VOProxy function, before that function is
   called on the actual :proxies.
 

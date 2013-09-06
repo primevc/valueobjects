@@ -175,6 +175,6 @@
               seq                  ; children
               (fn [node children]  ; make-node
                 (if (instance? ValueObject node)
-                  (into (.empty node) children)
+                  (into (.empty ^ValueObject node) children)
                   (vec children)))
               vo))

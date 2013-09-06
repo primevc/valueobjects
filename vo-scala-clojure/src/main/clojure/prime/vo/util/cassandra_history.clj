@@ -11,12 +11,10 @@
     [prime.vo.pathops             :as pathops]
     )
   (:import 
-    [prime.utils.msgpack.VOPacker]
-    [prime.utils.msgpack.VOUnpacker]
-    [java.io.ByteArrayOutputStream]
-    [java.io.ByteArrayInputStream]
-    [prime.vo ValueObject]
-    [org.msgpack.Unpacker]
+    [prime.utils.msgpack VOPacker VOUnpacker]
+    [java.io ByteArrayOutputStream ByteArrayInputStream]
+    [prime.vo ValueObject ValueObjectField]
+    [org.msgpack Unpacker MessagePackObject]
     )
 )
 
@@ -77,19 +75,33 @@
     pack (.pack msgpack value)]
     (.toByteArray out)))
 
-(defn VOChange->byte-array [value & options]
-  (let [out (java.io.ByteArrayOutputStream.)
-        msgpack (doto (prime.utils.msgpack.VOPacker. out)
-                  (.pack value))]
-    (prn options)
-    (doseq [option options]
-      (let [option (if (and (empty? option) (map? option)) nil option)
-            option (if (coll? option) (apply list option) option)]
-          (prn (type option) option)
-        (.pack msgpack option)
-        ))
-    (.close out)
-    (.toByteArray out)))
+(defn replace-star [path]
+  (map #(do
+      (cond
+          (= % *)
+            nil
+          (and (map? %) (= (val (first %)) *))
+            {(key (first %)) nil}
+          :else
+            %
+        )) path))
+
+(defn VOChange->byte-array
+  ([^ValueObject vo] (VOChange->byte-array vo nil))
+    
+  ([^ValueObject vo path & options]
+      (let [out (java.io.ByteArrayOutputStream.)
+            msgpack (doto (prime.utils.msgpack.VOPacker. out)
+                      (.pack vo))]
+        (when path
+          (.pack msgpack (replace-star (prime.vo/fields-path-seq vo path #(.id ^ValueObjectField %)))))
+        (doseq [option options]
+          (let [option (if (and (empty? option) (map? option)) nil option)
+                option (if (and (coll? option) (not (instance? ValueObject option))) (apply list option) option)]
+            (.pack msgpack option)
+            ))
+        (.close out)
+        (.toByteArray out))))
 
 (defn byte-array->VOChange [bytes vo]
   ; (apply prn (map #(Integer/toHexString (.get bytes %)) (range (.position bytes) (.capacity bytes))))
@@ -98,9 +110,11 @@
     ;pp (apply prn (map #(Integer/toHexString (.get bytes %)) (range (.position bytes) (.capacity bytes))))
     unpacker  (doto (org.msgpack.Unpacker. (org.apache.cassandra.utils.ByteBufferUtil/inputStream bytes))
                 (.setVOHelper prime.utils.msgpack.VOUnpacker$/MODULE$))
-    [vosource & options] (iterator-seq (.. unpacker iterator))]
-    (prn "vosource: " vosource)
-    (cons (.. vo voCompanion (apply vosource)) options)
+    [vosource integer-path & options] (iterator-seq (.. unpacker iterator))
+    path (map (fn [^MessagePackObject item] (if (.isNil item) nil #_else (.asInt item))) (if integer-path (.asArray integer-path)))
+    ]
+    
+    (cons (.. vo voCompanion (apply vosource)) (cons path options))
   ))
 
 (defn idconv [vo]
@@ -132,7 +146,6 @@
 (defn build-vo [res vo]
   (loop [i 0 c nil] ; i = counter, c = current result.
     (let [row (nth res i {})]
-      (prn "ROW: " row)
       (let [c
         (cond
           (= (:action row) (:put actions))
@@ -144,32 +157,32 @@
           (= (:action row) (:delete actions))
             (empty c)
           
-          (= (:action row) (:appendTo actions))
+          (= (:action row) (:append-to actions))
             (let [  [vo path path-vars value options] (byte-array->VOChange (:data row) vo)
                     path (pathops/fill-path path path-vars)]
               (pathops/append-to-vo vo path value))
           
-          (= (:action row) (:moveTo actions))
+          (= (:action row) (:move-to actions))
             (let [  [vo path path-vars to options] (byte-array->VOChange (:data row) vo)
                     path (pathops/fill-path path path-vars)]
               (pathops/move-vo-to vo path to))
           
-          (= (:action row) (:removeFrom actions))
+          (= (:action row) (:remove-from actions))
             (let [  [vo path path-vars options] (byte-array->VOChange (:data row) vo)
                     path (pathops/fill-path path path-vars)]
               (pathops/remove-from vo path))
           
-          (= (:action row) (:insertAt actions))
+          (= (:action row) (:insert-at actions))
             (let [  [vo path path-vars value options] (byte-array->VOChange (:data row) vo)
                     path (pathops/fill-path path path-vars)]
               (pathops/insert-at vo path value))
           
-          (= (:action row) (:replaceAt actions))
+          (= (:action row) (:replace-at actions))
             (let [  [vo path path-vars value options] (byte-array->VOChange (:data row) vo)
                     path (pathops/fill-path path path-vars)]
               (pathops/replace-at vo path value))
           
-          (= (:action row) (:mergeAt actions))
+          (= (:action row) (:merge-at actions))
             (let [  [vo path path-vars value options] (byte-array->VOChange (:data row) vo)
                     path (pathops/fill-path path path-vars)]
               (pathops/merge-at vo path value))
@@ -187,7 +200,6 @@
   ; This should send a merge of all records since the last put.
   (let [
     last-put (:version (or (clojure.core/get (last-put-cache vo) (str (:id vo))) (get-latest-put vo cluster)))
-    pp (prn "Last-put: " last-put)
     result
         (alia/with-session cluster
         (alia/execute
@@ -205,7 +217,6 @@
     (take slices (byte-array->VOChange (:data (last result)) vo))))
 
 (defn- insert [cluster vo id action data]
-  (prn "Data: " data)
   (alia/with-session cluster
       (alia/execute (alia/prepare
         (apply str "INSERT INTO " (get-table-name vo) " (version, id, action, data) VALUES ( ? , ? , ? , ? )"))
@@ -221,7 +232,6 @@
           (VOChange->byte-array vo)))
 
 (defn update [cluster vo id options]
-  (prn "Update!")
   (insert cluster
           vo
           (idconv (conj vo {:id id}))
@@ -240,39 +250,39 @@
           vo
           (idconv vo)
           :append-to
-          (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
+          (VOChange->byte-array vo path path-vars value options)))
 
 (defn insert-at [cluster vo path path-vars value options]
   (insert cluster
           vo
           (idconv vo)
           :insert-at
-          (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
+          (VOChange->byte-array vo path path-vars value options)))
 
 (defn move-to [cluster vo path path-vars to options]
   (insert cluster
           vo
           (idconv vo)
           :move-to
-          (VOChange->byte-array vo (es/hexify-path vo path) path-vars to options)))
+          (VOChange->byte-array vo path path-vars to options)))
 
 (defn replace-at [cluster vo path path-vars value options]
   (insert cluster
           vo
           (idconv vo)
           :replace-at
-          (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
+          (VOChange->byte-array vo path path-vars value options)))
 
 (defn merge-at [cluster vo path path-vars value options]
   (insert cluster
           vo
           (idconv vo)
           :merge-at
-          (VOChange->byte-array vo (es/hexify-path vo path) path-vars value options)))
+          (VOChange->byte-array vo path path-vars value options)))
 
 (defn remove-from [cluster vo path path-vars options]
   (insert cluster
           vo
           (idconv vo)
           :remove-from
-          (VOChange->byte-array vo (es/hexify-path vo path) path-vars options)))
+          (VOChange->byte-array vo path path-vars options)))

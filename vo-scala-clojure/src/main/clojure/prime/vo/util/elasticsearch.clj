@@ -159,7 +159,7 @@
             (set (keys option-map))
             (set (map vo/keyword field-set))
             #{ :exclude :only } )]
-      (assert (empty? unknown-options) (print-str "\n\tMapping non-existant field(s):" unknown-options "\n\t")))
+      (assert (empty? unknown-options) (print-str "\n\tMapping non-existant field(s):" unknown-options "\n\t " vo)))
     { :type       "object"
       :dynamic    "strict"
       :properties
@@ -548,14 +548,14 @@
   (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
   (let [
     [resolved-path varnum]  (resolve-path vo (pop path))
-    last-pathnode           (first (hexify-path vo [(last path)]))
+    last-pathnode           (last (hexify-path vo path))
     from-pos-loop           (cond
                               (string? last-pathnode) (get-pos-for-str last-pathnode)
                               (map? last-pathnode) (get-pos last-pathnode (inc varnum))
                               (number? last-pathnode) (apply str "var pos = " last-pathnode ";"))
     script                  (apply str resolved-path "; " from-pos-loop "; var from = pos; var tmpval = path.get(from); path.remove(from); if( to < 0 ) { to = path.size() + to; } if (to < 0 ) {to = 0; } if (to > path.size() ) { to = path.size()-1 } path.add(to, tmpval);")
     newval                  (get-in vo (:steps resolved-path))
-    parameters              (into {} (merge {:to to} (map-indexed #(do {(str "n" %1) %2}) path-vars)))
+    parameters              (merge {:to to} (into {} (map-indexed #(do {(str "n" %1) %2}) path-vars)))
     ]
     (script-query client index vo (:id vo) script parameters options)))
 
@@ -564,7 +564,7 @@
   (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
   (let [
     [resolved-path varnum]  (resolve-path vo (pop path))
-    last-pathnode           (first (hexify-path vo [(last path)]))
+    last-pathnode           (last (hexify-path vo path))
     from-pos-loop           (cond
                               (string? last-pathnode) (get-pos-for-str last-pathnode)
                               (map? last-pathnode) (get-pos last-pathnode (inc varnum))
@@ -589,7 +589,7 @@
   (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
   (let [
     [resolved-path varnum]  (resolve-path vo (pop path))
-    last-pathnode           (first (hexify-path vo [(last path)]))
+    last-pathnode           (last (hexify-path vo path))
     from-pos-loop           (cond
                               (string? last-pathnode) (get-pos-for-str last-pathnode)
                               (map? last-pathnode) (get-pos last-pathnode (inc varnum))

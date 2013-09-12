@@ -164,29 +164,3 @@
   "For's analog of mapcat. Equivalent to (apply concat (for [...] ...))."
   [seq-exprs body-expr]
   `(apply concat (for ~seq-exprs ~body-expr)))
-
-
-(defmacro protocol-forwarder
-  "Reifies a protocol that forwards all calls to an existing
-  implementation. For example:
-
-  (defprotocol Foo (bar [this baz]))
-
-  (deftype FooImpl [] Foo (bar [_ baz] (prn baz)))
-
-  (def foo-forwarder (protocol-forwarder Foo))
-
-  (bar (foo-forwarder (FooImpl.)) 'alice) ; prints alice.
-
-  A forwarder is useful in case a protocol does not recognize the
-  implementation as such."
-  [protocol]
-  (let [impl (gensym "impl")]
-    `(fn [~impl]
-       (reify ~protocol
-         ~@(for [sig (:sigs (eval protocol))
-                 :let [{:keys [name arglists]} (val sig)]
-                 arglist arglists]
-             `(~name ~arglist (. ~impl
-                                 ~(symbol (.replaceAll (str name) "-" "_"))
-                                 ~@(rest arglist))))))))

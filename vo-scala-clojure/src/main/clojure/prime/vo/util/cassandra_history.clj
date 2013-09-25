@@ -135,7 +135,7 @@
   :merge-at (int 9)
   })
 
-(defn get-latest-put [vo cluster]
+(defn get-latest-put [cluster vo]
   (let [result (alia/with-session cluster
         (alia/execute
           (alia/prepare (apply str "SELECT version,action FROM " (get-table-name vo) " WHERE id = ? ORDER BY version DESC;")) :values [(idconv vo)]))]
@@ -198,7 +198,7 @@
 (defn get [cluster vo]
   ; This should send a merge of all records since the last put.
   (let [
-    last-put (:version (or (clojure.core/get (last-put-cache vo) (str (:id vo))) (get-latest-put vo cluster)))
+    last-put (:version (or (clojure.core/get (last-put-cache vo) (str (:id vo))) (get-latest-put cluster vo)))
     result
         (alia/with-session cluster
         (alia/execute

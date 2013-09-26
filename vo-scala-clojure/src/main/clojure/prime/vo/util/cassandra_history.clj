@@ -6,7 +6,6 @@
   (:refer-clojure :exclude [get])
   (require prime.vo
     [qbits.alia                   :as alia]
-    [qbits.tardis                 :as tardis]
     [prime.vo.util.elasticsearch  :as es]
     [prime.vo.pathops             :as pathops]
     )
@@ -220,7 +219,7 @@
   (alia/with-session cluster
       (alia/execute (alia/prepare
         (apply str "INSERT INTO " (get-table-name vo) " (version, id, action, data) VALUES ( ? , ? , ? , ? )"))
-        :values [(tardis/unique-time-uuid (.getTime (java.util.Date.))) id (actions action) (java.nio.ByteBuffer/wrap data)])))
+        :values [(org.apache.cassandra.utils.UUIDGen/getTimeUUID) id (actions action) (java.nio.ByteBuffer/wrap data)])))
 
 (defn put [cluster vo options]
   ; TODO: If action is put, save version into immutant cache.

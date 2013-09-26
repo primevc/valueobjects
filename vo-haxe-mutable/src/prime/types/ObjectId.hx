@@ -1,7 +1,6 @@
 package prime.types;
  import prime.core.traits.IObjectId;
  import haxe.io.BytesOutput;
-  using prime.utils.msgpack.Format;
   using prime.utils.IfUtil;
 
 class ObjectId

@@ -7,7 +7,7 @@
   (:require [clojure.set :as s]
             [fast-zip.core :as zip])
   (:import  [prime.vo IDField ValueObject ValueObjectField VOValueObjectField ValueObjectManifest ValueObjectManifest_0 ValueObjectManifest_1 ValueObjectManifest_N ID]
-            [prime.types package$ValueType package$ValueTypes$Tarray package$ValueTypes$Tdef]))
+            [prime.types package$ValueType package$ValueTypes$Tarray package$ValueTypes$Tdef VORef]))
 
 (set! *warn-on-reflection* true)
 
@@ -160,6 +160,26 @@
   (and vo (instance? IDField (. vo voManifest))
     (. (._id ^IDField (. vo voManifest)) in vo)))
 
+(definline ^{:doc
+  "Gets the :id of a map, ValueObject or VORef.
+  If input is neither, just returns the input."}
+  id [input]
+  `(let [v# ~input] (if (instance? VORef v#) (._id ^VORef v#) (or (:id v#) v#))))
+
+(defn id=
+  "Compare the id of `a` and `b`.
+    Useful to check if:
+    - a VORef refers to a particular object
+    - two ValueObjects share the same :id"
+  ([x] true)
+  ([x y] (= (id x) (id y)))
+  ([x y & more]
+   (if (= (id x) (id y))
+    (if (next more)
+      (recur y (first more) (next more))
+      (id=   y (first more)))
+    false)))
+
 (defn vo+subtypes-manifests-seq "Builds a seq of all subtype manifests." [^ValueObjectManifest voManifest]
   (cons voManifest (mapcat vo+subtypes-manifests-seq (.subtypes voManifest))))
 
@@ -175,6 +195,6 @@
               seq                  ; children
               (fn [node children]  ; make-node
                 (if (instance? ValueObject node)
-                  (into (.empty ^ValueObject node) children)
+                  (into (.. ^ValueObject node voCompanion empty) children)
                   (vec children)))
               vo))

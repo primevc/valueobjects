@@ -10,7 +10,7 @@
             [clj-elasticsearch.client :as ces]
             [prime.vo.source :refer (def-valuesource)]
             [prime.vo.util.json :as json]) ; For loading the right VO encoders in Cheshire.
-  (:import [prime.types VORef EnumValue package$ValueType package$ValueTypes$Tdef
+  (:import [prime.types EnumValue package$ValueType package$ValueTypes$Tdef
             package$ValueTypes$Tarray package$ValueTypes$Tenum]
            [prime.vo IDField ValueObject ValueObjectManifest ValueObjectField ValueObjectCompanion ID]
            [com.fasterxml.jackson.core JsonGenerator]

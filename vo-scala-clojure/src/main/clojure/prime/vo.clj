@@ -156,7 +156,7 @@
     #_else
         (next full-path)))) ; No field found, return the rest of the path as is.
 
-(defn id-field [vo-or-manifest]
+(defn ^ValueObjectField id-field [vo-or-manifest]
   (let [m (manifest vo-or-manifest)]
     (if (instance? IDField m) (._id ^IDField m))))
 

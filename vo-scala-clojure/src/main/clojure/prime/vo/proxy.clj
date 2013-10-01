@@ -305,22 +305,3 @@
                         ~@(apply concat (for [option (apply hash-map (drop 1 option))]
                           `[~(first option) (do ~(concat (list fnc (second option)) param))])))
                     `(do ~(concat (list fnc (second option)) param))))))))))))
-
-
-(defmacro implement-by-forwarding
-  "More general approach then `default-vo-proxy`. This one does not
-  support conditional choice of forwarded implementation, though. This
-  version does use the meta-data already supplied by the protocol,
-  whereas `default-vo-proxy` keeps a separate map of meta-data."
-  [type protocol impl-instance]
-  (let [ns-str (str (:ns (meta (eval `(var ~protocol)))))
-        forwards (for [sig (:sigs (eval protocol))
-                       :let [{:keys [name arglists]} (val sig)
-                             qname (symbol ns-str (str name))]]
-                   `(~name ~@(for [arglist arglists
-                                   :let [arglist (vec (rest arglist))]
-                                   :when (not (empty? arglist))]
-                               `(~arglist (~qname ~impl-instance ~@arglist)))))]
-    `(extend-type ~type
-       ~protocol
-       ~@forwards)))

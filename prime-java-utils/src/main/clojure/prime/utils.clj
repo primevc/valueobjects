@@ -164,3 +164,30 @@
   "For's analog of mapcat. Equivalent to (apply concat (for [...] ...))."
   [seq-exprs body-expr]
   `(apply concat (for ~seq-exprs ~body-expr)))
+
+(defmacro implement-by-forwarding
+  "Forwards all methods in `protocol` to calls to `impl-instance`.
+  Drops the first `this` argument in the forwarded call:
+
+    user=> (defprotocol B (method [x y z]))
+    user=> (macroexpand-1 '(implement-by-forwarding A B implementation))
+    (clojure.core/extend-type A
+      B
+      (method ([y z] (user/method implementation y z))))
+
+  Useful for quicker VOProxy forwarding than `prime.vo.proxy/default-vo-proxy`.
+  You have no choice of forwarded implementation though. This
+  macro uses the meta-data already supplied by the protocol,
+  whereas `default-vo-proxy` keeps a separate map of meta-data."
+  [type protocol impl-instance]
+  (let [ns-str (str (:ns (meta (eval `(var ~protocol)))))
+        forwards (for [sig (:sigs (eval protocol))
+                       :let [{:keys [name arglists]} (val sig)
+                             qname (symbol ns-str (str name))]]
+                   `(~name ~@(for [arglist arglists
+                                   :let [arglist (vec (rest arglist))]
+                                   :when (not (empty? arglist))]
+                               `(~arglist (~qname ~impl-instance ~@arglist)))))]
+    `(extend-type ~type
+       ~protocol
+       ~@forwards)))

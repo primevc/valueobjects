@@ -160,8 +160,9 @@
   (let [m (manifest vo-or-manifest)]
     (if (instance? IDField m) (._id ^IDField m))))
 
-(defn has-id? [vo-or-manifest]
-  (let [field (id-field vo-or-manifest)]
+(defn has-id? [^ValueObject vo]
+  "Check if the ValueObject has an ID-field and this field has a value."
+  (let [field (id-field vo)]
     (and field (. field in vo))))
 
 (definline ^{:doc

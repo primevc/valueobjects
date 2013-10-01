@@ -33,11 +33,6 @@ object ClojureSupport {
     case null => null;
   }
 
-  final def findOrNull[T <: ValueObject](obj : T, key : Any) : ValueObjectField[T] =
-    if (key == id_keyword && obj.voManifest.isInstanceOf[IDField]) obj.voManifest.asInstanceOf[ValueObjectManifest[T] with IDField]._id
-    else obj.voManifest.asInstanceOf[ValueObjectManifest[T]].findOrNull(key);
-
-
   RT.load("prime/vo");
   val seqFieldFn = RT.`var`("prime.vo", "*voseq-key-fn*");
   var id_keyword = Keyword.intern("id");
@@ -54,6 +49,25 @@ trait ClojureMapSupport extends IPersistentMap
 
   import ClojureSupport.clojurify;
 
+  // --- WARNING ------------------------------------------------------------
+  // For some reason: self !== this, maybe due to overloading rules?
+  // --- WARNING ------------------------------------------------------------
+  //
+  // When using findOrNull() on `this`, assoc breaks and fields aren't found.
+  // But everything seems to work just fine when using `self`!!!
+  //
+  // Scala didn't even complain when findFieldOrNull was called with 2 args,
+  //  so something is tripping up the compiler in this trait?
+  //
+  // ------------------------------------------------------------------------
+
+  final def findFieldOrNull(key : Any) =
+    if (key == ClojureSupport.id_keyword && voManifest.isInstanceOf[IDField])
+      voManifest.asInstanceOf[ValueObjectManifest[VOType] with IDField]._id
+    else
+      voManifest.findOrNull(key);
+
+
   private[this] var _hash : Int = -1;
   override def hashCode = if(_hash != -1) _hash else {
     _hash = this.getClass.hashCode ^ clojure.lang.APersistentMap.mapHash(this);
@@ -64,7 +78,7 @@ trait ClojureMapSupport extends IPersistentMap
   // Associative
   // ---
   final def assoc       (key: Any, value: Any) : IPersistentMap = {
-    val f = ClojureSupport.findOrNull(this, key);
+    val f = findFieldOrNull(key);
     if (f != null)
       assoc(f, value)
     else {
@@ -82,9 +96,9 @@ trait ClojureMapSupport extends IPersistentMap
   }
 
   final def entryAt(key: Any) = try {
-    val f = ClojureSupport.findOrNull(this, key);
-    if (f != null && (f in this))
-      new MapEntry(f.keyword, clojurify(f, f(this)));
+    val f = findFieldOrNull(key);
+    if (f != null && (f in self))
+      new MapEntry(f.keyword, clojurify(f, f(self)));
     else
       null;
   }
@@ -205,17 +219,17 @@ trait ClojureMapSupport extends IPersistentMap
 
   // IPersistentMap interfaces
   // ILookup
-  final def valAt (key: Any) : AnyRef = ClojureSupport.findOrNull(this, key) match {
+  final def valAt (key: Any) : AnyRef = findFieldOrNull(key) match {
     case null => null;
-    case f    => ClojureSupport.valAt(f, this);
+    case f    => ClojureSupport.valAt(f, self);
   }
-  final def valAt (key: Any, notFound: AnyRef): AnyRef = ClojureSupport.findOrNull(this, key) match {
+  final def valAt (key: Any, notFound: AnyRef): AnyRef = findFieldOrNull(key) match {
     case null => null;
-    case f    => ClojureSupport.valAt(f, this, notFound);
+    case f    => ClojureSupport.valAt(f, self, notFound);
   }
 
   // IKeywordLookup
-  final def getLookupThunk(key: Keyword): ILookupThunk = ClojureSupport.findOrNull(this, key) match {
+  final def getLookupThunk(key: Keyword): ILookupThunk = findFieldOrNull(key) match {
     case null => throw new ValueObjectManifest.NoSuchFieldException(this, key.toString);
     case f    => f.asInstanceOf[ILookupThunk];
   }
@@ -234,13 +248,13 @@ trait ClojureMapSupport extends IPersistentMap
   // ---
   // IFn: VO as function from key to value
   // ---
-  override final def invoke  (key: AnyRef)                   : AnyRef = ClojureSupport.findOrNull(this, key) match {
+  override final def invoke  (key: AnyRef)                   : AnyRef = findFieldOrNull(key) match {
     case null => throw new ValueObjectManifest.NoSuchFieldException(this, key.toString);
-    case f    => ClojureSupport.valAt(f, this)
+    case f    => ClojureSupport.valAt(f, self)
   }
-  override final def invoke  (key: AnyRef, notFound: AnyRef) : AnyRef = ClojureSupport.findOrNull(this, key) match {
+  override final def invoke  (key: AnyRef, notFound: AnyRef) : AnyRef = findFieldOrNull(key) match {
     case null => throw new ValueObjectManifest.NoSuchFieldException(this, key.toString);
-    case f    => ClojureSupport.valAt(f, this, notFound)
+    case f    => ClojureSupport.valAt(f, self, notFound)
   }
 
   final def applyTo (arglist: ISeq) = RT.boundedLength(arglist, 20) match {

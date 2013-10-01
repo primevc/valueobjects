@@ -152,7 +152,7 @@
   ([^ValueObject vo] (vo-mapping vo {}))
 
   ([^ValueObject vo, option-map]
-   (let [id-field  (if (instance? IDField (. vo voManifest)) (._id ^IDField (. vo voManifest)))
+   (let [id-field  (vo/id-field vo)
          field-set (vo/field-filtered-seq vo (:only option-map) (:exclude option-map))]
     (let [unknown-options
           (set/difference

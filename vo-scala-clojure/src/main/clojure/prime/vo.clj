@@ -156,9 +156,13 @@
     #_else
         (next full-path)))) ; No field found, return the rest of the path as is.
 
-(defn has-id? [^ValueObject vo]
-  (and vo (instance? IDField (. vo voManifest))
-    (. (._id ^IDField (. vo voManifest)) in vo)))
+(defn id-field [vo-or-manifest]
+  (let [m (manifest vo-or-manifest)]
+    (if (instance? IDField m) (._id ^IDField m))))
+
+(defn has-id? [vo-or-manifest]
+  (let [field (id-field vo-or-manifest)]
+    (and field (. field in vo))))
 
 (definline ^{:doc
   "Gets the :id of a map, ValueObject or VORef.

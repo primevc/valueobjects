@@ -116,8 +116,8 @@
     (cons (.. vo voCompanion (apply vosource)) (cons path options))
   ))
 
-(defn idconv [vo]
-  ((second (simple-prime-type->cql-type (.. vo voManifest _id valueType keyword))) (:id vo)))
+(defn idconv [{:keys [id] :as vo}] {:pre [id]}
+  ((second (simple-prime-type->cql-type (.. vo voManifest _id valueType keyword))) id))
 
 (defn keyword-keys [m]
   (into (empty m) (for [[k v] m] [(keyword (.toLowerCase k)) v])))

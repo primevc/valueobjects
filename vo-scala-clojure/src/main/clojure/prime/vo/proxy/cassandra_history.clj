@@ -19,6 +19,9 @@
   (put-vo [this vo options]
     (ch/put cluster vo options))
 
+  (update [this vo]
+    (ch/update cluster vo (:id vo) {}))
+
   (update [this vo id]
     (ch/update cluster vo id {}))
 

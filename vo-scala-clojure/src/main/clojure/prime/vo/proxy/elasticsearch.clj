@@ -22,6 +22,9 @@
   (put-vo [this vo options]
     (es/put client index vo options))
 
+  (update [this vo]
+    (es/update client index vo (:id vo) {}))
+
   (update [this vo id]
     (es/update client index vo id {}))
 

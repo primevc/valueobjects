@@ -33,9 +33,14 @@ object ClojureSupport {
     case null => null;
   }
 
+  final def findOrNull[T <: ValueObject](obj : T, key : Any) : ValueObjectField[T] =
+    if (key == id_keyword && obj.voManifest.isInstanceOf[IDField]) obj.voManifest.asInstanceOf[ValueObjectManifest[T] with IDField]._id
+    else obj.voManifest.asInstanceOf[ValueObjectManifest[T]].findOrNull(key);
+
 
   RT.load("prime/vo");
   val seqFieldFn = RT.`var`("prime.vo", "*voseq-key-fn*");
+  var id_keyword = Keyword.intern("id");
 }
 
 trait ClojureMapSupport extends IPersistentMap
@@ -59,7 +64,7 @@ trait ClojureMapSupport extends IPersistentMap
   // Associative
   // ---
   final def assoc       (key: Any, value: Any) : IPersistentMap = {
-    val f = voManifest.findOrNull(key);
+    val f = ClojureSupport.findOrNull(this, key);
     if (f != null)
       assoc(f, value)
     else {
@@ -77,9 +82,9 @@ trait ClojureMapSupport extends IPersistentMap
   }
 
   final def entryAt(key: Any) = try {
-    val f = voManifest.findOrNull(key);
-    if (f != null && (f in self))
-      new MapEntry(f.keyword, clojurify(f, f(self)));
+    val f = ClojureSupport.findOrNull(this, key);
+    if (f != null && (f in this))
+      new MapEntry(f.keyword, clojurify(f, f(this)));
     else
       null;
   }
@@ -200,17 +205,17 @@ trait ClojureMapSupport extends IPersistentMap
 
   // IPersistentMap interfaces
   // ILookup
-  final def valAt (key: Any) : AnyRef = voManifest.findOrNull(key) match {
+  final def valAt (key: Any) : AnyRef = ClojureSupport.findOrNull(this, key) match {
     case null => null;
-    case f    => ClojureSupport.valAt(f, self);
+    case f    => ClojureSupport.valAt(f, this);
   }
-  final def valAt (key: Any, notFound: AnyRef): AnyRef = voManifest.findOrNull(key) match {
+  final def valAt (key: Any, notFound: AnyRef): AnyRef = ClojureSupport.findOrNull(this, key) match {
     case null => null;
-    case f    => ClojureSupport.valAt(f, self, notFound);
+    case f    => ClojureSupport.valAt(f, this, notFound);
   }
 
   // IKeywordLookup
-  final def getLookupThunk(key: Keyword): ILookupThunk = voManifest.findOrNull(key) match {
+  final def getLookupThunk(key: Keyword): ILookupThunk = ClojureSupport.findOrNull(this, key) match {
     case null => throw new ValueObjectManifest.NoSuchFieldException(this, key.toString);
     case f    => f.asInstanceOf[ILookupThunk];
   }
@@ -229,13 +234,13 @@ trait ClojureMapSupport extends IPersistentMap
   // ---
   // IFn: VO as function from key to value
   // ---
-  override final def invoke  (key: AnyRef)                   : AnyRef = voManifest.findOrNull(key) match {
+  override final def invoke  (key: AnyRef)                   : AnyRef = ClojureSupport.findOrNull(this, key) match {
     case null => throw new ValueObjectManifest.NoSuchFieldException(this, key.toString);
-    case f    => ClojureSupport.valAt(f, self)
+    case f    => ClojureSupport.valAt(f, this)
   }
-  override final def invoke  (key: AnyRef, notFound: AnyRef) : AnyRef = voManifest.findOrNull(key) match {
+  override final def invoke  (key: AnyRef, notFound: AnyRef) : AnyRef = ClojureSupport.findOrNull(this, key) match {
     case null => throw new ValueObjectManifest.NoSuchFieldException(this, key.toString);
-    case f    => ClojureSupport.valAt(f, self, notFound)
+    case f    => ClojureSupport.valAt(f, this, notFound)
   }
 
   final def applyTo (arglist: ISeq) = RT.boundedLength(arglist, 20) match {

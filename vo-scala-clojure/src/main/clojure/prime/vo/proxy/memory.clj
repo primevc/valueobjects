@@ -38,7 +38,11 @@
     (debug "Putting VO" vo)
     (swap! data assoc-in [(votype->hex vo) (:id vo)] vo))
 
+  (update [this vo]
+    (update this vo (:id vo) {}))
+
   (update [this vo id]
+    (assert (not (nil? id)) (print-str "id required, but nil id supplied for vo:" vo))
     (update this vo id {}))
 
   (update [this vo id options]

@@ -528,7 +528,7 @@
   (prn vo path path-vars value options)
   (let [
     [resolved-path varnum]  (resolve-path vo path)
-    script                  (apply str resolved-path "; if(path == null) { " (.substring resolved-path 11) " = newval; } else { path.add(newval)};")
+    script                  (apply str resolved-path "; if(path == null) { " (.substring resolved-path 11) " = [newval]; } else { path.add(newval)};")
     parameters              (into {} (cons [:newval value] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
     ]
     (prn script parameters)

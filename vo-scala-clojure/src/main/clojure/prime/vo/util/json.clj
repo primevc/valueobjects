@@ -10,7 +10,7 @@
   (:require [prime.vo :as vo]
             [cheshire.generate :refer (add-encoder)])
   (:import [prime.types VORef EnumValue package$ValueType package$ValueTypes$Tdef
-            package$ValueTypes$Tarray package$ValueTypes$Tenum]
+            package$ValueTypes$Tarray package$ValueTypes$Tenum FileRef]
            [prime.vo IDField ValueObject ValueObjectManifest ValueObjectField ValueObjectCompanion ID]
            [com.fasterxml.jackson.core JsonGenerator]))
 
@@ -96,6 +96,10 @@
   [^org.bson.types.ObjectId in ^JsonGenerator out]
   (.writeString out (.toString in)))
 
+(defn- encode-fileref
+  [^prime.types.FileRef in ^JsonGenerator out]
+  (.writeString out (.toString in)))
+
 
 ;;; Register encoders and advice cheshire.generate/generate.
 
@@ -105,6 +109,7 @@
 (add-encoder org.joda.time.ReadableInstant encode-instant)
 (add-encoder org.bson.types.ObjectId encode-objectId)
 (add-encoder javax.mail.internet.InternetAddress encode-internetAddress)
+(add-encoder prime.types.FileRef encode-fileref)
 
 (alter-var-root
  #'cheshire.generate/generate

@@ -138,7 +138,7 @@
 (defn get-latest-put [cluster vo]
   (let [result (alia/with-session cluster
         (alia/execute
-          (alia/prepare (apply str "SELECT version,action FROM " (get-table-name vo) " WHERE id = ? ORDER BY version DESC;")) :values [(idconv vo)]))]
+          (alia/prepare (str "SELECT version,action FROM " (get-table-name vo) " WHERE id = ? ORDER BY version DESC;")) :values [(idconv vo)]))]
       ; Find first version where action == (:put actions)
       (first (filter #(= (:action %) (:put actions)) result))))
 
@@ -202,7 +202,7 @@
     result
         (alia/with-session cluster
         (alia/execute
-          (alia/prepare (apply str "SELECT * FROM " (get-table-name vo) " WHERE id = ? and version >= ?;")) :values [(idconv vo) last-put]))]
+          (alia/prepare (str "SELECT * FROM " (get-table-name vo) " WHERE id = ? " (when last-put "and version >= ?;"))) :values [(idconv vo) last-put]))]
       (build-vo result vo)))
 
 (defn get-slice [cluster vo options]
@@ -210,7 +210,7 @@
   (let [
         result (alia/with-session cluster
                 (alia/execute
-                  (alia/prepare (apply str "SELECT * FROM " (get-table-name vo) " WHERE id = ?")) :values [(idconv vo)]))
+                  (alia/prepare (str "SELECT * FROM " (get-table-name vo) " WHERE id = ?")) :values [(idconv vo)]))
         slices (or (:slices options) 1)]
     ;TODO: Create a custom ValueSource for history data, keeping the UUID and action around.
     (take slices (byte-array->VOChange (:data (last result)) vo))))
@@ -218,7 +218,7 @@
 (defn- insert [cluster vo id action data]
   (alia/with-session cluster
       (alia/execute (alia/prepare
-        (apply str "INSERT INTO " (get-table-name vo) " (version, id, action, data) VALUES ( ? , ? , ? , ? )"))
+        (str "INSERT INTO " (get-table-name vo) " (version, id, action, data) VALUES ( ? , ? , ? , ? )"))
         :values [(org.apache.cassandra.utils.UUIDGen/getTimeUUID) id (actions action) (java.nio.ByteBuffer/wrap data)])))
 
 (defn put [cluster vo options]

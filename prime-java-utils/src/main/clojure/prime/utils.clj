@@ -2,7 +2,10 @@
 ;; License, v. 2.0. If a copy of the MPL was not distributed with this
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-(ns prime.utils)
+(ns prime.utils
+  (:import [java.io PipedInputStream PipedOutputStream]
+           [org.apache.commons.io.input TeeInputStream]))
+
 
 (defmacro or-not
   "Evaluates exprs one at a time, from left to right. If a form
@@ -17,6 +20,7 @@
   ([pred x & next]
       `(let [or# ~x]
          (if-not (~pred or#) or# (or-not ~pred ~@next)))))
+
 
 (defmacro mapify
   "Given some symbols, construct a map with the symbols as keys, and the value
@@ -165,6 +169,7 @@
   [seq-exprs body-expr]
   `(apply concat (for ~seq-exprs ~body-expr)))
 
+
 (defmacro implement-by-forwarding
   "Forwards all methods in `protocol` to calls to `impl-instance`.
   Drops the first `this` argument in the forwarded call:
@@ -191,3 +196,18 @@
     `(extend-type ~type
        ~protocol
        ~@forwards)))
+
+
+(defn eavesdrop-inputstream
+  "Given an InputStream, this function returns a pair of InputStreams.
+  The first one reads directly from the given InputStream, whereas the
+  second will have those read bytes as its data. Be sure to read the
+  returned InputStreams in separate threads, to avoid deadlocks.
+  Optionally, a buffer size can be specified, otherwise the default of
+  PipedInputStream is used. Note that when this buffer is full,
+  reading from the first stream blocks. Thus, make sure the second
+  stream is being read as well."
+  [in & [buffer-size]]
+  (let [pis (if buffer-size (PipedInputStream. buffer-size) (PipedInputStream.))
+        pos (PipedOutputStream. pis)]
+    [(TeeInputStream. in pos true) pis]))

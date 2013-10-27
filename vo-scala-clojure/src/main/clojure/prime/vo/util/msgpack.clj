@@ -10,8 +10,7 @@
   (:import 
     [prime.utils.msgpack.VOPacker]
     [prime.utils.msgpack.VOUnpacker]
-    [java.io.FileOutputStream]
-    [java.io.FileInputStream]
+    [java.io File FileOutputStream FileInputStream]
     [prime.vo ValueObject]
     [org.msgpack.Unpacker]
     )
@@ -38,18 +37,23 @@
   (let [process (.exec (Runtime/getRuntime) (apply str command))]
     process))
 
-(defn pack 
-  "Create package. Write it to a temp file. Rename temp file."
-  [vo directory]
-  (let [temp-fn    (create-tmp-filename directory vo)
-        sevenzip   (execute "7za a "temp-fn" -tgzip -mx=9 -si")
+(defn pack-to-tmp-gzip
+  "Create a package to temporary gzip file. Returns the created java.io.File."
+  [vo ^File file-or-directory]
+  (let [temp-file  (if-not (.isDirectory file-or-directory) file-or-directory
+                    #_else (create-tmp-filename directory vo))
+        sevenzip   (execute "7za a "temp-file" -tgzip -mx=9 -si")
         zip-stream (.getOutputStream sevenzip)
         msgpack    (prime.utils.msgpack.VOPacker. zip-stream)]
-    (dosync
-      (.pack msgpack vo)
-      (.close zip-stream)
-      (.waitFor sevenzip)
-      (rename-file temp-fn (create-filename directory vo)))))
+    (.pack msgpack vo)
+    (.close zip-stream)
+    (.waitFor sevenzip)
+    (io/as-file temp-file)))
+
+(defn pack
+  "Create package. Write it to a temp file. Rename temp file."
+  [vo directory]
+  (rename-file (pack-to-tmp-gzip vo directory) (create-filename directory vo)))
 
 (defn unpack [vo directory]
   (if-not (.exists (java.io.File. (create-filename directory vo)))

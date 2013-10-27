@@ -41,7 +41,7 @@
   "Create a package to temporary gzip file. Returns the created java.io.File."
   [vo ^File file-or-directory]
   (let [temp-file  (if-not (.isDirectory file-or-directory) file-or-directory
-                    #_else (create-tmp-filename directory vo))
+                    #_else (create-tmp-filename file-or-directory vo))
         sevenzip   (execute "7za a "temp-file" -tgzip -mx=9 -si")
         zip-stream (.getOutputStream sevenzip)
         msgpack    (prime.utils.msgpack.VOPacker. zip-stream)]

@@ -231,6 +231,14 @@ class NFSRepository(nfsMountsRoot: File, repositoryName: String)
     "The local repository directory, which should be located at '" +
     myRoot.getAbsolutePath + "', could not be created.")
 
+  // Remove temporary files older than a day.
+  val filter = new FileFilter {
+    def accept(f: File) = f.isFile &&
+                          f.getName.endsWith(".tmp") &&
+                          f.lastModified < System.currentTimeMillis - 1000 * 60 * 60 * 24
+  }
+  myRoot.listFiles(filter).foreach( f => f.delete() )
+
   val myPrefix = "nfs://" + myLocalHostname + "/" + repositoryName + "/"
 
 

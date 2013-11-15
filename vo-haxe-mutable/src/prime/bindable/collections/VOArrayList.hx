@@ -51,7 +51,7 @@ class VOArrayList<DataType : prime.core.traits.IValueObject> extends ArrayList<D
 
 	public function new ( wrapAroundList:FastArray<Dynamic> = null )
 	{
-		super(if (wrapAroundList == null) null else #if flash10 flash.Vector.convert #end(wrapAroundList));
+		super(if (wrapAroundList == null) null else #if x_flash10 flash.Vector.convert #else cast #end(wrapAroundList));
 		itemChange = new Signal1();
 	}
 	

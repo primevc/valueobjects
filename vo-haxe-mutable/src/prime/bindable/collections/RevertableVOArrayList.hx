@@ -51,14 +51,14 @@ private typedef BindFlags = prime.bindable.RevertableBindableFlags;
  * @author Danny Wilson
  * @creation-date Dec 20, 2010
  */
-class RevertableVOArrayList<DataType:prime.core.traits.IValueObject> extends ReadOnlyArrayList<DataType> implements IRevertableList<DataType>
+class RevertableVOArrayList<DataType> extends ReadOnlyArrayList<DataType> implements IRevertableList<DataType>
 {
 	private var changeHandlerFn : ObjectChangeSet -> Void;
 	public  var itemChange : Signal1<ObjectChangeSet>;
 	
 	public function new( wrapAroundList:FastArray<Dynamic> = null )
 	{
-		super(if (wrapAroundList == null) null else #if flash10 flash.Vector.convert #end(wrapAroundList));
+		super(if (wrapAroundList == null) null else #if x_flash10 flash.Vector.convert #else cast #end(wrapAroundList));
 		itemChange = new Signal1();
 		flags = ListFlags.REMEMBER_CHANGES;
 	}
@@ -97,7 +97,7 @@ class RevertableVOArrayList<DataType:prime.core.traits.IValueObject> extends Rea
 	public var changes (default,null) : FastArray<ListChange<DataType>>;
 
 #if debug
-	@:keep public inline function readFlags ()
+	@:keep public #if !noinline inline #end function readFlags ()
 		return BindFlags.readProperties(flags);
 #end
 	
@@ -106,21 +106,21 @@ class RevertableVOArrayList<DataType:prime.core.traits.IValueObject> extends Rea
 	
 	
 	
-	@:keep public inline function rememberChanges (enabled:Bool = true)				flags = enabled ? flags.set(ListFlags.REMEMBER_CHANGES) : flags.unset(ListFlags.REMEMBER_CHANGES);
-	@:keep public inline function dispatchChangesBeforeCommit (enabled:Bool = true)	flags = enabled ? flags.set(BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT) : flags.unset(BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT);
+	@:keep public #if !noinline inline #end function rememberChanges (enabled:Bool = true)				flags = enabled ? flags.set(ListFlags.REMEMBER_CHANGES) : flags.unset(ListFlags.REMEMBER_CHANGES);
+	@:keep public #if !noinline inline #end function dispatchChangesBeforeCommit (enabled:Bool = true)	flags = enabled ? flags.set(BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT) : flags.unset(BindFlags.DISPATCH_CHANGES_BEFORE_COMMIT);
 	
 	
 	//
 	// EDITABLE VALUE-OBJECT METHODS
 	//
 	
-	@:keep public inline function isEmpty()
+	@:keep public #if !noinline inline #end function isEmpty()
 	{
 		return this.length == 0;
 	}
 	
 	
-	@:keep public inline function beginEdit ()
+	@:keep public #if !noinline inline #end function beginEdit ()
 	{
 		if (flags.hasNone( BindFlags.IN_EDITMODE ))
 		{
@@ -162,7 +162,7 @@ class RevertableVOArrayList<DataType:prime.core.traits.IValueObject> extends Rea
 	}
 	
 	
-	@:keep private inline function stopEdit ()
+	@:keep private #if !noinline inline #end function stopEdit ()
 	{
 		if (changes != null) {
 			changes.removeAll();
@@ -172,7 +172,7 @@ class RevertableVOArrayList<DataType:prime.core.traits.IValueObject> extends Rea
 	}
 
 
-	@:keep public inline function isEditable ()
+	@:keep public #if !noinline inline #end function isEditable ()
 	{
 		return flags.has( BindFlags.IN_EDITMODE );
 	}
@@ -184,7 +184,7 @@ class RevertableVOArrayList<DataType:prime.core.traits.IValueObject> extends Rea
 	//
 	
 	
-	@:keep private inline function addChange (listChange:ListChange<DataType>)
+	@:keep private #if !noinline inline #end function addChange (listChange:ListChange<DataType>)
 	{
 		if (flags.has( ListFlags.REMEMBER_CHANGES ))
 			changes.push( listChange );

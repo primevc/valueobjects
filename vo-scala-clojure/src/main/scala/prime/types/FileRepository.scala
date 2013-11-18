@@ -31,7 +31,7 @@ with FileRefStream {
 }
 
 class FileRefInputStream(val wrap: InputStream, val prefix: String,
-                         val sha: MessageDigest = MessageDigest.getInstance("SHA-256"))
+                         val sha: MessageDigest)
 extends DigestInputStream(wrap, sha)
 with FileRefStream {
   def this(wrap: InputStream, prefix: String) =

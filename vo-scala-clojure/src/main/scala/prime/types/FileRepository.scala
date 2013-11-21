@@ -1,23 +1,45 @@
 package prime.types
 
-import org.bouncycastle.crypto.digests.SHA256Digest
-import org.bouncycastle.crypto.io.DigestOutputStream
-import org.bouncycastle.crypto.Digest
 import org.apache.commons.codec.digest.DigestUtils
 import org.apache.commons.io.{FileUtils, IOUtils}
+
 import java.io._
+import java.nio.file.{Files, StandardCopyOption}
+import java.security.{DigestOutputStream, DigestInputStream, MessageDigest}
+
+
+/* Helper classes. */
+
+trait FileRefStream {
+  val sha: MessageDigest
+  val prefix: String
+  val wrap: Closeable
+
+  def ref(): FileRef = {
+    val innerRef = new FileRef(prefix, sha.digest)
+    wrap.close()
+    innerRef
+  }
+}
+
+class FileRefOutputStream(val wrap: OutputStream, val prefix: String,
+                          val sha: MessageDigest)
+extends DigestOutputStream(wrap, sha)
+with FileRefStream {
+  def this(wrap: OutputStream, prefix: String) =
+    this(wrap, prefix, MessageDigest.getInstance("SHA-256"))
+}
+
+class FileRefInputStream(val wrap: InputStream, val prefix: String,
+                         val sha: MessageDigest)
+extends DigestInputStream(wrap, sha)
+with FileRefStream {
+  def this(wrap: InputStream, prefix: String) =
+    this(wrap, prefix, MessageDigest.getInstance("SHA-256"))
+}
 
 
 /* Public traits. */
-
-trait FileRefOutputStream extends OutputStream {
-
-  /** Closes the OutputStream and returns the FileRef constructed. Use this
-    * function _after_ the data has been written.
-    * @return A FileRef to the written file in the repository.
-    */
-  def ref: FileRef
-}
 
 /** The public functions of any FileRepository. File repositories that want
   * to have garbage collection, should implement GarbageCollectableFR below.
@@ -39,17 +61,12 @@ trait FileRepository {
     * use `exists`!
     * @param ref The FileRef to check.
     */
-  def existsImpl(ref: FileRef): Boolean
+  protected def existsImpl(ref: FileRef): Boolean
 
   /** Create an URI for the specified URI.
     * @param fileRef The FileRef to get the URI from.
     */
   def toURI(ref: FileRef): URI
-
-  /** Opens an [[prime.types.FileRefOutputStream]] to write a new file to, which
-    * can return the [[prime.types.FileRef]] reference to it.
-    */
-  def create(): FileRefOutputStream
 
   /** Absorb the specified File into the repository. The specified File is
     * deleted after it is absorbed. A FileRef to the new location of File in
@@ -74,13 +91,11 @@ trait FileRepository {
 
   /** Store a file using a function that receives an OutputStream to the new
     * file in the repository. The FileRef to the newly written file is returned.
+    * Tests have shown that using the given OutputStream can be slow, so using
+    * the absorb function is preferred.
     * @param writer The function that writes the data to the OutputStream.
     */
-  def store[T](writer: FileRefOutputStream => T): FileRef = {
-    val out = create
-    writer(out)
-    out.ref
-  }
+  def store[T](writer: OutputStream => T): FileRef
 }
 
 /** This trait must be implemented by file repositories that want to support
@@ -97,28 +112,13 @@ trait GarbageCollectableFR extends FileRepository {
 }
 
 
-/* Helper classes. */
+/* Helper classes for local file handling. */
 
-class DigestFileRefOutputStream private(wrap: DigestOutputStream, prefix: String, sha256: SHA256Digest)
-    extends FilterOutputStream(wrap)
-    with FileRefOutputStream {
-
-  def this(wrap: OutputStream, prefix: String, sha256: SHA256Digest) =
-    this(new DigestOutputStream(wrap, sha256), prefix, sha256)
-
-  def this(wrap: OutputStream, prefix: String) =
-    this(wrap, prefix, new SHA256Digest)
-
-  def ref = {
-    val innerRef = new FileRef(prefix, new Array[Byte](32))
-    sha256.doFinal(innerRef.hash, 0)
-    wrap.close()
-    innerRef
-  }
+object LocalFileRef {
+  def apply(file: File, prefix : String): FileRef =
+    new FileRef(prefix, DigestUtils.sha256(new FileInputStream(file)), file.getName);
 }
 
-
-/* Helper classes for local file handling. */
 
 trait LocalFileRepository extends FileRepository {
 
@@ -131,36 +131,58 @@ trait LocalFileRepository extends FileRepository {
   def getFile(instance: FileRef): File
   def apply(instance: FileRef) = getFile(instance)
 
+  val root: File
+  val prefix: String
+
+  // Default implementations.
+
+  def toURI(f: FileRef) = Conversion.URI(f.toString)
   def stream(instance: FileRef) = new FileInputStream(getFile(instance))
   def existsImpl(instance: FileRef) = getFile(instance).exists
 
+  def absorb (file : File) = {
+    val ref = LocalFileRef(file, prefix)
+    val newFile = getFile(ref)
+    if (newFile.exists) {
+      org.apache.commons.io.FileUtils.touch(newFile)
+      file.delete
+    }
+    else file renameTo newFile
+    assert(newFile.exists, "Absorbing "+ file.getAbsolutePath +" failed. Target: " + newFile.getAbsolutePath);
+    ref
+  }
+
   def absorb(is: InputStream) = {
-    val fileRefOS = this.create
-    IOUtils.copy(is, fileRefOS)
-    is.close
-    fileRefOS.ref
+    val tmp = File.createTempFile("local-", ".tmp", root)
+    val path = tmp.toPath()
+    val fris = new FileRefInputStream(is, prefix)
+    Files.copy(fris, path, StandardCopyOption.REPLACE_EXISTING)
+    val ref = fris.ref
+    val newFile = getFile(ref)
+    if (newFile.exists) {
+      org.apache.commons.io.FileUtils.touch(newFile)
+      tmp.delete
+    }
+    else tmp renameTo newFile
+    assert(newFile.exists, "Absorbing "+ tmp.getAbsolutePath +" failed. Target: " + newFile.getAbsolutePath);
+    ref
   }
-}
 
-object LocalFileRef {
-  def apply(file: File): FileRef = apply(file, null);
-  def apply(file: File, prefix : String): FileRef =
-    new FileRef(prefix, DigestUtils.sha256(new FileInputStream(file)), file.getName);
-}
-
-class LocalDigestFileRefOutputStream private(repo: LocalFileRepository, prefix: String,
-                                             tmpFile: File, wrap: OutputStream)
-    extends DigestFileRefOutputStream(wrap, prefix) {
-
-  def this(repo: LocalFileRepository, prefix: String, tmpFile: File) =
-    this(repo, prefix, tmpFile, new FileOutputStream(tmpFile))
-
-  override def ref = {
-    val innerRef = super.ref
-    if (! repo.exists(innerRef))
-      FileUtils.moveFile(tmpFile, repo.getFile(innerRef))
-    innerRef
+  def store[T](writer: OutputStream => T) = {
+    val tmp = File.createTempFile("local-", ".tmp", root)
+    val fros = new FileRefOutputStream(new FileOutputStream(tmp), prefix)
+    writer(fros)
+    val ref = fros.ref
+    val newFile = getFile(ref)
+    if (newFile.exists) {
+      org.apache.commons.io.FileUtils.touch(newFile)
+      tmp.delete
+    }
+    else tmp renameTo newFile
+    assert(newFile.exists, "Absorbing "+ tmp.getAbsolutePath +" failed. Target: " + newFile.getAbsolutePath);
+    ref
   }
+
 }
 
 
@@ -172,26 +194,19 @@ class LocalDigestFileRefOutputStream private(repo: LocalFileRepository, prefix: 
   *
   * @param root The directory where to store and read the files.
   */
-class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
+class BasicLocalFileRepository(val root: File) extends LocalFileRepository {
+
+  // Initialisation.
+
   root.mkdir();
   require(root.isDirectory, root + " is not a directory.")
 
-  def toURI(f: FileRef) = Conversion.URI(f.toString)
-  def getFile(f: FileRef) = new File(root.getAbsolutePath + "/" + f.toString)
-  def create = new LocalDigestFileRefOutputStream(this, null,
-    File.createTempFile("basiclocal-", ".tmp", root))
 
-  def absorb (file : File) = {
-    val ref = LocalFileRef(file)
-    val newFile = getFile(ref)
-    if (newFile.exists) {
-      org.apache.commons.io.FileUtils.touch(newFile)
-      file.delete
-    }
-    else file renameTo newFile
-    assert(newFile.exists, "Absorbing "+ file.getAbsolutePath +" failed. Target: " + newFile.getAbsolutePath);
-    ref
-  }
+  // Overriding definitions.
+
+  val prefix = null;
+
+  def getFile(f: FileRef) = new File(root.getAbsolutePath + "/" + f.toString)
 }
 
 
@@ -210,9 +225,11 @@ class BasicLocalFileRepository(val root:File) extends LocalFileRepository {
   * @param repositoryName The name of this repository.
   */
 class NFSRepository(nfsMountsRoot: File, repositoryName: String)
-    extends LocalFileRepository {
+extends LocalFileRepository {
 
   import java.net.InetAddress
+
+  // Initialisation.
 
   require(nfsMountsRoot.exists && nfsMountsRoot.isDirectory,
     "The root directory of all NFS mounts must exist and point to a directory.")
@@ -224,27 +241,27 @@ class NFSRepository(nfsMountsRoot: File, repositoryName: String)
     "The NFS \"mount\" for this host, which should be located at '" +
     myNFSMount.getAbsolutePath + "', does not exist or is not a directory.")
 
-  val myRoot = new File(myNFSMount, repositoryName)
-  myRoot.mkdir
+  val root = new File(myNFSMount, repositoryName)
+  root.mkdir
 
-  require(myRoot.exists && myRoot.isDirectory,
+  require(root.exists && root.isDirectory,
     "The local repository directory, which should be located at '" +
-    myRoot.getAbsolutePath + "', could not be created.")
+    root.getAbsolutePath + "', could not be created.")
+
 
   // Remove temporary files older than a day.
+
   val filter = new FileFilter {
     def accept(f: File) = f.isFile &&
                           f.getName.endsWith(".tmp") &&
                           f.lastModified < System.currentTimeMillis - 1000 * 60 * 60 * 24
   }
-  myRoot.listFiles(filter).foreach( f => f.delete() )
-
-  val myPrefix = "nfs://" + myLocalHostname + "/" + repositoryName + "/"
+  root.listFiles(filter).foreach( f => f.delete() )
 
 
-  def toURI(fileRef: FileRef) = Conversion.URI(fileRef.toString)
-  def create = new LocalDigestFileRefOutputStream(this, myPrefix,
-    File.createTempFile("nfs-", ".tmp", myRoot))
+  // Overriding definitions.
+
+  val prefix = "nfs://" + myLocalHostname + "/" + repositoryName + "/"
 
   def getFile (fileRef: FileRef) = {
     val fileRefURI = toURI(fileRef)
@@ -252,19 +269,5 @@ class NFSRepository(nfsMountsRoot: File, repositoryName: String)
     val filePath = nfsMountsRoot.getAbsolutePath + "/" + fileRefURI.getHost +
                    "/" + fileRefURI.getPath
     new File(filePath)
-  }
-
-  def absorb (file : File) = {
-    val ref = LocalFileRef(file, myPrefix)
-    val refFile = getFile(ref)
-    if (refFile.exists) {
-      org.apache.commons.io.FileUtils.touch(refFile) // update the access time.
-      file.delete
-    } else {
-      file.renameTo(refFile)
-    }
-    require(refFile.exists, "Absorbing "+ file.getAbsolutePath +" failed. Target: " +
-                            refFile.getAbsolutePath);
-    ref
   }
 }

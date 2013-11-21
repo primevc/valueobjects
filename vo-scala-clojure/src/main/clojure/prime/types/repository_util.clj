@@ -15,7 +15,7 @@
 
 
 (defn local-FileRef [file-or-path]
-  (prime.types.LocalFileRef/apply (as-file file-or-path)))
+  (prime.types.LocalFileRef/apply (as-file file-or-path) nil))
 
 
 (defn local-File [^prime.types.FileRef fileref ^prime.types.LocalFileRepository repository]

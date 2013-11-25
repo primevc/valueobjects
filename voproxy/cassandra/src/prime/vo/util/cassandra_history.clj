@@ -6,10 +6,10 @@
   (:refer-clojure :exclude [get])
   (require prime.vo
     [qbits.alia                   :as alia]
-    [prime.vo.util.elasticsearch  :as es]
+    [prime.vo.util.elasticsearch  :as es] ;; TODO: Is this for loading JSON? If so, fix this.
     [prime.vo.pathops             :as pathops]
     )
-  (:import 
+  (:import
     [prime.utils.msgpack VOPacker VOUnpacker]
     [java.io ByteArrayOutputStream ByteArrayInputStream]
     [prime.vo ValueObject ValueObjectField]
@@ -87,7 +87,7 @@
 
 (defn VOChange->byte-array
   ([^ValueObject vo] (VOChange->byte-array vo nil))
-    
+
   ([^ValueObject vo path & options]
       (let [out (java.io.ByteArrayOutputStream.)
             msgpack (doto (prime.utils.msgpack.VOPacker. out)
@@ -104,7 +104,7 @@
 
 (defn byte-array->VOChange [bytes vo]
   ; (apply prn (map #(Integer/toHexString (.get bytes %)) (range (.position bytes) (.capacity bytes))))
-  (let [ 
+  (let [
     bytes (.slice bytes)
     ;pp (apply prn (map #(Integer/toHexString (.get bytes %)) (range (.position bytes) (.capacity bytes))))
     unpacker  (doto (org.msgpack.Unpacker. (org.apache.cassandra.utils.ByteBufferUtil/inputStream bytes))
@@ -112,7 +112,7 @@
     [vosource integer-path & options] (iterator-seq (.. unpacker iterator))
     path (map (fn [^MessagePackObject item] (if (.isNil item) nil #_else (.asInt item))) (if integer-path (.asArray integer-path)))
     ]
-    
+
     (cons (.. vo voCompanion (apply vosource)) (cons path options))
   ))
 
@@ -149,43 +149,43 @@
         (cond
           (= (:action row) (:put actions))
             (first (byte-array->VOChange (:data row) vo))
-          
+
           (= (:action row) (:update actions))
             (conj c (first (byte-array->VOChange (:data row) vo)))
-          
+
           (= (:action row) (:delete actions))
             (empty c)
-          
+
           (= (:action row) (:append-to actions))
             (let [  [vo path path-vars value options] (byte-array->VOChange (:data row) vo)
                     path (pathops/fill-path path path-vars)]
               (pathops/append-to-vo vo path value))
-          
+
           (= (:action row) (:move-to actions))
             (let [  [vo path path-vars to options] (byte-array->VOChange (:data row) vo)
                     path (pathops/fill-path path path-vars)]
               (pathops/move-vo-to vo path to))
-          
+
           (= (:action row) (:remove-from actions))
             (let [  [vo path path-vars options] (byte-array->VOChange (:data row) vo)
                     path (pathops/fill-path path path-vars)]
               (pathops/remove-from vo path))
-          
+
           (= (:action row) (:insert-at actions))
             (let [  [vo path path-vars value options] (byte-array->VOChange (:data row) vo)
                     path (pathops/fill-path path path-vars)]
               (pathops/insert-at vo path value))
-          
+
           (= (:action row) (:replace-at actions))
             (let [  [vo path path-vars value options] (byte-array->VOChange (:data row) vo)
                     path (pathops/fill-path path path-vars)]
               (pathops/replace-at vo path value))
-          
+
           (= (:action row) (:merge-at actions))
             (let [  [vo path path-vars value options] (byte-array->VOChange (:data row) vo)
                     path (pathops/fill-path path path-vars)]
               (pathops/merge-at vo path value))
-          
+
           :else
             c
           )

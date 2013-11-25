@@ -128,17 +128,6 @@
 (def ^:pure FileRef prime.types.FileRef$/MODULE$)
 (def ^:pure RGBA    to-RGBA)
 
-(def-existing-protocol FileRepository
-  (^FileRefOutputStream create [this])
-  (^Boolean             exists [this ^FileRef ref  ])
-  (^URI                 toURI  [this ^FileRef ref  ])
-  (^InputStream         stream [this ^FileRef ref  ])
-  (^FileRef             store  [this writer]))
-
-(defn absorb [^prime.types.FileRepository repo, file-or-stream]
-  (condp instance? file-or-stream
-    File           (. repo absorb ^File        file-or-stream)
-    InputStream    (. repo absorb ^InputStream file-or-stream)))
 
 (comment
 ;

@@ -1,0 +1,13 @@
+;; This Source Code Form is subject to the terms of the Mozilla Public
+;; License, v. 2.0. If a copy of the MPL was not distributed with this
+;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+(defproject prime/voproxy-core "0.1.0-SNAPSHOT"
+  :description "VOProxy core library."
+  :url "https://github.com/primevc/valueobjects"
+  :dependencies [[org.clojure/clojure "1.5.1"]
+                 [prime/shared_2.9.2 "0.1-SNAPSHOT"]
+                 [cheshire "5.2.0"]
+                 [fast-zip "0.3.0"]
+                 [com.taoensso/timbre "2.6.2"]]
+  :profiles {:test {:dependencies [[midje "1.5.1"]]}})

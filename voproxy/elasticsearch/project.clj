@@ -9,4 +9,17 @@
                  [prime/voproxy-core "0.1.0-SNAPSHOT"]
                  [org.elasticsearch/elasticsearch "0.90.5"]
                  [org.clojars.touch/clj-elasticsearch "0.4.1"]
-                 [cheshire "5.2.0"]])
+                 [cheshire "5.2.0"]]
+  :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"
+                 {:extensions "true"
+                  :executions ([:execution
+                                [:id "clojure-compile"]
+                                [:phase "compile"]
+                                [:configuration
+                                 [:temporaryOutputDirectory "true"]
+                                 [:sourceDirectories [:sourceDirectory "src"]]]
+                                [:goals [:goal "compile"]]]
+                               [:execution
+                                [:id "clojure-test"]
+                                [:phase "test"]
+                                [:goals [:goal "test"]]])}]])

@@ -4,18 +4,16 @@
 
 (ns prime.vo.util.cassandra-history
   (:refer-clojure :exclude [get])
-  (require prime.vo
-    [qbits.alia                   :as alia]
-    [prime.vo.util.elasticsearch  :as es] ;; TODO: Is this for loading JSON? If so, fix this.
-    [prime.vo.pathops             :as pathops]
-    )
-  (:import
-    [prime.utils.msgpack VOPacker VOUnpacker]
-    [java.io ByteArrayOutputStream ByteArrayInputStream]
-    [prime.vo ValueObject ValueObjectField]
-    [org.msgpack Unpacker MessagePackObject]
-    )
-)
+  (require [prime.vo]
+           [qbits.alia :as alia]
+           [prime.vo.pathops :as pathops]
+           [prime.types]
+           [prime.vo.util.json])
+  (:import [prime.utils.msgpack VOPacker VOUnpacker]
+           [java.io ByteArrayOutputStream ByteArrayInputStream]
+           [prime.vo ValueObject ValueObjectField]
+           [org.msgpack Unpacker MessagePackObject]))
+
 
 (defn get-table-name [vo]
   (str "t" (Integer/toHexString (.ID (prime.vo/manifest vo)))))

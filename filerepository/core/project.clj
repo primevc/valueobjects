@@ -9,13 +9,11 @@
                  [org.scala-lang/scala-library "2.9.2"]
                  [prime/vo "0.1.0-SNAPSHOT"]]
   :profiles {:test {:dependencies [[org.specs2/specs2_2.9.2 "1.11"]]}}
-  :source-paths ["src/clojure"]
-  :test-paths ["test/clojure"]
+  :source-paths ["src/main/clojure"]
+  :test-paths ["src/test/clojure"]
   :pom-plugins [[net.alchim31.maven/scala-maven-plugin "3.1.6"
                  {:executions [:execution [:goals [:goal "compile"] [:goal "testCompile"]]]
                   :configuration ([:scalaVersion "2.9.2"]
-                                  [:sourceDir "src/scala"]
-                                  [:testSourceDir "test/scala"]
                                   [:recompileMode "modified-only"]
                                   [:args [:arg "-Xelide-below"] [:arg "FINEST"]
                                          [:arg "-deprecation"] [:arg "-unchecked"]
@@ -24,8 +22,8 @@
 
                 [com.theoryinpractise/clojure-maven-plugin "1.3.15"
                  {:extensions "true"
-                  :configuration ([:sourceDirectories [:sourceDirectory "src/clojure"]]
-                                  [:testSourceDirectories [:testSourceDirectory "test/clojure"]]
+                  :configuration ([:sourceDirectories [:sourceDirectory "src/main/clojure"]]
+                                  [:testSourceDirectories [:testSourceDirectory "src/test/clojure"]]
                                   [:temporaryOutputDirectory "true"])
                   :executions [:execution [:phase "compile"] [:goals [:goal "compile"]]]}]
 

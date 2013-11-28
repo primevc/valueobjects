@@ -6,7 +6,7 @@
   :description "A Kryo serializer for ValueObjects."
   :url "https://github.com/primevc/valueobjects"
   :dependencies [[org.scala-lang/scala-library "2.9.2"]
-                 [prime/shared_2.9.2 "0.1-SNAPSHOT"]
+                 [prime/vo "0.1.0-SNAPSHOT"]
                  [com.esotericsoftware.kryo/kryo "2.20"]]
   :profiles {:test {:dependencies [[org.specs2/specs2_2.9.2 "1.11"]]}}
   :pom-plugins [[net.alchim31.maven/scala-maven-plugin "3.1.6"

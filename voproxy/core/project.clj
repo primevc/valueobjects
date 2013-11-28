@@ -6,7 +6,7 @@
   :description "VOProxy core library."
   :url "https://github.com/primevc/valueobjects"
   :dependencies [[org.clojure/clojure "1.5.1"]
-                 [prime/shared_2.9.2 "0.1-SNAPSHOT"]
+                 [prime/vo "0.1.0-SNAPSHOT"]
                  [cheshire "5.2.0"]
                  [fast-zip "0.3.0"]
                  [com.taoensso/timbre "2.6.2"]]

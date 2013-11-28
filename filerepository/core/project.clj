@@ -7,7 +7,7 @@
   :url "https://github.com/primevc/valueobjects"
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [org.scala-lang/scala-library "2.9.2"]
-                 [prime/shared_2.9.2 "0.1-SNAPSHOT"]]
+                 [prime/vo "0.1.0-SNAPSHOT"]]
   :profiles {:test {:dependencies [[org.specs2/specs2_2.9.2 "1.11"]]}}
   :source-paths ["src/clojure"]
   :test-paths ["test/clojure"]

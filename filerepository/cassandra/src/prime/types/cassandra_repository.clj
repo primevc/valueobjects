@@ -26,7 +26,7 @@
            [java.nio ByteBuffer MappedByteBuffer]
            [java.nio.channels FileChannel FileChannel$MapMode]
            [org.apache.commons.codec.binary Base64]
-           [com.esotericsoftware.kryo.io ByteBufferInputStream]))
+           [org.apache.cassandra.utils ByteBufferUtil]))
 
 
 ;;;---TODO: See how the optimisations of the absorb and stream help, and how

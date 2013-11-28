@@ -7,8 +7,9 @@
   :url "https://github.com/primevc/valueobjects"
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [prime/voproxy-core "0.1.0-SNAPSHOT"]
-                 [cc.qbits/alia "1.9.2"]]
-  :profiles {:test {:dependencies [[midje "1.5.1"]]}}
+                 [cc.qbits/alia "1.9.2" :exclusions [org.apache.httpcomponents/httpclient]]
+                 [containium "0.1.0-SNAPSHOT"]]
+  :profiles {:test {:dependencies [[midje "1.5.1" :exclusions [leiningen-core]]]}}
   :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"
                  {:extensions "true"
                   :executions ([:execution

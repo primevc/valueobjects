@@ -4,8 +4,8 @@
 
 (ns prime.vo.util.cassandra-history
   (:refer-clojure :exclude [get])
-  (require [prime.vo]
-           [qbits.alia :as alia]
+  (require [containium.systems.cassandra :as cassandra]
+           [prime.vo]
            [prime.vo.pathops :as pathops]
            [prime.types]
            [prime.vo.util.json])
@@ -16,11 +16,11 @@
 
 
 (defn get-table-name [vo]
+  "Returns the table name for the given VO."
   (str "t" (Integer/toHexString (.ID (prime.vo/manifest vo)))))
 
-;
-; PUT version caching
-;
+
+;;; PUT version caching
 
 (defn ^:dynamic mk-last-put-cache "
   Create a cache per VO type: called and memoized by last-put-cache.
@@ -43,9 +43,8 @@
 (defn last-put-cache [vo]
   (mk-last-put-cache-memoized (prime.vo/manifest vo)))
 
-;
-; Column serialization
-;
+
+;;; Column serialization
 
 (defn ObjectId->byte-buffer [^org.bson.types.ObjectId oid] (java.nio.ByteBuffer/wrap (.toByteArray oid)))
 
@@ -120,7 +119,7 @@
 (defn keyword-keys [m]
   (into (empty m) (for [[k v] m] [(keyword (.toLowerCase k)) v])))
 
-; TODO: VOAction enum definition
+;;--- TODO: VOAction enum definition
 (def actions {
   :put (int 1)
   :update (int 2)
@@ -133,12 +132,15 @@
   :merge-at (int 9)
   })
 
-(defn get-latest-put [cluster vo]
-  (let [result (alia/with-session cluster
-        (alia/execute
-          (alia/prepare (str "SELECT version,action FROM " (get-table-name vo) " WHERE id = ? ORDER BY version DESC;")) :values [(idconv vo)]))]
-      ; Find first version where action == (:put actions)
-      (first (filter #(= (:action %) (:put actions)) result))))
+(defn get-latest-put [system consistency vo]
+  (let [table-name (get-table-name vo)
+        query (str "SELECT version, action FROM " table-name " WHERE id = ? ORDER BY version DESC;")
+        prepared (cassandra/prepare system query)
+        result (cassandra/do-prepared system prepared {:consistency consistency} [(idconv vo)])]
+    ;; Find first version where action == (:put actions)
+    (let [put-nr (:put actions)]
+      (first (filter #(= (:action %) put-nr) result)))))
+
 
 (defn build-vo [res vo]
   (loop [i 0 c nil] ; i = counter, c = current result.
@@ -193,93 +195,72 @@
         #_else
         (if (empty? c) nil c))))))
 
-(defn get [cluster vo]
-  ; This should send a merge of all records since the last put.
-  (let [
-    last-put (:version (or (clojure.core/get (last-put-cache vo) (str (:id vo))) (get-latest-put cluster vo)))
-    result
-        (alia/with-session cluster
-        (alia/execute
-          (alia/prepare (str "SELECT * FROM " (get-table-name vo) " WHERE id = ? " (when last-put "and version >= ?;"))) :values [(idconv vo) last-put]))]
+
+;;; Proxy functions.
+
+(defn get [{:keys [system consistency]} vo]
+  ;; This should send a merge of all records since the last put.
+  (let [last-put (:version (or (clojure.core/get (last-put-cache vo) (str (:id vo)))
+                               (get-latest-put system consistency vo)))
+        query (str "SELECT * FROM " (get-table-name vo) " WHERE id = ? "
+                   (when last-put "and version >= ?;"))
+        prepared (cassandra/prepare system query)
+        args (if last-put [(idconv vo) last-put] [(idconv vo)])
+        result (cassandra/do-prepared system prepared {:consistency consistency} args)]
       (build-vo result vo)))
 
-(defn get-slice [cluster vo options]
-  ; This should just send all records.
-  (let [
-        result (alia/with-session cluster
-                (alia/execute
-                  (alia/prepare (str "SELECT * FROM " (get-table-name vo) " WHERE id = ?")) :values [(idconv vo)]))
-        slices (or (:slices options) 1)]
-    ;TODO: Create a custom ValueSource for history data, keeping the UUID and action around.
+
+(defn get-slice [{:keys [system consistency]} vo {:keys [slices] :or [slices 1]}]
+  ;; This should just send all records.
+  (let [query (str "SELECT * FROM " (get-table-name vo) " WHERE id = ?")
+        prepared (cassandra/prepare system query)
+        result (cassandra/do-prepared system prepared {:consistency consistency} [(idconv vo)])]
+    ;;---TODO: Create a custom ValueSource for history data, keeping the UUID and action around.
     (take slices (byte-array->VOChange (:data (last result)) vo))))
 
-(defn- insert [cluster vo id action data]
-  (alia/with-session cluster
-      (alia/execute (alia/prepare
-        (str "INSERT INTO " (get-table-name vo) " (version, id, action, data) VALUES ( ? , ? , ? , ? )"))
-        :values [(org.apache.cassandra.utils.UUIDGen/getTimeUUID) id (actions action) (if (nil? data) nil (java.nio.ByteBuffer/wrap data))])))
 
-(defn put [cluster vo options]
-  ; TODO: If action is put, save version into immutant cache.
+(defn- insert [{:keys [system consistency]} vo id action data]
+  (let [query (str "INSERT INTO " (get-table-name vo) " (version, id, action, data) "
+                   "VALUES ( ? , ? , ? , ? )")
+        prepared (cassandra/prepare system query)]
+    (cassandra/do-prepared system prepared {:consistency consistency}
+                           [(org.apache.cassandra.utils.UUIDGen/getTimeUUID) id (get actions action)
+                            (when data (java.nio.ByteBuffer/wrap data))])))
+
+
+(defn put [proxy vo options]
+  ;; ---TODO: If action is put, save version into immutant cache.
   (assert (:id vo) "vo requires an id")
-  (insert cluster
-          vo
-          (idconv vo)
-          :put
-          (VOChange->byte-array vo)))
+  (insert proxy vo (idconv vo) :put (VOChange->byte-array vo)))
 
-(defn update [cluster vo id options]
-  (insert cluster
-          vo
-          (idconv (conj vo {:id id}))
-          :update
-          (VOChange->byte-array vo)))
 
-(defn delete [cluster vo options]
-  (insert cluster
-          vo
-          (idconv vo)
-          :delete
-          nil))
+(defn update [proxy vo id options]
+  (insert proxy vo (idconv (conj vo {:id id})) :update (VOChange->byte-array vo)))
 
-(defn append-to [cluster vo path path-vars value options]
-  (insert cluster
-          vo
-          (idconv vo)
-          :append-to
-          (VOChange->byte-array vo path path-vars value options)))
 
-(defn insert-at [cluster vo path path-vars value options]
-  (insert cluster
-          vo
-          (idconv vo)
-          :insert-at
-          (VOChange->byte-array vo path path-vars value options)))
+(defn delete [proxy vo options]
+  (insert proxy vo (idconv vo) :delete nil))
 
-(defn move-to [cluster vo path path-vars to options]
-  (insert cluster
-          vo
-          (idconv vo)
-          :move-to
-          (VOChange->byte-array vo path path-vars to options)))
 
-(defn replace-at [cluster vo path path-vars value options]
-  (insert cluster
-          vo
-          (idconv vo)
-          :replace-at
-          (VOChange->byte-array vo path path-vars value options)))
+(defn append-to [proxy vo path path-vars value options]
+  (insert proxy vo (idconv vo) :append-to (VOChange->byte-array vo path path-vars value options)))
 
-(defn merge-at [cluster vo path path-vars value options]
-  (insert cluster
-          vo
-          (idconv vo)
-          :merge-at
-          (VOChange->byte-array vo path path-vars value options)))
 
-(defn remove-from [cluster vo path path-vars options]
-  (insert cluster
-          vo
-          (idconv vo)
-          :remove-from
-          (VOChange->byte-array vo path path-vars options)))
+(defn insert-at [proxy vo path path-vars value options]
+  (insert proxy vo (idconv vo) :insert-at (VOChange->byte-array vo path path-vars value options)))
+
+
+(defn move-to [proxy vo path path-vars to options]
+  (insert proxy vo (idconv vo) :move-to (VOChange->byte-array vo path path-vars to options)))
+
+
+(defn replace-at [proxy vo path path-vars value options]
+  (insert proxy vo (idconv vo) :replace-at (VOChange->byte-array vo path path-vars value options)))
+
+
+(defn merge-at [proxy vo path path-vars value options]
+  (insert proxy vo (idconv vo) :merge-at (VOChange->byte-array vo path path-vars value options)))
+
+
+(defn remove-from [proxy vo path path-vars options]
+  (insert proxy vo (idconv vo) :remove-from (VOChange->byte-array vo path path-vars options)))

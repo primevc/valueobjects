@@ -136,7 +136,9 @@
   (let [table-name (get-table-name vo)
         query (str "SELECT version, action FROM " table-name " WHERE id = ? ORDER BY version DESC;")
         prepared (cassandra/prepare system query)
-        result (cassandra/do-prepared system prepared {:consistency consistency} [(idconv vo)])]
+        result (cassandra/do-prepared system prepared
+                                      {:consistency consistency :keywordize? true}
+                                      [(idconv vo)])]
     ;; Find first version where action == (:put actions)
     (let [put-nr (:put actions)]
       (first (filter #(= (:action %) put-nr) result)))))
@@ -206,7 +208,8 @@
                    (when last-put "and version >= ?;"))
         prepared (cassandra/prepare system query)
         args (if last-put [(idconv vo) last-put] [(idconv vo)])
-        result (cassandra/do-prepared system prepared {:consistency consistency} args)]
+        result (cassandra/do-prepared system prepared {:consistency consistency :keywordize? true}
+                                      args)]
       (build-vo result vo)))
 
 
@@ -214,7 +217,8 @@
   ;; This should just send all records.
   (let [query (str "SELECT * FROM " (get-table-name vo) " WHERE id = ?")
         prepared (cassandra/prepare system query)
-        result (cassandra/do-prepared system prepared {:consistency consistency} [(idconv vo)])]
+        result (cassandra/do-prepared system prepared {:consistency consistency :keywordize? true}
+                                      [(idconv vo)])]
     ;;---TODO: Create a custom ValueSource for history data, keeping the UUID and action around.
     (take slices (byte-array->VOChange (:data (last result)) vo))))
 
@@ -224,7 +228,7 @@
                    "VALUES ( ? , ? , ? , ? )")
         prepared (cassandra/prepare system query)]
     (cassandra/do-prepared system prepared {:consistency consistency}
-                           [(org.apache.cassandra.utils.UUIDGen/getTimeUUID) id (get actions action)
+                           [(org.apache.cassandra.utils.UUIDGen/getTimeUUID) id (actions action)
                             (when data (java.nio.ByteBuffer/wrap data))])))
 
 

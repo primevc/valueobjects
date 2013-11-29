@@ -19,4 +19,5 @@
                   :executions ([:execution [:id "clojure-compile"] [:phase "compile"]
                                 [:goals [:goal "compile"]]]
                                [:execution [:id "clojure-test"] [:phase "test"]
-                                [:goals [:goal "test"]]])}]])
+                                [:goals [:goal "test"]]])}]]
+  :pom-addition [:properties [:project.build.sourceEncoding "UTF-8"]])

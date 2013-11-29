@@ -93,7 +93,7 @@
   (let [query (str "SELECT columnfamily_name FROM system.schema_columnfamilies WHERE "
                    "keyspace_name = ? AND columnfamily_name = ?")
         prepared (cassandra/prepare system query)]
-    (not (empty? (cassandra/do-prepared system prepared [keyspace table])))))
+    (not (empty? (cassandra/do-prepared system prepared {:consistency :one} [keyspace table])))))
 
 
 ;;; Initialisation and setup functions.
@@ -124,12 +124,12 @@
   Optionally, one can supply initial VOs that need to be supported in
   this proxy. One can also add such support later using the
   `add-vo-support` function."
-  [system consistency keyspace & vos]
+  [system keyspace consistency & vos]
   (when-not (cassandra/has-keyspace? system keyspace)
-    (cassandra/write-schema system (str "CREATE KEYSPACE " keyspace "WITH REPLICATION = "
+    (cassandra/write-schema system (str "CREATE KEYSPACE " keyspace " WITH REPLICATION = "
                               "{ 'class' : 'SimpleStrategy', 'replication_factor' : 3 };")))
   (let [proxy (CassandraHistoryVOProxy. (cassandra/keyspaced system keyspace) consistency keyspace)]
-    (add-vo-support proxy vos)
+    (apply add-vo-support proxy vos)
     proxy))
 
 

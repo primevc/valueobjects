@@ -28,4 +28,5 @@
                   :executions [:execution [:phase "compile"] [:goals [:goal "compile"]]]}]
 
                 [com.mmakowski/maven-specs2-plugin "0.3.0"
-                 {:executions [:execution [:phase "test"] [:goals [:goal "run-specs"]]]}]])
+                 {:executions [:execution [:phase "test"] [:goals [:goal "run-specs"]]]}]]
+  :pom-addition [:properties [:project.sourceEncoding "UTF-8"]])

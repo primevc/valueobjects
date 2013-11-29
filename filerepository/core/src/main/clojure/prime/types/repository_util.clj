@@ -3,14 +3,32 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.types.repository-util
-  (:require [taoensso.timbre :as log])
-  (:use [clojure.java.io :only [as-file]]
-        [prime.types]))
+  (:require [clojure.java.io :refer (as-file)]
+            [prime.types]))
 
 
-;; FIXME, this cannot be used in this form when libraryized.
+;;; Repository creation functions.
 
-;;; File and repository related functions.
+(defmulti mk-repository
+  "Creates a FileRepository based on the specified type and descriptor
+  Strings."
+  (fn [type descriptor] type))
+
+
+(defmethod mk-repository :default
+  [type _]
+  (let [supported (keys (dissoc (.getMethodTable mk-repository) :default))]
+    (throw (IllegalArgumentException.
+            (str "Unknown repository type '" type "'. Supported types are: "
+                 (apply str (interpose "," supported)) ".")))))
+
+
+(defmethod mk-repository "basic"
+  [_ descriptor]
+  (prime.types.BasicLocalFileRepository. (as-file descriptor)))
+
+
+;;; Local file and repository related functions.
 
 (defn local-FileRepository [root-path]
   (prime.types.BasicLocalFileRepository. (as-file root-path)))
@@ -22,29 +40,3 @@
 
 (defn local-File [^prime.types.FileRef fileref ^prime.types.LocalFileRepository repository]
   (.getFile repository fileref))
-
-
-(defn nfs-repository
-  "Creates an NFSRepository based on a descriptor string that follows the
-  following convention: `<repository-name>@<mounts-root-path>`."
-  [descriptor-str]
-  (let [[_ repository-name mounts-root-path] (re-matches #"^(.+?)@(.+?)$" descriptor-str)]
-    (prime.types.NFSRepository. mounts-root-path repository-name)))
-
-
-;;; Configuration functions.
-
-(def repository-types #{"basic" "nfs"})
-
-(defn repository
-  "Get a repository based on the supplied type, which must be one of those
-  defined in `repository-types`, and a descriptor string, such as a path or a
-  connection specification. Using this function, bolts can create their own
-  reference to a repository based on configuration info they receive."
-  [repository-type descriptor-str]
-  (assert (repository-types repository-type)
-    (apply str "Specified repository type '" repository-type "' is invalid. Please use one of "
-      (interpose ", " repository-types)))
-  (case repository-type
-    "basic" (local-FileRepository descriptor-str)
-    "nfs" (nfs-repository descriptor-str)))

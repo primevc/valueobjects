@@ -19,4 +19,5 @@
                                   [:jvmArgs [:arg "-XX:MaxPermSize=1024M"] [:arg "-Xmx4G"]])}]
 
                 [com.mmakowski/maven-specs2-plugin "0.3.0"
-                 {:executions [:execution [:phase "test"] [:goals [:goal "run-specs"]]]}]])
+                 {:executions [:execution [:phase "test"] [:goals [:goal "run-specs"]]]}]]
+  :pom-addition [:properties [:project.build.sourceEncoding "UTF-8"]])

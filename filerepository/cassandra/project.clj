@@ -20,5 +20,7 @@
                   :executions ([:execution [:id "clojure-compile"] [:phase "compile"]
                                 [:goals [:goal "compile"]]]
                                [:execution [:id "clojure-test"] [:phase "test"]
-                                [:goals [:goal "test"]]])}]]
+                                [:goals [:goal "test"]]])}]
+                [;; Explicit version, as it contains a retryOnError.
+                 org.apache.maven.plugins/maven-clean-plugin "2.5"]]
   :pom-addition [:properties [:project.build.sourceEncoding "UTF-8"]])

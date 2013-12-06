@@ -7,7 +7,8 @@
   :url "https://github.com/primevc/valueobjects"
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [prime/filerepository-core "0.1.0-SNAPSHOT"]
-                 [cc.qbits/alia "1.9.1" :exclusions [org.apache.httpcomponents/httpclient]]
+                 [cc.qbits/alia "1.9.1" :exclusions [org.apache.httpcomponents/httpclient org.xerial.snappy/snappy-java]]
+                 [org.xerial.snappy/snappy-java "1.1.0-M4"]
                  [com.taoensso/timbre "2.6.2"]
                  [commons-codec "1.8"]]
   :profiles {:test {:dependencies [[midje "1.5.1"]]}}

@@ -11,6 +11,7 @@
                  [fast-zip "0.3.0"]
                  [com.taoensso/timbre "2.6.2"]]
   :profiles {:test {:dependencies [[midje "1.5.1"]]}}
+  :scm {:dir "../.."}
   :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"
                  {:extensions "true"
                   :executions ([:execution

@@ -21,10 +21,14 @@
     "Get will get you a VO based on ID")
 
   (put-vo [vo] [proxy vo] [proxy vo options]
-    "Putting will replace the existing VO with the new one. Requires ID")
+    "Putting will instert the new VO, or it will replace an existing VO
+    completely if it already exists. The VO needs to have an ID.")
 
   (update [vo] [proxy vo] [proxy vo id] [proxy vo id options]
-    "Updating will add the new VO or replace the data if it already exists.")
+    "Updating will 'deep-merge' the new VO data with the existing VO.
+    Sequential values are replaced, not joined in any way. One can specify
+    the ID to look up the existing VO, otherwise it requires an ID in
+    the new VO data. If the VO does not exist yet, it is upserted.")
 
   (delete [vo] [proxy vo] [proxy vo options]
     "Deletes a VO. Use with care.")

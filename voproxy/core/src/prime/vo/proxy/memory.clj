@@ -7,6 +7,7 @@
   memory. This implementation is mostly suitable for unit testing or
   interactive development."
   (:require [prime.vo :refer (manifest)]
+            [prime.utils :as utils]
             [prime.vo.proxy :refer :all]
             [prime.vo.pathops :as pathops]
             [taoensso.timbre :refer (trace debug info warn error fatal spy)]))
@@ -49,9 +50,11 @@
     (update this vo id {}))
 
   (update [this vo id options]
-    (assert (not (nil? id)) (print-str "id required, but " id " id supplied for vo:" vo))
+    (assert id (print-str "id required, but no id supplied for vo:" vo))
     (debug "Updating VO" vo "having ID" id "with options" options)
-    (swap! data assoc-in [(votype->hex vo) id] (assoc vo :id id)))
+    (swap! data update-in [(votype->hex vo) id]
+           (partial utils/deep-merge-with (fn [x y] y))
+           (assoc vo :id id)))
 
   (delete [this vo]
     (delete this vo {}))

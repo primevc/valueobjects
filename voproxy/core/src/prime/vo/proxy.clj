@@ -34,15 +34,39 @@
     "Deletes a VO. Use with care.")
 
   ;; Delta changes functions.
-  (append-to [vo path path-vars value] [this vo path path-vars value] [this vo path path-vars value options])
+  (append-to [vo path path-vars value] [this vo path path-vars value]
+    [this vo path path-vars value options]
+    "Given a VO and a path that points to an array, this appends the
+    given value to that array.")
 
-  (insert-at [vo path path-vars value] [proxy vo path path-vars value] [proxy vo path path-vars value options])
+  (insert-at [vo path path-vars value] [proxy vo path path-vars value]
+    [proxy vo path path-vars value options]
+    "Given a VO and a path that points to an array location, this
+    inserts the given value in that array. Out of bounds indexes are
+    automatically trimmed. Negative indexes count from the end of the
+    array, e.g. an index of -1 equals the last index of the array.
+    Inserting into an empty array is allowed, and has the same effect
+    as an `append-to` on an empty array, i.e. the index is ignored.")
 
-  (move-to [vo path path-vars to] [proxy vo path path-vars to] [proxy vo path path-vars to options])
+  (move-to [vo path path-vars to] [proxy vo path path-vars to] [proxy vo path path-vars to options]
+    "Given a VO, a path that points to an array location, and a new 'to'
+    index, it moves the item to the new index. Out of bounds indexes
+    are automatically trimmed, allowing one index higher than
+    currently in the array (to allow moving to the end of the array).
+    Negative indexes count from the end of the array (including the
+    index that allows moving after the last item in the array), e.g.
+    an index of -1 equals the last index of the array, increased by
+    one.")
 
-  (replace-at [vo path path-vars value] [proxy vo path path-vars value] [proxy vo path path-vars value options])
+  (replace-at [vo path path-vars value] [proxy vo path path-vars value]
+    [proxy vo path path-vars value options]
+    "Given a VO and a path to a value, which may point to an ordinary
+    value or to an index in an array, this replaces that value with
+    the new value.")
 
-  (merge-at [vo path path-vars value] [prxoy vo path path-vars value] [proxy vo path path-vars value options])
+  (merge-at [vo path path-vars value] [prxoy vo path path-vars value]
+    [proxy vo path path-vars value options]
+    "")
 
   (remove-from [vo path path-vars] [proxy vo path path-vars] [proxy vo path path-vars options]))
 

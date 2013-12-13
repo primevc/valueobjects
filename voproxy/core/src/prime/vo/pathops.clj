@@ -73,18 +73,23 @@
 (defn- relative-vector-index [length i & options]
   "Calculates the index relative to a vector length. Optionally, one
   can specify that an extra index at the end is allowed, using the
-  :allow-index-after-last keyword. Examples:
+  :allow-index-after-last keyword. The relative index for a length of
+  0 is always 0. Examples:
 
   (relative-vector-index 3 2)  ;=> 2
   (relative-vector-index 3 4)  ;=> 2
   (relative-vector-index 3 -1) ;=> 2
   (relative-vector-index 3 -3) ;=> 0
   (relative-vector-index 3 -4) ;=> 0
+  (relative-vector-index 0 0)  ;=> 0
   (relative-vector-index 3 4 :allow-index-after-last)  ;=> 3
-  (relative-vector-index 3 -1 :allow-index-after-last) ;=> 3"
-  (let [options (zipmap options (repeat true))
-        div (if (:allow-index-after-last options) (inc length) length)]
-    (if (>= i div) (dec div) (mod (max i (- div)) div))))
+  (relative-vector-index 3 -1 :allow-index-after-last) ;=> 3
+  (relative-vector-index 0 2 :allow-index-after-last)  ;=> 0"
+  (if (= 0 length)
+    0
+    (let [options (zipmap options (repeat true))
+          div (if (:allow-index-after-last options) (inc length) length)]
+      (if (>= i div) (dec div) (mod (max i (- div)) div)))))
 
 
 ;;; Concrete opertion, append to.
@@ -99,13 +104,15 @@
 ;;; Concrete opertion, insert at.
 
 (defn- vector-insert-at [vec index value & options]
-  {:pre [vector? vec]}
+  {:pre [(vector? vec)]}
   (let [index (apply relative-vector-index (count vec) index options)]
-    (apply conj (subvec vec 0 index) value (subvec vec index))))
+    ;; ---TODO: Fix this, as (apply vector ...) is now needed since working on ScalaSeqWrapper
+    ;;          fails to conj.
+    (apply conj (apply vector (subvec vec 0 index)) value (subvec vec index))))
 
 
 (defn insert-at
-  "Given a path in a VO that points an index in an array, this inserts
+  "Given a path in a VO that points to an index in an array, this inserts
   the value at that specific index."
   [vo path value]
   {:pre [(integer? (last path))]}
@@ -117,7 +124,7 @@
 ;;; Concrete opertion, move to.
 
 (defn- vector-remove [vec i]
-  {:pre [vector? vec]}
+  {:pre [(vector? vec)]}
   (cond (empty? vec) []
         (>= i (dec (count vec))) (subvec vec 0 (- (count vec) 1))
         (<= i 0) (subvec vec 1)
@@ -125,7 +132,7 @@
 
 
 (defn- vector-move-item [vec from to]
-  {:pre [vector? vec]}
+  {:pre [(vector? vec) (not (empty? vec))]}
   (let [vec (clojure.core/vec vec) ; Hack: subvec behaves different on Scala vectors vs Clojure's.
         from (relative-vector-index (count vec) (concrete-path-step vec from))
         to (relative-vector-index (count vec) to :allow-index-after-last)
@@ -148,6 +155,7 @@
 
 (defn- update-with-replace
   [container at value]
+  (assert container "replace is only possible in existing container")
   (if (vector? container)
     (assoc container (relative-vector-index (count container) at) value)
     (assoc container at value)))

@@ -24,8 +24,10 @@
     (#'prime.vo.pathops/relative-vector-index 3 -1) => 2
     (#'prime.vo.pathops/relative-vector-index 3 -3) => 0
     (#'prime.vo.pathops/relative-vector-index 3 -4) => 0
+    (#'prime.vo.pathops/relative-vector-index 0 0)  => 0
     (#'prime.vo.pathops/relative-vector-index 3 4 :allow-index-after-last)  => 3
-    (#'prime.vo.pathops/relative-vector-index 3 -1 :allow-index-after-last) => 3)
+    (#'prime.vo.pathops/relative-vector-index 3 -1 :allow-index-after-last) => 3
+    (#'prime.vo.pathops/relative-vector-index 0 2 :allow-index-after-last)  => 0)
 
 
   (fact "an inner value can be retrieved using our special paths"

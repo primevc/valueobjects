@@ -3,7 +3,9 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.types.repository-util
-  (:require [taoensso.timbre :as log])
+  (:require [taoensso.timbre :as log]
+            [prime.types.cassandra-repository :as c]
+            [qbits.alia :as alia])
   (:use [clojure.java.io :only [as-file]]
         [prime.types]))
 
@@ -21,6 +23,13 @@
 (defn local-File [^prime.types.FileRef fileref ^prime.types.LocalFileRepository repository]
   (.getFile repository fileref))
 
+(defn cassandra-repository
+  "Creates a CassandraRepository based on a descriptor string that follows
+  the following convention: `<repository-name>@<host>:<native-port>`"
+  [descriptor-str]
+  (let [[_ repository-name host port] (re-matches #"^(.+?)@(.+?):(.+?)$" descriptor-str)
+        cluster (alia/cluster host port)]
+    (c/cassandra-repository cluster repository-name)))
 
 (defn nfs-repository
   "Creates an NFSRepository based on a descriptor string that follows the
@@ -32,7 +41,7 @@
 
 ;;; Configuration functions.
 
-(def repository-types #{"basic" "nfs"})
+(def repository-types #{"basic" "nfs" "cassandra"})
 
 (defn repository
   "Get a repository based on the supplied type, which must be one of those
@@ -44,5 +53,6 @@
     (apply str "Specified repository type '" repository-type "' is invalid. Please use one of "
       (interpose ", " repository-types)))
   (case repository-type
-    "basic" (local-FileRepository descriptor-str)
-    "nfs" (nfs-repository descriptor-str)))
+    "basic"     (local-FileRepository descriptor-str)
+    "cassandra" (cassandra-repository descriptor-str)
+    "nfs"       (nfs-repository descriptor-str)))

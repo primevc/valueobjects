@@ -439,27 +439,24 @@
           (if-not scroll (.. response getHits hits) #_else (scroll-seq es response scroll 0)))
         {:request es-options, :response response})))
 
-(defn ^org.elasticsearch.action.index.IndexRequest ->IndexRequest [^String index ^String type ^String id, input options]
-  (let [^"[B" input (if (instance? ValueObject input) (generate-hexed-fields-smile input) input)
-            request (new org.elasticsearch.action.index.IndexRequest index type id)
-        {:keys [routing parent timestamp ttl version versionType]} options]
-    (. request source input)
-    (when routing     (. request routing     routing))
-    (when parent      (. request parent      parent))
-    (when timestamp   (. request timestamp   timestamp))
-    (when ttl         (. request ttl         ttl))
-    (when version     (. request version     version))
-    (when versionType (. request versionType versionType))
-    request))
+;; (defn ^org.elasticsearch.action.index.IndexRequest ->IndexRequest [^String index ^String type ^String id, input options]
+;;   (let [^"[B" input (if (instance? ValueObject input) (generate-hexed-fields-smile input) input)
+;;             request (new org.elasticsearch.action.index.IndexRequest index type id)
+;;         {:keys [routing parent timestamp ttl version versionType]} options]
+;;     (. request source input)
+;;     (when routing     (. request routing     routing))
+;;     (when parent      (. request parent      parent))
+;;     (when timestamp   (. request timestamp   timestamp))
+;;     (when ttl         (. request ttl         ttl))
+;;     (when version     (. request version     version))
+;;     (when versionType (. request versionType versionType))
+;;     request))
 
 (defn- patched-update-options [type id options]
-  (let [ {:keys [upsert doc]} options
-        options (if upsert (assoc options :upsert (->IndexRequest (:index options) type id, upsert options)) #_else options)
-        options (if doc    (assoc options :doc    (generate-hexed-fields-smile doc)                                  ) #_else options) ]
-    (conj options {
-      :type   type
-      :id     id
-    })))
+  (let [{:keys [doc] :as options} (assoc options :type type :id id)]
+    (if doc
+      (assoc options :doc (generate-hexed-fields-smile doc))
+      options)))
 
 (defn update
   [es index ^ValueObject vo id {:as options :keys [fields]}]
@@ -467,7 +464,8 @@
   (let [type    (Integer/toHexString (.. vo voManifest ID))
         id      (prime.types/to-String id)
         fields  (map field-hexname fields)]
-    (ces/update-doc es (patched-update-options type id (assoc options :index index :doc vo)))))
+    (ces/update-doc es (patched-update-options type id (assoc options :index index :doc vo
+                                                              :doc-as-upsert? true)))))
 
 
 

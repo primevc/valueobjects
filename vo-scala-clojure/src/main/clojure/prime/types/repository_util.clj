@@ -28,7 +28,7 @@
   the following convention: `<repository-name>@<host>:<native-port>`"
   [descriptor-str]
   (let [[_ repository-name host port] (re-matches #"^(.+?)@(.+?):(.+?)$" descriptor-str)
-        cluster (alia/cluster host port)]
+        cluster (alia/cluster host :port (Integer/parseInt port))]
     (c/cassandra-repository cluster repository-name)))
 
 (defn nfs-repository

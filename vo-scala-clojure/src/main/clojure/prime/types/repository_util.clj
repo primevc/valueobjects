@@ -36,7 +36,7 @@
   following convention: `<repository-name>@<mounts-root-path>`."
   [descriptor-str]
   (let [[_ repository-name mounts-root-path] (re-matches #"^(.+?)@(.+?)$" descriptor-str)]
-    (prime.types.NFSRepository. mounts-root-path repository-name)))
+    (prime.types.NFSRepository. (as-file mounts-root-path) repository-name)))
 
 
 ;;; Configuration functions.

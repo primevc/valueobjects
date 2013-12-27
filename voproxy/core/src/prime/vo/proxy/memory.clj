@@ -73,7 +73,7 @@
            "having options" options)
     (let [filled-path (pathops/fill-path path path-vars)
           updated-vo (pathops/append-to-vo (get-vo this vo) filled-path value)]
-      (update this updated-vo (:id updated-vo))))
+      (put-vo this updated-vo (:id updated-vo))))
 
   (insert-at [this vo path path-vars value]
     (insert-at this vo path path-vars value {}))
@@ -84,7 +84,7 @@
            "having options" options)
     (let [filled-path (pathops/fill-path path path-vars)
           updated-vo (pathops/insert-at (get-vo this vo) (vec filled-path) value)]
-      (update this updated-vo (:id updated-vo))))
+      (put-vo this updated-vo (:id updated-vo))))
 
   (move-to [this vo path path-vars to]
     (move-to this vo path path-vars to {}))
@@ -95,7 +95,7 @@
            "having options" options "to" to)
     (let [filled-path (pathops/fill-path path path-vars)
           updated-vo (pathops/move-vo-to (get-vo this vo) (vec filled-path) to)]
-      (update this updated-vo (:id updated-vo))))
+      (put-vo this updated-vo (:id updated-vo))))
 
   (replace-at [this vo path path-vars value]
     (replace-at this vo path path-vars value {}))
@@ -106,7 +106,7 @@
            "having options" options "with" value)
     (let [filled-path (pathops/fill-path path path-vars)
           updated-vo (pathops/replace-at (get-vo this vo) (vec filled-path) value)]
-      (update this updated-vo (:id updated-vo))))
+      (put-vo this updated-vo (:id updated-vo))))
 
   (merge-at [this vo path path-vars value]
     (merge-at this vo path path-vars value {}))
@@ -117,7 +117,7 @@
            "having options" options)
     (let [filled-path (pathops/fill-path path path-vars)
           updated-vo (pathops/merge-at (get-vo this vo) filled-path value)]
-      (update this updated-vo (:id updated-vo))))
+      (put-vo this updated-vo (:id updated-vo))))
 
   (remove-from [this vo path path-vars]
     (remove-from this vo path path-vars {}))
@@ -128,7 +128,7 @@
            "having options" options)
     (let [filled-path (pathops/fill-path path path-vars)
           updated-vo (pathops/remove-from (get-vo this vo) (vec filled-path))]
-      (update this updated-vo (:id updated-vo))))
+      (put-vo this updated-vo (:id updated-vo))))
 
   VOSearchProxy
   (search [this vo]

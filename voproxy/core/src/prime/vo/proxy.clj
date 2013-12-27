@@ -64,11 +64,14 @@
     value or to an index in an array, this replaces that value with
     the new value.")
 
-  (merge-at [vo path path-vars value] [prxoy vo path path-vars value]
+  (merge-at [vo path path-vars value] [proxy vo path path-vars value]
     [proxy vo path path-vars value options]
-    "")
+    "Given a VO and path in a VO, pointing to a VO (possibly inside an
+    array), this merges the given map into that VO, replacing any
+    existing values.")
 
-  (remove-from [vo path path-vars] [proxy vo path path-vars] [proxy vo path path-vars options]))
+  (remove-from [vo path path-vars] [proxy vo path path-vars] [proxy vo path path-vars options]
+    "Given a VO and a path in a VO, removes that what the path points to."))
 
 
 (defprotocol VOSearchProxy

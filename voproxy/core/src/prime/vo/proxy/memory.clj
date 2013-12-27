@@ -21,8 +21,18 @@
   [vo]
   (Integer/toHexString (.ID (manifest vo))))
 
-(defn assert-not-nil-id [vo]
+(defn- assert-not-nil-id [vo]
   (assert (not (nil? (:id vo))) (print-str "id required, but" (:id vo) "id supplied for vo:" vo)))
+
+(defn- matches?
+  "Tests whether the search VO matches the actual VO."
+  [search actual]
+  (letfn [(vector-merge [actual search]
+            (if (and (vector? search)
+                     (every? #(some (partial matches? %) actual) search))
+              actual
+              search))]
+    (= actual (utils/deep-merge-with vector-merge actual search))))
 
 ;;; Define the in-memory proxy, both implementing VOProxy as well as
 ;;; VOSearchProxy. The MemoryVOProxy takes an atom encapsulating a map as its
@@ -136,7 +146,8 @@
 
   (search [this vo options]
     (debug "Searching for VOs based on" vo "having options" options "in" @data)
-    (vals (get @data (votype->hex vo)))))
+    (let [vos (vals (get @data (votype->hex vo)))]
+      (filter (partial matches? vo) vos))))
 
 
 ;;; A constructor function.

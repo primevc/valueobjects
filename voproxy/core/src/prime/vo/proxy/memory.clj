@@ -93,7 +93,7 @@
     (debug "Inserting" value "identified by" vo " on path" path "with vars" path-vars
            "having options" options)
     (let [filled-path (pathops/fill-path path path-vars)
-          updated-vo (pathops/insert-at (get-vo this vo) (vec filled-path) value)]
+          updated-vo (pathops/insert-at (get-vo this vo) filled-path value)]
       (put-vo this updated-vo (:id updated-vo))))
 
   (move-to [this vo path path-vars to]
@@ -104,7 +104,7 @@
     (debug "Moving value identified by" vo "on path" path "with vars" path-vars
            "having options" options "to" to)
     (let [filled-path (pathops/fill-path path path-vars)
-          updated-vo (pathops/move-vo-to (get-vo this vo) (vec filled-path) to)]
+          updated-vo (pathops/move-vo-to (get-vo this vo) filled-path to)]
       (put-vo this updated-vo (:id updated-vo))))
 
   (replace-at [this vo path path-vars value]
@@ -115,7 +115,7 @@
     (debug "Replacing value identified by" vo "on path" path "with vars" path-vars
            "having options" options "with" value)
     (let [filled-path (pathops/fill-path path path-vars)
-          updated-vo (pathops/replace-at (get-vo this vo) (vec filled-path) value)]
+          updated-vo (pathops/replace-at (get-vo this vo) filled-path value)]
       (put-vo this updated-vo (:id updated-vo))))
 
   (merge-at [this vo path path-vars value]
@@ -137,7 +137,7 @@
     (debug "Removing value from vo identified by" vo "on path" path "with vars" path-vars
            "having options" options)
     (let [filled-path (pathops/fill-path path path-vars)
-          updated-vo (pathops/remove-from (get-vo this vo) (vec filled-path))]
+          updated-vo (pathops/remove-from (get-vo this vo) filled-path)]
       (put-vo this updated-vo (:id updated-vo))))
 
   VOSearchProxy

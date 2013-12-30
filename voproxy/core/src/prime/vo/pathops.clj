@@ -116,7 +116,8 @@
   the value at that specific index."
   [vo path value]
   {:pre [(integer? (last path))]}
-  (let [index (last path)
+  (let [path (vec path)
+        index (last path)
         path (pop path)]
     (update-in-vo vo path vector-insert-at index value)))
 
@@ -146,7 +147,8 @@
   "Given a path in a VO to an value in an array, this moves that value
   to the specified index in that array."
   [vo path to]
-  (let [from (last path)
+  (let [path (vec path)
+        from (last path)
         path (pop path)]
     (update-in-vo vo path vector-move-item from to)))
 
@@ -167,7 +169,8 @@
   value or to an array. In case it points to an array, that entire
   array is being replaced."
   [vo path value]
-  (let [at (last path)
+  (let [path (vec path)
+        at (last path)
         path (pop path)]
     (update-in-vo vo path update-with-replace at value)))
 
@@ -201,6 +204,7 @@
 (defn remove-from
   "Given a path in a VO, removes that what it points to."
   [vo path]
-  (let [at (last path)
-        path (pop  path)]
+  (let [path (vec path)
+        at (last path)
+        path (pop path)]
     (update-in-vo vo path remove-at at)))

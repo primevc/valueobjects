@@ -125,6 +125,9 @@
     (assert-not-nil-id vo)
     (debug "Merging" value "identified by" vo "on path" path "with vars" path-vars
            "having options" options)
+    (when-not (or (seq path) (:allow-nil-or-empty-path? options))
+      (throw (IllegalArgumentException. (str "Empty or nil path in merge-at not allowed. "
+                                             "Use :allow-nil-or-empty-path? option to override."))))
     (let [filled-path (pathops/fill-path path path-vars)
           updated-vo (pathops/merge-at (get-vo this vo) filled-path value)]
       (put-vo this updated-vo (:id updated-vo))))

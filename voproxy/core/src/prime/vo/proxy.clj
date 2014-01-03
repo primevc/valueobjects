@@ -68,7 +68,9 @@
     [proxy vo path path-vars value options]
     "Given a VO and path in a VO, pointing to a VO (possibly inside an
     array), this merges the given map into that VO, replacing any
-    existing values.")
+    existing values. A standard supported option is
+    :allow-nil-or-empty-path? This defaults to false, which means a
+    path cannot be nil or empty.")
 
   (remove-from [vo path path-vars] [proxy vo path path-vars] [proxy vo path path-vars options]
     "Given a VO and a path in a VO, removes that what the path points to."))

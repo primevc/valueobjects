@@ -28,7 +28,7 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
   }
 
   final def pack(ref: VORef[_ <: ValueObject]) {
-    if (ref.isDefined) pack(ref.get)
+    if (ref.isDefined) pack(ref.get.asInstanceOf[ValueObject] /* force correct overload */)
     else               pack(ref._id)
   }
 
@@ -46,7 +46,7 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
 
   final def pack[V <: ValueObject](voArray:Array[V]) {
     packArray(voArray.length)
-    for (item <- voArray) pack(item);
+    for (item <- voArray) pack(item.asInstanceOf[ValueObject] /* force correct overload */);
   }
 
   final def pack(map : IPersistentMap) {

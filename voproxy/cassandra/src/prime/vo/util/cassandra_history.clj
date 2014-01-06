@@ -5,16 +5,19 @@
 (ns prime.vo.util.cassandra-history
   (:refer-clojure :exclude [get])
   (require [containium.systems.cassandra :as cassandra]
-           [prime.vo]
            [prime.vo.pathops :as pathops]
+           [prime.utils :as utils]
+           [clojure.walk :refer (stringify-keys keywordize-keys)]
+           [prime.vo]
            [prime.types]
-           [prime.vo.util.json]
-           [clojure.walk :refer (stringify-keys keywordize-keys)])
-  (:import [prime.utils.msgpack VOPacker VOUnpacker]
+           [prime.vo.util.json])
+  (:import [prime.utils.msgpack VOPacker VOUnpacker VOUnpacker$]
            [java.io ByteArrayOutputStream ByteArrayInputStream]
+           [java.nio ByteBuffer]
            [prime.vo ValueObject ValueObjectField]
            [org.msgpack Unpacker MessagePackObject]
-           [org.bson.types ObjectId]))
+           [org.bson.types ObjectId]
+           [org.apache.cassandra.utils ByteBufferUtil UUIDGen]))
 
 
 (defn get-table-name [vo]
@@ -81,18 +84,24 @@
     org.msgpack.object.MapType (reduce (fn [m [k v]] (assoc m (as-clojure k) (as-clojure v)))
                                        {} (.asMap obj))
     org.msgpack.object.NilType nil
-    org.msgpack.object.RawType (.asByteArray obj)
+    org.msgpack.object.RawType (.asString obj) ;;---TODO: Is this always correct?
     org.msgpack.object.ShortIntegerTypeIMPL (.asInt obj)
     prime.utils.msgpack.MessagePackValueSource obj
     prime.utils.msgpack.MessagePackObjectId (.oid obj)))
 
 
-(defn ->byte-array [value]
-  (let [
-    out (java.io.ByteArrayOutputStream.)
-    msgpack (prime.utils.msgpack.VOPacker. out)
-    pack (.pack msgpack value)]
-    (.toByteArray out)))
+(defn as-vo
+  [source target-vo]
+  (.. target-vo voCompanion (apply source)))
+
+
+;; (defn ->byte-array [value]
+;;   (let [
+;;     out (java.io.ByteArrayOutputStream.)
+;;     msgpack (prime.utils.msgpack.VOPacker. out)
+;;     pack (.pack msgpack value)]
+;;     (.toByteArray out)))
+
 
 (defn replace-star [path]
   (reduce #(cond (= % *) (conj %1 nil)
@@ -100,34 +109,26 @@
                  :else (conj %1 %2))
           [] path))
 
-(defn VOChange->byte-array
-  ([^ValueObject vo] (VOChange->byte-array vo nil))
 
-  ([^ValueObject vo path & options]
-      (let [out (java.io.ByteArrayOutputStream.)
-            msgpack (doto (prime.utils.msgpack.VOPacker. out)
-                      (.pack vo))]
-        (when path
-          (let [packed-path (replace-star (prime.vo/fields-path-seq vo path #(.id ^ValueObjectField %)))]
-            ;; (prn 'PACKED-PATH packed-path)
-            (.pack msgpack packed-path)))
-        (doseq [option options]
-          (let [option (if (and (map? option) (empty? option)) nil option)
-                option (if (and (coll? option) (not (instance? ValueObject option))) (apply list option) option)]
-            (.pack msgpack option)))
-        (.close out)
-        (.toByteArray out))))
+(defn prepare-path
+  [vo path]
+  (replace-star (prime.vo/fields-path-seq vo path #(.id ^ValueObjectField %))))
 
-(defn byte-array->VOChange
-  [bytes vo]
-  (let [bytes (.slice bytes)
-        unpacker  (doto (org.msgpack.Unpacker. (org.apache.cassandra.utils.ByteBufferUtil/inputStream bytes))
-                    (.setVOHelper prime.utils.msgpack.VOUnpacker$/MODULE$))
-        [vosource fields-path & options] (iterator-seq (.. unpacker iterator))
-        path (map (fn [^MessagePackObject item] (if (.isNil item) nil (as-clojure item)))
-                  (when fields-path (.asArray fields-path)))]
-    ;; (prn 'UNPACKED-PATH path)
-    (cons (.. vo voCompanion (apply vosource)) (cons path options))))
+
+(defn change-data->bytes
+  [& items]
+  (let [out (ByteArrayOutputStream.)
+        packer (VOPacker. out)]
+    (doseq [item items] (.pack packer item))
+    (.toByteArray out)))
+
+
+(defn bytes->change-data
+  [bytes]
+  (let [unpacker (doto (Unpacker. (ByteBufferUtil/inputStream bytes))
+                   (.setVOHelper VOUnpacker$/MODULE$))]
+    (map as-clojure (iterator-seq (.. unpacker iterator)))))
+
 
 (defn idconv [{:keys [id] :as vo}] {:pre [id]}
   ((second (simple-prime-type->cql-type (.. vo voManifest _id valueType keyword))) id))
@@ -136,17 +137,17 @@
   (into (empty m) (for [[k v] m] [(keyword (.toLowerCase k)) v])))
 
 ;;--- TODO: VOAction enum definition
-(def actions {
-  :put (int 1)
-  :update (int 2)
-  :delete (int 3)
-  :append-to (int 5)
-  :move-to (int 4)
-  :remove-from (int 6)
-  :insert-at (int 7)
-  :replace-at (int 8)
-  :merge-at (int 9)
-  })
+(def actions
+  {:put (int 1)
+   :update (int 2)
+   :delete (int 3)
+   :append-to (int 5)
+   :move-to (int 4)
+   :remove-from (int 6)
+   :insert-at (int 7)
+   :replace-at (int 8)
+   :merge-at (int 9)})
+
 
 (defn get-latest-put [system consistency vo]
   (let [table-name (get-table-name vo)
@@ -160,82 +161,78 @@
       (first (filter #(= (:action %) put-nr) result)))))
 
 
-(defn build-vo [res vo]
-  (loop [i 0 c nil] ; i = counter, c = current result.
-    (let [row (nth res i {})]
-      (prn 'ROW row)
-      (let [c
-        (cond
-          (= (:action row) (:put actions))
-            (first (byte-array->VOChange (:data row) vo))
+(defn build-vo [result target-vo]
+  (loop [index 0
+         accumulator (assoc (empty target-vo) :id (:id target-vo))]
+    (if-let [row (nth result index nil)]
+      (recur (inc index)
+             (condp = (:action row)
+               (:put actions)
+               (let [vo-source (first (bytes->change-data (:data row)))]
+                 (as-vo vo-source target-vo))
 
-            (= (:action row) (:update actions))
-            ;;--- FIXME: Shouldn't this be a deep merge?
-            (conj c (first (byte-array->VOChange (:data row) vo)))
+               (:update actions)
+               (let [[vo-source _] (bytes->change-data (:data row))
+                     update-vo (as-vo vo-source target-vo)]
+                 (utils/deep-merge-with (fn [x y] y) accumulator update-vo))
 
-          (= (:action row) (:delete actions))
-            (empty c)
+               (:delete actions)
+               (empty target-vo)
 
-            ;;--- FIXME: Don't apply the pathops to the VO, but to the c var, for all vo-change
-            ;;           functions below..
-          (= (:action row) (:append-to actions))
-          (let [[vo path path-vars value options] (byte-array->VOChange (:data row) vo)
-                path (pathops/fill-path path (as-clojure path-vars))]
-            ;;---TODO: Does this (as-clojure ..) below work when a VO should be appended?
-            (pathops/append-to-vo vo path (as-clojure value)))
+               (:append-to actions)
+               (let [[path path-vars value _] (bytes->change-data (:data row))
+                     filled-path (pathops/fill-path path path-vars)]
+                 (pathops/append-to-vo accumulator filled-path value))
 
-          (= (:action row) (:move-to actions))
-          (let [[vo path path-vars to options] (byte-array->VOChange (:data row) vo)
-                path (pathops/fill-path path (as-clojure path-vars))]
-            (pathops/move-vo-to vo path (as-clojure to)))
+               (:move-to actions)
+               (let [[path path-vars to _] (bytes->change-data (:data row))
+                     filled-path (pathops/fill-path path path-vars)]
+                 (pathops/move-vo-to accumulator filled-path to))
 
-          (= (:action row) (:remove-from actions))
-          (let [[vo path path-vars options] (byte-array->VOChange (:data row) vo)
-                path (pathops/fill-path path (as-clojure path-vars))]
-            (pathops/remove-from vo path))
+               (:remove-from actions)
+               (let [[path path-vars _] (bytes->change-data (:data row))
+                     filled-path (pathops/fill-path path path-vars)]
+                 (pathops/remove-from accumulator filled-path))
 
-          (= (:action row) (:insert-at actions))
-          (let [[vo path path-vars value options] (byte-array->VOChange (:data row) vo)
-                path (pathops/fill-path path (as-clojure path-vars))]
-            ;;---TODO: Does this (as-clojure ..) below work when a VO should be inserted?
-            (pathops/insert-at vo path (as-clojure value)))
+               (:insert-at actions)
+               (let [[path path-vars value _] (bytes->change-data (:data row))
+                     filled-path (pathops/fill-path path path-vars)]
+                 (pathops/insert-at accumulator filled-path value))
 
-          (= (:action row) (:replace-at actions))
-          (let [[vo path path-vars value options] (byte-array->VOChange (:data row) vo)
-                path (pathops/fill-path path (as-clojure path-vars))]
-            ;;---TODO: Does this (as-clojure ..) below work when a VO should be replaced?
-            (pathops/replace-at vo path (as-clojure value)))
+               (:replace-at actions)
+               (let [[path path-vars value _] (bytes->change-data (:data row))
+                     filled-path (pathops/fill-path path path-vars)]
+                 (pathops/replace-at accumulator filled-path value))
 
-          (= (:action row) (:merge-at actions))
-          (let [[vo path path-vars value options] (byte-array->VOChange (:data row) vo)
-                options (keywordize-keys options)
-                path (pathops/fill-path path (as-clojure path-vars))]
-            (pathops/merge-at vo path value))
+               (:merge-at actions)
+               (let [[path path-vars value _] (bytes->change-data (:data row))
+                     filled-path (pathops/fill-path path path-vars)]
+                 (pathops/merge-at accumulator filled-path value))
 
-          :else c)]
-        (if-not (empty? row)
-          (recur (inc i) c)
-          (if (empty? c) nil c))))))
+              :else accumulator))
+      (if (empty? accumulator) nil accumulator))))
 
 
 ;;; Proxy functions.
 
-(defn get [{:keys [system consistency]} vo]
-  ;; This should send a merge of all records since the last put.
-  (let [last-put (:version (or (clojure.core/get (last-put-cache vo) (str (:id vo)))
-                               (get-latest-put system consistency vo)))
-        query (str "SELECT * FROM " (get-table-name vo) " WHERE id = ? "
+(defn get [{:keys [system consistency]} target-vo]
+  ;; This returns a VO having all records sinds the last put re-applied to it.
+  (let [last-put (:version (or (clojure.core/get (last-put-cache target-vo) (str (:id target-vo)))
+                               (get-latest-put system consistency target-vo)))
+        query (str "SELECT * FROM " (get-table-name target-vo) " WHERE id = ? "
                    (when last-put "and version >= ?;"))
         prepared (cassandra/prepare system query)
-        args (if last-put [(idconv vo) last-put] [(idconv vo)])
+        args (if last-put [(idconv target-vo) last-put] [(idconv target-vo)])
         result (cassandra/do-prepared system prepared {:consistency consistency :keywordize? true}
                                       args)]
-      (build-vo result vo)))
+      (build-vo result target-vo)))
 
 
+;;--- FIXME: Implement this based on dates and slice query.
+;;    (and implicit search to latest put for begin date)
 (defn get-slice [{:keys [system consistency]} vo {:keys [slices] :or [slices 1]}]
   ;; This should just send all records.
-  (let [query (str "SELECT * FROM " (get-table-name vo) " WHERE id = ?")
+  #_(let [query (str "SELECT * FROM " (get-table-name vo) " WHERE id = ?")
         prepared (cassandra/prepare system query)
         result (cassandra/do-prepared system prepared {:consistency consistency :keywordize? true}
                                       [(idconv vo)])]
@@ -248,54 +245,68 @@
                    "VALUES ( ? , ? , ? , ? )")
         prepared (cassandra/prepare system query)]
     (cassandra/do-prepared system prepared {:consistency consistency}
-                           [(org.apache.cassandra.utils.UUIDGen/getTimeUUID) id (actions action)
-                            (when data (java.nio.ByteBuffer/wrap data))])))
+                           [(UUIDGen/getTimeUUID) id (actions action)
+                            (when data (ByteBuffer/wrap data))])))
 
 
 (defn put [proxy vo options]
   ;; ---TODO: If action is put, save version into immutant cache.
   (assert (:id vo) "vo requires an id")
-  (insert proxy vo (idconv vo) :put (VOChange->byte-array vo)))
+  (insert proxy vo (idconv vo) :put (change-data->bytes vo (stringify-keys options))))
 
 
 (defn update [proxy vo id options]
-  ;; ---FIXME: Do deep merge here.
-  (insert proxy vo (idconv (conj vo {:id id})) :update (VOChange->byte-array vo)))
+  (insert proxy vo (idconv (conj vo {:id id})) :update
+          (change-data->bytes vo (stringify-keys options))))
 
 
-(defn delete [proxy vo options]
+(defn delete
+  [proxy vo options]
   (insert proxy vo (idconv vo) :delete nil))
 
-;; ---FIXME: Don't store the VO for all vo-change functions below, only the action and action data.
-(defn append-to [proxy vo path path-vars value options]
-  (insert proxy vo (idconv vo) :append-to (VOChange->byte-array vo path path-vars value
-                                                                (stringify-keys options))))
+
+(defn append-to
+  [proxy vo path path-vars value options]
+  {:pre [(or (pathops/append-to-vo vo (pathops/fill-path path path-vars) value) true)]}
+  (insert proxy vo (idconv vo) :append-to
+          (change-data->bytes (prepare-path vo path) path-vars value (stringify-keys options))))
 
 
-(defn insert-at [proxy vo path path-vars value options]
-  (insert proxy vo (idconv vo) :insert-at (VOChange->byte-array vo path path-vars value
-                                                                (stringify-keys options))))
+(defn insert-at
+  [proxy vo path path-vars value options]
+  {:pre [(or (pathops/insert-at vo (pathops/fill-path path path-vars) value) true)]}
+  (insert proxy vo (idconv vo) :insert-at
+          (change-data->bytes (prepare-path vo path) path-vars value (stringify-keys options))))
 
 
-(defn move-to [proxy vo path path-vars to options]
-  (insert proxy vo (idconv vo) :move-to (VOChange->byte-array vo path path-vars to
-                                                              (stringify-keys options))))
+(defn move-to
+  [proxy vo path path-vars to options]
+  {:pre [(or (pathops/move-vo-to vo (pathops/fill-path path path-vars) to) true)]}
+  (insert proxy vo (idconv vo) :move-to
+          (change-data->bytes (prepare-path vo path) path-vars to (stringify-keys options))))
 
 
-(defn replace-at [proxy vo path path-vars value options]
-  (insert proxy vo (idconv vo) :replace-at (VOChange->byte-array vo path path-vars value
-                                                                 (stringify-keys options))))
+(defn replace-at
+  [proxy vo path path-vars value options]
+  {:pre [(or (pathops/replace-at vo (pathops/fill-path path path-vars) value) true)]}
+  (insert proxy vo (idconv vo) :replace-at
+          (change-data->bytes (prepare-path vo path) path-vars value (stringify-keys options))))
 
 
-(defn merge-at [proxy vo path path-vars value options]
+(defn merge-at
+  [proxy vo path path-vars value options]
+  {:pre [(or (pathops/merge-at vo (pathops/fill-path path path-vars) value) true)]}
   (let [path-value (if (and (:allow-nil-or-empty-path? options) (not (seq path))) [] path)]
     (when-not path-value
       (throw (IllegalArgumentException. (str "Empty or nil path in merge-at not allowed. "
                                              "Use :allow-nil-or-empty-path? option to override."))))
-    (insert proxy vo (idconv vo) :merge-at (VOChange->byte-array vo path-value path-vars value
-                                                                 (stringify-keys options)))))
+    (insert proxy vo (idconv vo) :merge-at
+            (change-data->bytes (prepare-path vo path-value) path-vars value
+                                (stringify-keys options)))))
 
 
-(defn remove-from [proxy vo path path-vars options]
-  (insert proxy vo (idconv vo) :remove-from (VOChange->byte-array vo path path-vars
-                                                                  (stringify-keys options))))
+(defn remove-from
+  [proxy vo path path-vars options]
+  {:pre [(or (pathops/remove-from vo (pathops/fill-path path path-vars)) true)]}
+  (insert proxy vo (idconv vo) :remove-from
+          (change-data->bytes (prepare-path vo path) path-vars (stringify-keys options))))

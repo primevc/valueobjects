@@ -7,6 +7,7 @@
   (require [containium.systems.cassandra :as cassandra]
            [prime.vo.pathops :as pathops]
            [prime.utils :as utils]
+           [prime.utils.msgpack :as msgpack]
            [clojure.walk :refer (stringify-keys keywordize-keys)]
            [prime.vo]
            [prime.types]
@@ -20,42 +21,34 @@
            [org.apache.cassandra.utils ByteBufferUtil UUIDGen]))
 
 
-(defn get-table-name [vo]
+;;; Helper functions.
+
+(defn get-table-name
   "Returns the table name for the given VO."
+  [vo]
   (str "t" (Integer/toHexString (.ID (prime.vo/manifest vo)))))
 
 
-;;; PUT version caching
-
-(defn ^:dynamic mk-last-put-cache "
-  Create a cache per VO type: called and memoized by last-put-cache.
-
-  This fn creates a cache (map)
-    wherein the last version id of a PUT operation per VO-id is stored
-    to speed up retrieval of VO changes since the last put.
-
-  This should improve speed of VOProxy/get: replaying only the VO changes since the last PUT.
-
-  If running on immutant, the default implementation returns an immutant.cache named: `${VO table name}-last-put`."
-  [vo]
-  (try
-    (require 'immutant.cache)
-    (eval (list 'immutant.cache/cache (str (get-table-name vo) "-last-put") :locking :pessimistic))
-  (catch Exception e)))
-
-(def ^:private mk-last-put-cache-memoized (memoize #'mk-last-put-cache))
-
-(defn last-put-cache [vo]
-  (mk-last-put-cache-memoized (prime.vo/manifest vo)))
+(defn- as-vo
+  "Returns the actual VO based on a source and a target."
+  [source target-vo]
+  (.. target-vo voCompanion (apply source)))
 
 
-;;; Column serialization
+;;; Column serialization.
 
-(defn ObjectId->byte-buffer [^org.bson.types.ObjectId oid] (java.nio.ByteBuffer/wrap (.toByteArray oid)))
+(defn- ObjectId->ByteBuffer
+  "Wrap an ObjectId in an ByteBuffer."
+  [^org.bson.types.ObjectId oid]
+  (ByteBuffer/wrap (.toByteArray oid)))
 
-(defn simple-prime-type->cql-type [type-keyword]
-  (case type-keyword
-    :prime.types/ObjectId   [ :blob       ObjectId->byte-buffer   ]
+
+(defn simple-prime-type->cql-type
+  "Given a prime type, returns a tuple having the equivalent CQL type
+  and a conversion function to get to that type."
+  [type]
+  (case (keyword type)
+    :prime.types/ObjectId   [ :blob       ObjectId->ByteBuffer    ]
     :prime.types/integer    [ :int        prime.types/to-Integer  ]
     :prime.types/Color      [ :int        prime.types/to-Integer  ]
     :prime.types/String     [ :varchar    prime.types/to-String   ]
@@ -66,56 +59,36 @@
     :prime.types/boolean    [ :boolean    prime.types/to-Boolean  ]
     :prime.types/decimal    [ :double     prime.types/to-Decimal  ]
     :prime.types/Date       [ :timestamp  prime.types/to-DateTime ]
-    :prime.types/Date+time  [ :timestamp  prime.types/to-DateTime ]
-))
-
-;;--- FIXME: quick fix for now, maybe something already exists, otherwise it needs to be moved to
-;;           a more general place.
-(defn as-clojure
-  "Get the Clojuresque type for the given MessagePackObject."
-  [obj]
-  (condp instance? obj
-    org.msgpack.object.ArrayType (reduce (fn [v o] (conj v (as-clojure o))) [] (.asArray obj))
-    org.msgpack.object.BigIntegerTypeIMPL (.asBigInteger obj)
-    org.msgpack.object.BooleanType (.asBoolean obj)
-    org.msgpack.object.DoubleTypeIMPL (.asDouble obj)
-    org.msgpack.object.FloatTypeIMPL (.asFloat obj)
-    org.msgpack.object.LongIntegerTypeIMPL (.asLong obj)
-    org.msgpack.object.MapType (reduce (fn [m [k v]] (assoc m (as-clojure k) (as-clojure v)))
-                                       {} (.asMap obj))
-    org.msgpack.object.NilType nil
-    org.msgpack.object.RawType (.asString obj) ;;---TODO: Is this always correct?
-    org.msgpack.object.ShortIntegerTypeIMPL (.asInt obj)
-    prime.utils.msgpack.MessagePackValueSource obj
-    prime.utils.msgpack.MessagePackObjectId (.oid obj)))
+    :prime.types/Date+time  [ :timestamp  prime.types/to-DateTime ]))
 
 
-(defn as-vo
-  [source target-vo]
-  (.. target-vo voCompanion (apply source)))
+(defn- idconv
+  "Returns the ID of the given VO, converted to the correct CQL type."
+  [{:keys [id] :as vo}]
+  {:pre [id]}
+  (let [convert-fn (second (simple-prime-type->cql-type (.. vo voManifest _id valueType)))]
+    (convert-fn id)))
 
 
-;; (defn ->byte-array [value]
-;;   (let [
-;;     out (java.io.ByteArrayOutputStream.)
-;;     msgpack (prime.utils.msgpack.VOPacker. out)
-;;     pack (.pack msgpack value)]
-;;     (.toByteArray out)))
+;;; Change data serialization.
 
-
-(defn replace-star [path]
+(defn- replace-star
+  "Replaces the * parts in the vo-change path."
+  [path]
   (reduce #(cond (= % *) (conj %1 nil)
                  (and (map? %2) (= (val (first %2)) *)) (conj %1 {(key (first %2)) nil})
                  :else (conj %1 %2))
           [] path))
 
 
-(defn prepare-path
+(defn- prepare-path
+  "Prepares a vo-change path such that it can be serialized."
   [vo path]
   (replace-star (prime.vo/fields-path-seq vo path #(.id ^ValueObjectField %))))
 
 
-(defn change-data->bytes
+(defn- change-data->bytes
+  "Serializes the given items to a byte-array, using a VO aware MsgPack."
   [& items]
   (let [out (ByteArrayOutputStream.)
         packer (VOPacker. out)]
@@ -123,21 +96,18 @@
     (.toByteArray out)))
 
 
-(defn bytes->change-data
+(defn- bytes->change-data
+  "Deserializes the given byte-array, using a VO-source aware MsgPack.
+  The items returned are Clojure data structures and/or
+  prime.utils.msgpack.MessagePackValueSource instances."
   [bytes]
   (let [unpacker (doto (Unpacker. (ByteBufferUtil/inputStream bytes))
                    (.setVOHelper VOUnpacker$/MODULE$))]
-    (map as-clojure (iterator-seq (.. unpacker iterator)))))
+    (map msgpack/as-clojure (iterator-seq (.. unpacker iterator)))))
 
-
-(defn idconv [{:keys [id] :as vo}] {:pre [id]}
-  ((second (simple-prime-type->cql-type (.. vo voManifest _id valueType keyword))) id))
-
-(defn keyword-keys [m]
-  (into (empty m) (for [[k v] m] [(keyword (.toLowerCase k)) v])))
 
 ;;--- TODO: VOAction enum definition
-(def actions
+(def ^:private actions
   {:put (int 1)
    :update (int 2)
    :delete (int 3)
@@ -149,7 +119,10 @@
    :merge-at (int 9)})
 
 
-(defn get-latest-put [system consistency vo]
+(defn- get-latest-put
+  "Returns the latest PUT action row for the given VO from the
+  database."
+  [system consistency vo]
   (let [table-name (get-table-name vo)
         query (str "SELECT version, action FROM " table-name " WHERE id = ? ORDER BY version DESC;")
         prepared (cassandra/prepare system query)
@@ -161,7 +134,11 @@
       (first (filter #(= (:action %) put-nr) result)))))
 
 
-(defn build-vo [result target-vo]
+(defn- build-vo
+  "Builds a target-vo using the result rows from the database. If no
+  PUT action is part of these rows, the other actions are applied on
+  an empty target-vo holding only the ID."
+  [result target-vo]
   (loop [index 0
          accumulator (assoc (empty target-vo) :id (:id target-vo))]
     (if-let [row (nth result index nil)]
@@ -215,10 +192,10 @@
 
 ;;; Proxy functions.
 
-(defn get [{:keys [system consistency]} target-vo]
-  ;; This returns a VO having all records sinds the last put re-applied to it.
-  (let [last-put (:version (or (clojure.core/get (last-put-cache target-vo) (str (:id target-vo)))
-                               (get-latest-put system consistency target-vo)))
+(defn get
+  "This returns a VO having all records since the last put re-applied to it."
+  [{:keys [system consistency]} target-vo]
+  (let [last-put (:version (get-latest-put system consistency target-vo))
         query (str "SELECT * FROM " (get-table-name target-vo) " WHERE id = ? "
                    (when last-put "and version >= ?;"))
         prepared (cassandra/prepare system query)
@@ -237,10 +214,13 @@
         result (cassandra/do-prepared system prepared {:consistency consistency :keywordize? true}
                                       [(idconv vo)])]
     ;;---TODO: Create a custom ValueSource for history data, keeping the UUID and action around.
-    (take slices (byte-array->VOChange (:data (last result)) vo))))
+      (take slices (byte-array->VOChange (:data (last result)) vo)))
+  (assert false "Not yet implemented."))
 
 
-(defn- insert [{:keys [system consistency]} vo id action data]
+(defn- insert
+  "Inserts the change data into the database."
+  [{:keys [system consistency]} vo id action data]
   (let [query (str "INSERT INTO " (get-table-name vo) " (version, id, action, data) "
                    "VALUES ( ? , ? , ? , ? )")
         prepared (cassandra/prepare system query)]
@@ -249,13 +229,14 @@
                             (when data (ByteBuffer/wrap data))])))
 
 
-(defn put [proxy vo options]
-  ;; ---TODO: If action is put, save version into immutant cache.
+(defn put
+  [proxy vo options]
   (assert (:id vo) "vo requires an id")
   (insert proxy vo (idconv vo) :put (change-data->bytes vo (stringify-keys options))))
 
 
-(defn update [proxy vo id options]
+(defn update
+  [proxy vo id options]
   (insert proxy vo (idconv (conj vo {:id id})) :update
           (change-data->bytes vo (stringify-keys options))))
 

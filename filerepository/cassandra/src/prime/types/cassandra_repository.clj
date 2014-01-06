@@ -18,7 +18,7 @@
   (:use [prime.types :only (to-URI)]
         [clojure.java.io :only (resource)]
         [clojure.string :only (replace split)])
-  (:require [qbits.alia :as alia]
+  (:require [containium.systems.cassandra :as cassandra]
             [taoensso.timbre :as log]
             [clojure.java.io :as io])
   (:import [prime.types FileRef LocalFileRef FileRefInputStream FileRefOutputStream]
@@ -35,19 +35,18 @@
 
 ;;; Helper definitions.
 
-;; The consistency to use for the queries. One can set this to another value
-;; when testing, for example.
-(def consistency (atom :quorum))
-
-
 (defn- prepare-statements
   "Prepare the statements used for the Cassandra repository."
-  [session]
+  [system consistency]
   (log/debug "Preparing statements for Cassandra repository.")
-  {:create (alia/prepare session "INSERT INTO files (hash, data) VALUES (?, ?);")
-   :exists (alia/prepare session "SELECT COUNT(*) FROM files WHERE hash=?;")
-   :stream (alia/prepare session "SELECT data FROM files WHERE hash=?;")
-   :delete (alia/prepare session "DELETE FROM files WHERE hash=?;")})
+  (letfn [(mk-cassandra-fn [statement]
+            (let [prepared (cassandra/prepare system statement)]
+              (partial cassandra/do-prepared system prepared {:consistency consistency
+                                                              :keywordize? true})))]
+    {:create (mk-cassandra-fn "INSERT INTO files (hash, data) VALUES (?, ?);")
+     :exists (mk-cassandra-fn "SELECT COUNT(*) FROM files WHERE hash=?;")
+     :stream (mk-cassandra-fn "SELECT data FROM files WHERE hash=?;")
+     :delete (mk-cassandra-fn "DELETE FROM files WHERE hash=?;")}))
 
 
 (defn- ref-hash
@@ -56,27 +55,13 @@
   (Base64/encodeBase64URLSafeString (.hash ref)))
 
 
-(defn- cql-statements
-  "Returns the CQL statements from the specified String in a sequence."
-  [s]
-  (let [no-comments (-> s
-                        (replace #"(?s)/\*.*?\*/" "")
-                        (replace #"--.*$" "")
-                        (replace #"//.*$" ""))]
-    (map #(str % ";") (split no-comments #"\s*;\s*"))))
-
-
-(defn write-schema
+(defn- write-schema
   "This function writes the schema for the Cassandra repository, using
   the supplied cluster."
-  [cluster]
-  (log/info "Writing schema to Cassandra.")
-  (let [session (alia/connect cluster)
-        schema (slurp (resource "cassandra-repo-schema.cql"))]
-    (log/debug "Schema to write: " schema)
-    (doseq [s (cql-statements schema)]
-      (log/debug "Executing statement:" s)
-      (alia/execute session s))))
+  [system]
+  (when-not (cassandra/has-keyspace? system "fs")
+    (log/info "Writing schema to Cassandra.")
+    (cassandra/write-schema system (slurp (resource "cassandra-repo-schema.cql")))))
 
 
 ;;---TODO: Play with this when we get actual metrics.
@@ -97,10 +82,10 @@
             fc (.getChannel fis)
             buffer (.map fc (FileChannel$MapMode/READ_ONLY) 0 (.size fc))
             session (:session state)
-            statement (-> state :statements :create)
+            statement-fn (-> state :statements :create)
             hash (ref-hash ref)]
         (log/info "Storing file using MappedByteBuffer for FileRef" ref)
-        (alia/execute session statement :values [hash buffer] :consistency @consistency)))
+        (statement-fn [hash buffer])))
     ref))
 
 
@@ -109,11 +94,11 @@
   (if-not (exists repo ref)
     (let [state (.state repo)
           session (:session state)
-          statement (-> state :statements :create)
+          statement-fn (-> state :statements :create)
           buffer (ByteBuffer/wrap byte-array)
           hash (ref-hash ref)]
       (log/debug "Underlying FileRef not stored yet, storing it now.")
-      (alia/execute session statement :values [hash buffer] :consistency @consistency))
+      (statement-fn [hash buffer]))
     (log/debug "Underlying FileRef already stored.")))
 
 
@@ -125,9 +110,9 @@
   (log/info "Checking whether FileRef" ref "is stored.")
   (let [state (.state this)
         session (:session state)
-        statement (-> state :statements :exists)
+        statement-fn (-> state :statements :exists)
         hash (ref-hash ref)
-        result (alia/execute session statement :values [hash] :consistency @consistency)
+        result (statement-fn [hash])
         exists (= 1 (:count (first result)))]
     (log/info "FileRef" ref (if exists "is stored." "is not stored."))
     exists))
@@ -182,9 +167,9 @@
   (log/info "Stream requested for FileRef" ref)
   (let [state (.state this)
         session (:session state)
-        statement (-> state :statements :stream)
+        statement-fn (-> state :statements :stream)
         hash (ref-hash ref)
-        result (alia/execute session statement :values [hash] :consistency @consistency)
+        result (statement-fn [hash])
         data (:data (first result))]
     (ByteBufferUtil/inputStream data)))
 
@@ -211,23 +196,23 @@
   (log/info "Deleting file for FileRef" ref)
   (let [state (.state this)
         session (:session state)
-        statement (-> state :statements :delete)
+        statement-fn (-> state :statements :delete)
         hash (ref-hash ref)]
-    (alia/execute session statement :values [hash] :consistency @consistency)))
+    (statement-fn [hash])))
 
 
 ;;; Generate CassandraRepository class, for use in Java and Scala.
 
 (defn repo-init
   "This function is called when the CassandraRepository is constructed."
-  [cluster repository-name]
-  (log/info "Creating CassandraRepository object for repository" repository-name
-            "using cluster:" (.. cluster getMetadata getClusterName))
-  (let [session (alia/connect cluster "fs")
-        statements (prepare-statements session)]
+  [system consistency repository-name]
+  (log/info "Creating CassandraRepository object for repository" repository-name)
+  (write-schema system)
+  (let [session (cassandra/keyspaced system "fs")
+        statement-fns (prepare-statements session consistency)]
     [[] {:repository-name repository-name
          :session session
-         :statements statements
+         :statements statement-fns
          :prefix "cassandra://"}]))
 
 (gen-class
@@ -236,17 +221,18 @@
   :init init
   :prefix "repo-"
   :state state
-  :constructors {[com.datastax.driver.core.Cluster String] []})
+  :constructors {[containium.systems.cassandra.Cassandra clojure.lang.Keyword String] []})
 
 
 ;;; API functions. Use these to call the repository functions on the
 ;;; Cassandra file repository.
 
 (defn cassandra-repository
-  "Create a new instance of the CassandraRepository class, given the supplied
-  cluster and repository name."
-  [cluster repository-name]
-  (prime.types.CassandraRepository. cluster repository-name))
+  "Create a new instance of the CassandraRepository class, given the
+  supplied Cassandra containium system, the consistency keyword to use
+  for queries and the repository name."
+  [system consistency repository-name]
+  (prime.types.CassandraRepository. system consistency repository-name))
 
 
 (defn exists

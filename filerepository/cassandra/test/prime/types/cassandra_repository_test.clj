@@ -5,40 +5,20 @@
 (ns prime.types.cassandra-repository-test
   "The test namespace for the Cassandra file repository."
   (:use [clojure.test]
-        [midje.sweet]
         [prime.types.cassandra-repository])
-  (:require [qbits.alia :as alia]
+  (:require [containium.systems :refer (with-systems)]
+            [containium.systems.config :as config]
+            [containium.systems.cassandra :as cassandra]
+            [containium.systems.cassandra.embedded12 :as embedded]
             [taoensso.timbre :as log])
   (:import [java.io File]
            [org.apache.commons.io FileUtils IOUtils]
            [prime.types FileRef]))
 
 
-;;; Setup functions.
-
-(defn- start-cassandra
-  "Start a Cassandra instance."
-  []
-  (let [daemon (org.apache.cassandra.service.CassandraDaemon.)]
-    (System/setProperty "cassandra.config" "file:dev-resources/cassandra.yaml")
-    (System/setProperty "cassandra-foreground" "true")
-    (.activate daemon)))
-
-
 ;;; The testing fixtures.
 
-(def cluster (delay (alia/cluster "localhost" :port 9042)))
-
-
-(defn- prepare-cassandra
-  "Write the schema to the database."
-  [cluster]
-  (alia/with-session (alia/connect cluster)
-    (try
-      (alia/execute "DROP KEYSPACE fs;")
-      (catch Exception ex))
-    (write-schema cluster)))
-
+(def cassandra (promise))
 
 (defn cassandra-fixture
   "This wraps the tests in this namespace, and sets up an embedded Cassandra
@@ -47,12 +27,12 @@
   (let [log-level-before (:current-level @log/config)]
     (log/set-level! :info)
     (try
-      (reset! consistency :one)
-      (start-cassandra)
-      (prepare-cassandra @cluster)
-      (f)
+      (with-systems systems [:config (config/map-config {:cassandra {:config-file "cassandra.yaml"}})
+                             :cassandra embedded/embedded12]
+        (deliver cassandra (:cassandra systems))
+        (try (cassandra/write-schema @cassandra "DROP KEYSPACE fs;") (catch Exception ex))
+        (f))
       (finally
-        (alia/shutdown @cluster)
         (log/set-level! log-level-before)))))
 
 
@@ -70,49 +50,44 @@
 ;;; The actual tests.
 
 (deftest absorb-test
-  (facts "about absorbing a file"
+  (testing "about absorbing a file"
 
-    (let [repo (cassandra-repository @cluster "not-used-atm")
+    (let [repo (cassandra-repository @cassandra :one "not-used-atm")
           file (File/createTempFile "cassandra" ".test")]
       (FileUtils/writeStringToFile file "cassandra test")
 
-      (fact "it succeeds"
-        (let [ref (absorb repo file)]
-          ref => truthy
+      (let [ref (absorb repo file)]
+        (is ref "absorbing succeeds")
 
-          (fact "it returns the correct reference"
-            (str ref) => "cassandra://2-Ll2ZG1O9D2DuVM4-8y_Oo8UMjn66zGw8OdMwUEngY")
+        (is (= (str ref) "cassandra://2-Ll2ZG1O9D2DuVM4-8y_Oo8UMjn66zGw8OdMwUEngY")
+            "it returns the correct reference")
 
-          (fact "it contains the file"
-            (exists repo ref) => true)
+        (is (exists repo ref) "it contains the file")
 
-          (fact "it can stream the contents"
-                (IOUtils/toString (stream repo ref)) => "cassandra test")
+        (is (= (IOUtils/toString (stream repo ref)) "cassandra test")
+            "it can stream the contents")
 
-          (fact "it can delete the file"
-                (.delete repo ref)
-                (exists repo ref) => false))))))
+        (.delete repo ref)
+        (is (not (exists repo ref)) "it can delete the file")))))
 
 
 (deftest store-test
-  (facts "about storing a file using a function"
+  (testing "about storing a file using a function"
 
-    (let [repo (cassandra-repository @cluster "not-used-atm")]
+    (let [repo (cassandra-repository @cassandra :one "not-used-atm")]
 
-      (fact "it succeeds"
-        (let [store-fn (fn [file-ref-os] (IOUtils/write "hi there!" file-ref-os))
-              ref (store repo store-fn)]
-          ref => truthy
+      (let [store-fn (fn [file-ref-os] (IOUtils/write "hi there!" file-ref-os))
+            ref (store repo store-fn)]
+        (is ref "storing succeeds")
 
-          (fact "it returns the correct reference"
-            (str ref) => "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
 
-          (fact "it contains the file"
-            (exists repo ref) => true)
+        (is (= (str ref) "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
+            "it returns the correct reference")
 
-          (fact "it can stream the contents"
-                (IOUtils/toString (stream repo ref)) => "hi there!")
+        (is (exists repo ref) "it contains the file")
 
-          (fact "it can delete the file"
-                (.delete repo ref)
-                (exists repo ref) => false))))))
+        (is (= (IOUtils/toString (stream repo ref)) "hi there!")
+            "it can stream the contents")
+
+        (.delete repo ref)
+        (is (not (exists repo ref)) "it can delete the file")))))

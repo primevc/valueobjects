@@ -44,10 +44,10 @@
 
 
 (defn simple-prime-type->cql-type
-  "Given a prime type, returns a tuple having the equivalent CQL type
-  and a conversion function to get to that type."
+  "Given a prime type keyword, returns a tuple having the equivalent
+  CQL type and a conversion function to get to that type."
   [type]
-  (case (keyword type)
+  (case type
     :prime.types/ObjectId   [ :blob       ObjectId->ByteBuffer    ]
     :prime.types/integer    [ :int        prime.types/to-Integer  ]
     :prime.types/Color      [ :int        prime.types/to-Integer  ]
@@ -66,7 +66,7 @@
   "Returns the ID of the given VO, converted to the correct CQL type."
   [{:keys [id] :as vo}]
   {:pre [id]}
-  (let [convert-fn (second (simple-prime-type->cql-type (.. vo voManifest _id valueType)))]
+  (let [convert-fn (second (simple-prime-type->cql-type (.. vo voManifest _id valueType keyword)))]
     (convert-fn id)))
 
 

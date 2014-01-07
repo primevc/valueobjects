@@ -8,7 +8,7 @@
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [prime/voproxy-core "0.1.0-SNAPSHOT"]
                  [org.elasticsearch/elasticsearch "0.90.5"]
-                 [org.clojars.touch/clj-elasticsearch "0.4.1"]
+                 [org.clojars.touch/clj-elasticsearch "0.4.2"]
                  [cheshire "5.2.0"]]
   :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"
                  {:extensions "true"

@@ -3,10 +3,11 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.types.nfs-repository
-  (:require [prime.types.repository-util :refer (mk-repository)]))
+  (:require [prime.types.repository-util :refer (mk-repository)]
+            [clojure.java.io :refer (as-file)]))
 
 
 (defmethod mk-repository "nfs"
   [_ descriptor]
   (let [[_ repository-name mounts-root-path] (re-matches #"^(.+?)@(.+?)$" descriptor)]
-    (prime.types.NFSRepository. mounts-root-path repository-name)))
+    (prime.types.NFSRepository. (as-file mounts-root-path) repository-name)))

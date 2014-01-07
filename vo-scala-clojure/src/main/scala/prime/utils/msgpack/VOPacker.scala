@@ -29,34 +29,39 @@ class VOPacker (out:OutputStream) extends ValuePacker(out)
     if (vo != null)
     {
       out.write(0xD7); // VO msgpack type header
-      packValueObject(vo, vo.voManifest, vo.voIndexSet);
+      packValueObject(vo, vo.voIndexSet);
     }
     else packNil();
   }
 
   /** Packs specific valueobject fields as set in the fields bitmask.  */
-  final def packValueObject(vo : ValueObject, manifest : ValueObjectManifest[_], fields : Int)
+  final def packValueObject(vo : ValueObject, fields : Int)
   {
+    val manifest = vo.voManifest;
     val mixinCount = manifest.mixinCount(fields);
     assert(mixinCount <= 7, "Packing ValueObjects with more than 7 mixins is currently not supported.");
 
     val fieldBits = fields >>> manifest.mixinIndexBitsReserved
     packValueObjectHeader(manifest.ID, mixinCount, fieldBits);
-    if (fieldBits != 0) packValueObjectFields(vo, manifest, fieldBits);
+    if (fieldBits != 0) packValueObjectFields(vo, fieldBits, manifest.mixinIndexBitsReserved);
 
     if (mixinCount > 0) for (m <- manifest.mixins)
     {
       val mixin = m.indexBitsShifted(fields);
-      if (mixin != 0) {
+      if (mixin != 0) try {
           packValueObjectHeader(m.manifest.ID, 0, mixin);
-          packValueObjectFields(vo, m.manifest, mixin);
+          packValueObjectFields(vo, mixin, m.numberOfIndexBitsShifted);
+      } catch {
+        case e : Throwable =>
+          throw new Exception("Error while packing "+ vo +" mixin: " + m + "; mixin: 0x" + Integer.toHexString(mixin) + " fields: 0x" + Integer.toHexString(fields), e)
       }
     }
   }
 
-  final def packValueObjectFields(vo : ValueObject, manifest : ValueObjectManifest[_], fields : Int)
+  final def packValueObjectFields(vo : ValueObject, fields : Int, startIndex : Int)
   {
-    var i = manifest.mixinIndexBitsReserved;
+    val manifest = vo.voManifest;
+    var i = startIndex;
     var fieldBits = fields;
     do {
       writeByte( fieldBits );

@@ -242,9 +242,7 @@ trait ValueObjectCompanion[T <: ValueObject] {
 
   def unapply(any : Any)  : Option[T] = try Option(valueOf(any)) catch { case _ => None }
 
-  def   apply(src : ValueSource) : T  = {
-    assert(src != null);
-
+  def   apply(src : ValueSource) : T  = if (src == null) empty else {
     val voc = this.subtype(src.typeID(manifest.ID));
     if (voc.manifest.VOType.erasure.isInstance(src))
       src.asInstanceOf[T];

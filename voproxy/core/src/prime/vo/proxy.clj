@@ -293,7 +293,7 @@
     [ [['vo] ['vo 'options]]
       'put-vo]
   `update
-    [ [['vo 'id] ['vo 'id 'options]]
+    [ [['vo] ['vo 'id] ['vo 'id 'options]]
       'update]
   `delete
     [ [['vo] ['vo 'options]]

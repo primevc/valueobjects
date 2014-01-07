@@ -81,7 +81,6 @@
       (let [fis (FileInputStream. file)
             fc (.getChannel fis)
             buffer (.map fc (FileChannel$MapMode/READ_ONLY) 0 (.size fc))
-            session (:session state)
             statement-fn (-> state :statements :create)
             hash (ref-hash ref)]
         (log/info "Storing file using MappedByteBuffer for FileRef" ref)
@@ -93,7 +92,6 @@
   [repo ref byte-array]
   (if-not (exists repo ref)
     (let [state (.state repo)
-          session (:session state)
           statement-fn (-> state :statements :create)
           buffer (ByteBuffer/wrap byte-array)
           hash (ref-hash ref)]
@@ -109,7 +107,6 @@
   [this ^FileRef ref]
   (log/info "Checking whether FileRef" ref "is stored.")
   (let [state (.state this)
-        session (:session state)
         statement-fn (-> state :statements :exists)
         hash (ref-hash ref)
         result (statement-fn [hash])
@@ -166,7 +163,6 @@
   [this ^FileRef ref]
   (log/info "Stream requested for FileRef" ref)
   (let [state (.state this)
-        session (:session state)
         statement-fn (-> state :statements :stream)
         hash (ref-hash ref)
         result (statement-fn [hash])
@@ -195,7 +191,6 @@
   [this ^FileRef ref]
   (log/info "Deleting file for FileRef" ref)
   (let [state (.state this)
-        session (:session state)
         statement-fn (-> state :statements :delete)
         hash (ref-hash ref)]
     (statement-fn [hash])))
@@ -211,7 +206,6 @@
   (let [session (cassandra/keyspaced system "fs")
         statement-fns (prepare-statements session consistency)]
     [[] {:repository-name repository-name
-         :session session
          :statements statement-fns
          :prefix "cassandra://"}]))
 

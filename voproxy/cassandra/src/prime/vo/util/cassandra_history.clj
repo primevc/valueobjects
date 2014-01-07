@@ -106,17 +106,18 @@
     (map msgpack/as-clojure (iterator-seq (.. unpacker iterator)))))
 
 
-;;--- TODO: VOAction enum definition
-(def ^:private actions
-  {:put (int 1)
-   :update (int 2)
-   :delete (int 3)
-   :append-to (int 5)
-   :move-to (int 4)
-   :remove-from (int 6)
-   :insert-at (int 7)
-   :replace-at (int 8)
-   :merge-at (int 9)})
+(defn- actions
+  [key]
+  (case key
+    :put (int 1)
+    :update (int 2)
+    :delete (int 3)
+    :append-to (int 5)
+    :move-to (int 4)
+    :remove-from (int 6)
+    :insert-at (int 7)
+    :replace-at (int 8)
+    :merge-at (int 9)))
 
 
 (defn- get-latest-put
@@ -130,7 +131,7 @@
                                       {:consistency consistency :keywordize? true}
                                       [(idconv vo)])]
     ;; Find first version where action == (:put actions)
-    (let [put-nr (:put actions)]
+    (let [put-nr (actions :put)]
       (first (filter #(= (:action %) put-nr) result)))))
 
 
@@ -144,44 +145,44 @@
     (if-let [row (nth result index nil)]
       (recur (inc index)
              (condp = (:action row)
-               (:put actions)
+               (actions :put)
                (let [vo-source (first (bytes->change-data (:data row)))]
                  (as-vo vo-source target-vo))
 
-               (:update actions)
+               (actions :update)
                (let [[vo-source _] (bytes->change-data (:data row))
                      update-vo (as-vo vo-source target-vo)]
                  (utils/deep-merge-with (fn [x y] y) accumulator update-vo))
 
-               (:delete actions)
+               (actions :delete)
                (empty target-vo)
 
-               (:append-to actions)
+               (actions :append-to)
                (let [[path path-vars value _] (bytes->change-data (:data row))
                      filled-path (pathops/fill-path path path-vars)]
                  (pathops/append-to-vo accumulator filled-path value))
 
-               (:move-to actions)
+               (actions :move-to)
                (let [[path path-vars to _] (bytes->change-data (:data row))
                      filled-path (pathops/fill-path path path-vars)]
                  (pathops/move-vo-to accumulator filled-path to))
 
-               (:remove-from actions)
+               (actions :remove-from)
                (let [[path path-vars _] (bytes->change-data (:data row))
                      filled-path (pathops/fill-path path path-vars)]
                  (pathops/remove-from accumulator filled-path))
 
-               (:insert-at actions)
+               (actions :insert-at)
                (let [[path path-vars value _] (bytes->change-data (:data row))
                      filled-path (pathops/fill-path path path-vars)]
                  (pathops/insert-at accumulator filled-path value))
 
-               (:replace-at actions)
+               (actions :replace-at)
                (let [[path path-vars value _] (bytes->change-data (:data row))
                      filled-path (pathops/fill-path path path-vars)]
                  (pathops/replace-at accumulator filled-path value))
 
-               (:merge-at actions)
+               (actions :merge-at)
                (let [[path path-vars value _] (bytes->change-data (:data row))
                      filled-path (pathops/fill-path path path-vars)]
                  (pathops/merge-at accumulator filled-path value))

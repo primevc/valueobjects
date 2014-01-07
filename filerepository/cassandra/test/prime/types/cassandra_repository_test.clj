@@ -10,7 +10,9 @@
             [containium.systems.config :as config]
             [containium.systems.cassandra :as cassandra]
             [containium.systems.cassandra.embedded12 :as embedded]
-            [taoensso.timbre :as log])
+            [taoensso.timbre :as log]
+            [prime.types.repository-util :as repo-util]
+            [prime.types.cassandra-repository-util])
   (:import [java.io File]
            [org.apache.commons.io FileUtils IOUtils]
            [prime.types FileRef]))
@@ -50,7 +52,7 @@
 ;;; The actual tests.
 
 (deftest absorb-test
-  (testing "about absorbing a file"
+  (testing "absorbing a file"
 
     (let [repo (cassandra-repository @cassandra :one "not-used-atm")
           file (File/createTempFile "cassandra" ".test")]
@@ -72,7 +74,7 @@
 
 
 (deftest store-test
-  (testing "about storing a file using a function"
+  (testing "storing a file using a function"
 
     (let [repo (cassandra-repository @cassandra :one "not-used-atm")]
 
@@ -80,6 +82,27 @@
             ref (store repo store-fn)]
         (is ref "storing succeeds")
 
+
+        (is (= (str ref) "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
+            "it returns the correct reference")
+
+        (is (exists repo ref) "it contains the file")
+
+        (is (= (IOUtils/toString (stream repo ref)) "hi there!")
+            "it can stream the contents")
+
+        (.delete repo ref)
+        (is (not (exists repo ref)) "it can delete the file")))))
+
+
+(deftest mk-repository-test
+  (testing "creating a Cassandra repository through the mk-repository multimethod"
+
+    (let [repo (repo-util/mk-repository "cassandra" "not-used-atm@localhost:9042")]
+
+      (let [store-fn (fn [file-ref-os] (IOUtils/write "hi there!" file-ref-os))
+            ref (store repo store-fn)]
+        (is ref "storing succeeds")
 
         (is (= (str ref) "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
             "it returns the correct reference")

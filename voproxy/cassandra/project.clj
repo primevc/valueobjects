@@ -7,6 +7,7 @@
   :url "https://github.com/primevc/valueobjects"
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [prime/voproxy-core "0.1.0-SNAPSHOT"]
+                 [prime/voserializer-cheshire "0.1.0-SNAPSHOT"]
                  [cc.qbits/hayt "1.4.0"]
                  [containium "0.1.0-SNAPSHOT"]] ;---TODO: Use containium-cassandra when available.
   :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"

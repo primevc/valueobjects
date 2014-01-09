@@ -7,6 +7,7 @@
   :url "https://github.com/primevc/valueobjects"
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [prime/voproxy-core "0.1.0-SNAPSHOT"]
+                 [prime/voserializer-cheshire "0.1.0-SNAPSHOT"]
                  [org.elasticsearch/elasticsearch "0.90.5"]
                  [org.clojars.touch/clj-elasticsearch "0.4.2"]
                  [cheshire "5.2.0"]]

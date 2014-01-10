@@ -5,7 +5,7 @@ import java.lang.Math
 import java.io.OutputStream
 import org.bson.types.ObjectId
 import clojure.lang.{IPersistentMap, IMapEntry, ISeq, Seqable}
-import prime.types.{Conversion, VORef, Ref, RefArray, EmailAddr, EnumValue, RGBA, FileRef, URI, DateTime, Date}
+import prime.types.{Conversion, VORef, Ref, RefArray, EmailAddr, EnumValue, RGBA, FileRef, URI, URL, DateTime, Date}
 import prime.vo._
 import Util._
 
@@ -92,6 +92,7 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
 
   final def pack(fileRef : FileRef)                 { super.pack(fileRef.toString);       }
   final def pack(uri     : URI)                     { super.pack(Conversion.String(uri)); }
+  final def pack(url     : URL)                     { super.pack(Conversion.String(url)); }
   final def pack(email   : EmailAddr)               { super.pack(email.toString);         }
   final def pack(rgba    : RGBA)                    { super.pack(rgba.rgba);              }
 
@@ -111,6 +112,7 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
     case v : DateTime                 => pack(v);
     case v : Date                     => pack(v);
     case v : URI                      => pack(v);
+    case v : URL                      => pack(v);
     case v : FileRef                  => pack(v);
     case v : RGBA                     => pack(v);
     case v : EmailAddr                => pack(v);

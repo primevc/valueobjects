@@ -18,7 +18,7 @@
     (timbre/set-config! [:appenders :standard-out :enabled?] false)
     (timbre/set-config! [:appenders :tools.logging] (eval tools-logging-appender))
     (timbre/info "Standard out Timbre logging now forwarded to tools.logging."))
-  (catch java.lang.ClassNotFoundExceptionException ex
+  (catch java.lang.ClassNotFoundException ex
     (println (str "prime.utils.timbre: Could not load tools.logging, make sure "
                   "tools.logging is on your classpath.")))
   (catch java.io.FileNotFoundException ex

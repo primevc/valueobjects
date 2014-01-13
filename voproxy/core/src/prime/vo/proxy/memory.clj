@@ -150,7 +150,7 @@
   (search [this vo options]
     (debug "Searching for VOs based on" vo "having options" options "in" @data)
     (let [vos (vals (get @data (votype->hex vo)))]
-      (filter (partial matches? vo) vos))))
+      (doall (filter (partial matches? vo) vos)))))
 
 
 ;;; A constructor function.

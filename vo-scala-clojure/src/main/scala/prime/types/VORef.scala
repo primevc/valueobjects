@@ -29,7 +29,7 @@ object VORef {
       require(V.manifest.VOType.erasure.isInstance(r._cached), V.empty.getClass+" incompatible with "+r._cached.getClass);
       r.asInstanceOf[VORef[V]]
     case r:  Ref[_] => new VORefImpl(IDType(r.ref), V.valueOf(r.vo_!));
-    case V(value)   => vo2ref(value)
+    case V(value) if V(value) != V.empty => vo2ref(value)
     case None       => throw NoInputException;
     case value      =>
       value match {
@@ -61,7 +61,7 @@ protected[prime] final class VORefImpl[V <: ValueObject with ID](val _id:V#IDTyp
 {
   assert(_cached != null, "VORefImpl requires _cached to be at least the empty ValueObject.");
   if (isDefined) require(_id != null, toString + "._id should be non-null when _cached is set.");
-  
+
   @inline def isEmpty   = _cached.voCompanion.empty == _cached;
   @inline def isDefined = _cached.voCompanion.empty != _cached;
 
@@ -70,7 +70,7 @@ protected[prime] final class VORefImpl[V <: ValueObject with ID](val _id:V#IDTyp
     else throw new IllegalArgumentException(toString + (if (vo == null) " cannot cache a null VO." else "._id does not match the given VO._id: "+ vo));
   }
 
-  
+
   def   ? (implicit voGetter : V#IDType => Option[V]) = if (isDefined) Some(_cached) else voGetter(_id) match { case opt @ Some(vo) => apply(vo); opt; case None => None }
   def get = if (isDefined) _cached else throw new NoSuchElementException(toString + ".get");
 

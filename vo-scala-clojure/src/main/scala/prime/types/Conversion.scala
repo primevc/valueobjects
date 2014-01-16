@@ -282,8 +282,6 @@ object Conversion
     case value       => val v = uri.invoke(value); if (v != null) v.asInstanceOf[URI] else throw FailureException;
   }
 
-  implicit def URI(ref : FileRef)(implicit repository:FileRepository) : URI = repository.toURI(ref);
-
   //  -------
 
   def URL (value:URI) = if (value.getHost != null) value.toURL else throw FailureException;

@@ -4,17 +4,23 @@
 
 (ns prime.utils.timbre
   "Load this namespace to have timbre logging over tools.logging."
-  (:require [taoensso.timbre :as timbre]
-            [clojure.tools.logging :as logging]))
+  (:require [taoensso.timbre :as timbre]))
 
 
-(def tools-logging-appender
-  {:doc "Forwards logging messages to tools.logging."
-   :enabled? true
-   :async? false
-   :fn (fn [{:keys [level message throwable ns]}]
-         (logging/log ns level throwable message))})
-
-(timbre/set-config! [:appenders :standard-out :enabled?] false)
-
-(timbre/set-config! [:appenders :tools.logging] tools-logging-appender)
+(try
+  (require 'clojure.tools.logging)
+  (let [tools-logging-appender
+        (quote {:doc "Forwards logging messages to tools.logging."
+                :enabled? true
+                :async? false
+                :fn (fn [{:keys [level message throwable ns]}]
+                      (clojure.tools.logging/log ns level throwable message))})]
+    (timbre/set-config! [:appenders :standard-out :enabled?] false)
+    (timbre/set-config! [:appenders :tools.logging] (eval tools-logging-appender))
+    (timbre/info "Standard out Timbre logging now forwarded to tools.logging."))
+  (catch java.lang.ClassNotFoundException ex
+    (println (str "prime.utils.timbre: Could not load tools.logging, make sure "
+                  "tools.logging is on your classpath.")))
+  (catch java.io.FileNotFoundException ex
+    (println (str "prime.utils.timbre: Could not load tools.logging, make sure "
+                  "tools.logging is on your classpath."))))

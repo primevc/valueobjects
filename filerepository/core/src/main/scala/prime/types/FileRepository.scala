@@ -98,6 +98,13 @@ trait FileRepository {
   def store[T](writer: OutputStream => T): FileRef
 }
 
+object FileRepository {
+
+  /** Automatically convert a FileRef to an URI. */
+  implicit def FileRef2URI(ref: FileRef)(implicit repository: FileRepository): URI =
+    repository.toURI(ref);
+}
+
 /** This trait must be implemented by file repositories that want to support
   * garbage collection. The functions in this trait should not be called
   * directly! The garbage collector uses these functions. See the

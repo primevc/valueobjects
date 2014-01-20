@@ -24,4 +24,10 @@
                                 [:id "clojure-test"]
                                 [:phase "test"]
                                 [:goals [:goal "test"]]])}]]
-  :pom-addition [:properties [:project.build.sourceEncoding "UTF-8"]])
+  :pom-addition [:properties [:project.build.sourceEncoding "UTF-8"]]
+  :plugins [[lein-midje-doc "0.0.17"]]
+  :documentation {:files {"voproxy-doc" {:input "src/prime/vo/proxy_tests.clj"
+                                         :title "VOProxy documentation"
+                                         :sub-title "VOProxy documentation by tests"
+                                         :author "Arnout Roemers"
+                                         :email  "github@functionalbytes.nl"}}})

@@ -18,7 +18,8 @@
   (:use [prime.types :only (to-URI)]
         [clojure.java.io :only (resource)]
         [clojure.string :only (replace split)])
-  (:require [containium.systems.cassandra :as cassandra]
+  (:require [containium.systems :refer (protocol-forwarder)]
+            [containium.systems.cassandra :as cassandra :refer (Cassandra)]
             [taoensso.timbre :as log]
             [clojure.java.io :as io])
   (:import [prime.types FileRef LocalFileRef FileRefInputStream FileRefOutputStream]
@@ -203,7 +204,7 @@
   [system consistency repository-name]
   (log/info "Creating CassandraRepository object for repository" repository-name)
   (write-schema system)
-  (let [session (cassandra/keyspaced system "fs")
+  (let [session ((protocol-forwarder Cassandra) (cassandra/keyspaced system "fs"))
         statement-fns (prepare-statements session consistency)]
     [[] {:repository-name repository-name
          :statements statement-fns

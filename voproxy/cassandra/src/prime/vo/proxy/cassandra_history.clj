@@ -7,7 +7,8 @@
   protocols, having Cassandra as its backend."
   (:require [prime.vo.proxy :refer (VOProxy VOHistoryProxy)]
             [prime.vo.util.cassandra-history :as ch]
-            [containium.systems.cassandra :as cassandra]
+            [containium.systems :refer (protocol-forwarder)]
+            [containium.systems.cassandra :as cassandra :refer (Cassandra)]
             [qbits.hayt :as hayt]))
 
 
@@ -128,7 +129,8 @@
   (when-not (cassandra/has-keyspace? system keyspace)
     (cassandra/write-schema system (str "CREATE KEYSPACE " keyspace " WITH REPLICATION = "
                               "{ 'class' : 'SimpleStrategy', 'replication_factor' : 3 };")))
-  (let [proxy (CassandraHistoryVOProxy. (cassandra/keyspaced system keyspace) consistency keyspace)]
+  (let [session ((protocol-forwarder Cassandra) (cassandra/keyspaced system keyspace))
+        proxy (CassandraHistoryVOProxy. session consistency keyspace)]
     (apply add-vo-support proxy vos)
     proxy))
 

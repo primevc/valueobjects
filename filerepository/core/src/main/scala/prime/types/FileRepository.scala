@@ -96,6 +96,12 @@ trait FileRepository {
     * @param writer The function that writes the data to the OutputStream.
     */
   def store[T](writer: OutputStream => T): FileRef
+
+  /** Return a [[java.io.File]] for the specified [[prime.types.FileRef]] */
+  def getFile(ref: FileRef): File
+
+  /** Performs a getFile operation on this FileRepository. */
+  def apply(ref: FileRef) = getFile(ref)
 }
 
 object FileRepository {
@@ -128,15 +134,6 @@ object LocalFileRef {
 
 
 trait LocalFileRepository extends FileRepository {
-
-  /** Return the [[java.io.File]] where the specified [[prime.types.FileRef]]
-    * can be found on this host.
-    *
-    * @param f The FileRef to get a File object for. Note that this must be a
-    *          FileRef with the `nfs: ` scheme for its URI.
-    */
-  def getFile(instance: FileRef): File
-  def apply(instance: FileRef) = getFile(instance)
 
   val root: File
   val prefix: String

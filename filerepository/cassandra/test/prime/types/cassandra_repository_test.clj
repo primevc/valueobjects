@@ -82,7 +82,6 @@
             ref (store repo store-fn)]
         (is ref "storing succeeds")
 
-
         (is (= (str ref) "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
             "it returns the correct reference")
 
@@ -111,6 +110,26 @@
 
         (is (= (IOUtils/toString (stream repo ref)) "hi there!")
             "it can stream the contents")
+
+        (.delete repo ref)
+        (is (not (exists repo ref)) "it can delete the file")))))
+
+(deftest get-file-test
+  (testing "retrieving a file via get-file"
+
+    (let [repo (cassandra-repository @cassandra :one "not-used-atm")]
+
+      (let [store-fn (fn [file-ref-os] (IOUtils/write "hi there!" file-ref-os))
+            ref (store repo store-fn)]
+        (is ref "storing succeeds")
+
+        (is (= (str ref) "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
+            "it returns the correct reference")
+
+        (is (exists repo ref) "it contains the file")
+
+        (is (= (FileUtils/readFileToString (get-file repo ref)) "hi there!")
+            "it can return the contents as a File")
 
         (.delete repo ref)
         (is (not (exists repo ref)) "it can delete the file")))))

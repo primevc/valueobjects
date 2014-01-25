@@ -26,6 +26,7 @@
            [java.io File InputStream OutputStream ByteArrayOutputStream FileInputStream]
            [java.nio ByteBuffer MappedByteBuffer]
            [java.nio.channels FileChannel FileChannel$MapMode]
+           [java.nio.file StandardOpenOption]
            [org.apache.commons.codec.binary Base64]
            [org.apache.cassandra.utils ByteBufferUtil]))
 
@@ -186,6 +187,25 @@
       ref)))
 
 
+(defn repo-getFile
+  "Returns a File containing the data as referenced by the FileRef."
+  [this ^FileRef ref]
+  (log/info "File requested for FileRef" ref)
+  (let [state (.state this)
+        hash (ref-hash ref)
+        tmp (File. (:tmp-dir state) (str "cfr-" hash))]
+    (when-not (.exists tmp)
+      (log/info "File not available in temporary directory, creating it now.")
+      (let [statement-fn (-> state :statements :stream)
+            result (statement-fn [hash])
+            data (:data (first result))
+            channel (FileChannel/open (.toPath tmp) (into-array [StandardOpenOption/CREATE_NEW
+                                                                 StandardOpenOption/WRITE]))]
+        (.write channel data)
+        (.close channel)))
+    tmp))
+
+
 (defn repo-delete
   "Deletes the specified FileRef from the repository. This function is called by
   the garbage collector and should not be called by other clients."
@@ -208,7 +228,9 @@
         statement-fns (prepare-statements session consistency)]
     [[] {:repository-name repository-name
          :statements statement-fns
-         :prefix "cassandra://"}]))
+         :prefix "cassandra://"
+         :tmp-dir (System/getProperty "java.io.tmpdir")}]))
+
 
 (gen-class
   :name "prime.types.CassandraRepository"
@@ -250,3 +272,4 @@
 (def toURI repo-toURI)
 (def absorb repo-absorb)
 (def stream repo-stream)
+(def get-file repo-getFile)

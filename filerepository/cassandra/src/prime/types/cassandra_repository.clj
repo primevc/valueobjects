@@ -18,8 +18,7 @@
   (:use [prime.types :only (to-URI)]
         [clojure.java.io :only (resource)]
         [clojure.string :only (replace split)])
-  (:require [containium.systems :refer (protocol-forwarder)]
-            [containium.systems.cassandra :as cassandra :refer (Cassandra)]
+  (:require [containium.systems.cassandra :as cassandra]
             [taoensso.timbre :as log]
             [clojure.java.io :as io])
   (:import [prime.types FileRef LocalFileRef FileRefInputStream FileRefOutputStream]
@@ -244,7 +243,7 @@
   (log/info "Creating CassandraRepository object for repository" repository-name)
   (write-schema system)
   (clean-dir (File. (System/getProperty "java.io.tmpdir")) "cfr-" 24)
-  (let [session ((protocol-forwarder Cassandra) (cassandra/keyspaced system "fs"))
+  (let [session (cassandra/keyspaced system "fs")
         statement-fns (prepare-statements session consistency)]
     [[] {:repository-name repository-name
          :statements statement-fns
@@ -258,7 +257,7 @@
   :init init
   :prefix "repo-"
   :state state
-  :constructors {[containium.systems.cassandra.Cassandra clojure.lang.Keyword String] []})
+  :constructors {[Object clojure.lang.Keyword String] []})
 
 
 ;;; API functions. Use these to call the repository functions on the

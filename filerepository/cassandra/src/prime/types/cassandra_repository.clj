@@ -23,7 +23,7 @@
             [taoensso.timbre :as log]
             [clojure.java.io :as io])
   (:import [prime.types FileRef LocalFileRef FileRefInputStream FileRefOutputStream]
-           [java.io File InputStream OutputStream ByteArrayOutputStream FileInputStream]
+           [java.io File InputStream OutputStream ByteArrayOutputStream FileInputStream FileFilter]
            [java.nio ByteBuffer MappedByteBuffer]
            [java.nio.channels FileChannel FileChannel$MapMode]
            [java.nio.file StandardOpenOption]
@@ -100,6 +100,23 @@
       (log/debug "Underlying FileRef not stored yet, storing it now.")
       (statement-fn [hash buffer]))
     (log/debug "Underlying FileRef already stored.")))
+
+
+(defn- clean-dir
+  "Removes files from dir, having a name starting with prefix (can be
+  nil), and was not modified the last specified hours."
+  [^File dir ^String prefix ^Long hours]
+  (log/info "Removing files from" (.getAbsolutePath dir) "having a the prefix" prefix
+            "and not modified since the last" hours "hours.")
+  (let [filter (reify FileFilter
+                 (^boolean accept [this ^File f]
+                   (boolean (and (.isFile f)
+                                 (if prefix (.. f getName (startsWith prefix)) true)
+                                 (< (.lastModified f)
+                                    (- (System/currentTimeMillis) (* 1000 60 60 hours)))))))]
+    (doseq [file (.listFiles dir filter)]
+      (log/debug "Deleting file" file)
+      (.delete file))))
 
 
 ;;; Implementation of prime.types.FileRepository interface.
@@ -194,15 +211,17 @@
   (let [state (.state this)
         hash (ref-hash ref)
         tmp (File. (:tmp-dir state) (str "cfr-" hash))]
-    (when-not (.exists tmp)
-      (log/info "File not available in temporary directory, creating it now.")
-      (let [statement-fn (-> state :statements :stream)
-            result (statement-fn [hash])
-            data (:data (first result))
-            channel (FileChannel/open (.toPath tmp) (into-array [StandardOpenOption/CREATE_NEW
-                                                                 StandardOpenOption/WRITE]))]
-        (.write channel data)
-        (.close channel)))
+    (if-not (.exists tmp)
+      (do (log/info "File not available in temporary directory; creating it now.")
+          (let [statement-fn (-> state :statements :stream)
+                result (statement-fn [hash])
+                data (:data (first result))
+                channel (FileChannel/open (.toPath tmp) (into-array [StandardOpenOption/CREATE_NEW
+                                                                     StandardOpenOption/WRITE]))]
+            (.write channel data)
+            (.close channel)))
+      (do (log/info "File already available in temporary directory; touching it now.")
+          (.setLastModified tmp (System/currentTimeMillis)))) ;; touch
     tmp))
 
 
@@ -224,6 +243,7 @@
   [system consistency repository-name]
   (log/info "Creating CassandraRepository object for repository" repository-name)
   (write-schema system)
+  (clean-dir (File. (System/getProperty "java.io.tmpdir")) "cfr-" 24)
   (let [session ((protocol-forwarder Cassandra) (cassandra/keyspaced system "fs"))
         statement-fns (prepare-statements session consistency)]
     [[] {:repository-name repository-name

@@ -39,7 +39,7 @@
 (defn- prepare-statements
   "Prepare the statements used for the Cassandra repository."
   [system consistency]
-  (log/debug "Preparing statements for Cassandra repository.")
+  (log/info "Preparing statements for Cassandra repository.")
   (letfn [(mk-cassandra-fn [statement]
             (let [prepared (cassandra/prepare system statement)]
               (partial cassandra/do-prepared system prepared {:consistency consistency
@@ -78,13 +78,13 @@
         prefix (:prefix state)
         ref (LocalFileRef/apply file prefix)]
     (if (exists repo ref)
-      (log/info "File already stored for FileRef" ref)
+      (log/debug "File already stored for FileRef" ref)
       (let [fis (FileInputStream. file)
             fc (.getChannel fis)
             buffer (.map fc (FileChannel$MapMode/READ_ONLY) 0 (.size fc))
             statement-fn (-> state :statements :create)
             hash (ref-hash ref)]
-        (log/info "Storing file using MappedByteBuffer for FileRef" ref)
+        (log/debug "Storing file using MappedByteBuffer for FileRef" ref)
         (statement-fn [hash buffer])))
     ref))
 
@@ -123,13 +123,13 @@
 (defn repo-existsImpl
   "Test whether the specified FileRef exists in the repository."
   [this ^FileRef ref]
-  (log/info "Checking whether FileRef" ref "is stored.")
+  (log/debug "Checking whether FileRef" ref "is stored.")
   (let [state (.state this)
         statement-fn (-> state :statements :exists)
         hash (ref-hash ref)
         result (statement-fn [hash])
         exists (= 1 (:count (first result)))]
-    (log/info "FileRef" ref (if exists "is stored." "is not stored."))
+    (log/debug "FileRef" ref (if exists "is stored." "is not stored."))
     exists))
 
 
@@ -151,7 +151,7 @@
 
   A FileRef to the location of the stored content is returned."
   [this in]
-  (log/info "Absorb called with inputstream:" in)
+  (log/debug "Absorb called with inputstream:" in)
   (condp instance? in
     ;; InputStream implementation.
     InputStream
@@ -179,7 +179,7 @@
 (defn repo-stream
   "Open an InputStream to the file as referenced by the FileRef."
   [this ^FileRef ref]
-  (log/info "Stream requested for FileRef" ref)
+  (log/debug "Stream requested for FileRef" ref)
   (let [state (.state this)
         statement-fn (-> state :statements :stream)
         hash (ref-hash ref)
@@ -228,7 +228,7 @@
   "Deletes the specified FileRef from the repository. This function is called by
   the garbage collector and should not be called by other clients."
   [this ^FileRef ref]
-  (log/info "Deleting file for FileRef" ref)
+  (log/debug "Deleting file for FileRef" ref)
   (let [state (.state this)
         statement-fn (-> state :statements :delete)
         hash (ref-hash ref)]
@@ -283,7 +283,7 @@
   must be an ordinary Clojure function, which takes a FileRefOutputStream as its
   sole argument."
   [this f]
-  (log/info "Store requested with Clojure function.")
+  (log/debug "Store requested with Clojure function.")
   (let [scala-func (reify scala.Function1 (apply [_ x] (f x)))]
     (.store this scala-func)))
 

@@ -289,6 +289,7 @@ object Conversion
   def URL (value:Any) : URL = unpack(value) match {
     case v:URL          => v
     case v:URI          => v.toURL
+    case v:RawType      => URL(v.asString);
     case None           => throw NoInputException;
     case value          => val v = uri.invoke(value); if (v != null) v.asInstanceOf[URI].toURL else throw FailureException;
   }

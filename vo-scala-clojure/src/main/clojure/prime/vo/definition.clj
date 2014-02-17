@@ -99,8 +99,11 @@
              valueType (eval valueType-expr)]
     (if (or (not (instance? prime.types.package$ValueTypes$Tdef valueType))
             (. ^prime.types.package$ValueTypes$Tdef valueType ref))
-      `(try (. ~valueType-expr (~'convert ~value-expr))
-        (catch Conversion$NoInputException$ e# ~(default-value-expr votrait prop)))
+      (let [default-value-expr (default-value-expr votrait prop)
+            v-sym (with-meta 'value {:tag (class (eval default-value-expr))})] ; Forces return type
+        `(let [~v-sym (try (. ~valueType-expr (~'convert ~value-expr))
+                           (catch Conversion$NoInputException$ e# ~default-value-expr))]
+          ~v-sym))
     ;else Tdef: not a ref
       (let [valueType ^prime.types.package$ValueTypes$Tdef valueType]
         `(~(.. valueType keyword sym) ~value-expr)))))

@@ -180,7 +180,7 @@
         (intern-vo-expr ~'value-map (list ~runtime-constructor ~'value-map))
 
       (map? ~'value-map)
-        (let [~'construct-expr# (list '.apply '~(companion-object-symbol votrait) ~@args)
+        (let [~'construct-expr# ~(apply list `'.apply `'~(companion-object-symbol votrait) args)
               ~'instance#       (if ~'stable-value-map (eval? ~'construct-expr#))
               ~'undefined       (set/difference (set (map key ~'value-map)) ~(set props))]
           (assert (empty? ~'undefined), (str "\n  " ~votrait " defined fields,\n  are:   " (prn-str ~@props) ",\n  not! " ~'undefined))

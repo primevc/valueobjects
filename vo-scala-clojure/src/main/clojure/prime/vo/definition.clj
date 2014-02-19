@@ -100,7 +100,7 @@
     (if (or (not (instance? prime.types.package$ValueTypes$Tdef valueType))
             (. ^prime.types.package$ValueTypes$Tdef valueType ref))
       (let [default-value-expr (default-value-expr votrait prop)
-            v-sym (with-meta 'value {:tag (symbol (.getName (.klass valueType)))})] ; Forces return type
+            v-sym (with-meta 'value {:tag (symbol (.getName (.klass ^prime.types.package$ValueType valueType)))})] ; Forces return type
         `(let [~v-sym (try (. ~valueType-expr (~'convert ~value-expr))
                            (catch Conversion$NoInputException$ e# ~default-value-expr))]
           ~v-sym))

@@ -177,15 +177,16 @@
 
 
 (defn repo-stream
-  "Open an InputStream to the file as referenced by the FileRef."
+  "Open an InputStream to the file as referenced by the FileRef. Or
+  returns nil/null when the ref cannot be found."
   [this ^FileRef ref]
   (log/debug "Stream requested for FileRef" ref)
   (let [state (.state this)
         statement-fn (-> state :statements :stream)
         hash (ref-hash ref)
-        result (statement-fn [hash])
-        data (:data (first result))]
-    (ByteBufferUtil/inputStream data)))
+        result (statement-fn [hash])]
+    (when-let [data (:data (first result))]
+      (ByteBufferUtil/inputStream data))))
 
 
 (defn repo-store

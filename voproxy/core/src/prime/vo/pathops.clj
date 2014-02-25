@@ -41,6 +41,11 @@
     path-step))
 
 
+(defn- array-like?
+  [val]
+  (or (sequential? val) (.. val getClass isArray) (instance? java.util.List val)))
+
+
 ;;; General functions, used by the other concrete path operations.
 
 (defn get-in-vo
@@ -98,7 +103,9 @@
   "Given a path in a VO that points to an array, this append the value
   at the end of that array."
   [vo path value]
-  (update-in-vo vo path conj value))
+  (if (array-like? value)
+    (update-in-vo vo path concat value)
+    (update-in-vo vo path conj value)))
 
 
 ;;; Concrete opertion, insert at.
@@ -160,7 +167,7 @@
   (assert container "replace is only possible in existing container")
   (if (vector? container)
     (let [index (relative-vector-index (count container) at)]
-      (if (or (sequential? value) (.. value getClass isArray) (instance? java.util.List value))
+      (if (array-like? value)
         (let [[pre post] (split-at index container)]
           (into [] (concat pre value (next post))))
         (assoc container index value)))

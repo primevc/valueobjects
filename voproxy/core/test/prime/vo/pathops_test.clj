@@ -44,6 +44,14 @@
     => {:booklet {:spreads [{:id 1 :tags ["ahoi" "string"]}]}})
 
 
+  (fact "multiple values can be appended to an array"
+
+    (append-to-vo {:booklet {:spreads [{:id 1 :tags ["can" "I" "have" "a"]}]}}
+                  [:booklet :spreads {:id 1} :tags]
+                  ["whoop" "whoop"])
+    => {:booklet {:spreads [{:id 1 :tags ["can" "I" "have" "a" "whoop" "whoop"]}]}})
+
+
   (fact "a value can be inserted in an array as a specific index"
 
     (insert-at {:booklet {:spreads [{:id 1 :tags [:a :b :c "ahoi"]}]}}

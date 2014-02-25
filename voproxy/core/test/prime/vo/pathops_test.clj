@@ -99,7 +99,14 @@
       (replace-at {:publication {:booklet {:firstPageOffset 1}}}
                   [:publication :booklet :firstPageOffset]
                   2)
-      => {:publication {:booklet {:firstPageOffset 2}}}))
+      => {:publication {:booklet {:firstPageOffset 2}}})
+
+    (fact "a value within an array can be replaced with multiple values"
+
+      (replace-at {:booklet {:spreads [{:id 1 :tags [0 1 2 3 4]}]}}
+                  [:booklet :spreads {:id 1} :tags 2]
+                  ["two" "two" "two"])
+      => {:booklet {:spreads [{:id 1 :tags [0 1 "two" "two" "two" 3 4]}]}}))
 
 
   (fact "a map can be merged in VO, replacing its values"

@@ -62,7 +62,10 @@
     [proxy vo path path-vars value options]
     "Given a VO and a path to a value, which may point to an ordinary
     value or to an index in an array, this replaces that value with
-    the new value.")
+    the new value. If the value is a vector and the path points to an
+    index in an array, the appointed array member is replaced with all
+    the values in the given vector. E.g. (replace-at [0 1 2] [1] nil
+    [9 9 9]) => [0 9 9 9 2]")
 
   (merge-at [vo path path-vars value] [proxy vo path path-vars value]
     [proxy vo path path-vars value options]

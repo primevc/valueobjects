@@ -159,7 +159,11 @@
   [container at value]
   (assert container "replace is only possible in existing container")
   (if (vector? container)
-    (assoc container (relative-vector-index (count container) at) value)
+    (let [index (relative-vector-index (count container) at)]
+      (if (or (sequential? value) (.. value getClass isArray) (instance? java.util.List value))
+        (let [[pre post] (split-at index container)]
+          (into [] (concat pre value (next post))))
+        (assoc container index value)))
     (assoc container at value)))
 
 

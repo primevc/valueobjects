@@ -524,8 +524,8 @@
   [client index vo path path-vars value options]
   {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
   (prn vo path path-vars value options)
-  (assert (boolean (vo/array-field? (last (vo/fields-path-seq vo (butlast path)))))
-          "Function append-to only applicable to paths inside an array.")
+  (assert (boolean (vo/array-field? (last (vo/fields-path-seq vo path))))
+          "Function append-to only applicable to paths pointing to an array.")
   (let [is-array?               (boolean (pathops/array-like? value))
         [resolved-path varnum]  (resolve-path vo path)
         update-val              (if is-array?

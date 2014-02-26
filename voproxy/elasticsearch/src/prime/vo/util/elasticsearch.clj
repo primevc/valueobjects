@@ -9,6 +9,7 @@
             [cheshire [core :as core] [generate :as gen]]
             [clj-elasticsearch.client :as ces]
             [prime.vo.source :refer (def-valuesource)]
+            [prime.vo.pathops :as pathops]
             [prime.vo.util.json :as json]) ; For loading the right VO encoders in Cheshire.
   (:import [prime.types EnumValue package$ValueType package$ValueTypes$Tdef
             package$ValueTypes$Tarray package$ValueTypes$Tenum]
@@ -482,11 +483,11 @@
 (defn- get-pos [step varname]
   (let [[k v] (first step)]
     (assert (string? k) k)
-    (apply str "var pos = -1; for (var i = 0; (i < path.size() && pos == -1); i++) { if(path[i]['" k "'] == n" varname ") { pos = i; }}")))
+    (str "var pos = -1; for (var i = 0; (i < path.size() && pos == -1); i++) { if(path[i]['" k "'] == n" varname ") { pos = i; }}")))
 
 (defn- get-pos-for-str [step]
   (prn "Step: " step)
-  (apply str "var pos = -1; for (var i = 0; (i < path.size() && pos == -1); i++) { if(path[i] == " (core/encode step) ") { pos = i; }}"))
+  (str "var pos = -1; for (var i = 0; (i < path.size() && pos == -1); i++) { if(path[i] == " (core/encode step) ") { pos = i; }}"))
 
 (defn resolve-path-simple [path]
   (loop [i 0 r "var path = ctx._source" varnum -1]
@@ -494,11 +495,9 @@
       (if (nil? step)
         [r varnum] ; Return result
         (let [varnum (if (map? step) (inc varnum) #_else varnum)
-          r
-          (cond
-            (map? step) (str r "; " (get-pos step varnum) " path = path[pos]")
-            :else (str r "['" step "']")
-          )]
+              r (if (map? step)
+                  (str r "; " (get-pos step varnum) " path = path[pos]")
+                  (str r "['" step "']"))]
           (recur (inc i) r varnum))))))
 
 (defn resolve-path [vo path]
@@ -520,15 +519,21 @@
 
 ;TODO convert names!
 ; TODO -> Use insert-at script for this. Except leave position in .add(newval).
+;;---TODO fields-path-seq gets called multiple times, and so is hexify-path. This can be optimised.
 (defn append-to "Add something to the end of an array"
   [client index vo path path-vars value options]
   {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
   (prn vo path path-vars value options)
-  (let [
-    [resolved-path varnum]  (resolve-path vo path)
-    script                  (apply str resolved-path "; if(path == null) { " (.substring resolved-path 11) " = [newval]; } else { path.add(newval)};")
-    parameters              (into {} (cons [:newval value] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
-    ]
+  (assert (boolean (vo/array-field? (last (vo/fields-path-seq vo (butlast path)))))
+          "Function append-to only applicable to paths inside an array.")
+  (let [is-array?               (boolean (pathops/array-like? value))
+        [resolved-path varnum]  (resolve-path vo path)
+        update-val              (if is-array?
+                                  " = newval; } else { path.addAll(newval) };"
+                                  " = [newval]; } else { path.add(newval) };")
+        ;;---TODO This .substring below is very fragile.
+        script                  (str resolved-path "; if(path == null) { " (.substring resolved-path 11) update-val)
+        parameters              (into {} (cons [:newval value] (map-indexed #(do [(str "n" %1) %2]) path-vars)))]
     (prn script parameters)
     (script-query client index vo (:id vo) script parameters options)))
 
@@ -557,19 +562,24 @@
     ]
     (script-query client index vo (:id vo) script parameters options)))
 
+;;---TODO fields-path-seq gets called multiple times, and so is hexify-path. This can be optimised.
 (defn replace-at [client index vo path path-vars value options]
   {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index]}
-  (assert (or (number? (last path)) (string? (last path)) (map? (last path))) "Last step of the path has to be a map, number or string")
-  (let [
-    [resolved-path varnum]  (resolve-path vo (pop path))
-    last-pathnode           (last (hexify-path vo path))
-    from-pos-loop           (cond
-                              (string? last-pathnode) (get-pos-for-str last-pathnode)
-                              (map? last-pathnode) (get-pos last-pathnode (inc varnum))
-                              (number? last-pathnode) (apply str "var pos = " last-pathnode ";"))
-    script                  (apply str resolved-path "; " from-pos-loop "; path[pos] = newval;")
-    parameters              (into {} (cons [:newval value] (map-indexed #(do [(str "n" %1) %2]) path-vars)))
-    ]
+  (assert (or (number? (last path)) (string? (last path)) (map? (last path)))
+          "Last step of the path has to be a map, number or string")
+  (let [in-array? (boolean (vo/array-field? (last (vo/fields-path-seq vo (butlast path)))))
+        is-array? (boolean (pathops/array-like? value))
+        [resolved-path varnum]  (resolve-path vo (pop path))
+        last-pathnode           (last (hexify-path vo path))
+        from-pos-loop           (cond
+                                 (string? last-pathnode) (get-pos-for-str last-pathnode)
+                                 (map? last-pathnode) (get-pos last-pathnode (inc varnum))
+                                 (number? last-pathnode) (str "var pos = " last-pathnode ";"))
+        update-val              (if (and in-array? is-array?)
+                                  "path.remove(pos); path.addAll(pos, newval);"
+                                  "path[pos] = newval;")
+        script                  (str resolved-path "; " from-pos-loop "; " update-val)
+        parameters              (into {} (cons [:newval value] (map-indexed #(do [(str "n" %1) %2]) path-vars)))]
     (script-query client index vo (:id vo) script parameters options)))
 
 (defn merge-at [client index vo path path-vars options]

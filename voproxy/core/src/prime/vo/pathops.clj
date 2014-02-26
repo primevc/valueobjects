@@ -41,7 +41,7 @@
     path-step))
 
 
-(defn- array-like?
+(defn array-like?
   [val]
   (or (sequential? val) (.. val getClass isArray) (instance? java.util.List val)))
 

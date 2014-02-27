@@ -2,6 +2,7 @@ package prime.types;
  import prime.vo._;
  import org.joda.time.{ReadableInstant}
  import org.joda.time.format.{DateTimeFormatter, ISODateTimeFormat}
+ import org.apache.commons.codec.binary.Base64;
  import org.msgpack.`object`._
  import prime.utils.msgpack.MessagePackObjectId;
  import java.text.{ParseException, DecimalFormatSymbols, DecimalFormat}
@@ -272,9 +273,11 @@ object Conversion
   def URI       (value:String)    : URI = new URI(value.replace(" ", "%20"));
   def URI       (value:RawType)   : URI = URI(value.asString);
   def URI       (value:URL)       : URI = value.toURI;
+  def URI       (value:ObjectId)  : URI = URI(Base64.encodeBase64URLSafeString(value.toByteArray));
 
   def URI(value:Any) : URI = unpack(value) match {
     case v:URI       => v
+    case v:ObjectId  => URI(v)
     case v:String    => URI(v)
     case v:URL       => URI(v)
     case v:RawType   => URI(v)
@@ -337,12 +340,14 @@ object Conversion
 
   def ObjectId  (value:ObjectId)            : ObjectId = value;
   def ObjectId  (value:MessagePackObjectId) : ObjectId = value.oid;
+  def ObjectId  (value:URI)                 : ObjectId = if (value == null) throw NoInputException else new ObjectId(Base64.decodeBase64(value.toString));
   def ObjectId  (value:String)              : ObjectId = new ObjectId(value);
   def ObjectId  (value:Array[Byte])         : ObjectId = new ObjectId(value);
 
   def ObjectId  (value:Any) : ObjectId = unpack(value) match {
     case v:ObjectId            => ObjectId(v)
     case v:MessagePackObjectId => ObjectId(v)
+    case v:URI                 => ObjectId(v)
     case v:String              => ObjectId(v)
     case v:Array[Byte]         => ObjectId(v)
     case None                  => throw NoInputException;

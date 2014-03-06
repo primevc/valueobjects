@@ -64,8 +64,8 @@
 (def-default-converter DateTime   =>  DateTime         ReadableInstant Number        Long Integer java.util.Date)
 (def-default-converter Interval   =>  Interval)
 (def-default-converter EmailAddr  =>  InternetAddress  String  URI  URL)
-(def-default-converter URI        =>  URI              String       URL)
-(def-default-converter ObjectId   =>  ObjectId         String       ByteArray)
+(def-default-converter URI        =>  URI              String       URL  ObjectId)
+(def-default-converter ObjectId   =>  ObjectId         String  URI       ByteArray)
 
 (extend-type org.bson.types.ObjectId
   To-String

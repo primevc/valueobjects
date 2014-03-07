@@ -11,6 +11,9 @@
                  [org.elasticsearch/elasticsearch "0.90.5"]
                  [org.clojars.touch/clj-elasticsearch "0.4.2"]
                  [cheshire "5.2.0"]]
+  :profiles {:test {:dependencies [[containium "0.1.0-SNAPSHOT"]
+                                   [org.clojars.touch/elasticsearch-lang-clojure "0.1.0-SNAPSHOT"]]}
+             :mvel {:dependencies [[org.mvel/mvel2 "2.1.3.Final"]]}}
   :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"
                  {:extensions "true"
                   :executions ([:execution
@@ -24,4 +27,12 @@
                                 [:id "clojure-test"]
                                 [:phase "test"]
                                 [:goals [:goal "test"]]])}]]
-  :pom-addition [:properties [:project.build.sourceEncoding "UTF-8"]])
+  :pom-addition [:properties [:project.build.sourceEncoding "UTF-8"]]
+  :aliases {;; Most crappy shell ever. I mean, no history?
+            "mvel-shell" ["with-profile" "+mvel" "exec" "-ep"
+                          "(do (import 'org.mvel2.sh.Main)
+                               (org.mvel2.sh.Main/main (into-array String [])))"]
+            ;;---TODO Can I pass arguments? Now it's fixed to run script.mvel.
+            "mvel-script" ["with-profile" "+mvel" "exec" "-ep"
+                           "(do (import 'org.mvel2.sh.Main)
+                                (org.mvel2.sh.Main/main (into-array [\"script.mvel\"])))"]})

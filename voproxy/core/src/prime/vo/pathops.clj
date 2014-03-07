@@ -30,8 +30,13 @@
             (fill-path path-rest variables)))))
 
 
-(defn- concrete-path-step [obj path-step]
-  (if (and (vector? obj) (not (number? path-step))) ; assert maybe
+(defn array-like?
+  [val]
+  (and val (or (sequential? val) (.. val getClass isArray) (instance? java.util.List val))))
+
+
+(defn concrete-path-step [obj path-step]
+  (if (and (array-like? obj) (not (number? path-step)))
     (let [[k v] (first path-step)
           result (first (keep-indexed (fn [i item] (when (= (get item k) v) i)) obj))]
       (if-not result
@@ -39,11 +44,6 @@
         result))
     #_else
     path-step))
-
-
-(defn array-like?
-  [val]
-  (or (sequential? val) (.. val getClass isArray) (instance? java.util.List val)))
 
 
 ;;; General functions, used by the other concrete path operations.
@@ -75,7 +75,7 @@
         (apply f m args)))))
 
 
-(defn- relative-vector-index [length i & options]
+(defn relative-vector-index [length i & options]
   "Calculates the index relative to a vector length. Optionally, one
   can specify that an extra index at the end is allowed, using the
   :allow-index-after-last keyword. The relative index for a length of
@@ -140,7 +140,7 @@
 
 
 (defn- vector-move-item [vec from to]
-  {:pre [(vector? vec) (not (empty? vec))]}
+  {:pre [(array-like? vec) (not (empty? vec))]}
   (let [vec (clojure.core/vec vec) ; Hack: subvec behaves different on Scala vectors vs Clojure's.
         from (relative-vector-index (count vec) (concrete-path-step vec from))
         to (relative-vector-index (count vec) to :allow-index-after-last)

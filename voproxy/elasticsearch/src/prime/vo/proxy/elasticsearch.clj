@@ -85,3 +85,10 @@
 
   (search [this vo options]
     (es/search this vo options)))
+
+
+(defn ->ElasticSearchVOProxy
+  ([index client]
+     (ElasticSearchVOProxy. index client {}))
+  ([index client default-opts]
+     (ElasticSearchVOProxy. index client default-opts)))

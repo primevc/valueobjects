@@ -3,6 +3,10 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.vo.util.elasticsearch.script
+  "This namespace contains the script functions used by update-doc. As
+  it is unnecessary to transfer the entire script for each request, at
+  the end of this file the script functions are read and combined to
+  smaller scripts."
   (:require [prime.vo.pathops :as po])
   (:import [java.util List Map LinkedHashMap ArrayList]))
 
@@ -159,6 +163,11 @@
 ;;;;
 ;;;; Script source functions.
 ;;;;
+;;;; Each script must end with an function that takes an `env` as its sole parameter.
+;;;;
+
+
+;;; Functions to read the source of namespace declarations and functions.
 
 (require '[clojure.edn :as edn]
          '[clojure.java.io :as io]
@@ -204,6 +213,8 @@
                               (and (#{'def 'defn 'defn- 'defmacro} (first form))
                                    (= (name sym) (str (second form))))) source))))))
 
+
+;;; Per operation script source strings.
 
 (def base-script
   (str (ns-source 'prime.vo.pathops)

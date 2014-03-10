@@ -3,6 +3,7 @@
 ;; file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 (ns prime.vo.util.elasticsearch
+  "The implementation of the ElasticSearch VOProxy and VOSearchProxy."
   (:refer-clojure :exclude (get))
   (:require [prime.vo :as vo]
             [clojure.set     :as set]
@@ -380,6 +381,37 @@
     (finish-change proxy options resp)))
 
 
+(defn- patched-update-options
+  [type id options]
+  (let [{:keys [doc] :as options} (assoc options :type type :id id)]
+    (if doc
+      (assoc options :doc (generate-hexed-fields-smile doc))
+      options)))
+
+
+(defn update
+  [{:keys [client index default-opts] :as proxy} ^ValueObject vo id {:as options :keys [fields]}]
+  {:pre [(instance? ValueObject vo) (not (nil? id)) index client]}
+  (let [type (Integer/toHexString (.. vo voManifest ID))
+        id (prime.types/to-String id)
+        fields (map field-hexname fields)]
+    (->> (merge default-opts {:index index :doc vo :doc-as-upsert? true} options)
+         (patched-update-options type id)
+         (ces/update-doc client)
+         (finish-change proxy options))))
+
+
+(defn delete
+  [{:keys [client index default-opts] :as proxy} ^ValueObject vo options]
+  {:pre [(instance? ValueObject vo) index client (prime.vo/has-id? vo)]}
+  (->> (ces/delete-doc client (merge default-opts
+                                     {:index index
+                                      :id (prime.types/to-String (.. ^ID vo _id))
+                                      :type (Integer/toHexString (.. vo voManifest ID))}
+                                     options))
+       (finish-change proxy options)))
+
+
 ;;; Search.
 
 (defn SearchHit->fields [^SearchHit sh] (.fields sh)     )
@@ -457,37 +489,6 @@
                (.. response getHits hits)
                (scroll-seq client response scroll 0)))
         {:request es-options, :response response})))
-
-
-(defn- patched-update-options
-  [type id options]
-  (let [{:keys [doc] :as options} (assoc options :type type :id id)]
-    (if doc
-      (assoc options :doc (generate-hexed-fields-smile doc))
-      options)))
-
-
-(defn update
-  [{:keys [client index default-opts] :as proxy} ^ValueObject vo id {:as options :keys [fields]}]
-  {:pre [(instance? ValueObject vo) (not (nil? id)) index client]}
-  (let [type (Integer/toHexString (.. vo voManifest ID))
-        id (prime.types/to-String id)
-        fields (map field-hexname fields)]
-    (->> (merge default-opts {:index index :doc vo :doc-as-upsert? true} options)
-         (patched-update-options type id)
-         (ces/update-doc client)
-         (finish-change proxy options))))
-
-
-(defn delete
-  [{:keys [client index default-opts] :as proxy} ^ValueObject vo options]
-  {:pre [(instance? ValueObject vo) index client (prime.vo/has-id? vo)]}
-  (->> (ces/delete-doc client (merge default-opts
-                                     {:index index
-                                      :id (prime.types/to-String (.. ^ID vo _id))
-                                      :type (Integer/toHexString (.. vo voManifest ID))}
-                                     options))
-       (finish-change proxy options)))
 
 
 ;;; Delta change functions.

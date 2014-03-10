@@ -499,13 +499,14 @@
   (let [path (hexify-path vo (pathops/fill-path path path-vars))
         type (Integer/toHexString (.. vo voManifest ID))
         id (prime.types/to-String (:id vo))]
-    (ces/update-doc client {:index index
-                            :type type
-                            :id id
-                            :source (generate-hexed-fields-smile
-                                     {:script script
-                                      :lang "clj"
-                                      :params (assoc params :path path)})})))
+    (->> (ces/update-doc client {:index index
+                                 :type type
+                                 :id id
+                                 :source (generate-hexed-fields-smile
+                                          {:script script
+                                           :lang "clj"
+                                           :params (assoc params :path path)})})
+         (finish-change proxy options))))
 
 
 (defn append-to

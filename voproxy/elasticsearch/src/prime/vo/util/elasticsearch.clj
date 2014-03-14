@@ -436,8 +436,8 @@
    :query-hint :scroll :source])
 
 (def search-extra-source-opts
-  [:query :filter :from :size :types :sort :highlighting :only :exclude :script-fields :preference
-   :facets :named-filters :boost :explain :version :min-score])
+  [:query :filter :from :size :types :sort :highlighting :script-fields :preference :facets
+   :named-filters :boost :explain :version :min-score])
 
 (def need-hex-map-opts
   [:query :sort :highlighting :script-fields :facets :named-filters])

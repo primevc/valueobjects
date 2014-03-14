@@ -192,7 +192,7 @@
       edn/read-string))
 
 
-(defn ns-source
+(defmacro ns-source
   "Reads the source file of the given namespace (string or symbol),
   and returns the String representation of the first form. This is
   probably the (ns ...) form. Sophisticated, isn't it?!"
@@ -201,7 +201,7 @@
     (pr-str (first (read-ns ns)))))
 
 
-(defn def-source
+(defmacro def-source
   "Reads the source file of a given namespace-qualified symbol, and
   returns the last def, defn, defn- or defmacro form that has the
   symbol as the second part of that symbol. That means, no metadata
@@ -217,46 +217,46 @@
 ;;; Per operation script source strings.
 
 (def base-script
-  (str (ns-source 'prime.vo.pathops)
-       (def-source 'prime.vo.pathops/array-like?)
-       (def-source 'prime.vo.pathops/concrete-path-step)
-       (def-source 'prime.vo.pathops/relative-vector-index)
-       (ns-source 'prime.vo.util.elasticsearch.script)
-       (def-source 'prime.vo.util.elasticsearch.script/debug)
-       (def-source 'prime.vo.util.elasticsearch.script/update-in-vo)))
+  (str (ns-source prime.vo.pathops)
+       (def-source prime.vo.pathops/array-like?)
+       (def-source prime.vo.pathops/concrete-path-step)
+       (def-source prime.vo.pathops/relative-vector-index)
+       (ns-source prime.vo.util.elasticsearch.script)
+       (def-source prime.vo.util.elasticsearch.script/debug)
+       (def-source prime.vo.util.elasticsearch.script/update-in-vo)))
 
 (def move-to-script
   (str base-script
-       (ns-source 'prime.vo.util.elasticsearch.script)
-       (def-source 'prime.vo.util.elasticsearch.script/move-to*)
-       (def-source 'prime.vo.util.elasticsearch.script/move-to)))
+       (ns-source prime.vo.util.elasticsearch.script)
+       (def-source prime.vo.util.elasticsearch.script/move-to*)
+       (def-source prime.vo.util.elasticsearch.script/move-to)))
 
 (def merge-at-script
   (str base-script
-       (ns-source 'prime.vo.util.elasticsearch.script)
-       (def-source 'prime.vo.util.elasticsearch.script/merge-at*)
-       (def-source 'prime.vo.util.elasticsearch.script/merge-at)))
+       (ns-source prime.vo.util.elasticsearch.script)
+       (def-source prime.vo.util.elasticsearch.script/merge-at*)
+       (def-source prime.vo.util.elasticsearch.script/merge-at)))
 
 (def replace-at-script
   (str base-script
-       (ns-source 'prime.vo.util.elasticsearch.script)
-       (def-source 'prime.vo.util.elasticsearch.script/replace-at*)
-       (def-source 'prime.vo.util.elasticsearch.script/replace-at)))
+       (ns-source prime.vo.util.elasticsearch.script)
+       (def-source prime.vo.util.elasticsearch.script/replace-at*)
+       (def-source prime.vo.util.elasticsearch.script/replace-at)))
 
 (def remove-from-script
   (str base-script
-       (ns-source 'prime.vo.util.elasticsearch.script)
-       (def-source 'prime.vo.util.elasticsearch.script/remove-from*)
-       (def-source 'prime.vo.util.elasticsearch.script/remove-from)))
+       (ns-source prime.vo.util.elasticsearch.script)
+       (def-source prime.vo.util.elasticsearch.script/remove-from*)
+       (def-source prime.vo.util.elasticsearch.script/remove-from)))
 
 (def insert-at-script
   (str base-script
-       (ns-source 'prime.vo.util.elasticsearch.script)
-       (def-source 'prime.vo.util.elasticsearch.script/insert-at*)
-       (def-source 'prime.vo.util.elasticsearch.script/insert-at)))
+       (ns-source prime.vo.util.elasticsearch.script)
+       (def-source prime.vo.util.elasticsearch.script/insert-at*)
+       (def-source prime.vo.util.elasticsearch.script/insert-at)))
 
 (def append-to-script
   (str base-script
-       (ns-source 'prime.vo.util.elasticsearch.script)
-       (def-source 'prime.vo.util.elasticsearch.script/append-to*)
-       (def-source 'prime.vo.util.elasticsearch.script/append-to)))
+       (ns-source prime.vo.util.elasticsearch.script)
+       (def-source prime.vo.util.elasticsearch.script/append-to*)
+       (def-source prime.vo.util.elasticsearch.script/append-to)))

@@ -141,7 +141,7 @@
   an empty target-vo holding only the ID."
   [result target-vo]
   (loop [index 0
-         accumulator (assoc (empty target-vo) :id (:id target-vo))]
+         accumulator (empty target-vo)]
     (if-let [row (nth result index nil)]
       (recur (inc index)
              (condp = (:action row)
@@ -188,7 +188,7 @@
                  (pathops/merge-at accumulator filled-path value))
 
               :else accumulator))
-      (if (empty? accumulator) nil accumulator))))
+      (if (empty? accumulator) nil (assoc accumulator :id (:id target-vo))))))
 
 
 ;;; Proxy functions.

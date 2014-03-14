@@ -239,7 +239,7 @@
 
 ;; ---TODO: Maybe having a keep filter per proxy in :proxies is also an option?
 
-(defmacro vo-proxy-delegator [delegations]
+(defmacro vo-proxy-delegator
   "Given a sequence alternating value object types and their delegation
   options maps, returns a reified VOProxy supporting the delegations.
 
@@ -272,6 +272,7 @@
   :proxies are executed in order, and as soon as one returns a result,
   that result is returned and the other proxies are not executed. The
   :with-meta option has no effect on `get-vo` calls either."
+  [delegations]
   (let [vo-opts-pairs (partition 2 delegations)]
     `(reify VOProxy
        ~@(for [{:keys [name arglists]} (vals (:sigs VOProxy))

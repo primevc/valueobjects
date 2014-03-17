@@ -30,7 +30,7 @@
   (let [foo \"bar\"]
     (mapify foo))    ; => {:foo \"bar\"}"
   [& symbols]
-  `(into {} (filter second ~(for [item symbols] [(keyword item) item]))))
+  `(into {} (filter second ~(vec (for [item symbols] [(keyword item) item])))))
 
 
 (defmacro try-let

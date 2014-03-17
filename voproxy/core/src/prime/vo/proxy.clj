@@ -226,7 +226,7 @@
                                (str ":with-meta cannot be the same as :return-result-of for " type))
                        `[(instance? ~type ~'vo)
                          (let [~'vo ~(if keep-map `(vo-keep ~'vo ~keep-map) 'vo)]
-                           (let ~(vec (concat ['_ pre-form] proxy-forms ['_ post-form]))
+                           (let ~(vec (concat ['vo pre-form] proxy-forms ['_ post-form]))
                              ~(if (and meta-proxy (not= name 'get-vo))
                                 `(with-meta ~proxy-result-sym ~meta-result-sym)
                                 `~proxy-result-sym)))]))]
@@ -250,8 +250,10 @@
   be specified.
 
   :pre-<VOProxy function> - a form that is evaluated before the
-  VOProxy function is executed for all the specifend :proxies. For
-  example, one could specify :pre-update (log \"update requested\").
+  VOProxy function is executed for all the specifend :proxies. The result
+  of the pre form is used in the proxy function, which allows one to change
+  the input. For example, one could specify:
+  `` :pre-update (do (log \"update requested\") (assoc vo :at (now)). ``
 
   :post-<VOProxy function> - a form that is evaluated after the
   VOProxy function is executed for all specifend :proxies.

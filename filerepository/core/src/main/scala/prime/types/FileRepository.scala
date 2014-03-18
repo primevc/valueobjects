@@ -187,6 +187,10 @@ trait LocalFileRepository extends FileRepository {
     ref
   }
 
+  def delete(ref: FileRef) {
+    getFile(ref).delete();
+  }
+
 }
 
 
@@ -198,7 +202,7 @@ trait LocalFileRepository extends FileRepository {
   *
   * @param root The directory where to store and read the files.
   */
-class BasicLocalFileRepository(val root: File) extends LocalFileRepository {
+class BasicLocalFileRepository(val root: File) extends LocalFileRepository with GarbageCollectableFR {
 
   // Initialisation.
 

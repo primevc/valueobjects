@@ -50,5 +50,18 @@ class BasicLocalFileRepositorySpec extends Specification {
       val ref = repo.absorb(is)
       ref.toString mustEqual base64
     }
+
+    "delete from the repository" in {
+      val (tmpData, base64) = createTempData
+      val is = new ByteArrayInputStream(tmpData)
+      val ref = repo.absorb(is)
+      val file = new File(systemTmpDir + "/" + ref.toString)
+
+      repo.exists(ref) must beTrue
+      file.exists must beTrue
+      repo.delete(ref)
+      repo.exists(ref) must beFalse
+      file.exists must beFalse
+    }
   }
 }

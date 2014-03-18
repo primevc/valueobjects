@@ -63,11 +63,15 @@
 
 
 (defn- idconv
-  "Returns the ID of the given VO, converted to the correct CQL type."
-  [{:keys [id] :as vo}]
-  {:pre [id]}
-  (let [convert-fn (second (simple-prime-type->cql-type (.. vo voManifest _id valueType keyword)))]
-    (convert-fn id)))
+  ("Returns the ID of the given VO, converted to the correct CQL type."
+    [{:keys [id] :as vo}]
+      {:pre [id]}
+      (idconv vo id))
+  ("Return the given ID of VO converted to the correct CQL type."
+    [vo id]
+      {:pre [vo id]}
+        (let [convert-fn (second (simple-prime-type->cql-type (.. vo voManifest _id valueType keyword)))]
+          (convert-fn id))))
 
 
 ;;; Change data serialization.
@@ -238,8 +242,9 @@
 
 (defn update
   [proxy vo id options]
-  (insert proxy vo (idconv (conj vo {:id id})) :update
-          (change-data->bytes vo (stringify-keys options))))
+  (let [vo (dissoc vo (.. vo voManifest _id keyword))] ; Prevent change of the id.
+    (insert proxy vo (idconv vo id) :update
+            (change-data->bytes vo (stringify-keys options)))))
 
 
 (defn delete

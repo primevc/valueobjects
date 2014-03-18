@@ -41,21 +41,22 @@
   [system consistency ttl-fn]
   (log/info "Preparing statements for Cassandra repository.")
   (letfn [(mk-cassandra-fn [statement calculate-ttl]
-            (let [prepared (cassandra/prepare system statement)]
+            (let [prepared     (cassandra/prepare system (str statement ";"))
+                  prepared-ttl (if calculate-ttl (cassandra/prepare system (str statement " USING TTL ?;")))
+                  options      {:consistency consistency :keywordize? true}]
               (if-not calculate-ttl
                 (fn [& values]
-                  (cassandra/do-prepared system prepared
-                                         {:consistency consistency :keywordize? true}
-                                         values))
+                  (cassandra/do-prepared system prepared options values))
               #_else
                 (fn [hash buffer]
-                  (cassandra/do-prepared system prepared
-                                         {:consistency consistency :keywordize? true}
-                                         [hash buffer (calculate-ttl)])))))]
-    {:create (mk-cassandra-fn (str "INSERT INTO files (hash, data) VALUES (?, ?)" (if ttl-fn " USING TTL ?") ";") ttl-fn)
-     :exists (mk-cassandra-fn "SELECT COUNT(*) FROM files WHERE hash=?;" nil)
-     :stream (mk-cassandra-fn "SELECT data FROM files WHERE hash=?;" nil)
-     :delete (mk-cassandra-fn "DELETE FROM files WHERE hash=?;" nil)}))
+                  (let [ttl-secs (calculate-ttl)
+                        prepared (if-not ttl-secs prepared      #_else prepared-ttl)
+                        values   (if-not ttl-secs [hash buffer] #_else [hash buffer ttl-secs])]
+                    (cassandra/do-prepared system prepared options values))))))]
+    {:create (mk-cassandra-fn "INSERT INTO files (hash, data) VALUES (?, ?)" ttl-fn)
+     :exists (mk-cassandra-fn "SELECT COUNT(*) FROM files WHERE hash=?" nil)
+     :stream (mk-cassandra-fn "SELECT data FROM files WHERE hash=?" nil)
+     :delete (mk-cassandra-fn "DELETE FROM files WHERE hash=?" nil)}))
 
 
 (defn- ref-hash
@@ -281,7 +282,7 @@
     :ttl-fn   0-arity function called when creating a FileRef which should
               return the number of seconds after which to expire the file."
   [system consistency repository-name & {:keys [ttl-fn] :as options}]
-  (prime.types.CassandraRepository. system consistency repository-name (apply hash-map options)))
+  (prime.types.CassandraRepository. system consistency repository-name (into {} options)))
 
 
 (defn exists

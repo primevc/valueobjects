@@ -38,16 +38,24 @@
 
 (defn- prepare-statements
   "Prepare the statements used for the Cassandra repository."
-  [system consistency]
+  [system consistency ttl-fn]
   (log/info "Preparing statements for Cassandra repository.")
-  (letfn [(mk-cassandra-fn [statement]
+  (letfn [(mk-cassandra-fn [statement calculate-ttl]
             (let [prepared (cassandra/prepare system statement)]
-              (partial cassandra/do-prepared system prepared {:consistency consistency
-                                                              :keywordize? true})))]
-    {:create (mk-cassandra-fn "INSERT INTO files (hash, data) VALUES (?, ?);")
-     :exists (mk-cassandra-fn "SELECT COUNT(*) FROM files WHERE hash=?;")
-     :stream (mk-cassandra-fn "SELECT data FROM files WHERE hash=?;")
-     :delete (mk-cassandra-fn "DELETE FROM files WHERE hash=?;")}))
+              (if-not calculate-ttl
+                (fn [& values]
+                  (cassandra/do-prepared system prepared
+                                         {:consistency consistency :keywordize? true}
+                                         values))
+              #_else
+                (fn [hash buffer]
+                  (cassandra/do-prepared system prepared
+                                         {:consistency consistency :keywordize? true}
+                                         [hash buffer (calculate-ttl)])))))]
+    {:create (mk-cassandra-fn (str "INSERT INTO files (hash, data) VALUES (?, ?)" (if ttl-fn " USING TTL ?") ";") ttl-fn)
+     :exists (mk-cassandra-fn "SELECT COUNT(*) FROM files WHERE hash=?;" nil)
+     :stream (mk-cassandra-fn "SELECT data FROM files WHERE hash=?;" nil)
+     :delete (mk-cassandra-fn "DELETE FROM files WHERE hash=?;" nil)}))
 
 
 (defn- ref-hash
@@ -85,7 +93,7 @@
             statement-fn (-> state :statements :create)
             hash (ref-hash ref)]
         (log/debug "Storing file using MappedByteBuffer for FileRef" ref)
-        (statement-fn [hash buffer])))
+        (statement-fn hash buffer)))
     ref))
 
 
@@ -97,7 +105,7 @@
           buffer (ByteBuffer/wrap byte-array)
           hash (ref-hash ref)]
       (log/debug "Underlying FileRef not stored yet, storing it now.")
-      (statement-fn [hash buffer]))
+      (statement-fn hash buffer))
     (log/debug "Underlying FileRef already stored.")))
 
 
@@ -127,7 +135,7 @@
   (let [state (.state this)
         statement-fn (-> state :statements :exists)
         hash (ref-hash ref)
-        result (statement-fn [hash])
+        result (statement-fn hash)
         exists (= 1 (:count (first result)))]
     (log/debug "FileRef" ref (if exists "is stored." "is not stored."))
     exists))
@@ -184,7 +192,7 @@
   (let [state (.state this)
         statement-fn (-> state :statements :stream)
         hash (ref-hash ref)
-        result (statement-fn [hash])]
+        result (statement-fn hash)]
     (when-let [data (:data (first result))]
       (ByteBufferUtil/inputStream data))))
 
@@ -214,13 +222,13 @@
     (if-not (.exists tmp)
       (do (log/info "File not available in temporary directory; creating it now.")
           (let [statement-fn (-> state :statements :stream)
-                result (statement-fn [hash])
+                result (statement-fn hash)
                 data (:data (first result))
                 channel (FileChannel/open (.toPath tmp) (into-array [StandardOpenOption/CREATE_NEW
                                                                      StandardOpenOption/WRITE]))]
             (.write channel data)
             (.close channel)))
-      (do (log/info "File already available in temporary directory; touching it now.")
+      (do (log/info "File" tmp "already available in temporary directory; touching it now.")
           (.setLastModified tmp (System/currentTimeMillis)))) ;; touch
     tmp))
 
@@ -233,19 +241,19 @@
   (let [state (.state this)
         statement-fn (-> state :statements :delete)
         hash (ref-hash ref)]
-    (statement-fn [hash])))
+    (statement-fn hash)))
 
 
 ;;; Generate CassandraRepository class, for use in Java and Scala.
 
 (defn repo-init
   "This function is called when the CassandraRepository is constructed."
-  [system consistency repository-name]
+  [system consistency repository-name options]
   (log/info "Creating CassandraRepository object for repository" repository-name)
   (write-schema system)
   (clean-dir (File. (System/getProperty "java.io.tmpdir")) "cfr-" 24)
   (let [session (cassandra/keyspaced system "fs")
-        statement-fns (prepare-statements session consistency)]
+        statement-fns (prepare-statements session consistency (:ttl-fn options))]
     [[] {:repository-name repository-name
          :statements statement-fns
          :prefix "cassandra://"
@@ -258,7 +266,7 @@
   :init init
   :prefix "repo-"
   :state state
-  :constructors {[Object clojure.lang.Keyword String] []})
+  :constructors {[Object clojure.lang.Keyword String clojure.lang.IPersistentMap] []})
 
 
 ;;; API functions. Use these to call the repository functions on the
@@ -267,9 +275,13 @@
 (defn cassandra-repository
   "Create a new instance of the CassandraRepository class, given the
   supplied Cassandra containium system, the consistency keyword to use
-  for queries and the repository name."
-  [system consistency repository-name]
-  (prime.types.CassandraRepository. system consistency repository-name))
+  for queries and the repository name.
+
+  Options:
+    :ttl-fn   0-arity function called when creating a FileRef which should
+              return the number of seconds after which to expire the file."
+  [system consistency repository-name & {:keys [ttl-fn] :as options}]
+  (prime.types.CassandraRepository. system consistency repository-name (apply hash-map options)))
 
 
 (defn exists

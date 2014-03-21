@@ -17,12 +17,12 @@
   )
 
 (defn make-dirs [& directory]
-  (let [directory (java.io.File. (apply str directory))]
+  (let [directory (io/as-file (apply str directory))]
     (when-not (.isDirectory directory)
       (.mkdir directory))
     (.toString directory)))
 
-(defn create-filename [directory vo & {:keys [appendix id]}]
+(defn create-filename [directory ^ValueObject vo & {:keys [appendix id]}]
   (apply str (make-dirs directory "/" (.. vo voManifest ID)) "/" appendix (or id (:id vo)) ".vo.gz"))
 
 (defn create-tmp-filename [directory vo]
@@ -31,11 +31,10 @@
 (defn read-file [filename])
 
 (defn rename-file "This is used to avoid multithread overwriting." [filename new-fn]
-  (.renameTo (java.io.File. filename) (java.io.File. new-fn)))
+  (.renameTo (io/as-file filename) (io/as-file new-fn)))
 
-(defn execute [& command]
-  (let [process (.exec (Runtime/getRuntime) (apply str command))]
-    process))
+(defn ^java.lang.Process execute [& command]
+  (.exec (Runtime/getRuntime) ^String (apply str command)))
 
 (defn pack-to-tmp-gzip
   "Create a package to temporary gzip file. Returns the created java.io.File."
@@ -55,10 +54,10 @@
   [vo directory]
   (rename-file (pack-to-tmp-gzip vo directory) (create-filename directory vo)))
 
-(defn unpack [vo directory]
-  (if-not (.exists (java.io.File. (create-filename directory vo)))
+(defn unpack [^ValueObject vo directory]
+  (if-not (.exists (io/as-file (create-filename directory vo)))
     nil
-    (let [  unpacker    (org.msgpack.Unpacker. (java.util.zip.GZIPInputStream. (java.io.FileInputStream. (create-filename directory vo))))]
+    (let [  unpacker    (org.msgpack.Unpacker. (java.util.zip.GZIPInputStream. (java.io.FileInputStream. (io/as-file (create-filename directory vo)))))]
       (.setVOHelper unpacker prime.utils.msgpack.VOUnpacker$/MODULE$)
       (.. vo voCompanion (valueOf (.next unpacker))))))
 
@@ -71,7 +70,7 @@
   (pack vo directory))
 
 (defn delete [directory ^ValueObject vo options]
-  (.delete (java.io.File. (create-filename directory vo))))
+  (.delete (io/as-file (create-filename directory vo))))
 
 (defn update [directory ^ValueObject vo id options]
   (let [old-vo (get directory (conj vo {:id id}))] ; Conj id into vo to overwrite possible new id.

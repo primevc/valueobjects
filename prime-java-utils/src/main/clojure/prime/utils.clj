@@ -208,7 +208,7 @@
   reading from the first stream blocks. Thus, make sure the second
   stream is being read as well."
   [in & [buffer-size]]
-  (let [pis (if buffer-size (PipedInputStream. buffer-size) (PipedInputStream.))
+  (let [pis (if buffer-size (PipedInputStream. (int buffer-size)) #_else (PipedInputStream.))
         pos (PipedOutputStream. pis)]
     [(TeeInputStream. in pos true) pis]))
 

@@ -43,8 +43,8 @@
      (when-not (== baseTypeID (.. vo voManifest ID))
        (.writeNumberField out "t" (.. vo voManifest ID)))
 
-     (doseq [[k v] vo]                  ; Note that prime.vo/*voseq-key-fn* is used here.
-       (.writeFieldName out (*field-transform-fn* k))
+     (doseq [[^ValueObjectField k v] vo] ;; Note that prime.vo/*voseq-key-fn* is used here.
+       (.writeFieldName out (str (*field-transform-fn* k)))
        (cond
         (instance? ValueObject v)
         ;; First try to find and call a protocol implementation for this type immediately.

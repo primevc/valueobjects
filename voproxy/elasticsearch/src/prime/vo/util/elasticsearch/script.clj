@@ -28,7 +28,7 @@
   [obj path f & args]
   (debug "UPDATE IN VO" obj path f args)
   (if-let [key (and path (po/concrete-path-step obj (first path)))]
-    (let [inner (and obj (.get obj key))
+    (let [inner (if (instance? Map obj) (.get ^Map obj key) #_else (.get ^List obj (int key)))
           value (apply update-in-vo inner (next path) f args)]
       (debug "BACKTRACK VALUE" value "- WILL BE PUT IN" obj "USING KEY" key)
       (cond (and (number? key) (instance? Map inner))
@@ -45,12 +45,12 @@
 ;; Moving
 
 (defn- move-to*
-  [obj from to]
+  [^List obj from to]
   (debug "MOVE TO" obj from to)
   (let [from (po/relative-vector-index (count obj) from)
         to (po/relative-vector-index (count obj) to :allow-index-after-last)
         to (if (< from to) (dec to) to)
-        val (.remove ^List obj (int from))]
+        val (.remove obj (int from))]
     (doto obj (.add (int to) val))))
 
 

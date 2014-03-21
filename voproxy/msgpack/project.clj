@@ -8,6 +8,7 @@
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [prime/voproxy-core "0.1.0-SNAPSHOT"]
                  [org.msgpack/msgpack "0.5.1-devel"]]
+  :global-vars {*warn-on-reflection* true}
   :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"
                  {:extensions "true"
                   :executions ([:execution

@@ -352,6 +352,8 @@
                  (recur (rest items) (conj terms (apply hash-map (term-kv-pair v k pair)))))
            terms)))))
 
+(defn vo-id->str [vo]
+  (-> vo prime.vo/id prime.types/to-String))
 
 (defn get
   "options: see clj-elasticsearch.client/get-doc"
@@ -362,7 +364,7 @@
                                          :type (Integer/toHexString (.. vo voManifest ID))
                                          :index index
                                          :format :java
-                                         :id (.. vo _id toString)))]
+                                         :id (vo-id->str vo)))]
     (when (.isExists resp)
       (.apply (. vo voCompanion)
               (ElasticSearch-ValueSource. (.. vo voManifest ID) (.getSourceAsMap resp) resp)))))
@@ -375,7 +377,7 @@
         resp (ces/index-doc client
                             (assoc options
                               :index index
-                              :id (prime.types/to-String (.. vo _id))
+                              :id (vo-id->str vo)
                               :type (Integer/toHexString (.. vo voManifest ID))
                               :source (generate-hexed-fields-smile vo)))]
     (finish-change proxy options resp)))
@@ -480,6 +482,7 @@
                      :indices (clojure.core/get options :indices [index])
                      :extra-source (generate-hexed-fields-smile extra-source-opts))
         ;; _ (clojure.pprint/pprint (assoc es-options :extra-source extra-source-opts))
+        ^SearchResponse
         response (ces/search client es-options)]
       (with-meta
         (map (partial SearchHit->ValueObject
@@ -494,7 +497,7 @@
 ;;; Delta change functions.
 
 (defn- update-by-script
-  [{:keys [client index default-opts] :as proxy} vo path path-vars options script params]
+  [{:keys [client index default-opts] :as proxy} ^ValueObject vo path path-vars options script params]
   {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index client (string? script)]}
   (let [path (hexify-path vo (pathops/fill-path path path-vars))
         type (Integer/toHexString (.. vo voManifest ID))

@@ -32,7 +32,7 @@
 
 (defn array-like?
   [val]
-  (and val (or (sequential? val) (.. val getClass isArray) (instance? java.util.List val))))
+  (and val (or (sequential? val) (.. (class val) isArray) (instance? java.util.List val))))
 
 
 (defn concrete-path-step [obj path-step]

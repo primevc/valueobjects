@@ -31,7 +31,7 @@
 
 (defn- as-vo
   "Returns the actual VO based on a source and a target."
-  [source target-vo]
+  [source ^ValueObject target-vo]
   (.. target-vo voCompanion (apply source)))
 
 
@@ -69,7 +69,7 @@
       (idconv vo id))
   ([vo id]
       {:pre [vo id]}
-        (let [convert-fn (second (simple-prime-type->cql-type (.. vo voManifest _id valueType keyword)))]
+        (let [convert-fn (second (simple-prime-type->cql-type (.. (prime.vo/id-field vo) valueType keyword)))]
           (convert-fn id))))
 
 
@@ -241,7 +241,7 @@
 
 (defn update
   [proxy vo id options]
-  (let [vo (dissoc vo (.. vo voManifest _id keyword))] ; Prevent change of the id.
+  (let [vo (dissoc vo (. (prime.vo/id-field vo) keyword))] ; Prevent change of the id.
     (insert proxy vo (idconv vo id) :update
             (change-data->bytes vo (stringify-keys options)))))
 

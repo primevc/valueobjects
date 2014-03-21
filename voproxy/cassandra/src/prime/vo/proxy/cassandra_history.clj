@@ -105,7 +105,7 @@
   (doseq [vo vos]
     (let [table-name (ch/get-table-name vo)]
       (when-not (table-exists? (:system proxy) (:keyspace proxy) table-name)
-        (let [id-cql-type (->> (.. vo voManifest _id valueType keyword)
+        (let [id-cql-type (->> (. (prime.vo/id-field vo) keyword)
                                ch/simple-prime-type->cql-type
                                first)
               vo-columns (hayt/column-definitions {:version :timeuuid, :id id-cql-type, :action :int,

@@ -28,7 +28,7 @@
   [obj path f & args]
   (debug "UPDATE IN VO" obj path f args)
   (if-let [key (and path (po/concrete-path-step obj (first path)))]
-    (let [inner (if (instance? Map obj) (.get ^Map obj key) #_else (.get ^List obj (int key)))
+    (let [inner (and obj (if (instance? Map obj) (.get ^Map obj key) #_else (.get ^List obj key)))
           value (apply update-in-vo inner (next path) f args)]
       (debug "BACKTRACK VALUE" value "- WILL BE PUT IN" obj "USING KEY" key)
       (cond (and (number? key) (instance? Map inner))

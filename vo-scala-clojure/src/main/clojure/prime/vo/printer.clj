@@ -5,7 +5,7 @@
 (ns prime.vo.printer
   "Extends the Clojure printer with formatted printing of ValueObject instances."
   (:import java.io.Writer
-           [prime.types package$ValueType EnumValue FileRef RGBA]
+           [prime.types package$ValueType EnumValue FileRef RGBA VORefImpl]
            [prime.vo ValueObject ValueObjectField]))
 
 (def ^:private print-sequential #'clojure.core/print-sequential)
@@ -45,6 +45,13 @@
   (.write w "(prime.types/FileRef \"")
   (.write w (.toString v))
   (.write w "\")"))
+
+(defmethod print-method VORefImpl [^VORefImpl v, ^Writer w]
+  (.write w "(prime.types/VORef ")
+  (pr-on (._id v) w)
+  (.write w " => ")
+  (pr-on (._cached v) w)
+  (.write w ")"))
 
 (defmethod print-method RGBA      [^RGBA      v, ^Writer w]
   (.write w "(prime.types/RGBA 0x")

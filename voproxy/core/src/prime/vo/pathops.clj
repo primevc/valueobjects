@@ -12,15 +12,15 @@
 (defn- fill-path-step [step var]
   (if (map? step)
     (let [[k v] (first step)]
-      (if-not (nil? v) step #_else {k var}))
+      (if-not (or (nil? v) (= * v)) step #_else {k var}))
     #_else
     (or-not nil? step var)))
 
 
 (defn fill-path
   "Takes a sequence of path steps and a sequence of variables, where
-  each nil path step is replaced by the corresponding variable. For
-  example: (fill-path [1 nil nil 4] [2 3]) => (1 2 3 4)"
+  each nil (or *) path step is replaced by the corresponding variable.
+  For example: (fill-path [1 nil * 4] [2 3]) => (1 2 3 4)"
   [path variables]
   (let [[step & path-rest] path
         path-value (fill-path-step step (first variables))

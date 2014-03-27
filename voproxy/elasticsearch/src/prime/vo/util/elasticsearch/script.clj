@@ -47,7 +47,9 @@
 (defn- move-to*
   [^List obj from to]
   (debug "MOVE TO" obj from to)
-  (let [from (po/relative-vector-index (count obj) from)
+  (let [from (->> from
+                  (po/concrete-path-step obj)
+                  (po/relative-vector-index (count obj)))
         to (po/relative-vector-index (count obj) to :allow-index-after-last)
         to (if (< from to) (dec to) to)
         val (.remove obj (int from))]
@@ -81,7 +83,8 @@
 (defn- replace-at*
   [obj at value]
   (debug "REPLACE AT" obj at value)
-  (let [at (if (and (po/array-like? obj) (number? at))
+  (let [at (po/concrete-path-step obj at)
+        at (if (and (po/array-like? obj) (number? at))
              (po/relative-vector-index (count obj) at)
              at)]
     (if (po/array-like? obj)
@@ -107,7 +110,8 @@
 (defn- remove-from*
   [obj at]
   (debug "REMOVE FROM" obj at)
-  (let [at (if (and (po/array-like? obj) (number? at))
+  (let [at (po/concrete-path-step obj at)
+        at (if (and (po/array-like? obj) (number? at))
              (po/relative-vector-index (count obj) at)
              at)]
     (if (po/array-like? obj)
@@ -127,7 +131,8 @@
 (defn- insert-at*
   [^List obj at value]
   (debug "INSERT AT" obj at value)
-  (let [obj (or obj (new ArrayList))
+  (let [at (po/concrete-path-step obj at)
+        obj (or obj (new ArrayList))
         at (po/relative-vector-index (count obj) at)]
     (if (po/array-like? value)
       (.addAll ^List obj at value)

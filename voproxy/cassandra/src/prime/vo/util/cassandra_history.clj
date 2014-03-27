@@ -236,14 +236,14 @@
 (defn put
   [proxy vo options]
   (assert (:id vo) "vo requires an id")
-  (insert proxy vo (idconv vo) :put (change-data->bytes vo (stringify-keys options))))
+  (insert proxy vo (idconv vo) :put (change-data->bytes vo)))
 
 
 (defn update
   [proxy vo id options]
   (let [vo (dissoc vo (. (prime.vo/id-field vo) keyword))] ; Prevent change of the id.
     (insert proxy vo (idconv vo id) :update
-            (change-data->bytes vo (stringify-keys options)))))
+            (change-data->bytes vo))))
 
 
 (defn delete
@@ -255,28 +255,28 @@
   [proxy vo path path-vars value options]
   {:pre [(or (pathops/append-to-vo vo (pathops/fill-path path path-vars) value) true)]}
   (insert proxy vo (idconv vo) :append-to
-          (change-data->bytes (prepare-path vo path) path-vars value (stringify-keys options))))
+          (change-data->bytes (prepare-path vo path) path-vars value)))
 
 
 (defn insert-at
   [proxy vo path path-vars value options]
   {:pre [(or (pathops/insert-at vo (pathops/fill-path path path-vars) value) true)]}
   (insert proxy vo (idconv vo) :insert-at
-          (change-data->bytes (prepare-path vo path) path-vars value (stringify-keys options))))
+          (change-data->bytes (prepare-path vo path) path-vars value)))
 
 
 (defn move-to
   [proxy vo path path-vars to options]
   {:pre [(or (pathops/move-vo-to vo (pathops/fill-path path path-vars) to) true)]}
   (insert proxy vo (idconv vo) :move-to
-          (change-data->bytes (prepare-path vo path) path-vars to (stringify-keys options))))
+          (change-data->bytes (prepare-path vo path) path-vars to)))
 
 
 (defn replace-at
   [proxy vo path path-vars value options]
   {:pre [(or (pathops/replace-at vo (pathops/fill-path path path-vars) value) true)]}
   (insert proxy vo (idconv vo) :replace-at
-          (change-data->bytes (prepare-path vo path) path-vars value (stringify-keys options))))
+          (change-data->bytes (prepare-path vo path) path-vars value)))
 
 
 (defn merge-at
@@ -288,11 +288,11 @@
                                              "Use :allow-nil-or-empty-path? option to override."))))
     (insert proxy vo (idconv vo) :merge-at
             (change-data->bytes (prepare-path vo path-value) path-vars value
-                                (stringify-keys options)))))
+                               ))))
 
 
 (defn remove-from
   [proxy vo path path-vars options]
   {:pre [(or (pathops/remove-from vo (pathops/fill-path path path-vars)) true)]}
   (insert proxy vo (idconv vo) :remove-from
-          (change-data->bytes (prepare-path vo path) path-vars (stringify-keys options))))
+          (change-data->bytes (prepare-path vo path) path-vars)))

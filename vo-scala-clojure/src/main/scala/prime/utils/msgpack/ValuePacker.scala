@@ -125,7 +125,7 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
     case v : IPersistentMap           => pack(v);
     case v : Seqable                  => pack(v);
     case null                         => packNil();
-    case v                            => println("Fallback: " + v.getClass); super.pack(v);
+    case v                            => super.pack(v);
   }; this }
 
   final def packValueObjectHeader(voType : Int, mixins : Int, fieldFlagBytes : Int)

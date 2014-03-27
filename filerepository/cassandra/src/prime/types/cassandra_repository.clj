@@ -281,10 +281,8 @@
   Options:
     :ttl-fn   0-arity function called when creating a FileRef which should
               return the number of seconds after which to expire the file."
-  ([system consistency repository-name]
-    (cassandra-repository system consistency repository-name {}))
-  ([system consistency repository-name {:keys [ttl-fn] :as options}]
-    (prime.types.CassandraRepository. system consistency repository-name options)))
+  [system consistency repository-name & {:keys [ttl-fn] :as options}]
+  (prime.types.CassandraRepository. system consistency repository-name (into {} options)))
 
 
 (defn exists

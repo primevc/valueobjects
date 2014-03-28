@@ -29,7 +29,7 @@
 (defn ValueSource->map [^MessagePackValueSource vsrc]
   (->> (map (fn [id value]
               [ (Integer/toHexString id),
-                (if (instance? MessagePackValueSource value) (MessagePackValueSource->map value)
+                (if (instance? MessagePackValueSource value) (ValueSource->map value)
                 #_else (as-clojure value)) ])
             (. vsrc ids)
             (. vsrc values))

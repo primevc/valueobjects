@@ -12,7 +12,7 @@
            [prime.vo]
            [prime.types]
            [prime.vo.util.json])
-  (:import [prime.utils.msgpack VOPacker VOUnpacker VOUnpacker$]
+  (:import [prime.utils.msgpack VOPacker VOUnpacker VOUnpacker$ MessagePackValueSource]
            [java.io ByteArrayOutputStream ByteArrayInputStream]
            [java.nio ByteBuffer]
            [prime.vo ValueObject ValueObjectField]
@@ -96,7 +96,6 @@
   (let [out (ByteArrayOutputStream.)
         packer (VOPacker. out)]
     (doseq [item items] (.pack packer item))
-    (.close packer)
     (.toByteArray out)))
 
 
@@ -138,6 +137,15 @@
     (let [put-nr (action->int :put)]
       (first (filter #(= (:action %) put-nr) result)))))
 
+(defmacro with-debug
+  "Only compiles the 'debug-expr when:
+  (binding [*compiler-options* { :with-debug/history true }] ...)"
+  [debug-expr & actions]
+  (if (:with-debug/history *compiler-options*)
+    `(do ~debug-expr
+        ~@actions)
+  #_else
+    `(do ~@actions)))
 
 (defn- build-vo
   "Builds a target-vo using the result rows from the database. If no
@@ -147,6 +155,10 @@
   (loop [index 0
          accumulator (empty target-vo)]
     (if-let [row (nth result index nil)]
+     (with-debug
+      (do (prn (:version row) (:action row))
+          (let [[vsrc] (bytes->change-data (:data row))] (clojure.pprint/pprint (msgpack/ValueSource->map vsrc)))
+          (println))
       (recur (inc index)
              (case (int (:action row))
                #=(action->int :put)

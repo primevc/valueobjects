@@ -25,3 +25,12 @@
     ShortIntegerTypeIMPL   (.asInt ^ShortIntegerTypeIMPL obj)
     MessagePackValueSource obj
     MessagePackObjectId    (.oid ^MessagePackObjectId obj)))
+
+(defn ValueSource->map [^MessagePackValueSource vsrc]
+  (->> (map (fn [id value]
+              [ (Integer/toHexString id),
+                (if (instance? MessagePackValueSource value) (MessagePackValueSource->map value)
+                #_else (as-clojure value)) ])
+            (. vsrc ids)
+            (. vsrc values))
+    (into {})))

@@ -56,6 +56,7 @@ final class VOInstanceUnpacker extends UnpackerImpl.VOInstance
   final def fieldgroupRequiresMoreValues = bits8 != 0
 
   final def prepareForNext8Fields(fields: Byte) {
+    if (fields == 0) fieldOffset += 8;
     this.bits8 = fields & 0xFF;
   }
 

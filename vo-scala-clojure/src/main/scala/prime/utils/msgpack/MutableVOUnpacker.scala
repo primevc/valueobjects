@@ -66,6 +66,7 @@ class MutableVOInstanceUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends
   final def fieldgroupRequiresMoreValues = fields != 0
 
   final def prepareForNext8Fields(fields: Byte) {
+    if (fields == 0) fieldOffset += 8;
     this.fields = fields & 0xFF;
   }
 

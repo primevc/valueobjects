@@ -96,6 +96,7 @@
   (let [out (ByteArrayOutputStream.)
         packer (VOPacker. out)]
     (doseq [item items] (.pack packer item))
+    (.close packer)
     (.toByteArray out)))
 
 
@@ -109,7 +110,7 @@
     (map msgpack/as-clojure (iterator-seq (.. unpacker iterator)))))
 
 
-(defn- actions
+(defn- action->int
   [key]
   (case key
     :put (int 1)
@@ -134,7 +135,7 @@
                                       {:consistency consistency :keywordize? true}
                                       [(idconv vo)])]
     ;; Find first version where action == (:put actions)
-    (let [put-nr (actions :put)]
+    (let [put-nr (action->int :put)]
       (first (filter #(= (:action %) put-nr) result)))))
 
 
@@ -147,50 +148,50 @@
          accumulator (empty target-vo)]
     (if-let [row (nth result index nil)]
       (recur (inc index)
-             (condp = (:action row)
-               (actions :put)
+             (case (int (:action row))
+               #=(action->int :put)
                (let [vo-source (first (bytes->change-data (:data row)))]
                  (as-vo vo-source target-vo))
 
-               (actions :update)
+               #=(action->int :update)
                (let [[vo-source _] (bytes->change-data (:data row))
                      update-vo (as-vo vo-source target-vo)]
                  (utils/deep-merge-with (fn [x y] y) accumulator update-vo))
 
-               (actions :delete)
+               #=(action->int :delete)
                (empty target-vo)
 
-               (actions :append-to)
+               #=(action->int :append-to)
                (let [[path path-vars value _] (bytes->change-data (:data row))
                      filled-path (pathops/fill-path path path-vars)]
                  (pathops/append-to-vo accumulator filled-path value))
 
-               (actions :move-to)
+               #=(action->int :move-to)
                (let [[path path-vars to _] (bytes->change-data (:data row))
                      filled-path (pathops/fill-path path path-vars)]
                  (pathops/move-vo-to accumulator filled-path to))
 
-               (actions :remove-from)
+               #=(action->int :remove-from)
                (let [[path path-vars _] (bytes->change-data (:data row))
                      filled-path (pathops/fill-path path path-vars)]
                  (pathops/remove-from accumulator filled-path))
 
-               (actions :insert-at)
+               #=(action->int :insert-at)
                (let [[path path-vars value _] (bytes->change-data (:data row))
                      filled-path (pathops/fill-path path path-vars)]
                  (pathops/insert-at accumulator filled-path value))
 
-               (actions :replace-at)
+               #=(action->int :replace-at)
                (let [[path path-vars value _] (bytes->change-data (:data row))
                      filled-path (pathops/fill-path path path-vars)]
                  (pathops/replace-at accumulator filled-path value))
 
-               (actions :merge-at)
+               #=(action->int :merge-at)
                (let [[path path-vars value _] (bytes->change-data (:data row))
                      filled-path (pathops/fill-path path path-vars)]
                  (pathops/merge-at accumulator filled-path value))
 
-              :else accumulator))
+              accumulator)))
       (if (empty? accumulator) nil (assoc accumulator :id (:id target-vo))))))
 
 
@@ -229,7 +230,7 @@
                    "VALUES ( ? , ? , ? , ? )")
         prepared (cassandra/prepare system query)]
     (cassandra/do-prepared system prepared {:consistency consistency}
-                           [(UUIDGen/getTimeUUID) id (actions action)
+                           [(UUIDGen/getTimeUUID) id (action->int action)
                             (when data (ByteBuffer/wrap data))])))
 
 

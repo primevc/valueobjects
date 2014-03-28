@@ -6,7 +6,9 @@ package prime.types;
  import prime.vo.{ValueObjectCompanion => IVOC};
 
 
-trait VORef[V <: ValueObject with ID] {
+trait VORef[V <: ValueObject with ID] extends ID {
+  type IDType = V#IDType;
+
   def isEmpty   : Boolean;
   def isDefined : Boolean;
 

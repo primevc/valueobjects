@@ -173,7 +173,7 @@
   "Gets the :id of a map, ValueObject or VORef.
   If input is neither, just returns the input."}
   id [input]
-  `(let [v# ~input] (if (instance? VORef v#) (._id ^VORef v#) (or (:id v#) v#))))
+  `(let [v# ~input] (if (instance? ID v#) (._id ^ID v#) (or (:id v#) v#))))
 
 (defn id=
   "Compare the id of `a` and `b`.

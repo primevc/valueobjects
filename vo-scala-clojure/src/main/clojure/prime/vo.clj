@@ -56,20 +56,17 @@
   (.subtypes (manifest vo-or-manifest)))
 
 (defn fields-with-subtypes [in]
-  (mapcat fields (cons in (subtypes in))))
+  (distinct (mapcat fields (cons in (subtypes in)))))
 
 (defn field-set
   "Returns a set of field keywords known for the given `VO or Manifest`"
   [vo-or-manifest]
   (set (map keyword (fields vo-or-manifest))))
 
-(defn field-or-subtype-field-set
-  "Returns a set of field keywords known for the given `VO or Manifest` and all of it's subtypes."
-  [vo-or-manifest]
-  (set
-    (concat
-      (map keyword (fields vo-or-manifest))
-      (mapcat field-or-subtype-field-set (subtypes vo-or-manifest)))))
+(defn fields->keyword-set
+  "Transforms a seq of ValueObjectFields into a set of field keywords."
+  [field-seq]
+  (->> field-seq (map keyword) (set)))
 
 (defn field-filtered-seq
   "Returns a sequence sequence of ValueObjectFields, filtered by the (optional)
@@ -77,12 +74,13 @@
   [vo-or-manifest, only, exclude]
   (let [only       (set only   )
         exclude    (set exclude)
-        all-keys   (field-or-subtype-field-set vo-or-manifest)
+        all-fields (fields-with-subtypes vo-or-manifest)
+        all-keys   (fields->keyword-set all-fields)
         field-keys (if-not (empty? only)    (s/select     only       all-keys) all-keys)
         field-keys (if-not (empty? exclude) (s/difference field-keys exclude)  field-keys)]
     (assert (empty? (s/difference only    all-keys)) (str vo-or-manifest ":only    " only    " contains key not present in VO (or subtype) field-set: " all-keys))
     (assert (empty? (s/difference exclude all-keys)) (str vo-or-manifest ":exclude " exclude " contains key not present in VO (or subtype) field-set: " all-keys))
-    (distinct (filter (comp field-keys keyword) (fields-with-subtypes vo-or-manifest)))))
+    (filter (comp field-keys keyword) all-fields)))
 
 (defn ^ValueObjectField find-own-field
   "Searches for a field by key. Returns nil if not found within the given ValueObject(manifest) type."

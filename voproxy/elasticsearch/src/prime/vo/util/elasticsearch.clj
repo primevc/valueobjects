@@ -321,6 +321,28 @@
 
     item))
 
+(defn- is-id-value? [manifest, id-value, name]
+  (and (not (nil? id-value))
+       (= name (.. ^IDField manifest _id name))))
+
+(def-valuesource ElasticSearch-root-ValueSource [^int type, ^ValueObjectManifest manifest, ^java.util.Map jmap, search-hit-id]
+  (typeID   [this, base] (if (not (== -1 type)) type #_else base))
+
+  (contains [this, name idx]
+    (or (is-id-value? manifest search-hit-id, name)
+        (.containsKey jmap (Integer/toHexString (bit-shift-right idx 8)))))
+
+  (anyAt    [this, name idx notFound]
+    (cond
+      (is-id-value? manifest search-hit-id, name)
+      search-hit-id
+
+      jmap
+      (let [item (.get jmap (Integer/toHexString (bit-shift-right idx 8)))]
+        (convert-search-result item))
+
+      :else notFound)))
+
 
 ;;; ElasticSearch querying API.
 
@@ -367,7 +389,7 @@
                                          :id (vo-id->str vo)))]
     (when (.isExists resp)
       (.apply (. vo voCompanion)
-              (ElasticSearch-ValueSource. (.. vo voManifest ID) (.getSourceAsMap resp) resp)))))
+              (ElasticSearch-root-ValueSource. (.. vo voManifest ID) (.. vo voManifest) (.getSourceAsMap resp) (vo/id vo))))))
 
 (defn put
   "options: see clj-elasticsearch.client/index-doc"
@@ -379,7 +401,7 @@
                               :index index
                               :id (vo-id->str vo)
                               :type (Integer/toHexString (.. vo voManifest ID))
-                              :source (generate-hexed-fields-smile vo)))]
+                              :source (generate-hexed-fields-smile (vo/without-id vo))))]
     (finish-change proxy options resp)))
 
 
@@ -397,7 +419,7 @@
   (let [type (Integer/toHexString (.. vo voManifest ID))
         id (prime.types/to-String id)
         fields (map field-hexname fields)]
-    (->> (merge default-opts {:index index :doc vo :doc-as-upsert? true} options)
+    (->> (merge default-opts {:index index :doc (vo/without-id vo) :doc-as-upsert? true} options)
          (patched-update-options type id)
          (ces/update-doc client)
          (finish-change proxy options))))
@@ -419,9 +441,9 @@
 (defn SearchHit->fields [^SearchHit sh] (.fields sh)     )
 (defn SearchHit->source [^SearchHit sh] (.sourceAsMap sh))
 
-(defn SearchHit->ValueObject [source-fn, ^ValueObjectCompanion voCompanion, ^SearchHit hit]
-  (.apply voCompanion
-    (ElasticSearch-ValueSource. (Integer/parseInt (.type hit) 16) (source-fn hit) hit)))
+(defn SearchHit->ValueObject [source-fn, ^ValueObject empty-vo, ^SearchHit hit]
+  (.apply (. empty-vo voCompanion)
+    (ElasticSearch-root-ValueSource. (Integer/parseInt (.type hit) 16) (.. empty-vo voManifest) (source-fn hit) (.id hit))))
 
 (defn scroll-seq [es, ^SearchResponse scroll-req keep-alive, from]
   (let [ ^SearchResponse response (ces/scroll es {:scroll-id (.getScrollId scroll-req) :scroll keep-alive, :format :java})
@@ -487,7 +509,7 @@
       (with-meta
         (map (partial SearchHit->ValueObject
                       (if fields SearchHit->fields SearchHit->source)
-                      (. vo voCompanion))
+                      vo)
              (if-not scroll
                (.. response getHits hits)
                (scroll-seq client response scroll 0)))

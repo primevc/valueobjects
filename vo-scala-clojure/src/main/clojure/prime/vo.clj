@@ -175,6 +175,10 @@
   id [input]
   `(let [v# ~input] (if (instance? ID v#) (._id ^ID v#) (or (:id v#) v#))))
 
+(defn without-id [^ValueObject vo]
+  (if-not (nil? (id vo)) vo
+   #_else (dissoc vo (. (prime.vo/id-field vo) keyword))))
+
 (defn id=
   "Compare the id of `a` and `b`.
     Useful to check if:

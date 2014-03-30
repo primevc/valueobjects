@@ -51,7 +51,7 @@
           `(~fn-sym
             ([~in]           (~converter ~in))
             ([~in ~'ignored] (~converter ~in)))))
-        types))))
+        (cons nil types)))))
 
 (def ByteArray (Class/forName "[B"))
 

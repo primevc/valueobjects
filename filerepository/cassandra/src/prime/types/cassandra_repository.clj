@@ -61,8 +61,15 @@
 
 (defn- ref-hash
   "Evaluates to the base64 encoded hash of the specified FileRef."
-  [^FileRef ref]
-  (Base64/encodeBase64URLSafeString (.hash ref)))
+  [^String prefix ^FileRef ref]
+  (cond
+    (.hash ref)
+    (Base64/encodeBase64URLSafeString (.hash ref))
+
+    (< (count prefix) (count (.uri ref)))
+    (.substring (.uri ref) (count prefix))
+
+    :else (throw (IllegalArgumentException. (print-str ref "is empty or incompatible.")))))
 
 
 (defn- write-schema
@@ -90,7 +97,8 @@
             fc (.getChannel fis)
             buffer (.map fc (FileChannel$MapMode/READ_ONLY) 0 (.size fc))
             statement-fn (-> state :statements :create)
-            hash (ref-hash ref)]
+            prefix (:prefix state)
+            hash (ref-hash prefix ref)]
         (log/debug "Storing file using MappedByteBuffer for FileRef" ref)
         (statement-fn hash buffer)))
     ref))
@@ -102,7 +110,8 @@
     (let [state (.state repo)
           statement-fn (-> state :statements :create)
           buffer (ByteBuffer/wrap byte-array)
-          hash (ref-hash ref)]
+          prefix (:prefix state)
+          hash (ref-hash prefix ref)]
       (log/debug "Underlying FileRef not stored yet, storing it now.")
       (statement-fn hash buffer))
     (log/debug "Underlying FileRef already stored.")))
@@ -133,7 +142,8 @@
   (log/debug "Checking whether FileRef" ref "is stored.")
   (let [state (.state this)
         statement-fn (-> state :statements :exists)
-        hash (ref-hash ref)
+        prefix (:prefix state)
+        hash (ref-hash prefix ref)
         result (statement-fn hash)
         exists (= 1 (:count (first result)))]
     (log/debug "FileRef" ref (if exists "is stored." "is not stored."))
@@ -190,7 +200,8 @@
   (log/debug "Stream requested for FileRef" ref)
   (let [state (.state this)
         statement-fn (-> state :statements :stream)
-        hash (ref-hash ref)
+        prefix (:prefix state)
+        hash (ref-hash prefix ref)
         result (statement-fn hash)]
     (when-let [data (:data (first result))]
       (ByteBufferUtil/inputStream data))))
@@ -216,7 +227,8 @@
   [this ^FileRef ref]
   (log/info "File requested for FileRef" ref)
   (let [state (.state this)
-        hash (ref-hash ref)
+        prefix (:prefix state)
+        hash (ref-hash prefix ref)
         tmp (File. (:tmp-dir state) (str "cfr-" hash))]
     (if-not (.exists tmp)
       (do (log/info "File not available in temporary directory; creating it now.")
@@ -239,7 +251,8 @@
   (log/debug "Deleting file for FileRef" ref)
   (let [state (.state this)
         statement-fn (-> state :statements :delete)
-        hash (ref-hash ref)]
+        prefix (:prefix state)
+        hash (ref-hash prefix ref)]
     (statement-fn hash)))
 
 

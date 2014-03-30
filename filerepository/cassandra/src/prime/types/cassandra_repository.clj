@@ -15,7 +15,7 @@
 
   This repository has the following URI convention: `cassandra://<hash>`"
   (:refer-clojure :exclude (replace))
-  (:use [prime.types :only (to-URI)]
+  (:use [prime.types :only (fileref-exists? to-URI)]
         [clojure.java.io :only (resource)]
         [clojure.string :only (replace split)])
   (:require [containium.systems.cassandra :as cassandra]
@@ -77,8 +77,6 @@
 ;;---TODO: Play with this when we get actual metrics.
 (def ^:const memory-map-minimum 1048576) ; 1 MiB
 
-(declare exists)
-
 (defn- memory-mapped-absorb
   "Absorbs the given File using a MappedByteBuffer. This improves the memory
   efficiency when absorbing large files."
@@ -86,7 +84,7 @@
   (let [state (.state repo)
         prefix (:prefix state)
         ref (LocalFileRef/apply file prefix)]
-    (if (exists repo ref)
+    (if (fileref-exists? repo ref)
       (log/debug "File already stored for FileRef" ref)
       (let [fis (FileInputStream. file)
             fc (.getChannel fis)
@@ -100,7 +98,7 @@
 
 (defn- write-bytes
   [repo ref byte-array]
-  (if-not (exists repo ref)
+  (if-not (fileref-exists? repo ref)
     (let [state (.state repo)
           statement-fn (-> state :statements :create)
           buffer (ByteBuffer/wrap byte-array)
@@ -283,13 +281,6 @@
               return the number of seconds after which to expire the file."
   [system consistency repository-name & {:keys [ttl-fn] :as options}]
   (prime.types.CassandraRepository. system consistency repository-name (into {} options)))
-
-
-(defn exists
-  "Call `exists` on the FileRepository Scala trait."
-  [this ^FileRef ref]
-  (log/debug "Exists called from Clojure, forwarded to Scala trait.")
-  (prime.types.FileRepository$class/exists this ref))
 
 
 (defn store

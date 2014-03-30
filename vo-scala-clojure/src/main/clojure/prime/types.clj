@@ -128,6 +128,12 @@
 (def ^:pure FileRef prime.types.FileRef$/MODULE$)
 (def ^:pure RGBA    to-RGBA)
 
+(defn fileref-exists?
+  "Call `exists` on the FileRepository Scala trait."
+  [this ^prime.types.FileRef ref]
+  (prime.types.FileRepository$class/exists this ref))
+
+
 
 (comment
 ;

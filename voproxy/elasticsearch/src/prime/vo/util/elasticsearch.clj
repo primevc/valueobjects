@@ -190,10 +190,10 @@
 (defn hexify-path "Recursively walks path.
   Maps keywords to hex-names (for JSON access) and keeps all other values as they are."
   [^ValueObject vo path]
-  (prime.vo/fields-path-seq vo path field-hexname))
+  (vo/fields-path-seq vo path field-hexname))
 
 (defn keyword->hex-field   [^prime.vo.ValueObject vo, ^clojure.lang.Named key]
-  (if-let [path (prime.vo/fields-path-seq vo (clojure.string/split (name key) #"[.]") field-hexname)]
+  (if-let [path (vo/fields-path-seq vo (clojure.string/split (name key) #"[.]") field-hexname)]
     (clojure.string/join "." (filter string? path))))
 
 (defn map-keywords->hex-fields [^prime.vo.ValueObject vo, expr]
@@ -357,7 +357,7 @@
      {:and (mapv #(hash-map :term %) (vo->term-filter vo ""))})
 
   ([vo prefix]
-     (binding [prime.vo/*voseq-key-fn* #(str prefix (field-hexname %))]
+     (binding [vo/*voseq-key-fn* #(str prefix (field-hexname %))]
        (loop [items (seq vo)
               terms []]
          (if-let [[k v :as pair] (first items)]
@@ -375,12 +375,12 @@
            terms)))))
 
 (defn vo-id->str [vo]
-  (-> vo prime.vo/id prime.types/to-String))
+  (-> vo vo/id prime.types/to-String))
 
 (defn get
   "options: see clj-elasticsearch.client/get-doc"
   [{:keys [client index default-opts] :as proxy} ^ValueObject vo options]
-  {:pre [client (string? index) (not (empty? vo)) options]}
+  {:pre [client (string? index) (vo/has-id? vo) options]}
   (let [^GetResponse resp (ces/get-doc client
                                        (assoc (merge default-opts options)
                                          :type (Integer/toHexString (.. vo voManifest ID))
@@ -394,7 +394,8 @@
 (defn put
   "options: see clj-elasticsearch.client/index-doc"
   [{:keys [client index default-opts] :as proxy} ^ValueObject vo options]
-  {:pre [client index (prime.vo/has-id? vo)]}
+  {:pre [client index]}
+  (assert (vo/has-id? vo) (print-str "VO requires an id: " vo))
   (let [options (merge default-opts options)
         resp (ces/index-doc client
                             (assoc options
@@ -427,7 +428,7 @@
 
 (defn delete
   [{:keys [client index default-opts] :as proxy} ^ValueObject vo options]
-  {:pre [(instance? ValueObject vo) index client (prime.vo/has-id? vo)]}
+  {:pre [(instance? ValueObject vo) index client (vo/has-id? vo)]}
   (->> (ces/delete-doc client (merge default-opts
                                      {:index index
                                       :id (prime.types/to-String (.. ^ID vo _id))

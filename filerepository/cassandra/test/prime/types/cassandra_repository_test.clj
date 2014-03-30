@@ -5,6 +5,7 @@
 (ns prime.types.cassandra-repository-test
   "The test namespace for the Cassandra file repository."
   (:use [clojure.test]
+        [prime.types.repository-util :refer (exists?)]
         [prime.types.cassandra-repository])
   (:require [containium.systems :refer (with-systems)]
             [containium.systems.config :as config]
@@ -41,7 +42,7 @@
 (defn mock-exists
   "The redefined exists call does not use Storm."
   [f]
-  (with-redefs [prime.types.cassandra-repository/exists
+  (with-redefs [prime.types.repository-util/exists?
                 (fn [repo ^FileRef ref] (.existsImpl repo ref))]
     (f)))
 
@@ -64,13 +65,13 @@
         (is (= (str ref) "cassandra://2-Ll2ZG1O9D2DuVM4-8y_Oo8UMjn66zGw8OdMwUEngY")
             "it returns the correct reference")
 
-        (is (exists repo ref) "it contains the file")
+        (is (exists? repo ref) "it contains the file")
 
         (is (= (IOUtils/toString (stream repo ref)) "cassandra test")
             "it can stream the contents")
 
         (.delete repo ref)
-        (is (not (exists repo ref)) "it can delete the file")))))
+        (is (not (exists? repo ref)) "it can delete the file")))))
 
 
 (deftest store-test
@@ -85,13 +86,13 @@
         (is (= (str ref) "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
             "it returns the correct reference")
 
-        (is (exists repo ref) "it contains the file")
+        (is (exists? repo ref) "it contains the file")
 
         (is (= (IOUtils/toString (stream repo ref)) "hi there!")
             "it can stream the contents")
 
         (.delete repo ref)
-        (is (not (exists repo ref)) "it can delete the file")))))
+        (is (not (exists? repo ref)) "it can delete the file")))))
 
 
 (deftest mk-repository-test
@@ -106,13 +107,13 @@
         (is (= (str ref) "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
             "it returns the correct reference")
 
-        (is (exists repo ref) "it contains the file")
+        (is (exists? repo ref) "it contains the file")
 
         (is (= (IOUtils/toString (stream repo ref)) "hi there!")
             "it can stream the contents")
 
         (.delete repo ref)
-        (is (not (exists repo ref)) "it can delete the file")))))
+        (is (not (exists? repo ref)) "it can delete the file")))))
 
 (deftest get-file-test
   (testing "retrieving a file via get-file"
@@ -126,10 +127,10 @@
         (is (= (str ref) "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
             "it returns the correct reference")
 
-        (is (exists repo ref) "it contains the file")
+        (is (exists? repo ref) "it contains the file")
 
         (is (= (FileUtils/readFileToString (get-file repo ref)) "hi there!")
             "it can return the contents as a File")
 
         (.delete repo ref)
-        (is (not (exists repo ref)) "it can delete the file")))))
+        (is (not (exists? repo ref)) "it can delete the file")))))

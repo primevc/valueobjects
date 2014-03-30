@@ -40,3 +40,9 @@
 
 (defn local-File [^prime.types.FileRef fileref ^prime.types.LocalFileRepository repository]
   (.getFile repository fileref))
+
+
+(defn exists?
+  "Call `exists` on the FileRepository Scala trait."
+  [this ^prime.types.FileRef ref]
+  (prime.types.FileRepository$class/exists this ref))

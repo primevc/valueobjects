@@ -15,7 +15,8 @@
 
   This repository has the following URI convention: `cassandra://<hash>`"
   (:refer-clojure :exclude (replace))
-  (:use [prime.types :only (fileref-exists? to-URI)]
+  (:use [prime.types :only (to-URI)]
+        [prime.types.repository-util :as repository]
         [clojure.java.io :only (resource)]
         [clojure.string :only (replace split)])
   (:require [containium.systems.cassandra :as cassandra]
@@ -91,7 +92,7 @@
   (let [state (.state repo)
         prefix (:prefix state)
         ref (LocalFileRef/apply file prefix)]
-    (if (fileref-exists? repo ref)
+    (if (repository/exists? repo ref)
       (log/debug "File already stored for FileRef" ref)
       (let [fis (FileInputStream. file)
             fc (.getChannel fis)
@@ -106,7 +107,7 @@
 
 (defn- write-bytes
   [repo ref byte-array]
-  (if-not (fileref-exists? repo ref)
+  (if-not (repository/exists? repo ref)
     (let [state (.state repo)
           statement-fn (-> state :statements :create)
           buffer (ByteBuffer/wrap byte-array)

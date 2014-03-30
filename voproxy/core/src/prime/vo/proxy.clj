@@ -8,6 +8,7 @@
   creation of implementations of these protocols."
   (:require [fast-zip.core :as zip]
             [prime.vo :refer (vo-zipper)]
+            [prime.vo.definition :refer (companion-object-symbol)]
             [prime.utils :refer (guard-let index-of forcat)]))
 
 
@@ -225,7 +226,16 @@
                        (assert (not= meta-proxy result-proxy)
                                (str ":with-meta cannot be the same as :return-result-of for " type))
                        `[(instance? ~type ~'vo)
-                         (let [~'vo ~(if keep-map `(vo-keep ~'vo ~keep-map) 'vo)]
+                         (let [~'vo
+                               ~(if-not keep-map, 'vo
+                               ;;else:
+                                 (let [keep-map (eval keep-map)
+                                       keep-map
+                                       (assoc keep-map
+                                              (.. (eval (companion-object-symbol (eval type)))
+                                                  manifest _id keyword)
+                                              *)]
+                                   `(vo-keep ~'vo ~keep-map)))]
                            (let ~(vec (concat [(if pre-form 'vo #_else '_) pre-form]
                                               proxy-forms
                                               ['_ post-form]))

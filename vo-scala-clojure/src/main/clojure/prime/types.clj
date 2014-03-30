@@ -67,6 +67,12 @@
 (def-default-converter URI        =>  URI              String       URL  ObjectId)
 (def-default-converter ObjectId   =>  ObjectId         String  URI       ByteArray)
 
+(extend-type nil
+  To-String
+  (^String to-String
+    ([in] "")
+    ([in ^String format] "")))
+
 (extend-type org.bson.types.ObjectId
   To-String
   (^String to-String

@@ -38,9 +38,11 @@ object Conversion
   def String    (value:Double)                : String = value.toString;
   def String    (value:Double, format:String) : String = if (format == null) value.toString else decimalFormatter(format).format(value);
   def String    (value:URI)                   : String = value.toString;
+  def String    (value:ObjectId)              : String = Base64.encodeBase64URLSafeString(value.toByteArray);
   def String    (value:Any, format:String)    : String = unpack(value) match {
     case v:String      => String(v)
     case v:RawType     => String(v)
+    case v:ObjectId    => String(v)
     case v:Double      => String(v, format)
     case v:Number      => String(v)
     case v:URI         => String(v)
@@ -273,7 +275,7 @@ object Conversion
   def URI       (value:String)    : URI = new URI(value.replace(" ", "%20"));
   def URI       (value:RawType)   : URI = URI(value.asString);
   def URI       (value:URL)       : URI = value.toURI;
-  def URI       (value:ObjectId)  : URI = URI(Base64.encodeBase64URLSafeString(value.toByteArray));
+  def URI       (value:ObjectId)  : URI = URI(String(value));
 
   def URI(value:Any) : URI = unpack(value) match {
     case v:URI       => v
@@ -340,8 +342,8 @@ object Conversion
 
   def ObjectId  (value:ObjectId)            : ObjectId = value;
   def ObjectId  (value:MessagePackObjectId) : ObjectId = value.oid;
-  def ObjectId  (value:URI)                 : ObjectId = if (value == null) throw NoInputException else new ObjectId(Base64.decodeBase64(value.toString));
-  def ObjectId  (value:String)              : ObjectId = new ObjectId(value);
+  def ObjectId  (value:URI)                 : ObjectId = if (value == null) throw NoInputException else ObjectId(value.toString);
+  def ObjectId  (value:String)              : ObjectId = try ObjectId(Base64.decodeBase64(value)) catch { case e:IllegalArgumentException => ObjectId(value); };
   def ObjectId  (value:Array[Byte])         : ObjectId = new ObjectId(value);
 
   def ObjectId  (value:Any) : ObjectId = unpack(value) match {

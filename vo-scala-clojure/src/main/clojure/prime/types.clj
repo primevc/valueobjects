@@ -56,7 +56,7 @@
 (def ByteArray (Class/forName "[B"))
 
 (def-default-converter Boolean    =>  Boolean          String          Number                    )
-(def-default-converter String     =>  String           URI             Number Double Long Integer)
+(def-default-converter String     =>  String         ObjectId  URI     Number Double Long Integer)
 (def-default-converter Integer    =>  Integer          String          Number Double Long        )
 (def-default-converter Decimal    =>  Double                           Number Double Long Integer)
 (def-default-converter RGBA       =>  prime.types.RGBA String)
@@ -72,12 +72,6 @@
   (^String to-String
     ([in] "")
     ([in ^String format] "")))
-
-(extend-type org.bson.types.ObjectId
-  To-String
-  (^String to-String
-    ([in] (.toString in))
-    ([in ^String format] (.toString in))))
 
 ; Default formatted String converters
 (extend-type Double To-String

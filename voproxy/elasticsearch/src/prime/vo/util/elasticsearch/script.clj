@@ -174,8 +174,7 @@
 
 ;;; Functions to read the source of namespace declarations and functions.
 
-(require '[clojure.edn :as edn]
-         '[clojure.java.io :as io]
+(require '[clojure.java.io :as io]
          '[clojure.string :as string])
 
 
@@ -184,17 +183,18 @@
   Returns a sequence of the forms within that source file. The source
   file should be on the classpath."
   [ns]
-  (-> ns
-      str
-      (string/replace "." "/")
-      (string/replace "-" "_")
-      (str ".clj")
-      io/resource
-      io/reader
-      slurp
-      (str "]")
-      (->> (str "["))
-      edn/read-string))
+  (binding [*read-eval* false]
+    (-> ns
+        str
+        (string/replace "." "/")
+        (string/replace "-" "_")
+        (str ".clj")
+        io/resource
+        io/reader
+        slurp
+        (str "]")
+        (->> (str "["))
+        read-string)))
 
 
 (defmacro ns-source
@@ -222,7 +222,8 @@
 ;;; Per operation script source strings.
 
 (def base-script
-  (str (ns-source prime.vo.pathops)
+  (str (ns-source prime.utils)
+       (ns-source prime.vo.pathops)
        (def-source prime.vo.pathops/array-like?)
        (def-source prime.vo.pathops/concrete-path-step)
        (def-source prime.vo.pathops/relative-vector-index)

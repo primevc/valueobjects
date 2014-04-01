@@ -73,6 +73,12 @@
     ([in] "")
     ([in ^String format] "")))
 
+(extend-type Object
+  To-String
+  (^String to-String
+    ([in] (.toString in))
+    ([in ^String format] (.toString in))))
+
 ; Default formatted String converters
 (extend-type Double To-String
   (^String to-String

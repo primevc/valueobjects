@@ -18,8 +18,8 @@
     DoubleTypeIMPL         (.asDouble ^DoubleTypeIMPL obj)
     FloatTypeIMPL          (.asFloat ^FloatTypeIMPL obj)
     LongIntegerTypeIMPL    (.asLong ^LongIntegerTypeIMPL obj)
-    MapType                (reduce (fn [m [k v]] (assoc m (as-clojure k) (as-clojure ^MapType v)))
-                                   {} (.asMap obj))
+    MapType                (reduce (fn [m [k v]] (assoc m (as-clojure k) (as-clojure v)))
+                                   {} (.asMap ^MapType obj))
     NilType                nil
     RawType                (.asString ^RawType obj) ;;---TODO: Is this always correct? Add option?
     ShortIntegerTypeIMPL   (.asInt ^ShortIntegerTypeIMPL obj)

@@ -8,6 +8,7 @@
   needs to be required. It does have dynamic vars that influence the
   resulting encoding."
   (:require [prime.vo :as vo]
+            [prime.types :refer (to-String)]
             [cheshire.generate :refer (add-encoder)])
   (:import [prime.types VORef EnumValue package$ValueType package$ValueTypes$Tdef
             package$ValueTypes$Tarray package$ValueTypes$Tenum FileRef]
@@ -82,23 +83,23 @@
 
 (defn- encode-uri
   [^java.net.URI in ^JsonGenerator out]
-  (.writeString out (.toString in)))
+  (.writeString out (to-String in)))
 
 (defn- encode-url
   [^java.net.URL in ^JsonGenerator out]
-  (.writeString out (.toString in)))
+  (.writeString out (to-String in)))
 
 (defn- encode-internetAddress
   [^javax.mail.internet.InternetAddress in ^JsonGenerator out]
-  (.writeString out (.toString in)))
+  (.writeString out (to-String in)))
 
 (defn- encode-objectId
   [^org.bson.types.ObjectId in ^JsonGenerator out]
-  (.writeString out (.toString in)))
+  (.writeString out (to-String in)))
 
 (defn- encode-fileref
   [^prime.types.FileRef in ^JsonGenerator out]
-  (.writeString out (.toString in)))
+  (.writeString out (to-String in)))
 
 
 ;;; Register encoders and advice cheshire.generate/generate.

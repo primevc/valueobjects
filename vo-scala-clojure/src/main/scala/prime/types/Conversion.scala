@@ -343,7 +343,7 @@ object Conversion
   def ObjectId  (value:ObjectId)            : ObjectId = value;
   def ObjectId  (value:MessagePackObjectId) : ObjectId = value.oid;
   def ObjectId  (value:URI)                 : ObjectId = if (value == null) throw NoInputException else ObjectId(value.toString);
-  def ObjectId  (value:String)              : ObjectId = try ObjectId(Base64.decodeBase64(value)) catch { case e:IllegalArgumentException => ObjectId(value); };
+  def ObjectId  (value:String)              : ObjectId = try new ObjectId(Base64.decodeBase64(value)) catch { case e:IllegalArgumentException => new ObjectId(value); };
   def ObjectId  (value:Array[Byte])         : ObjectId = new ObjectId(value);
 
   def ObjectId  (value:Any) : ObjectId = unpack(value) match {

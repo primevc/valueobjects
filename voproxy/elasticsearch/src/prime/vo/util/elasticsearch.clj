@@ -431,7 +431,7 @@
   {:pre [(instance? ValueObject vo) index client (vo/has-id? vo)]}
   (->> (ces/delete-doc client (merge default-opts
                                      {:index index
-                                      :id (prime.types/to-String (.. ^ID vo _id))
+                                      :id (vo-id->str vo)
                                       :type (Integer/toHexString (.. vo voManifest ID))}
                                      options))
        (finish-change proxy options)))
@@ -523,11 +523,10 @@
   [{:keys [client index default-opts] :as proxy} ^ValueObject vo path path-vars options script params]
   {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index client (string? script)]}
   (let [path (hexify-path vo (pathops/fill-path path path-vars))
-        type (Integer/toHexString (.. vo voManifest ID))
-        id (prime.types/to-String (:id vo))]
+        type (Integer/toHexString (.. vo voManifest ID))]
     (->> (ces/update-doc client {:index index
                                  :type type
-                                 :id id
+                                 :id (vo-id->str vo)
                                  :source (generate-hexed-fields-smile
                                           {:script script
                                            :lang "clj"

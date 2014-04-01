@@ -7,7 +7,7 @@
   protocols. The namespace also includes helper functions for easy
   creation of implementations of these protocols."
   (:require [fast-zip.core :as zip]
-            [prime.vo :refer (vo-zipper)]
+            [prime.vo :refer (id-field vo-zipper)]
             [prime.vo.definition :refer (companion-object-symbol)]
             [prime.utils :refer (guard-let index-of forcat)]))
 
@@ -232,8 +232,9 @@
                                  (let [keep-map (eval keep-map)
                                        keep-map
                                        (assoc keep-map
-                                              (.. (eval (companion-object-symbol (eval type)))
-                                                  manifest _id keyword)
+                                              (-> (companion-object-symbol (eval type))
+                                                  ^prime.vo.ValueObjectCompanion (eval)
+                                                  (.manifest) (id-field) (.keyword))
                                               *)]
                                    `(vo-keep ~'vo ~keep-map)))]
                            (let ~(vec (concat [(if pre-form 'vo #_else '_) pre-form]

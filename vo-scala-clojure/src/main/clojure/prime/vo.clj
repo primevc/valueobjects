@@ -176,8 +176,9 @@
   `(let [v# ~input] (if (instance? ID v#) (._id ^ID v#) (or (:id v#) v#))))
 
 (defn without-id [^ValueObject vo]
-  (if-not (nil? (id vo)) vo
-   #_else (dissoc vo (. (prime.vo/id-field vo) keyword))))
+  (let [field (prime.vo/id-field vo)]
+    (if-not (. field in vo) vo
+     #_else (dissoc vo (. field keyword)))))
 
 (defn id=
   "Compare the id of `a` and `b`.

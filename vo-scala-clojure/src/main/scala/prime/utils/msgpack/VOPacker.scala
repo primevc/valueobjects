@@ -63,7 +63,7 @@ class VOPacker (out:OutputStream) extends ValuePacker(out)
     val manifest = vo.voManifest;
     var i = startIndex;
     var fieldBits = fields;
-    do {
+    while (fieldBits != 0) {
       writeByte( fieldBits );
 
       if ((fieldBits & 0x01) != 0) pack( manifest(i    ).get(vo) );
@@ -78,6 +78,5 @@ class VOPacker (out:OutputStream) extends ValuePacker(out)
       fieldBits >>>= 8;
       i += 8;
     }
-    while (fieldBits != 0 && i < manifest.lastFieldIndex);
   }
 }

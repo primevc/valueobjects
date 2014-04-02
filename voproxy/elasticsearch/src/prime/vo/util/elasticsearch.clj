@@ -354,7 +354,9 @@
 
 (defn vo->term-filter
   ([vo]
-     {:and (mapv #(hash-map :term %) (vo->term-filter vo ""))})
+    (let [terms (vo->term-filter vo "")]
+      (if-not (empty? terms)
+        {:and (mapv #(hash-map :term %) terms)})))
 
   ([vo prefix]
      (binding [vo/*voseq-key-fn* #(str prefix (field-hexname %))]
@@ -374,8 +376,15 @@
                  (recur (rest items) (conj terms (apply hash-map (term-kv-pair v k pair)))))
            terms)))))
 
+(defn vo->search-filter [vo]
+  (let [term-filter (vo->term-filter (vo/without-id vo))]
+    (if (prime.vo/has-id? vo) (conj term-filter {"ids" {"values" [(:id vo)]}})
+    #_else term-filter)))
+
+
 (defn vo-id->str [vo]
   (-> vo :id prime.types/to-String))
+
 
 (defn get
   "options: see clj-elasticsearch.client/get-doc"
@@ -487,9 +496,9 @@
         filter (map-keywords->hex-fields vo filter)
         filter (if-not filter
                  (when-not (empty? vo)
-                   (vo->term-filter vo))
+                   (vo->search-filter vo))
                  (if-not (empty? vo)
-                   {:and (conj [filter] (vo->term-filter vo))}
+                   {:and (conj [filter] (vo->search-filter vo))}
                    filter))
         filter (if filter {:and [typefilter filter]} typefilter)
         fields (when (or only exclude)
@@ -564,7 +573,7 @@
 (defn has-child-vo
   "Construct a 'has_child' query for the given VO type and optional query.
    If no query is given: query is built using vo as term filter, or match_all if vo is empty."
-  ([vo] (has-child-vo vo (if (empty? vo) {"match_all" {}} #_else (vo->term-filter vo))))
+  ([vo] (has-child-vo vo (if (empty? vo) {"match_all" {}} #_else (vo->search-filter vo))))
 
   ([vo child-query]
     {"has_child" {"type" (vo-hexname vo), "query" child-query}}))

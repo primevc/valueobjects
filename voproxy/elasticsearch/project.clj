@@ -10,6 +10,7 @@
                  [prime/voserializer-cheshire "0.1.0-SNAPSHOT"]
                  [org.elasticsearch/elasticsearch "0.90.5"]
                  [org.clojars.touch/clj-elasticsearch "0.4.2"]
+                 [clj-tuple "0.1.5"]
                  [cheshire "5.2.0"]]
   :profiles {:test {:dependencies [[containium "0.1.0-SNAPSHOT"]
                                    [org.clojars.touch/elasticsearch-lang-clojure "0.1.0-SNAPSHOT"]]}

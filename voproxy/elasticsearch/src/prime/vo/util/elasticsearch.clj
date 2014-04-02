@@ -6,6 +6,7 @@
   "The implementation of the ElasticSearch VOProxy and VOSearchProxy."
   (:refer-clojure :exclude (get))
   (:require [prime.vo :as vo]
+            [clj-tuple :refer (tuple)]
             [clojure.set     :as set]
             [cheshire [core :as core] [generate :as gen]]
             [clj-elasticsearch.client :as ces]
@@ -51,9 +52,9 @@
   EnumValue
   (term-kv-pair [v k kv-pair]
     (if (.isInstance scala.Product v)
-      [(str k ".x") (. v toString)]
+      (tuple (str k ".x") (. v toString))
     #_else
-      [(str k ".v") (. v value   )]))
+      (tuple (str k ".v") (. v value))))
 
   (mapping-field-type-defaults [value]
     {:properties {
@@ -369,7 +370,7 @@
                  (vector? v)
                  (recur (rest items) (apply concat terms (mapv #(if (instance? ValueObject %)
                                                                   (vo->term-filter % (str k "."))
-                                                                  [{k %}])
+                                                                  (tuple {k %}))
                                                                v)))
 
                  :else
@@ -503,7 +504,7 @@
         filter (if filter {:and [typefilter filter]} typefilter)
         fields (when (or only exclude)
                  (map field-hexname (vo/field-filtered-seq vo only exclude)))
-        extra-source-opts (->> (map (fn [[k v]] [k (map-keywords->hex-fields vo v)])
+        extra-source-opts (->> (map (fn [[k v]] (tuple k (map-keywords->hex-fields vo v)))
                                     (select-keys options need-hex-map-opts))
                                (into {:fields fields :filter filter})
                                (merge (select-keys options search-extra-source-opts))

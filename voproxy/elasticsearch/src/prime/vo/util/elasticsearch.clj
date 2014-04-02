@@ -375,7 +375,7 @@
            terms)))))
 
 (defn vo-id->str [vo]
-  (-> vo vo/id prime.types/to-String))
+  (-> vo :id prime.types/to-String))
 
 (defn get
   "options: see clj-elasticsearch.client/get-doc"
@@ -389,7 +389,7 @@
                                          :id (vo-id->str vo)))]
     (when (.isExists resp)
       (.apply (. vo voCompanion)
-              (ElasticSearch-root-ValueSource. (.. vo voManifest ID) (.. vo voManifest) (.getSourceAsMap resp) (vo/id vo))))))
+              (ElasticSearch-root-ValueSource. (.. vo voManifest ID) (.. vo voManifest) (.getSourceAsMap resp) (:id vo))))))
 
 (defn put
   "options: see clj-elasticsearch.client/index-doc"

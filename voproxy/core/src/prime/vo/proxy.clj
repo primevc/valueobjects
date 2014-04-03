@@ -52,12 +52,8 @@
   (move-to [vo path path-vars to] [proxy vo path path-vars to] [proxy vo path path-vars to options]
     "Given a VO, a path that points to an array location, and a new 'to'
     index, it moves the item to the new index. Out of bounds indexes
-    are automatically trimmed, allowing one index higher than
-    currently in the array (to allow moving to the end of the array).
-    Negative indexes count from the end of the array (including the
-    index that allows moving after the last item in the array), e.g.
-    an index of -1 equals the last index of the array, increased by
-    one.")
+    are automatically trimmed. Negative indexes count from the end of
+    the array, e.g. an index of -1 equals the last index of the array.")
 
   (replace-at [vo path path-vars value] [proxy vo path path-vars value]
     [proxy vo path path-vars value options]

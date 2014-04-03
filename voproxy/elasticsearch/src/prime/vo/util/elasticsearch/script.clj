@@ -20,7 +20,7 @@
 
 (defmacro debug
   [& args]
-  ;; (println ~@args)
+  ;; `(println ~@args)
   )
 
 
@@ -50,8 +50,7 @@
   (let [from (->> from
                   (po/concrete-path-step obj)
                   (po/relative-vector-index (count obj)))
-        to (po/relative-vector-index (count obj) to :allow-index-after-last)
-        to (if (< from to) (dec to) to)
+        to (po/relative-vector-index (count obj) to)
         val (.remove obj (int from))]
     (doto obj (.add (int to) val))))
 

@@ -143,7 +143,7 @@
   {:pre [(array-like? vec) (not (empty? vec))]}
   (let [vec (clojure.core/vec vec) ; Hack: subvec behaves different on Scala vectors vs Clojure's.
         from (relative-vector-index (count vec) (concrete-path-step vec from))
-        to (relative-vector-index (count vec) to :allow-index-after-last)]
+        to (relative-vector-index (count vec) to)]
     (if (= from to) vec
         (vector-insert-at (vector-remove vec from) to
                           (nth vec from) :allow-index-after-last))))

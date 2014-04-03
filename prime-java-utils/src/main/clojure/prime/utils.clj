@@ -229,3 +229,22 @@
        (apply merge-with m maps)
        (apply f maps)))
    maps))
+
+
+(defmacro with-debug
+  "A debug macro, which keeps the `pre` forms iff the
+  *compiler-options* map contains a set under the keyword :with-debug
+  holding the given `name` symbol. Any pre form that is not a list,
+  will be wrapped with a `prn` call. The body has an implicet do. For
+  example:
+
+  (binding [*compiler-options* '{:with-debug #{voproxy-core}}]
+    (eval '(with-debug voproxy-core
+             [(println \"INPUT:\")
+              input]
+             (work-on input))))"
+  [name pre & body]
+  (if (get-in *compiler-options* [:with-debug name])
+    (let [pre (map (fn [form] (if-not (list? form) `(prn ~form) form)) pre)]
+      `(do ~@pre ~@body))
+    `(do ~@body)))

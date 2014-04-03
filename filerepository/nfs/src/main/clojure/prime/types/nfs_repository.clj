@@ -10,4 +10,5 @@
 (defmethod mk-repository "nfs"
   [_ descriptor]
   (let [[_ repository-name mounts-root-path] (re-matches #"^(.+?)@(.+?)$" descriptor)]
+    (assert mounts-root-path (str "Missing mount root path in " descriptor "; Example nfs repo uri: nfs://in-docs@/nfs"))
     (prime.types.NFSRepository. (as-file mounts-root-path) repository-name)))

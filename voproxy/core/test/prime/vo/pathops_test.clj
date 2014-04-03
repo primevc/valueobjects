@@ -65,7 +65,7 @@
     (move-vo-to {:booklet {:spreads [{:id 1 :tags ["ahoi" 0 1 2 3 4 5]}]}}
                 [:booklet :spreads {:id 1} :tags 0]
                 3)
-    => {:booklet {:spreads [{:id 1 :tags [0 1 "ahoi" 2 3 4 5]}]}})
+    => {:booklet {:spreads [{:id 1 :tags [0 1 2 "ahoi" 3 4 5]}]}})
 
 
   (fact "a value object in an array can be moved to a lower index"

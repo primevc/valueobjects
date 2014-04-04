@@ -195,7 +195,7 @@
   of pairs of value object types and their delegation options, returns
   a spec for reifying the `name` function in the VOProxy."
   [name arglist vo-opts-pairs]
-  (let [conditions (forcat [[type opts] vo-opts-pairs]
+  (let [conditions (forcat [[type opts] vo-opts-pairs :when ((:methods opts (constantly true)) name)]
                      (let [pre-form (get opts (keyword (str "pre-" name)))
                            post-form (get opts (keyword (str "post-" name)))
                            proxies (:proxies opts)
@@ -203,7 +203,7 @@
                                                        (index-of (:return-result-of opts) proxies)
                                                        0))
                            meta-proxy (:with-meta opts)
-                           proxy-result-sym (gensym "proxy-result-")
+                           proxy-result-sym (if (= name 'get-vo) 'vo #_else (gensym "proxy-result-"))
                            meta-result-sym (gensym "meta-result-")
                            keep-map (:keep opts)
                            proxy-forms (vo-proxy-delegator-proxy-forms name arglist proxies
@@ -235,7 +235,7 @@
                                    `(vo-keep ~'vo ~keep-map)))]
                            (let ~(vec (concat [(if pre-form 'vo #_else '_) pre-form]
                                               proxy-forms
-                                              ['_ post-form]))
+                                              [(if (= name 'get-vo) 'vo #_else '_) post-form]))
                              ~(if (and meta-proxy (not= name 'get-vo))
                                 `(with-meta ~proxy-result-sym ~meta-result-sym)
                                 `~proxy-result-sym)))]))]
@@ -258,6 +258,10 @@
   implementations. This option is required and at least one proxy must
   be specified.
 
+  :return-result-of - one of the symbols in the :proxies option,
+  telling the delegator which result should be returned. By default,
+  the result of the first proxy is returned.
+
   :pre-<VOProxy function> - a form that is evaluated before the
   VOProxy function is executed for all the specifend :proxies. The result
   of the pre form is used in the proxy function, which allows one to change
@@ -266,10 +270,7 @@
 
   :post-<VOProxy function> - a form that is evaluated after the
   VOProxy function is executed for all specifend :proxies.
-
-  :return-result-of - one of the symbols in the :proxies option,
-  telling the delegator which result should be returned. By default,
-  the result of the first proxy is returned.
+  When defining :post-get-vo, it's result is returned instead.
 
   :with-meta - one of the symbols in the :proxies option, telling the
   delegator to add the result of that proxy as meta data to the actual
@@ -278,6 +279,8 @@
   :keep - a map that is used by the `vo-keep` function. It is used
   on the vo argument of the VOProxy function, before that function is
   called on the actual :proxies.
+
+  :methods - a set of <VOProxy function> symbols that should be supported.
 
   Note that, when a `get-vo` function is executed, the proxies in
   :proxies are executed in order, and as soon as one returns a result,

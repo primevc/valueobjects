@@ -121,7 +121,8 @@
               new (if-not keep-item
                     (zip/edit next (constantly nil))
                     (if-not (map? keep-item)
-                      next
+                      (if-not (fn? keep-item) next
+                       #_else (zip/edit next keep-item))
                       ;; Check whether the value of the current key-value pair is a
                       ;; vector or a value object. If so, recurse!
                       (guard-let [value-vz (-> next zip/down zip/right) :when zip/branch?]

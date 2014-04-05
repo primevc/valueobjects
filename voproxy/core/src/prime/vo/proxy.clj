@@ -158,6 +158,23 @@
     ;; One could also call zip/root, but the zipper should already be at the root if everything
     ;; went correct.
     (zip/node (vo-keep-vo vz keep-map))))
+(defprotocol VOTransformer
+  "In mathematics, a transformation could be any function mapping a set X to another set or itself.
+   The term “transformation” refers to a function from X to itself that preserves this structure.
+
+   Usage:
+   (transform map-or-function (ValueObject {}))"
+  (transform [transformer vo]))
+
+(extend-type prime.vo.ValueObject
+  VOTransformer
+    (transform [target-vo source-vo]
+      (conj target-vo source-vo)))
+
+(extend-type java.util.Map
+  VOTransformer
+    (transform [vo keep-map]
+      (vo-keep keep-map vo)))
 
 
 ;;; Delegator proxies.
@@ -282,6 +299,8 @@
   :keep - a map that is used by the `vo-keep` function. It is used
   on the vo argument of the VOProxy function, before that function is
   called on the actual :proxies, except for get-vo (see below).
+  When a :keep map is supplied, the VOTransformer implementation of this proxy
+  forwards to vo-keep.
 
   :methods - a set of <VOProxy function> symbols that should be supported.
   If only `#{ get-vo }` is supplied (a readonly proxy) and a :keep map is
@@ -293,7 +312,15 @@
   :with-meta option has no effect on `get-vo` calls either."
   [delegations]
   (let [vo-opts-pairs (partition 2 delegations)]
-    `(reify VOProxy
+    `(reify
+      VOTransformer
+      (transform [this ~'vo]
+        (cond
+          ~@(forcat [[type opts] vo-opts-pairs :when (:keep opts)]
+              `[(instance? ~type ~'vo)
+                ~(vo-keep-form (:keep opts) type 'vo)])
+          :else ~'vo))
+      VOProxy
        ~@(for [{:keys [name arglists]} (vals (:sigs VOProxy))
                arglist arglists
                :when (< 1 (count arglist))]

@@ -2352,11 +2352,12 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 
 class ClassDef extends BaseTypeDefinition
 {
-	public	var isMixin : Bool;
-	public  var superClass (default, null) : Null<ClassDef>;
-	private var subclasses : Null<List<ClassDef>>;
+	public var isMixin : Bool;
+	public var superClass (default, null) : Null<ClassDef>;
+	public var subclasses (default, null) : List<ClassDef>;
 	
 	public function new(index:Int, name:String, module:Module) {
+		subclasses = new List();
 		super(index,name,module);
 	}
 	
@@ -2441,7 +2442,10 @@ class ClassDef extends BaseTypeDefinition
 		this.supertypes.remove(btype);
 		this.supertypes.push(btype); // Add superclass to front of the list.
 		
-		if (Std.is(type,ClassDef)) this.superClass = cast type;
+		if (Std.is(type,ClassDef)) {
+			this.superClass = cast type;
+			this.superClass.subclasses.add(this);
+		}
 		else throw Err_CannotExtendType(type);
 	}
 	

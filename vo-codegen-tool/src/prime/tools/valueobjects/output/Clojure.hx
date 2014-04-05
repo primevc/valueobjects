@@ -21,14 +21,55 @@ class ClojureDefVO implements CodeGenerator
 
 	public function genClass(def : ClassDef)
 	{
-		if (!def.isMixin && !map.exists(def.index)) {
+		// Generate all supertypes first
+		for (t in def.supertypes) if (t.is(ClassDef)) {
+			var c : ClassDef = cast t;
+			if (!c.isMixin) genClass(c);
+		}
+		if (!def.isMixin && !map.exists(def.index))
+		{
+			// Prevent repeated defs
 			map.set(def.index, true);
+			// Make sure any types we use are initialized first
+			for (p in def.propertiesSorted) {
+				var type = switch (p.type) {
+					case Tarray(ptype,_,_): Util.unpackPTypedef(Util.getPTypedef(p.type));
+					case Tdef(ptypedef): Util.unpackPTypedef(ptypedef);
+					default: null;
+				}
+				if (type.is(ClassDef)) genClass(cast type);
+			}
+			// Finally write our own def
 			file.writeString("\n(defvo ");
 			file.writeString(def.fullName);
 			for (p in def.propertiesSorted) file.writeString(" :" + p.name);
 			file.writeString(")");
+			// Write ValueObjectManifest initialization hack, to work around scala class loading issues
+			if (def.subclasses.isEmpty()) writeManifestInitHack(def);
 		}
 	}
+	private function writeManifestInitHack(def : ClassDef)
+	{
+		file.writeString("\n(. (");
+		file.writeString(def.module.fullName);
+		file.writeString("/");
+		file.writeString(def.name);
+		file.writeString(" {}) voManifest)");
+
+		/* Handle cases like this:
+			Box
+				WhiteBox
+				BlackBox
+					CoolBox
+						AwesomeBox
+
+			BlackBox and CoolBox should be constructed as well,
+			or it will not be included in Box.manifest.subtypes at runtime.
+		*/
+		if (def.superClass != null && def.superClass.superClass != null)
+			writeManifestInitHack(def.superClass);
+	}
+
 
 	public function genEnum(def:EnumDef) {}
 

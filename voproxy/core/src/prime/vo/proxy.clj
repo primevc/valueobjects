@@ -189,6 +189,14 @@
            '_)
          (proxy-calls proxy)]))))
 
+(defn- vo-keep-form [keep-map, type, target]
+(let [keep-map ; Make sure the ID field is kept.
+      (assoc (eval keep-map)
+             (-> (companion-object-symbol (eval type))
+                 ^prime.vo.ValueObjectCompanion (eval)
+                 (.manifest) (id-field) (.keyword))
+             *)]
+  `(if-let [vo# ~target] (vo-keep vo# ~keep-map))))
 
 (defn- vo-proxy-delegator-fn
   "Given a VOProxy function `name`, its arguments list, and a sequence
@@ -223,19 +231,14 @@
                                (str ":with-meta cannot be the same as :return-result-of for " type))
                        `[(instance? ~type ~'vo)
                          (let [~'vo
-                               ~(if-not keep-map, 'vo
-                               ;;else:
-                                 (let [keep-map (eval keep-map)
-                                       keep-map
-                                       (assoc keep-map
-                                              (-> (companion-object-symbol (eval type))
-                                                  ^prime.vo.ValueObjectCompanion (eval)
-                                                  (.manifest) (id-field) (.keyword))
-                                              *)]
-                                   `(vo-keep ~'vo ~keep-map)))]
+                               ~(if-not (and keep-map (not= name 'get-vo)) 'vo
+                                 #_else (vo-keep-form keep-map type 'vo))]
                            (let ~(vec (concat [(if pre-form 'vo #_else '_) pre-form]
                                               proxy-forms
-                                              [(if (= name 'get-vo) 'vo #_else '_) post-form]))
+                                              (if (= name 'get-vo)
+                                                ['vo  (if keep-map (vo-keep-form keep-map type post-form)
+                                                       #_else post-form)]
+                                               #_else ['_ post-form])))
                              ~(if (and meta-proxy (not= name 'get-vo))
                                 `(with-meta ~proxy-result-sym ~meta-result-sym)
                                 `~proxy-result-sym)))]))]
@@ -278,13 +281,15 @@
 
   :keep - a map that is used by the `vo-keep` function. It is used
   on the vo argument of the VOProxy function, before that function is
-  called on the actual :proxies.
+  called on the actual :proxies, except for get-vo (see below).
 
   :methods - a set of <VOProxy function> symbols that should be supported.
+  If only `#{ get-vo }` is supplied (a readonly proxy) and a :keep map is
+  defined, the returned result is filtered by `vo-keep` after :post-get-vo.
 
   Note that, when a `get-vo` function is executed, the proxies in
   :proxies are executed in order, and as soon as one returns a result,
-  that result is returned and the other proxies are not executed. The
+  that result is used and the other proxies are not executed. The
   :with-meta option has no effect on `get-vo` calls either."
   [delegations]
   (let [vo-opts-pairs (partition 2 delegations)]

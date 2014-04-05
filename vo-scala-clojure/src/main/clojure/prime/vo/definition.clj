@@ -179,7 +179,7 @@
       (instance? ~votrait ~'value-map)
         (intern-vo-expr ~'value-map (list ~runtime-constructor ~'value-map))
 
-      (empty? ~'value-map)
+      (and (map? ~'value-map) (empty? ~'value-map))
       (list '.empty '~(companion-object-symbol votrait))
 
       (map? ~'value-map)

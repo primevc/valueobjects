@@ -179,6 +179,9 @@
       (instance? ~votrait ~'value-map)
         (intern-vo-expr ~'value-map (list ~runtime-constructor ~'value-map))
 
+      (empty? ~'value-map)
+      (list '.empty '~(companion-object-symbol votrait))
+
       (map? ~'value-map)
         (let [~'construct-expr# (list '.apply '~(companion-object-symbol votrait) ~@args)
               ~'instance#       (if ~'stable-value-map (eval? ~'construct-expr#))

@@ -179,7 +179,7 @@ trait ClojureMapSupport extends IPersistentMap
   }
 
   // Seqable
-  final class Seq(seqFieldFn : IFn, remainingBits : Int, index : Int, meta: IPersistentMap = null) extends ASeq(meta) with Counted
+  final class Seq(val seqFieldFn : IFn, val remainingBits : Int, val index : Int, meta: IPersistentMap = null) extends ASeq(meta) with Counted
   {
     import java.lang.Integer._
 

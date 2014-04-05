@@ -18,12 +18,11 @@
 ;
 
 (defmethod print-method ValueObjectField [^ValueObjectField v, ^Writer w]
-  (pr-on (list 'ValueObjectField. {
-    :id           (Integer/toHexString (.id v))
-    :name         (.name         v)
-    :valueType    (.valueType    v)
-    :defaultValue (.defaultValue v)
-  }) w))
+  (.write w "(ValueObjectField. {:id 0x")  (.write w (Integer/toHexString (.id v)))
+  (.write w ", :name ")                    (pr-on (.name v) w)
+  (.write w ", :valueType ")               (pr-on (.valueType v) w)
+  (.write w ", :defaultValue ")            (pr-on (.defaultValue v) w)
+  (.write w "})"))
 
 (defmethod print-method package$ValueType [^package$ValueType v, ^Writer w]
   (pr-on (.keyword v) w))

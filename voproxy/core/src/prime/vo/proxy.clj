@@ -223,7 +223,7 @@
   [name arglist vo-opts-pairs]
   (let [conditions (forcat [[type opts] vo-opts-pairs :when ((:methods opts (constantly true)) name)]
                      (let [pre-form (get opts (keyword (str "pre-" name)))
-                           post-form (get opts (keyword (str "post-" name)))
+                           post-form (get opts (keyword (str "post-" name)) 'vo)
                            proxies (:proxies opts)
                            result-proxy (get proxies (if (:return-result-of opts)
                                                        (index-of (:return-result-of opts) proxies)

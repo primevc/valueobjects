@@ -121,7 +121,7 @@
               new (if-not keep-item
                     (zip/edit next (constantly nil))
                     (if-not (map? keep-item)
-                      (if-not (fn? keep-item) next
+                      (if (or (not (fn? keep-item)) (= keep-item *)) next
                        #_else (zip/edit next keep-item))
                       ;; Check whether the value of the current key-value pair is a
                       ;; vector or a value object. If so, recurse!

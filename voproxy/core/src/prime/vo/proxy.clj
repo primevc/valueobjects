@@ -121,7 +121,7 @@
               new (if-not keep-item
                     (zip/edit next (constantly nil))
                     (if-not (map? keep-item)
-                      (if (or (not (fn? keep-item)) (= keep-item *)) next
+                      (if-not (and (fn? keep-item) (not= keep-item *)) next
                        #_else (zip/edit next keep-item))
                       ;; Check whether the value of the current key-value pair is a
                       ;; vector or a value object. If so, recurse!
@@ -209,11 +209,11 @@
 
 (defn- vo-keep-form [keep-map, type, target]
 (let [keep-map ; Make sure the ID field is kept.
-      (assoc (eval keep-map)
+      (assoc (eval (clojure.walk/postwalk-replace {* true '* true} keep-map))
              (-> (companion-object-symbol (eval type))
                  ^prime.vo.ValueObjectCompanion (eval)
                  (.manifest) (id-field) (.keyword))
-             *)]
+             true)]
   `(if-let [vo# ~target] (vo-keep vo# ~keep-map))))
 
 (defn- vo-proxy-delegator-fn

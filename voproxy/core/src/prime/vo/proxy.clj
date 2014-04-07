@@ -386,6 +386,5 @@
                 (let [option (first (filter #(= fncname (first %)) options))]
                   (if (> (count option) 2)
                       `(cond
-                        ~@(apply concat (for [option (apply hash-map (drop 1 option))]
-                          `[~(first option) (do ~(concat (list fnc (second option)) param))])))
+                        ~@(rest option))
                     `(do ~(concat (list fnc (second option)) param))))))))))))

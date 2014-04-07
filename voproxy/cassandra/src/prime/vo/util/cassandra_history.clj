@@ -157,7 +157,7 @@
     (if-let [row (nth result index nil)]
      (with-debug
       (do (prn (:version row) (:action row))
-          (let [[vsrc] (bytes->change-data (:data row))] (clojure.pprint/pprint (msgpack/ValueSource->map vsrc)))
+          (let [[vsrc] (bytes->change-data (:data row))] (clojure.pprint/pprint (when vsrc (msgpack/ValueSource->map vsrc))))
           (println))
       (recur (inc index)
              (case (int (:action row))

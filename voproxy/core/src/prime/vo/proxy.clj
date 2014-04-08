@@ -383,8 +383,11 @@
             ~@(for [param params]
               `(~param
               ~(do
-                (let [option (first (filter #(= fncname (first %)) options))]
-                  (if (> (count option) 2)
+                (let [option (first (filter #(= fncname (first %)) options))
+                      conditions (rest option)]
+                  (if (next conditions)
                       `(cond
-                        ~@(rest option))
+                        ~@(forcat [[condition voproxy] (partition 2 conditions)]
+                            [condition (cons fnc (cons voproxy param))]) ; `[~(first option) (do ~(concat (list fnc (second option)) param))]
+                        )
                     `(do ~(concat (list fnc (second option)) param))))))))))))

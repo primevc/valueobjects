@@ -37,6 +37,8 @@
 
 ;;; Helper definitions.
 
+(defrecord Statements [^String create ^String exists ^String stream ^String delete])
+
 (defn- prepare-statements
   "Prepare the statements used for the Cassandra repository."
   [system consistency ttl-fn]
@@ -54,10 +56,11 @@
                         prepared (if-not ttl-secs prepared      #_else prepared-ttl)
                         values   (if-not ttl-secs [hash buffer] #_else [hash buffer ttl-secs])]
                     (cassandra/do-prepared system prepared options values))))))]
-    {:create (mk-cassandra-fn "INSERT INTO files (hash, data) VALUES (?, ?)" ttl-fn)
-     :exists (mk-cassandra-fn "SELECT COUNT(*) FROM files WHERE hash=?" nil)
-     :stream (mk-cassandra-fn "SELECT data FROM files WHERE hash=?" nil)
-     :delete (mk-cassandra-fn "DELETE FROM files WHERE hash=?" nil)}))
+    (Statements.
+      (mk-cassandra-fn "INSERT INTO files (hash, data) VALUES (?, ?)" ttl-fn)
+      (mk-cassandra-fn "SELECT COUNT(*) FROM files WHERE hash=?" nil)
+      (mk-cassandra-fn "SELECT data FROM files WHERE hash=?" nil)
+      (mk-cassandra-fn "DELETE FROM files WHERE hash=?" nil))))
 
 
 (defn- ref-hash
@@ -67,8 +70,8 @@
     (.hash ref)
     (Base64/encodeBase64URLSafeString (.hash ref))
 
-    (< (count prefix) (count (.uri ref)))
-    (.substring (.uri ref) (count prefix))
+    (< (.length prefix) (.length (.uri ref)))
+    (.substring (.uri ref) (.length prefix))
 
     :else (throw (IllegalArgumentException. (print-str ref "is empty or incompatible.")))))
 
@@ -169,7 +172,7 @@
 
   A FileRef to the location of the stored content is returned."
   [this in]
-  (log/debug "Absorb called with inputstream:" in)
+  (log/trace "Absorb called with inputstream:" in)
   (condp instance? in
     ;; InputStream implementation.
     InputStream
@@ -198,7 +201,7 @@
   "Open an InputStream to the file as referenced by the FileRef. Or
   returns nil/null when the ref cannot be found."
   [this ^FileRef ref]
-  (log/debug "Stream requested for FileRef" ref)
+  (log/trace "Stream requested for FileRef" ref)
   (let [state (.state this)
         statement-fn (-> state :statements :stream)
         prefix (:prefix state)
@@ -259,6 +262,8 @@
 
 ;;; Generate CassandraRepository class, for use in Java and Scala.
 
+(defrecord State [repository-name statements prefix tmp-dir])
+
 (defn repo-init
   "This function is called when the CassandraRepository is constructed."
   [system consistency repository-name options]
@@ -267,10 +272,10 @@
   (clean-dir (File. (System/getProperty "java.io.tmpdir")) "cfr-" 24)
   (let [session (cassandra/keyspaced system "fs")
         statement-fns (prepare-statements session consistency (:ttl-fn options))]
-    [[] {:repository-name repository-name
-         :statements statement-fns
-         :prefix "cassandra://"
-         :tmp-dir (System/getProperty "java.io.tmpdir")}]))
+    [[] (State. repository-name
+                statement-fns
+                "cassandra://"
+                (System/getProperty "java.io.tmpdir"))]))
 
 
 (gen-class

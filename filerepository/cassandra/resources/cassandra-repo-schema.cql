@@ -4,6 +4,6 @@ CREATE KEYSPACE fs WITH replication = {
 };
 
 CREATE TABLE fs.files (
-    hash varchar PRIMARY KEY,
+    hash blob PRIMARY KEY,
     data blob
 );

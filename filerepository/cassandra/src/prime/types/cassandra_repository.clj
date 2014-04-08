@@ -68,10 +68,13 @@
   [^String prefix ^FileRef ref]
   (cond
     (.hash ref)
-    (Base64/encodeBase64URLSafeString (.hash ref))
+    (.hash ref)
+
+    (= 44 (.length (.uri ref))) ;; FileRef URI already is base64(SHA-256(...))
+    (Base64/decodeBase64 (.uri ref))
 
     (< (.length prefix) (.length (.uri ref)))
-    (.substring (.uri ref) (.length prefix))
+    (Base64/decodeBase64 (.substring (.uri ref) (.length prefix)))
 
     :else (throw (IllegalArgumentException. (print-str ref "is empty or incompatible.")))))
 
@@ -197,9 +200,9 @@
         ref))))
 
 
-(defn repo-stream
-  "Open an InputStream to the file as referenced by the FileRef. Or
-  returns nil/null when the ref cannot be found."
+(defn ^ByteBuffer fetch
+  "Get the FileRef as a ByteBuffer from Cassandra,
+  Returns nil/null when the ref cannot be found."
   [this ^FileRef ref]
   (log/trace "Stream requested for FileRef" ref)
   (let [state (.state this)
@@ -207,8 +210,15 @@
         prefix (:prefix state)
         hash (ref-hash prefix ref)
         result (statement-fn hash)]
-    (when-let [data (:data (first result))]
-      (ByteBufferUtil/inputStream data))))
+    (:data (first result))))
+
+
+(defn repo-stream
+  "Open an InputStream to the file as referenced by the FileRef. Or
+  returns nil/null when the ref cannot be found."
+  [this ^FileRef ref]
+  (if-let [buffer (fetch this ref)]
+    (ByteBufferUtil/inputStream buffer)))
 
 
 (defn repo-store

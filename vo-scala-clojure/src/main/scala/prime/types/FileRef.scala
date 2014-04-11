@@ -5,6 +5,7 @@ package prime.types
 case class FileRef private[prime](uri:String, hash:Array[Byte], originalName : String = null)
 {
   require(uri != null || hash != null, "either 'uri' or 'hash' should be set")
+  require(uri == null || uri.length < 255, "uri length should be < 255, but is: " + uri.length + " for string: " + uri)
 
   override lazy val toString = if (hash == null) uri else {
     val base64 = Base64.encodeBase64URLSafeString(hash)

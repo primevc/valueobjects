@@ -90,7 +90,23 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
     for (item <- v) pack(item);
   }
 
-  final def pack(fileRef : FileRef)                 { super.pack(fileRef.toString);       }
+  final def pack(fileRef : FileRef) {
+    if (fileRef == null) packNil();
+    else packString(fileRef.toString); /* if (fileRef.hash == null) packString(fileRef.uri);
+    else {
+      out.write(0xD7)
+      if (fileRef.uri != null) {
+        val uriBytes = fileRef.uri.getBytes("UTF-8");
+        out.write(0x1F)
+        out.write(uriBytes.length)
+        out.write(uriBytes)
+      }
+      else
+        out.write(0x0F)
+      out.write(fileRef.hash)
+    }*/
+  }
+
   final def pack(uri     : URI)                     { super.pack(Conversion.String(uri)); }
   final def pack(url     : URL)                     { super.pack(Conversion.String(url)); }
   final def pack(email   : EmailAddr)               { super.pack(email.toString);         }

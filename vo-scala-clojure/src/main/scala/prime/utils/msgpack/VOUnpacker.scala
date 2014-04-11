@@ -16,14 +16,14 @@ final class VOInstanceUnpacker extends UnpackerImpl.VOInstance
   // ---
   // Value Types
 
-  final def processValueType(typeID: Int, bytes: Array[Byte]) = typeID match {
+  final def processValueType(typeID: Int /*, bytes: Array[Byte] */) = typeID match {
     case 0x1D => 12
     /*
     case 0x0F => 32
     */
   }
 
-  final def putValue(bytes: Array[Byte] /*, startIndex: Int*/): Unit = data = bytes(startIndex) match {
+  final def putValue(bytes: Array[Byte], startIndex: Int): Unit = data = bytes(startIndex) match {
     case 0x1D => new MessagePackObjectId( new ObjectId(bytes.slice(startIndex + 1, startIndex + 13)) )
     /*
     case 0x0F => new MessagePackFileRef( new FileRef(bytes.slice(startIndex + 1, startIndex + 33)) )

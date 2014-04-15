@@ -43,16 +43,20 @@ class FileRef extends prime.types.URI
 	 * isn't saved with a prefix
 	 */
 	public static var prefix (default, set_prefix) : String;
-	
-	
-	override public function toString ()
+
+	public function toURIString(cdnPostfix : String)
 	{
-		return scheme == null && prefix != null ? prefix + super.toString() : super.toString();
+		return (hasScheme(URIScheme.Scheme("cassandra"))
+				? (prefix != null? prefix : "") + (host != null? host : "") + cdnPostfix
+				: scheme == null && prefix != null ? prefix + super.toString() : super.toString());
 	}
+
+	public function toURI(?cdnPostfix : String) return new URI(toURIString(if (cdnPostfix == null) "" else cdnPostfix.toLowerCase()));
 	
+	override public function toString () return toURIString("");
 	
 	private static inline function set_prefix (v:String)
 	{
-		return prefix = (v != null && v != "") ? v + "/" : v;
+		return prefix = (v != null && v != "" && v.charAt(v.length - 1) != "/") ? v + "/" : v;
 	}
 }

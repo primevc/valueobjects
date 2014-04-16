@@ -12,6 +12,7 @@
                  [org.xerial.snappy/snappy-java "1.1.0-M4"]
                  [com.taoensso/timbre "2.6.2"]
                  [commons-codec "1.8"]]
+  :global-vars {*warn-on-reflection* true}
   :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"
                  {:extensions "true"
                   :configuration ([:sourceDirectories [:sourceDirectory "src"]]

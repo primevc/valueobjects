@@ -37,7 +37,17 @@
 
 ;;; Helper definitions.
 
-(defrecord Statements [^String create ^String exists ^String stream ^String delete])
+(gen-class
+  :name "prime.types.CassandraRepository"
+  :implements [prime.types.GarbageCollectableFR]
+  :init init
+  :prefix "repo-"
+  :state state
+  :constructors {[Object clojure.lang.Keyword String clojure.lang.IPersistentMap] []})
+
+
+(deftype Statements [create exists stream delete])
+(deftype State [^String repository-name ^Statements statements ^String prefix ^String tmp-dir])
 
 (defn- prepare-statements
   "Prepare the statements used for the Cassandra repository."
@@ -95,16 +105,16 @@
   "Absorbs the given File using a MappedByteBuffer. This improves the memory
   efficiency when absorbing large files."
   [repo ^File file]
-  (let [state (.state repo)
-        prefix (:prefix state)
+  (let [^State state (.state ^prime.types.CassandraRepository repo)
+        prefix (.prefix state)
         ref (LocalFileRef/apply file prefix)]
     (if (repository/exists? repo ref)
       (log/debug "File already stored for FileRef" ref)
       (let [fis (FileInputStream. file)
             fc (.getChannel fis)
             buffer (.map fc (FileChannel$MapMode/READ_ONLY) 0 (.size fc))
-            statement-fn (-> state :statements :create)
-            prefix (:prefix state)
+            statement-fn (. ^Statements (. state statements) create)
+            prefix (.prefix state)
             hash (ref-hash prefix ref)]
         (log/debug "Storing file using MappedByteBuffer for FileRef" ref)
         (statement-fn hash buffer)))
@@ -114,10 +124,10 @@
 (defn- write-bytes
   [repo ref byte-array]
   (if-not (repository/exists? repo ref)
-    (let [state (.state repo)
-          statement-fn (-> state :statements :create)
+    (let [^State state (.state ^prime.types.CassandraRepository repo)
+          statement-fn (. ^Statements (. state statements) create)
           buffer (ByteBuffer/wrap byte-array)
-          prefix (:prefix state)
+          prefix (.prefix state)
           hash (ref-hash prefix ref)]
       (log/debug "Underlying FileRef not stored yet, storing it now.")
       (statement-fn hash buffer))
@@ -136,7 +146,7 @@
                                  (if prefix (.. f getName (startsWith prefix)) true)
                                  (< (.lastModified f)
                                     (- (System/currentTimeMillis) (* 1000 60 60 hours)))))))]
-    (doseq [file (.listFiles dir filter)]
+    (doseq [^File file (.listFiles dir filter)]
       (log/debug "Deleting file" file)
       (.delete file))))
 
@@ -147,9 +157,9 @@
   "Test whether the specified FileRef exists in the repository."
   [this ^FileRef ref]
   (log/debug "Checking whether FileRef" ref "is stored.")
-  (let [state (.state this)
-        statement-fn (-> state :statements :exists)
-        prefix (:prefix state)
+  (let [^State state (.state ^prime.types.CassandraRepository this)
+        statement-fn (. ^Statements (. state statements) exists)
+        prefix (.prefix state)
         hash (ref-hash prefix ref)
         result (statement-fn hash)
         exists (= 1 (:count (first result)))]
@@ -179,8 +189,8 @@
   (condp instance? in
     ;; InputStream implementation.
     InputStream
-    (let [state (.state this)
-          prefix (:prefix state)
+    (let [^State state (.state ^prime.types.CassandraRepository this)
+          prefix (.prefix state)
           fris (FileRefInputStream. ^InputStream in ^String prefix)
           out (ByteArrayOutputStream.)]
       (io/copy fris out)
@@ -205,9 +215,9 @@
   Returns nil/null when the ref cannot be found."
   [this ^FileRef ref]
   (log/trace "Stream requested for FileRef" ref)
-  (let [state (.state this)
-        statement-fn (-> state :statements :stream)
-        prefix (:prefix state)
+  (let [^State state (.state ^prime.types.CassandraRepository this)
+        statement-fn (. ^Statements (. state statements) stream)
+        prefix (.prefix state)
         hash (ref-hash prefix ref)
         result (statement-fn hash)]
     (:data (first result))))
@@ -226,8 +236,8 @@
   OutputStream from the repository. Use the 'store' function below to
   use a Clojure function."
   [this ^scala.Function1 sf]
-  (let [state (.state this)
-        prefix (:prefix state)
+  (let [^State state (.state ^prime.types.CassandraRepository this)
+        prefix (.prefix state)
         out (ByteArrayOutputStream.)
         fros (FileRefOutputStream. ^OutputStream out ^String prefix)]
     (.apply sf fros)
@@ -240,15 +250,15 @@
   "Returns a File containing the data as referenced by the FileRef."
   [this ^FileRef ref]
   (log/info "File requested for FileRef" ref)
-  (let [state (.state this)
-        prefix (:prefix state)
+  (let [^State state (.state ^prime.types.CassandraRepository this)
+        prefix (.prefix state)
         hash (ref-hash prefix ref)
-        tmp (File. (:tmp-dir state) (str "cfr-" hash))]
+        tmp (File. ^String (.tmp-dir state) (str "cfr-" hash))]
     (if-not (.exists tmp)
       (do (log/info "File not available in temporary directory; creating it now.")
-          (let [statement-fn (-> state :statements :stream)
+          (let [statement-fn (. ^Statements (. state statements) stream)
                 result (statement-fn hash)
-                data (:data (first result))
+                 ^ByteBuffer data (:data (first result))
                 channel (FileChannel/open (.toPath tmp) (into-array [StandardOpenOption/CREATE_NEW
                                                                      StandardOpenOption/WRITE]))]
             (.write channel data)
@@ -263,16 +273,14 @@
   the garbage collector and should not be called by other clients."
   [this ^FileRef ref]
   (log/debug "Deleting file for FileRef" ref)
-  (let [state (.state this)
-        statement-fn (-> state :statements :delete)
-        prefix (:prefix state)
+  (let [^State state (.state ^prime.types.CassandraRepository this)
+        statement-fn (. ^Statements (. state statements) delete)
+        prefix (.prefix state)
         hash (ref-hash prefix ref)]
     (statement-fn hash)))
 
 
 ;;; Generate CassandraRepository class, for use in Java and Scala.
-
-(defrecord State [repository-name statements prefix tmp-dir])
 
 (defn repo-init
   "This function is called when the CassandraRepository is constructed."
@@ -286,15 +294,6 @@
                 statement-fns
                 "cassandra://"
                 (System/getProperty "java.io.tmpdir"))]))
-
-
-(gen-class
-  :name "prime.types.CassandraRepository"
-  :implements [prime.types.GarbageCollectableFR]
-  :init init
-  :prefix "repo-"
-  :state state
-  :constructors {[Object clojure.lang.Keyword String clojure.lang.IPersistentMap] []})
 
 
 ;;; API functions. Use these to call the repository functions on the
@@ -319,7 +318,7 @@
   [this f]
   (log/debug "Store requested with Clojure function.")
   (let [scala-func (reify scala.Function1 (apply [_ x] (f x)))]
-    (.store this scala-func)))
+    (.store ^prime.types.FileRepository this scala-func)))
 
 
 (def toURI repo-toURI)

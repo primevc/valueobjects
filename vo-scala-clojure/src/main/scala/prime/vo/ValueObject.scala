@@ -121,7 +121,10 @@ trait BranchNode {
   @inline override def contains(id : Int) : Boolean = {
     val idx = voManifest.index(id);
     val msk = 1 << idx;
-    if ((voManifest.lazyIndexMask & msk) != 0) (initIndexSet & msk) != 0; else voManifest(idx) in self;
+    // If the field is not lazy (0 in the lazy mask)
+    //   then:      check if the bit is set in the initial index.
+    //   otherwise: let the manifest field deal with it.
+    if ((voManifest.lazyIndexMask & msk) == 0) (initIndexSet & msk) != 0; else voManifest(idx) in self;
   }
 }
 

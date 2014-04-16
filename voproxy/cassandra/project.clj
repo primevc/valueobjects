@@ -6,7 +6,8 @@
   :description "Cassandra implementation of VOProxy."
   :url "https://github.com/primevc/valueobjects"
   :dependencies [[org.clojure/clojure "1.5.1"]
-                 [prime/vo "0.1.0-SNAPSHOT"]
+                 [prime/vo "0.1.0-SNAPSHOT"
+                  :exclusions [org.slf4j/slf4j-api org.slf4j/slf4j-log4j12]]
                  [prime/voproxy-core "0.1.0-SNAPSHOT"]
                  [prime/voserializer-cheshire "0.1.0-SNAPSHOT"]
                  [cc.qbits/hayt "1.4.0"]

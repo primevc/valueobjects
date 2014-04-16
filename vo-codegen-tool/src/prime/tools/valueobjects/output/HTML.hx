@@ -18,7 +18,7 @@ class HTML implements CodeGenerator
 		var html = new HTML();
 		Module.root.generateWith(html);
 		
-		var modkeys = Lambda.array({iterator: modules.keys});
+		var modkeys = Lambda.array({iterator: function() return modules.keys()});
 		modkeys.sortAlphabetically();
 		
 		var mods = [];

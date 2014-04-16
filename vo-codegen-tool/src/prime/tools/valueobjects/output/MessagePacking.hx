@@ -314,7 +314,7 @@ class MessagePacking
 	private function genFieldOffsetCases(t:TypeDefinition)
 	{
 		if (t.is(ClassDef)) {
-			for (s in t.as(ClassDef).supertypes) genFieldOffsetCases(s);
+			for (s in cast(t, ClassDef).supertypes) genFieldOffsetCases(s);
 		}
 		
 		if (!fieldIndexOffset.exists(t.index)) {

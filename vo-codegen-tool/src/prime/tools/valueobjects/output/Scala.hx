@@ -608,7 +608,7 @@ trait "); a(def.name); a(" extends ");
 						case Tdecimal(_,_,_): a(doubleAt(p, true));
 						default:
 							if (!p.isArray() && p.isReference()) try {
-								var idType = p.type.getPTypedef().unpackPTypedef().as(ClassDef).getIDPropertyFromTWithProperties().type;
+								var idType = cast(p.type.getPTypedef().unpackPTypedef(), ClassDef).getIDPropertyFromTWithProperties().type;
 								a("    VORef("); a(anyAt(p, true)); a(")("); a(p.type.scalaType().name); a(", "); a(idType.scalaConversionExpr()); a(")");
 							} catch (e:Dynamic) {
 								throw e + "\nCan't reference an object without an ID: "+ p.type;

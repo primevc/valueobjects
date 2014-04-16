@@ -1346,7 +1346,7 @@ class Haxe implements CodeGenerator
 					a(': "');  a(e.conversions.get(conv.name)); a('";');
 				}
 			}
-			var requiresDefaultCase = conv.enums.length < Lambda.count({iterator: def.enumerations.keys});
+			var requiresDefaultCase = conv.enums.length < Lambda.count({iterator: function() return def.enumerations.keys()});
 			if (requiresDefaultCase)
 				a("\n\t\tdefault: toString(e);");
 			
@@ -2161,7 +2161,7 @@ private class HaxeXMLMap extends CodeBufferer
 			
 			case XM_typeMap		(map):
 				var a = code.add;
-				var arr = Lambda.array( { iterator: map.keys } );
+				var arr = Lambda.array( { iterator: function() return map.keys() } );
 				arr.reverse();
 				for (val in arr) {
 					a("Type.getClass(this) == "); a(map.get(val).fullName); a('? "'); a(val); a('" : ');

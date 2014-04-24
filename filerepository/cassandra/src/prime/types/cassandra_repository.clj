@@ -75,18 +75,9 @@
 
 (defn- ref-hash
   "Evaluates to the base64 encoded hash of the specified FileRef."
-  [^String prefix ^FileRef ref]
-  (cond
-    (.hash ref)
-    (.hash ref)
-
-    (= 44 (.length (.uri ref))) ;; FileRef URI already is base64(SHA-256(...))
-    (Base64/decodeBase64 (.uri ref))
-
-    (< (.length prefix) (.length (.uri ref)))
-    (Base64/decodeBase64 (.substring (.uri ref) (.length prefix)))
-
-    :else (throw (IllegalArgumentException. (print-str ref "is empty or incompatible.")))))
+  [^FileRef ref]
+  {:pre [ref]}
+  (.hash ref))
 
 
 (defn- write-schema
@@ -115,7 +106,7 @@
             buffer (.map fc (FileChannel$MapMode/READ_ONLY) 0 (.size fc))
             statement-fn (. ^Statements (. state statements) create)
             prefix (.prefix state)
-            hash (ref-hash prefix ref)]
+            hash (ref-hash ref)]
         (log/debug "Storing file using MappedByteBuffer for FileRef" ref)
         (statement-fn hash buffer)))
     ref))
@@ -127,8 +118,7 @@
     (let [^State state (.state ^prime.types.CassandraRepository repo)
           statement-fn (. ^Statements (. state statements) create)
           buffer (ByteBuffer/wrap byte-array)
-          prefix (.prefix state)
-          hash (ref-hash prefix ref)]
+          hash (ref-hash ref)]
       (log/debug "Underlying FileRef not stored yet, storing it now.")
       (statement-fn hash buffer))
     (log/debug "Underlying FileRef already stored.")))
@@ -159,8 +149,7 @@
   (log/debug "Checking whether FileRef" ref "is stored.")
   (let [^State state (.state ^prime.types.CassandraRepository this)
         statement-fn (. ^Statements (. state statements) exists)
-        prefix (.prefix state)
-        hash (ref-hash prefix ref)
+        hash (ref-hash ref)
         result (statement-fn hash)
         exists (= 1 (:count (first result)))]
     (log/debug "FileRef" ref (if exists "is stored." "is not stored."))
@@ -217,8 +206,7 @@
   (log/trace "Stream requested for FileRef" ref)
   (let [^State state (.state ^prime.types.CassandraRepository this)
         statement-fn (. ^Statements (. state statements) stream)
-        prefix (.prefix state)
-        hash (ref-hash prefix ref)
+        hash (ref-hash ref)
         result (statement-fn hash)]
     (:data (first result))))
 
@@ -251,8 +239,7 @@
   [this ^FileRef ref]
   (log/info "File requested for FileRef" ref)
   (let [^State state (.state ^prime.types.CassandraRepository this)
-        prefix (.prefix state)
-        hash (ref-hash prefix ref)
+        hash (ref-hash ref)
         tmp (File. ^String (.tmp-dir state) (str "cfr-" hash))]
     (if-not (.exists tmp)
       (do (log/info "File not available in temporary directory; creating it now.")
@@ -275,8 +262,7 @@
   (log/debug "Deleting file for FileRef" ref)
   (let [^State state (.state ^prime.types.CassandraRepository this)
         statement-fn (. ^Statements (. state statements) delete)
-        prefix (.prefix state)
-        hash (ref-hash prefix ref)]
+        hash (ref-hash ref)]
     (statement-fn hash)))
 
 

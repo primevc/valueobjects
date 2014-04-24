@@ -40,11 +40,11 @@ object FileRef extends Function1[Any,FileRef] with ClojureFn
   def apply(value:RawType)      : FileRef = FileRef(value.asString);
   def apply(value:URI)          : FileRef = FileRef(value.toString);
   def apply(value:URL)          : FileRef = FileRef(value.toString);
-  def apply(value:String)       : FileRef = value.indexOf("://") match {
+  def apply(value:String)       : FileRef = value.lastIndexOf('/') match {
     case -1 =>
       new FileRef(value, null);
     case n =>
-      new FileRef(value, null, null, value.substring(0, n + 3 /* :// length */));
+      new FileRef(value, null, null, value.substring(0, n + 1 /* '/' length */));
   }
 
   def apply(value:Any) : FileRef = unpack(value) match {

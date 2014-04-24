@@ -42,7 +42,7 @@
 
 (defmethod print-method FileRef   [^FileRef   v, ^Writer w]
   (.write w "(prime.types/FileRef \"")
-  (.write w (.toString v))
+  (.write w (.prefixedString v))
   (.write w "\")"))
 
 (defmethod print-method VORefImpl [^VORefImpl v, ^Writer w]

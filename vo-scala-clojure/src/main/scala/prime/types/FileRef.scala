@@ -33,7 +33,7 @@ object FileRef extends Function1[Any,FileRef] with ClojureFn
   import ClojureProtocolVars._
   import org.msgpack.`object`._
 
-  def apply(prefix:String, value:Array[Byte], originalName:String) : FileRef = new FileRef(null, value, originalName, prefix);
+  def apply(prefix:String, value:Array[Byte], originalName:String) : FileRef = new FileRef(null, value, originalName, if (prefix != null) prefix else "");
 
   def apply(value:FileRef)      : FileRef = value;
   def apply(value:Array[Byte])  : FileRef = new FileRef(null, value);

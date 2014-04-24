@@ -16,7 +16,7 @@ trait FileRefStream {
   val wrap: Closeable
 
   def ref(): FileRef = {
-    val innerRef = new FileRef(prefix, sha.digest)
+    val innerRef = FileRef(prefix, sha.digest, null)
     wrap.close()
     innerRef
   }
@@ -129,7 +129,7 @@ trait GarbageCollectableFR extends FileRepository {
 
 object LocalFileRef {
   def apply(file: File, prefix : String): FileRef =
-    new FileRef(prefix, DigestUtils.sha256(new FileInputStream(file)), file.getName);
+    FileRef(prefix, DigestUtils.sha256(new FileInputStream(file)), file.getName);
 }
 
 

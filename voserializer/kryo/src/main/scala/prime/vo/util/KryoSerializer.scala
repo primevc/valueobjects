@@ -159,7 +159,7 @@ object EmailAddrSerializer extends Serializer[EmailAddr](true,true) {
 
 object FileRefSerializer extends Serializer[FileRef](true,true) {
   def write (kryo:Kryo, out:io.Output, value:FileRef) {
-    out.writeString(value.uri);
+    out.writeString(value.prefix);
     if (value.hash != null) {
       out.writeInt(value.hash.length,true);
       out.write(value.hash);
@@ -167,11 +167,11 @@ object FileRefSerializer extends Serializer[FileRef](true,true) {
     else out.write(0);
   }
   def read  (kryo:Kryo, in: io.Input, clz:Class[FileRef]): FileRef = {
-    val uri = in.readString();
+    val prefix = in.readString();
     val hashLength = in.readInt(true);
     val hash = if (hashLength == 0) null else in.readBytes(hashLength);
 
-    FileRef(uri, hash)
+    new FileRef(null, hash, null, prefix)
   }
 }
 

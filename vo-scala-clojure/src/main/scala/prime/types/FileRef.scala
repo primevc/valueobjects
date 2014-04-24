@@ -7,19 +7,19 @@ case class FileRef private[prime](var _uri:String, var _hash:Array[Byte], origin
   require(_uri != null || hash != null, "either 'uri' or 'hash' should be set")
   require(prefix.length < 255, "prefix length should be < 255, but is a " + prefix.length + " character long string: " + prefix)
 
-  def unprefixedString = if (prefix.length == 0) _uri else _uri.substring(prefix.length)
+  private def unprefixedURI = if (prefix.length == 0) _uri else _uri.substring(prefix.length)
 
   def hash = if (_hash != null) _hash else {
-    this._hash = Base64.decodeBase64(this.unprefixedString);
+    this._hash = Base64.decodeBase64(this.unprefixedURI);
     this._hash;
   }
 
-  override def toString = if (_uri != null) unprefixedString else {
-    this._uri = Base64.encodeBase64URLSafeString(hash);
-    this._uri;
+  override def toString = if (_uri != null) unprefixedURI else {
+    this._uri = prefix + Base64.encodeBase64URLSafeString(hash);
+    unprefixedURI;
   }
 
-  def prefixedString = if (_hash == null) _uri else prefix + toString
+  def prefixedString = if (_uri != null) _uri else prefix + toString
 
   override def equals(other : Any) = other match {
     case other@FileRef(u,h,_,_) => u == this._uri || h == this._hash || other.toString == this.toString

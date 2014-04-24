@@ -16,7 +16,7 @@ trait FileRefStream {
   val wrap: Closeable
 
   def ref(): FileRef = {
-    val innerRef = FileRef(prefix, sha.digest, null)
+    val innerRef = new FileRef(_uri = null, _hash = sha.digest, originalName = null, prefix = if (prefix != null) prefix else "")
     wrap.close()
     innerRef
   }
@@ -129,7 +129,7 @@ trait GarbageCollectableFR extends FileRepository {
 
 object LocalFileRef {
   def apply(file: File, prefix : String): FileRef =
-    FileRef(prefix, DigestUtils.sha256(new FileInputStream(file)), file.getName);
+    new FileRef(_uri = null, _hash = DigestUtils.sha256(new FileInputStream(file)), originalName = file.getName, prefix = if (prefix != null) prefix else "");
 }
 
 
@@ -140,7 +140,7 @@ trait LocalFileRepository extends FileRepository {
 
   // Default implementations.
 
-  def toURI(f: FileRef) = Conversion.URI(f.toString)
+  def toURI(f: FileRef) = Conversion.URI(f.prefixedString)
   def stream(instance: FileRef) = new FileInputStream(getFile(instance))
   def existsImpl(instance: FileRef) = getFile(instance).exists
 

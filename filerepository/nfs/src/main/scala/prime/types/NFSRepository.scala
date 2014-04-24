@@ -57,7 +57,7 @@ extends LocalFileRepository {
 
   def getFile (fileRef: FileRef) = {
     val fileRefURI = toURI(fileRef)
-    require(fileRefURI.getScheme == "nfs", "Cannot read a non-NFS FileRef from an NFS repository.")
+    require(fileRefURI.getScheme == "nfs", "Cannot read a non-NFS FileRef ("+ fileRefURI +") from an NFS repository.")
     val filePath = nfsMountsRoot.getAbsolutePath + "/" + fileRefURI.getHost +
                    "/" + fileRefURI.getPath
     new File(filePath)

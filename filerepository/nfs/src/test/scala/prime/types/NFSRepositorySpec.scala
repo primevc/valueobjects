@@ -55,7 +55,7 @@ class NFSRepositorySpec extends Specification {
       val ref = repo.absorb(tmpFile)
 
       "return a correct FileRef" in {
-        ref.toString mustEqual "nfs://" + myHostname + "/test-repo/" + base64
+        ref.prefixedString mustEqual "nfs://" + myHostname + "/test-repo/" + base64
       }
 
       "contain the absorbed file" in {
@@ -80,14 +80,14 @@ class NFSRepositorySpec extends Specification {
       val (tmpData, base64) = createTempData
       val writer = { out: OutputStream => IOUtils.write(tmpData, out) }
       val ref = repo.store(writer)
-      ref.toString mustEqual "nfs://" + myHostname + "/test-repo/" + base64
+      ref.prefixedString mustEqual "nfs://" + myHostname + "/test-repo/" + base64
     }
 
     "store the contents of an inputstream" in {
       val (tmpData, base64) = createTempData
       val is = new ByteArrayInputStream(tmpData)
       val ref = repo.absorb(is)
-      ref.toString mustEqual "nfs://" + myHostname + "/test-repo/" + base64
+      ref.prefixedString mustEqual "nfs://" + myHostname + "/test-repo/" + base64
     }
   }
 }

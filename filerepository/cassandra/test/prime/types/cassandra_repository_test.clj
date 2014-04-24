@@ -62,7 +62,7 @@
       (let [ref (absorb repo file)]
         (is ref "absorbing succeeds")
 
-        (is (= (str ref) "cassandra://2-Ll2ZG1O9D2DuVM4-8y_Oo8UMjn66zGw8OdMwUEngY")
+        (is (= (.prefixedString ref) "cassandra://2-Ll2ZG1O9D2DuVM4-8y_Oo8UMjn66zGw8OdMwUEngY")
             "it returns the correct reference")
 
         (is (exists? repo ref) "it contains the file")
@@ -83,7 +83,7 @@
             ref (store repo store-fn)]
         (is ref "storing succeeds")
 
-        (is (= (str ref) "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
+        (is (= (.prefixedString ref) "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
             "it returns the correct reference")
 
         (is (exists? repo ref) "it contains the file")
@@ -104,7 +104,7 @@
             ref (store repo store-fn)]
         (is ref "storing succeeds")
 
-        (is (= (str ref) "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
+        (is (= (.prefixedString ref) "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
             "it returns the correct reference")
 
         (is (exists? repo ref) "it contains the file")
@@ -124,7 +124,7 @@
             ref (store repo store-fn)]
         (is ref "storing succeeds")
 
-        (is (= (str ref) "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
+        (is (= (.prefixedString ref) "cassandra://PjbTYi9a2tAQgMwhILtywHFOzsYRjrlSNYZBC3Q1roA")
             "it returns the correct reference")
 
         (is (exists? repo ref) "it contains the file")

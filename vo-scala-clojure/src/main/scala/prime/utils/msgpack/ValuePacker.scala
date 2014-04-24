@@ -10,14 +10,15 @@ import prime.vo._
 import Util._
 
 /**
- * Created by IntelliJ IDEA.
- * User: blue
- * Date: 04-01-11
- * Time: 15:01
- * To change this template use File | Settings | File Templates.
+ * Prime Value msgpack writer
+ *
+ * When compact is true:
+ * - FileRef will be packed as hash bytes only
+ *
+ * When compact is false:
+ * - FileRef will be packed as fully prefixed hash URI-String
  */
-
-abstract class ValuePacker(out:OutputStream) extends Packer(out)
+abstract class ValuePacker(out:OutputStream, compact:Boolean = false) extends Packer(out)
 {
   def pack(vo : ValueObject);
   def pack(vo : mutable.ValueObject);
@@ -92,7 +93,9 @@ abstract class ValuePacker(out:OutputStream) extends Packer(out)
 
   final def pack(fileRef : FileRef) {
     if (fileRef == null) packNil();
-    else packString(fileRef.toString); /* if (fileRef.hash == null) packString(fileRef.uri);
+    else if (!compact) packString(fileRef.prefixedString);
+    else fileRef.hash;
+    /* if (fileRef.hash == null) packString(fileRef.uri);
     else {
       out.write(0xD7)
       if (fileRef.uri != null) {

@@ -8,14 +8,11 @@ import prime.types.{Ref, RefArray, Enum, RGBA, FileRef, URI}
 import Util._
 
 /**
- * Created by IntelliJ IDEA.
- * User: blue
- * Date: 04-01-11
- * Time: 15:01
- * To change this template use File | Settings | File Templates.
+ * ValueObject msgpack writer
+ *
+ * See ValuePacker for compact option documentation.
  */
-
-class VOPacker (out:OutputStream) extends ValuePacker(out)
+class VOPacker (out:OutputStream, compact:Boolean = false) extends ValuePacker(out, compact)
 {
   import prime.vo.{ValueObjectCompanion, ValueObjectManifest, ValueObject}
 

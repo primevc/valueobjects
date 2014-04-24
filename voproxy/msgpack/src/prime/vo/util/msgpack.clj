@@ -43,7 +43,7 @@
                     #_else (create-tmp-filename file-or-directory vo))
         sevenzip   (execute "7za a "temp-file" -tgzip -mx=9 -si")
         zip-stream (.getOutputStream sevenzip)
-        msgpack    (prime.utils.msgpack.VOPacker. zip-stream)]
+        msgpack    (prime.utils.msgpack.VOPacker. zip-stream false)]
     (.pack msgpack vo)
     (.close zip-stream)
     (.waitFor sevenzip)

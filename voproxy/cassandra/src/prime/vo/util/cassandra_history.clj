@@ -94,7 +94,7 @@
   "Serializes the given items to a byte-array, using a VO aware MsgPack."
   [& items]
   (let [out (ByteArrayOutputStream.)
-        packer (VOPacker. out)]
+        packer (VOPacker. out false)]
     (doseq [item items] (.pack packer item))
     (.toByteArray out)))
 

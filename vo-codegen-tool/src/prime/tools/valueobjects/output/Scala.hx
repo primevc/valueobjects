@@ -738,20 +738,17 @@ trait "); a(def.name); a(" extends ");
 		{
 			var first = true;
 			var bit   = 0;
-			a("  final val fields = { Array(");
+			a("  final val fields = { import field._; Array(");
 			for (p in fields) if (!p.isTransient()) {
 				if (!first) a(", "); else first = false;
 				while(bit++ < p.bitIndex()) {
 					//trace((bit - 1) +" != "+ p.bitIndex());
 					a("null, ");
 				}
-				a("{ val f = field.");
 				a(p.name.quote());
-				a("; f.id; f; }");
 			}
 			for (p in fields) if (p.isTransient()) {
 				if (!first) a(", "); else first = false;
-				a("field.");
 				a(p.name.quote());
 			}
 			a("); }\n\n");

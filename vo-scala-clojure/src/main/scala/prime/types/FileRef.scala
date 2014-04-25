@@ -22,7 +22,8 @@ case class FileRef private[prime](var _uri:String, var _hash:Array[Byte], origin
   def prefixedString = if (_uri != null) _uri else { toString; this._uri; }
 
   override def equals(other : Any) = other match {
-    case other@FileRef(u,h,_,_) => u == this._uri || h == this._hash || other.toString == this.toString
+    case other@FileRef(u,h,_,p) => (u != null && u == this._uri) ||
+                                   (p == this.prefix && other.hash == this.hash)
     case _ => false
   }
 }

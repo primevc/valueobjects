@@ -24,8 +24,7 @@ object MutableVOValueSource {
 
   prime.vo.source.ValueSource;
 
-  import clojure.lang.RT.{ `var` => v }
-  v("clojure.core", "eval").invoke(v("clojure.core","read-string").invoke("""
+  clojure.lang.Compiler.load(new java.io.StringReader("""
     (extend-type prime.vo.mutable.ValueObject
       prime.vo.source/ValueSourceable
     (as-source

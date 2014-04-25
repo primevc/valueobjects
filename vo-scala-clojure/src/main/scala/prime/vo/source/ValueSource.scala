@@ -104,7 +104,14 @@ trait Updateable {
 object ValueSource
 {
   import clojure.lang._
+  // ---
+  // Support for maven scala:console
+  //   Based on: https://groups.google.com/d/msg/scala-user/Bh_YmI6e-wY/Vszt68Yl8yAJ
+  //  Otherwise clojure tries to load clojure.core in a ClassLoader that doesn't have it!
+  Thread.currentThread().setContextClassLoader(this.getClass.getClassLoader)
+  // ---
   RT.load("prime/vo/source");
+
   protected[prime] val asValueSource : IFn = RT.`var`("prime.vo.source", "as-source");
 
   def   apply(any : Any, kind : Any) : ValueSource = any match {

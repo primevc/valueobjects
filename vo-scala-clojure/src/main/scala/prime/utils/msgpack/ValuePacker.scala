@@ -94,7 +94,7 @@ abstract class ValuePacker(out:OutputStream, compact:Boolean = false) extends Pa
   final def pack(fileRef : FileRef) {
     if (fileRef == null) packNil();
     else if (!compact) packString(fileRef.prefixedString);
-    else fileRef.hash;
+    else packString(fileRef.toString);
     /* if (fileRef.hash == null) packString(fileRef.uri);
     else {
       out.write(0xD7)

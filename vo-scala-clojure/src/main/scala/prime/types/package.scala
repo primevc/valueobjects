@@ -26,7 +26,7 @@ package object types
   val emptyURI       = new URI("");
   val emptyURL       = new URL("http:");
   val emptyEmailAddr = new EmailAddr("",null);
-  val emptyFileRef   = new FileRef("",null);
+  val emptyFileRef   = new FileRef("",Array[Byte]());
   val emptyObjectId  = new ObjectId(Array[Byte](0,0,0,0,0,0,0,0,0,0,0,0));
   val minDate        = new Date(0);
   val minDateTime    = new DateTime(0);

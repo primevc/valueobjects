@@ -213,5 +213,10 @@ class BasicLocalFileRepository(val root: File) extends LocalFileRepository with 
 
   val prefix = null;
 
-  def getFile(f: FileRef) = new File(root.getAbsolutePath + "/" + f.toString)
+  def getFile(f: FileRef) = {
+    // In tests we use the BasicLocalFileRepository as a PDF source repository
+    // Allow "normal" filenames (non base64 hashed) to be used by trying these first.
+    val normalFile = new File(root.getAbsolutePath + "/" + f.prefixedString);
+    if (normalFile.exists) normalFile else new File(root.getAbsolutePath + "/" + f.toString);
+  }
 }

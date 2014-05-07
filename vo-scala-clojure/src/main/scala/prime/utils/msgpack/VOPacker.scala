@@ -31,6 +31,11 @@ class VOPacker (out:OutputStream, compact:Boolean = false) extends ValuePacker(o
     else packNil();
   }
 
+  final def pack[V <: ValueObject](voArray:Array[V]) {
+    packArray(voArray.length)
+    for (item <- voArray) pack(item.asInstanceOf[ValueObject] /* force correct overload */);
+  }
+
   /** Packs specific valueobject fields as set in the fields bitmask.  */
   final def packValueObject(vo : ValueObject, fields : Int)
   {

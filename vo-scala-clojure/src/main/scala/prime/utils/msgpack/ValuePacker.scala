@@ -33,21 +33,16 @@ abstract class ValuePacker(out:OutputStream, compact:Boolean = false) extends Pa
     else               pack(ref._id)
   }
 
-  final def pack(ref: Ref[_ <: ValueObject]) {
-    if (ref.vo_! != null) pack(ref.vo_!)
+  final def pack(ref: Ref[_ <: mutable.ValueObjectWithID]) {
+    if (ref.vo_! != null) pack(ref.vo_!.asInstanceOf[mutable.ValueObject])
     else ref.ref match {
       case id:ObjectId => pack(id)
-      case ref:AnyRef  => pack(ref)
+      case v => pack(v)
     }
   }
 
   final def pack(refArray: RefArray[_ <: ValueObject]) {
     pack(refArray.voArray)
-  }
-
-  final def pack[V <: ValueObject](voArray:Array[V]) {
-    packArray(voArray.length)
-    for (item <- voArray) pack(item.asInstanceOf[ValueObject] /* force correct overload */);
   }
 
   final def pack(map : IPersistentMap) {
@@ -124,7 +119,12 @@ abstract class ValuePacker(out:OutputStream, compact:Boolean = false) extends Pa
     for (item <- fileRefArray) pack(item);
   }
 
-  override final def pack(any : Any) : this.type = { any match {
+  final override def pack(v : Int)     = super.pack(v);
+  final override def pack(v : Double)  = super.pack(v);
+  final override def pack(v : String)  = super.pack(v);
+  final override def pack(v : Boolean) = super.pack(v);
+
+  override def pack(any : Any) : this.type = { any match {
     case v : String                   => super.pack(v);
     case v : Number                   => super.pack(v);
     case v : ObjectId                 => pack(v);
@@ -136,8 +136,8 @@ abstract class ValuePacker(out:OutputStream, compact:Boolean = false) extends Pa
     case v : RGBA                     => pack(v);
     case v : EmailAddr                => pack(v);
     case v : ValueObject              => pack(v);
-    case v : VORef[_]                 => pack(v);
-    case v : Ref[_]                   => pack(v);
+    case v : VORef[_]                 => pack(v.asInstanceOf[VORef[_ <: ValueObject]]);
+    case v : Ref[_]                   => pack(v.asInstanceOf[Ref[_ <: mutable.ValueObjectWithID]]);
     case v : EnumValue                => pack(v);
     case v : mutable.ValueObject      => pack(v);
     case v : IndexedSeq[_]            => pack(v);

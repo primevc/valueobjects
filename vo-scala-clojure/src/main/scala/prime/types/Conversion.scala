@@ -289,11 +289,13 @@ object Conversion
 
   //  -------
 
-  def URL (value:URI) = if (value.getHost != null) value.toURL else throw FailureException;
+  def URL (value:URI)    = if (value.getHost != null) value.toURL else throw FailureException;
+  def URL (value:String) = if (value != null && value.trim != "") new URL(value) else throw NoInputException;
 
   def URL (value:Any) : URL = unpack(value) match {
     case v:URL          => v
     case v:URI          => v.toURL
+    case v:String       => URL(v)
     case v:RawType      => URL(v.asString);
     case None           => throw NoInputException;
     case value          => val v = uri.invoke(value); if (v != null) v.asInstanceOf[URI].toURL else throw FailureException;

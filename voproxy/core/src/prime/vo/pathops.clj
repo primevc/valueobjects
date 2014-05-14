@@ -54,6 +54,8 @@
   function understands our own type of paths."
   [m [k & ks]]
   (let [k (concrete-path-step m k)]
+    (when (and (number? k) (not (contains? m k)))
+      (throw (IllegalArgumentException. (str "Object " m " does not contain '" k "'."))))
     (if ks
       (recur (get m k) ks)
       (get m k))))

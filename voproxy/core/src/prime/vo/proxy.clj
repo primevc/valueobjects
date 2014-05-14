@@ -370,10 +370,6 @@
   })
 
 
-(defn is-published? [vo]
-  (= (vo :status) :published))
-
-
 (defmacro default-vo-proxy [vo & options]
   `(do
     (extend-type ~vo

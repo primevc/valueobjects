@@ -101,6 +101,10 @@
   [^prime.types.FileRef in ^JsonGenerator out]
   (.writeString out (to-String in)))
 
+(defn- encode-rgba
+  [^prime.types.RGBA in ^JsonGenerator out]
+  (.writeString out (.toRGBAString in)))
+
 
 ;;; Register encoders and advice cheshire.generate/generate.
 
@@ -111,6 +115,7 @@
 (add-encoder org.bson.types.ObjectId encode-objectId)
 (add-encoder javax.mail.internet.InternetAddress encode-internetAddress)
 (add-encoder prime.types.FileRef encode-fileref)
+(add-encoder prime.types.RGBA encode-rgba)
 
 (alter-var-root
  #'cheshire.generate/generate

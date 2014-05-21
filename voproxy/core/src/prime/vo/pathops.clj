@@ -201,7 +201,7 @@
 
 (defn- find-index [vec obj]
   {:pre [(vector? vec)]}
-  (first (keep-indexed (fn [i item] (if (= item obj) i)) vec)))
+  (first (keep-indexed (fn [i item] (when (to= item obj) i)) vec)))
 
 
 (defn- remove-at [map-or-vec key]

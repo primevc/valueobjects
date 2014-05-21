@@ -4,6 +4,7 @@
 
 (ns prime.vo.pathops
   "Operations (add, update, ...) for ValueObject using value-paths."
+  (require [prime.types :refer (to=)])
   (:use prime.utils))
 
 
@@ -38,7 +39,7 @@
 (defn concrete-path-step [obj path-step]
   (if (and (array-like? obj) (not (number? path-step)))
     (let [[k v] (first path-step)
-          result (first (keep-indexed (fn [i item] (when (= (get item k) v) i)) obj))]
+          result (first (keep-indexed (fn [i item] (when (to= (get item k) v) i)) obj))]
       (if-not result
         (throw (IllegalArgumentException. (str "Could not find a match for '" path-step "'.")))
         result))

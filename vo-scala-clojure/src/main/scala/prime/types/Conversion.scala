@@ -99,6 +99,24 @@ object Conversion
 
   //  -------
 
+  def Long      (value:Long)        : Long = value;
+  def Long      (value:String)      : Long = { val v = value.trim; if (!v.isEmpty && v != "NaN") v.toLong; else throw FailureException }
+  def Long      (value:Number)      : Long = if (value != null) value.longValue else throw FailureException;
+  def Long      (value:IntegerType) : Long = value.asLong;
+  def Long      (value:Int)         : Long = value.toLong;
+
+  def Long(value:Any) : Long = unpack(value) match {
+    case v:Long        => v
+    case v:Int         => Long(v)
+    case v:Number      => Long(v)
+    case v:String      => Long(v)
+    case v:IntegerType => Long(v)
+    case None          => throw NoInputException;
+    case value         => val v = long.invoke(value); if (v != null) v.asInstanceOf[Long] else throw FailureException;
+  }
+
+  //  -------
+
   def Decimal   (value:Double)                : Double = value;
   def Decimal   (value:String)                : Double = { val v = value.trim; if (!v.isEmpty) v.toDouble else throw FailureException; }
   def Decimal   (value:Number)                : Double = if (value != null) value.doubleValue else throw FailureException;
@@ -368,6 +386,7 @@ object ClojureProtocolVars
   val string    = RT.`var`("prime.types", "to-String"   );
   val boolean   = RT.`var`("prime.types", "to-Boolean"  );
   val integer   = RT.`var`("prime.types", "to-Integer"  );
+  val long      = RT.`var`("prime.types", "to-Long"     );
   val decimal   = RT.`var`("prime.types", "to-Decimal"  );
   val rgba      = RT.`var`("prime.types", "to-RGBA"     );
   val date      = RT.`var`("prime.types", "to-Date"     );

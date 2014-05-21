@@ -164,3 +164,28 @@
     #'dec #'dec' #'even? #'inc #'inc' #'max #'min #'odd? #'rem
     #'boolean #'short #'int #'long #'bigint #'double #'float
   ]] (alter-meta! purefn assoc :pure true))
+
+;
+; Convertable to equality protocol, mainly for pathops
+;
+
+(defprotocol ConvertableToEquality (^boolean ^:pure to= [a b]))
+
+(defmacro implement-to= [type conversion-fn]
+  `(extend-protocol ConvertableToEquality
+    ~type
+    (to= [~'a ~'b] (= ~'a (try (~conversion-fn ~'b) (catch Exception ~'e))))))
+
+(implement-to= ObjectId            to-ObjectId)
+(implement-to= String              to-String)
+(implement-to= Boolean             to-Boolean)
+(implement-to= Integer             to-Integer)
+(implement-to= Double              to-Decimal)
+(implement-to= prime.types.RGBA    to-RGBA)
+(implement-to= DateMidnight        to-Date)
+(implement-to= DateTime            to-DateTime)
+(implement-to= Interval            to-Interval)
+(implement-to= InternetAddress     to-EmailAddr)
+(implement-to= java.net.URI        to-URI)
+(implement-to= prime.types.FileRef to-FileRef)
+(implement-to= VORef               to-VORef)

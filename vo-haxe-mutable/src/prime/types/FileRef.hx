@@ -27,7 +27,7 @@
  *  Ruben Weijers	<ruben @ prime.vc>
  */
 package prime.types;
-
+  using StringTools;
 
 /**
  * FileRef class is meant for files that are hosted by online-touch. Use URI-class
@@ -47,8 +47,8 @@ class FileRef extends prime.types.URI
 	public function toURIString(cdnPostfix : String)
 	{
 		return (hasScheme(URIScheme.Scheme("cassandra"))
-				? (prefix != null? prefix : "") + (host != null? host : "")
-				: scheme == null && prefix != null ? prefix + super.toString() : super.toString()) + cdnPostfix;
+				? (prefix != null? prefix : "") + (host != null? host : "") + cdnPostfix
+				: (scheme == null && prefix != null ? prefix + super.toString() : super.toString()) + (path.indexOf(".") == -1? cdnPostfix : ""));
 	}
 
 	public function toURI(?cdnPostfix : String) return new URI(toURIString(if (cdnPostfix == null) "" else cdnPostfix.toLowerCase()));

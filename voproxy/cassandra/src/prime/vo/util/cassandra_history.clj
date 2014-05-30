@@ -152,14 +152,14 @@
   PUT action is part of these rows, the other actions are applied on
   an empty target-vo holding only the ID."
   [result target-vo]
-  (loop [index 0
+  (loop [rows result
          accumulator (empty target-vo)]
-    (if-let [row (nth result index nil)]
+    (if-let [row (first rows)]
      (with-debug
       (do (prn (:version row) (:action row))
           (let [[vsrc] (bytes->change-data (:data row))] (clojure.pprint/pprint (when vsrc (msgpack/ValueSource->map vsrc))))
           (println))
-      (recur (inc index)
+      (recur (next rows)
              (case (int (:action row))
                #=(action->int :put)
                (let [vo-source (first (bytes->change-data (:data row)))]

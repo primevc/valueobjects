@@ -13,7 +13,7 @@ package object types
 {
   def voManifest[V <: ValueObject](implicit manifest : ValueObjectManifest[V]) = manifest;
 
-  type URL = java.net.URL
+  type URL = java.net.URI
   type URI = java.net.URI
   type ObjectId = org.bson.types.ObjectId
   type EmailAddr = javax.mail.internet.InternetAddress
@@ -24,7 +24,7 @@ package object types
 
   val emptyString    = "";
   val emptyURI       = new URI("");
-  val emptyURL       = new URL("http:");
+  val emptyURL       = new URL("empty:URL");
   val emptyEmailAddr = new EmailAddr("",null);
   val emptyFileRef   = new FileRef("",Array[Byte]());
   val emptyObjectId  = new ObjectId(Array[Byte](0,0,0,0,0,0,0,0,0,0,0,0));

@@ -106,7 +106,6 @@ abstract class ValuePacker(out:OutputStream, compact:Boolean = false) extends Pa
   }
 
   final def pack(uri     : URI)                     { super.pack(Conversion.String(uri)); }
-  final def pack(url     : URL)                     { super.pack(Conversion.String(url)); }
   final def pack(email   : EmailAddr)               { super.pack(email.toString);         }
   final def pack(rgba    : RGBA)                    { super.pack(rgba.rgba);              }
 
@@ -131,7 +130,6 @@ abstract class ValuePacker(out:OutputStream, compact:Boolean = false) extends Pa
     case v : DateTime                 => pack(v);
     case v : Date                     => pack(v);
     case v : URI                      => pack(v);
-    case v : URL                      => pack(v);
     case v : FileRef                  => pack(v);
     case v : RGBA                     => pack(v);
     case v : EmailAddr                => pack(v);

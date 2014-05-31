@@ -117,8 +117,8 @@ object ConvertTo
   def uri (v:String) : URI = if (v == null || v.isEmpty) null else Conversion.URI(v)
 
   def url           (value:Any) : URL = unpack(value) match {
-    case v:java.net.URL => v
-    case v:URI => v.toURL
+    case v:java.net.URL => v.toURI
+    case v:URI => Conversion.URL(v)
     case v:String => url(v)
     case v:RawType => url(v.asString)
     case None => null

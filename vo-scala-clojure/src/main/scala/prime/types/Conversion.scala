@@ -275,13 +275,11 @@ object Conversion
   def EmailAddr (value:String)    : EmailAddr = new EmailAddr(String(value));
   def EmailAddr (value:RawType)   : EmailAddr = EmailAddr(value.asString);
   def EmailAddr (value:URI)       : EmailAddr = EmailAddr(value.getPath);
-  def EmailAddr (value:URL)       : EmailAddr = EmailAddr(value.getFile);
 
   def EmailAddr(value:Any) : EmailAddr = unpack(value) match {
     case v:EmailAddr                                => v
     case v:String                                   => EmailAddr(v)
     case v:URI       if ("mailto" == v.getScheme)   => EmailAddr(v)
-    case v:URL       if ("mailto" == v.getProtocol) => EmailAddr(v)
     case v:RawType                                  => EmailAddr(v)
     case None  => throw NoInputException;
     case value => val v = e_mail.invoke(value); if (v != null) v.asInstanceOf[EmailAddr] else throw FailureException;
@@ -289,34 +287,34 @@ object Conversion
 
   //  -------
 
-  def URI       (value:URI)       : URI = value;
-  def URI       (value:String)    : URI = new URI(value.replace(" ", "%20"));
-  def URI       (value:RawType)   : URI = URI(value.asString);
-  def URI       (value:URL)       : URI = value.toURI;
-  def URI       (value:ObjectId)  : URI = URI(String(value));
+  def URI       (value:URI)          : URI = value;
+  def URI       (value:String)       : URI = new URI(value.replace(" ", "%20"));
+  def URI       (value:RawType)      : URI = URI(value.asString);
+  def URI       (value:java.net.URL) : URI = value.toURI;
+  def URI       (value:ObjectId)     : URI = URI(String(value));
 
   def URI(value:Any) : URI = unpack(value) match {
-    case v:URI       => v
-    case v:ObjectId  => URI(v)
-    case v:String    => URI(v)
-    case v:URL       => URI(v)
-    case v:RawType   => URI(v)
-    case None        => throw NoInputException;
-    case value       => val v = uri.invoke(value); if (v != null) v.asInstanceOf[URI] else throw FailureException;
+    case v:URI          => v
+    case v:ObjectId     => URI(v)
+    case v:String       => URI(v)
+    case v:java.net.URL => URI(v)
+    case v:RawType      => URI(v)
+    case None           => throw NoInputException;
+    case value          => val v = uri.invoke(value); if (v != null) v.asInstanceOf[URI] else throw FailureException;
   }
 
   //  -------
 
-  def URL (value:URI)    = if (value.getHost != null) value.toURL else throw FailureException;
-  def URL (value:String) = if (value != null && value.trim != "") new URL(value) else throw NoInputException;
+  def URL (value:URI)    : URL = if (value != null) { require(value.isAbsolute); value; } else throw NoInputException;
+  def URL (value:String) : URL = URL(URI(value));
 
   def URL (value:Any) : URL = unpack(value) match {
-    case v:URL          => v
-    case v:URI          => v.toURL
+    case v:java.net.URL => v.toURI
+    case v:URI          => URL(v)
     case v:String       => URL(v)
     case v:RawType      => URL(v.asString);
     case None           => throw NoInputException;
-    case value          => val v = uri.invoke(value); if (v != null) v.asInstanceOf[URI].toURL else throw FailureException;
+    case value          => val v = uri.invoke(value); if (v != null) URL(v.asInstanceOf[URI]) else throw FailureException;
   }
 
   //  -------

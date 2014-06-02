@@ -154,11 +154,17 @@
                                                 (Spread{:width 2})]}),
                    :tags [\"foo\" \"bar\"]})"
   [vo keep-map]
-  ;; The keep filtering uses a zipper for efficiency.
-  (let [vz (vo-zipper vo)]
-    ;; One could also call zip/root, but the zipper should already be at the root if everything
-    ;; went correct.
-    (zip/node (vo-keep-vo vz keep-map))))
+  ;; If the keep-map is not a map, but is a truthy value, don't start zipping.
+  (if (and keep-map (not (map? keep-map)))
+    ;; It the keep-map is a function, apply it to the entire VO.
+    (if (and (fn? keep-map) (not= keep-map *)) (keep-map vo) vo)
+    ;; The keep-map is actually a map, so start zipping (which is used for efficiency).
+    (let [vz (vo-zipper vo)]
+      ;; One could also call zip/root, but the zipper should already be at the root if everything
+      ;; went correct.
+      (zip/node (vo-keep-vo vz keep-map)))))
+
+
 (defprotocol VOTransformer
   "In mathematics, a transformation could be any function mapping a set X to another set or itself.
    The term “transformation” refers to a function from X to itself that preserves this structure.

@@ -262,10 +262,11 @@
 
 (def base-script
   (str (ns-source prime.vo.util.elasticsearch.script)
+       (def-source prime.vo.util.elasticsearch.script/debug)
+       (def-source prime.vo.util.elasticsearch.script/to=)
        (def-source prime.vo.util.elasticsearch.script/array-like?)
        (def-source prime.vo.util.elasticsearch.script/concrete-path-step)
        (def-source prime.vo.util.elasticsearch.script/relative-vector-index)
-       (def-source prime.vo.util.elasticsearch.script/debug)
        (def-source prime.vo.util.elasticsearch.script/update-in-vo)))
 
 (def move-to-script

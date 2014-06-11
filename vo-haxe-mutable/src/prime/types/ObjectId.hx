@@ -135,7 +135,8 @@ class ObjectId
 	public function toString()
 	{
 		var S = StringTools;
-		return S.hex(cast timestamp, 8) + S.hex(machine, 6) + S.hex(pid, 4) + S.hex(increment, 6);
+		var hex = S.hex(cast timestamp, 8) + S.hex(machine, 6) + S.hex(pid, 4) + S.hex(increment, 6);
+		return hex.toLowerCase();
 	}
 	
 	public inline function equals(other : ObjectId)

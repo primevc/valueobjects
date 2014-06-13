@@ -305,7 +305,7 @@ object Conversion
 
   //  -------
 
-  def URL (value:URI)    : URL = if (value != null) { require(value.isAbsolute); value; } else throw NoInputException;
+  def URL (value:URI)    : URL = if (value != null) { if(value.isAbsolute) value else URI("http://" + value); } else throw NoInputException;
   def URL (value:String) : URL = URL(URI(value));
 
   def URL (value:Any) : URL = unpack(value) match {

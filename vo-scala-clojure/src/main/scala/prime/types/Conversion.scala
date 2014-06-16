@@ -183,7 +183,7 @@ object Conversion
     case _          => new RGBA(value)
   }
   def RGBA      (value:Number)                   : RGBA = RGBA(Integer(value));
-  def RGBA      (value:IntegerType)              : RGBA = RGBA(value.asInt);
+  def RGBA      (value:IntegerType)              : RGBA = RGBA(value.asLong);
   def RGBA      (value:Long)                     : RGBA = RGBA((value & 0xFFFFFFFF).toInt);
   def RGBA      (rgb:Int, a:Int)                 : RGBA = RGBA((rgb << 8) | a);
   def RGBA      (rgb:Int, alphaPercentage:Float) : RGBA = RGBA(rgb, (255 * alphaPercentage).toInt);

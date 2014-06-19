@@ -1208,6 +1208,7 @@ class EnumDef implements TypeDefinitionWithProperties
 	public var description						: String;
 	
 	public var enumerations	(default,null)		: Map<String,Enumeration>;
+	public var emptyEnum    (default,null)      : Enumeration;
 	public var catchAll							: Enumeration;
 	public var conversions	(default,null)		: Map<String,EnumConversionProperty>;
 	public var finalized	(default,null)		: Bool;
@@ -1256,6 +1257,9 @@ class EnumDef implements TypeDefinitionWithProperties
 		this.supertypes = new List();
 		this.property = cast this.conversions = new Map();
 		this.propTodo = new TodoList();
+
+		this.emptyEnum = new Enumeration("Null", this);
+		emptyEnum.conversions.set("toString", "");
 	}
 	
 	

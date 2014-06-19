@@ -837,6 +837,16 @@ trait "); a(def.name); a(" extends ");
 		}
 	}
 
+	function writeEnumValue(def:EnumDef, e:Enumeration)
+	{
+		a("  final val "); a(e.name); a(' = _'); a(e.name); a(";  protected object _"); a(e.name); a(' extends Value('); a(e.intValue + ', "'); a(e.conversions.get("toString")); ac('"'.code);
+		for (prop in def.conversions) if (prop.name != "toString") {
+			var conv = e.conversions.get(prop.name);
+			a(', "'); a(conv != null? conv : e.conversions.get("toString")); ac('"'.code);
+		}
+		a(");\n");
+	}
+
 	public function genEnum(def:EnumDef)
 	{
 		shouldWrite = true;
@@ -882,14 +892,12 @@ object ${def.name} extends Enum {
 				overrideValueOf = e;
 			}
 			else {
-				a("  final val "); a(e.name); a(' = _'); a(e.name); a(";  protected object _"); a(e.name); a(' extends Value('); a(e.intValue + ', "'); a(e.conversions.get("toString")); ac('"'.code);
-				for (prop in def.conversions) if (prop.name != "toString") {
-					var conv = e.conversions.get(prop.name);
-					a(', "'); a(conv != null? conv : e.name); ac('"'.code);
-				}
-				a(");\n");
+				writeEnumValue(def, e);
 			}
 		}
+		// override the Null enum value
+		a("  override "); writeEnumValue(def, def.emptyEnum);
+
 		a("\n  final def apply(v: Int) : Value = v match {");
 		for (e in enumerations) if (e.type == null)
 		{
@@ -2435,7 +2443,7 @@ class XMLProxyGenerator
 			case Tenum(cl):		a("(if ("); addPathEscaped(path); a(" != null) xml.Text(ConvertTo.string("); addPathEscaped(path); a(")) else NodeSeq.Empty)");
 		}
 */		
-		case TenumConverter(_): a("(if (!"); addPathEscaped(path); a(".isEmpty) xml.Text("); addPathEscaped(path); a(") else NodeSeq.Empty)");
+		case TenumConverter(_): a("if (!"); addPathEscaped(path); a(".isEmpty) xml.Text("); addPathEscaped(path); a(") else NodeSeq.Empty");
 		
 		case Tstring:
 			a("xml.Text(");

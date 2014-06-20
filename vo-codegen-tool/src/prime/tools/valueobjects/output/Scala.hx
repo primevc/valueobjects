@@ -392,9 +392,8 @@ trait "); a(def.name); a(" extends ");
 			}
 
 			a("\n) extends ValueObject_");
-			switch (fields.length) {
-				case 0:                      ac( "0".code);
-				case 1:                      ac( "1".code);
+			if (fields.length <= 1) a(fields.length + "");
+			else switch (lastField.index + 1) {
 				case 2,3,4:                   a( "4(voIndexSet, srcDiff)");
 				case 5,6,7,8:                 a( "8(voIndexSet.toByte,  srcDiff.toByte)");
 				case 9,10,11,12,13,14,15,16:  a("16(voIndexSet.toShort, srcDiff.toShort)");

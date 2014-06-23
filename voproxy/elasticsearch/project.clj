@@ -8,12 +8,11 @@
   :dependencies [[org.clojure/clojure "1.5.1"]
                  [prime/voproxy-core "0.1.0-SNAPSHOT"]
                  [prime/voserializer-cheshire "0.1.0-SNAPSHOT"]
-                 [org.elasticsearch/elasticsearch "0.90.5"]
-                 [org.clojars.touch/clj-elasticsearch "0.4.2"]
-                 [clj-tuple "0.1.5"]
-                 [cheshire "5.2.0"]]
+                 [org.elasticsearch/elasticsearch "1.2.1"]
+                 [clojurewerkz/elastisch "2.0.0"]
+                 [clj-tuple "0.1.5"]]
   :profiles {:test {:dependencies [[containium "0.1.0-SNAPSHOT"]
-                                   [org.clojars.touch/elasticsearch-lang-clojure "0.1.0-SNAPSHOT"]]}
+                                   [org.clojars.touch/elasticsearch-lang-clojure "0.2.0-SNAPSHOT"]]}
              :mvel {:dependencies [[org.mvel/mvel2 "2.1.3.Final"]]}}
   :global-vars {*warn-on-reflection* true}
   :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"

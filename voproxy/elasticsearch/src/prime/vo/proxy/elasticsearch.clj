@@ -5,13 +5,14 @@
 (ns prime.vo.proxy.elasticsearch
   "A concrete implementation of the VOProxy and VOSearchProxy
   protocols, with ElasticSearch as the backend."
+  (:import [org.elasticsearch.node Node])
   (:require [prime.vo.proxy :refer (VOProxy VOSearchProxy)]
             [prime.vo.util.elasticsearch :as es]))
 
 
 (defrecord ElasticSearchVOProxy
     [^String index
-     ^org.elasticsearch.client.transport.TransportClient client
+     ^org.elasticsearch.client.Client client
      default-opts] ;; Supported: :refresh-at-change
 
   VOProxy
@@ -88,7 +89,11 @@
 
 
 (defn ->ElasticSearchVOProxy
-  ([index client]
-     (ElasticSearchVOProxy. index client {}))
-  ([index client default-opts]
-     (ElasticSearchVOProxy. index client default-opts)))
+  ([index node-or-client]
+     (ElasticSearchVOProxy. index node-or-client {}))
+  ([index node-or-client default-opts]
+     (ElasticSearchVOProxy. index
+                            (if (instance? Node node-or-client)
+                              (.client ^Node node-or-client)
+                             #_else node-or-client)
+                            default-opts)))

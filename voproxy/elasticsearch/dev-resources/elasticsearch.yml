@@ -37,6 +37,8 @@ index:
       mmapfs:
         enabled: true
 
+script.disable_dynamic: false
+
 ################################### Cluster ###################################
 
 # Cluster name identifies your cluster for auto-discovery. If you're running

@@ -9,7 +9,10 @@
             [clj-tuple :refer (tuple)]
             [clojure.set     :as set]
             [cheshire [core :as core] [generate :as gen]]
-            [clj-elasticsearch.client :as ces]
+            [clojurewerkz.elastisch.native :as es]
+            [clojurewerkz.elastisch.native.conversion :as cnv]
+            [clojurewerkz.elastisch.native.document :as doc]
+            [clojurewerkz.elastisch.native.index :as idx]
             [prime.vo.source :refer (def-valuesource)]
             [prime.vo.pathops :as pathops]
             [prime.vo.util.json :as json] ; For loading the right VO encoders in Cheshire.
@@ -19,8 +22,10 @@
            [prime.vo IDField ValueObject ValueObjectManifest ValueObjectField ValueObjectCompanion ID]
            [com.fasterxml.jackson.core JsonGenerator]
            [org.elasticsearch.action.get GetResponse]
-           [org.elasticsearch.action.search SearchResponse]
-           [org.elasticsearch.action.index IndexResponse]
+           [org.elasticsearch.action.search SearchRequest SearchResponse]
+            org.elasticsearch.common.xcontent.XContentType
+           [org.elasticsearch.action.index IndexRequest IndexResponse]
+           [org.elasticsearch.action.update UpdateRequest UpdateResponse]
            [org.elasticsearch.search SearchHit SearchHitField]))
 
 
@@ -33,9 +38,6 @@
     (start [this])
     (stop  [this] (.close this))))
   (catch Exception e))
-
-(defn create-client [hosts cluster-name & options]
-  (ces/make-client :transport {:hosts hosts :cluster-name cluster-name}))
 
 
 ;;; Generate ElasticSearch mapping from VO.
@@ -249,45 +251,28 @@
 
 (defn vo-index-mapping-pair [[^ValueObject vo, options]]
   (assert options)
-  [ (Integer/toHexString (.. vo voManifest ID)),
-    (conj (dissoc (vo-mapping vo options) :type) options) ])
+  [ (vo-hexname vo),
+    (dissoc (vo-mapping vo options) :type :exclude :only) ])
 
 (defn put-mapping [es index-name, vo-options-pair]
   (if (map? vo-options-pair)
     (doseq [pair vo-options-pair]
       (put-mapping es index-name pair))
   ;else
-  (let [[type mapping] (vo-index-mapping-pair vo-options-pair)]
-    (ces/put-mapping es, {
-      :ignore-conflicts? true
-      :index  index-name
-      :type   type
-      :source {type mapping}
-    }))))
-
-(defn index-exists? [es indices]
-  {:pre [(or (string? indices) (vector? indices)) (not-empty indices)]}
-  (-> (ces/exists-index es
-        {:indices (if (instance? String indices) [indices] #_else indices)})
-      :exists))
+    (let [[type mapping] (vo-index-mapping-pair vo-options-pair)]
+      (idx/update-mapping es, index-name, type, :ignore-conflicts true, :mapping mapping))))
 
 (defn create-index
-  ([es index-name vo->options-map]
-    (create-index es index-name vo->options-map {}))
-  ([es index-name vo->options-map root-options]
+  ([client index-name vo->options-map]
+    (create-index client index-name vo->options-map {}))
+  ([client index-name vo->options-map root-options]
     (try
-      (ces/create-index es, {
-        :index  index-name
-        :source (assoc root-options :mappings (into {} (map vo-index-mapping-pair vo->options-map)))
-      })
+      (apply idx/create client index-name
+             (->> (into {} (map vo-index-mapping-pair vo->options-map))
+                  (assoc root-options :mappings)
+                  (mapcat identity)))
     (catch org.elasticsearch.indices.IndexAlreadyExistsException e
-      (put-mapping es index-name vo->options-map)))))
-
-(defn- finish-change
-  [proxy options retval]
-  (when (:refresh-at-change (merge (:default-opts proxy) options))
-    (ces/refresh-index (:client proxy) {:indices ["*"]}))
-  retval)
+      (put-mapping client index-name vo->options-map)))))
 
 
 ;;; ElasticSearch ValueSource.
@@ -355,9 +340,10 @@
 
 (defn vo->term-filter
   ([vo]
-    (let [terms (vo->term-filter vo "")]
-      (if-not (empty? terms)
-        {:and (mapv #(hash-map :term %) terms)})))
+    (let [terms (vo->term-filter vo "")
+          terms (mapv #(hash-map :term %) terms)]
+      (if (second terms) {:and terms}
+       #_else (first terms))))
 
   ([vo prefix]
      (binding [vo/*voseq-key-fn* #(str prefix (field-hexname %))]
@@ -379,7 +365,7 @@
 
 (defn vo->search-filter [vo]
   (let [term-filter (vo->term-filter (vo/without-id vo))]
-    (if (prime.vo/has-id? vo) (conj term-filter {"ids" {"values" [(:id vo)]}})
+    (if (prime.vo/has-id? vo) (conj (or term-filter {}) {"ids" {"values" [(:id vo)]}})
     #_else term-filter)))
 
 
@@ -388,63 +374,157 @@
 
 
 (defn get
-  "options: see clj-elasticsearch.client/get-doc"
+  "Options are  :parent, :preference, :routing, and :fields"
   [{:keys [client index default-opts] :as proxy} ^ValueObject vo options]
   {:pre [client (string? index) (vo/has-id? vo) options]}
-  (let [^GetResponse resp (ces/get-doc client
-                                       (assoc (merge default-opts options)
-                                         :type (Integer/toHexString (.. vo voManifest ID))
-                                         :index index
-                                         :format :java
-                                         :id (vo-id->str vo)))]
+  (let [ft (es/get client (cnv/->get-request index
+                                             (vo-hexname vo)
+                                             (vo-id->str vo)
+                                             (merge default-opts options)))
+        ^GetResponse resp (.actionGet ft)]
     (when (.isExists resp)
       (.apply (. vo voCompanion)
               (ElasticSearch-root-ValueSource. (.. vo voManifest ID) (.. vo voManifest) (.getSourceAsMap resp) (:id vo))))))
 
+
+
+(defn ^IndexRequest ->index-request
+  "Builds an index action request.
+   Copied from clojurewerkz.elastisch.native.conversion and modified to always generate \"smile\"."
+  ([index mapping-type doc]
+     ;; default content type used by IndexRequest is JSON. MK.
+     (-> (IndexRequest. (name index) (name mapping-type))
+         (.source ^bytes (generate-hexed-fields-smile doc))))
+  ;; non-variadic because it is more convenient and efficient to
+  ;; invoke this internal implementation fn this way. MK.
+  ([index mapping-type doc {:keys [id
+                                   routing
+                                   parent
+;                                   timeout
+                                   replication
+                                   consistency
+                                   timestamp
+                                   ttl
+                                   op-type
+                                   refresh, refresh-at-change
+;                                   fields
+                                   version
+                                   version-type]}]
+     (let [ir (-> (IndexRequest. (name index) (name mapping-type))
+                  (.source ^bytes (generate-hexed-fields-smile doc)))]
+       (.contentType ir XContentType/SMILE)
+       (when id
+         (.id ir ^String id))
+       (when routing
+         (.routing ir ^String routing))
+       (when parent
+         (.parent ir ^String parent))
+       (when timestamp
+         (.timestamp ir timestamp))
+       (when ttl
+         (.ttl ir ttl))
+       (when consistency
+         (.consistencyLevel ir (org.elasticsearch.action.WriteConsistencyLevel/fromString (name consistency))))
+       (when replication
+         (.replicationType ir (org.elasticsearch.action.support.replication.ReplicationType/fromString (name replication))))
+       (when op-type
+         (.opType ir ^String (.toLowerCase (name op-type))))
+       (when (or refresh refresh-at-change)
+         (.refresh ir true))
+       (when version
+         (.version ir version))
+       (when version-type
+         (.versionType ir (cnv/to-version-type version-type)))
+       ir)))
+
+
 (defn put
-  "options: see clj-elasticsearch.client/index-doc"
+  "Options are  :routing, :parent, :timestamp, :ttl, :refresh, :version and :version-type"
   [{:keys [client index default-opts] :as proxy} ^ValueObject vo options]
   {:pre [client index]}
   (assert (vo/has-id? vo) (print-str "VO requires an id: " vo))
-  (let [options (merge default-opts options)
-        resp (ces/index-doc client
-                            (assoc options
-                              :index index
-                              :id (vo-id->str vo)
-                              :type (Integer/toHexString (.. vo voManifest ID))
-                              :source (generate-hexed-fields-smile (vo/without-id vo))))]
-    (finish-change proxy options resp)))
+  (let [options (merge default-opts
+                       {:id (vo-id->str vo)
+                        :op-type "index"}
+                       options)
+        req (es/index client (->index-request index
+                                              (vo-hexname vo)
+                                              (vo/without-id vo)
+                                              (merge default-opts options)))
+        resp (cnv/index-response->map (.actionGet req))]))
 
 
-(defn- patched-update-options
-  [type id options]
-  (let [{:keys [doc] :as options} (assoc options :type type :id id)]
-    (if doc
-      (assoc options :doc (generate-hexed-fields-smile doc))
-      options)))
 
+(defn ^UpdateRequest ->update-request
+  ([index-name mapping-type ^String id doc {:keys [upsert
+                                                   doc-as-upsert?
+                                                   routing
+                                                   parent
+                                                   timeout
+                                                   replication
+                                                   consistency
+                                                   ttl
+                                                   refresh, refresh-at-change
+                                                   fields
+                                                   version
+                                                   version-type
+                                            ] :or {doc-as-upsert? true} :as options}]
+    (when doc-as-upsert?
+      (assert (= nil upsert) "Ambiguous: Should I use `doc` as upsert? or the given `upsert`?"))
+    (let [r (UpdateRequest. (name index-name) (name mapping-type) id)]
+       (when doc
+        (.doc r ^bytes (generate-hexed-fields-smile doc)))
+       (when upsert
+        (.upsert r ^bytes (generate-hexed-fields-smile upsert)))
+       (when doc-as-upsert?
+        (.docAsUpsert r true))
+       (when routing
+         (.routing r ^String routing))
+       (when parent
+         (.parent r ^String parent))
+       (when timeout
+         (.timeout r ^String timeout))
+       (when consistency
+         (.consistencyLevel r (org.elasticsearch.action.WriteConsistencyLevel/fromString (name consistency))))
+       (when replication
+         (.replicationType r (org.elasticsearch.action.support.replication.ReplicationType/fromString (name replication))))
+       (when (or refresh refresh-at-change)
+         (.refresh r true))
+       (when fields
+         (.fields r fields))
+       (when version
+         (.version r version))
+       (when version-type
+         (.versionType r (cnv/to-version-type version-type)))
+       r)))
 
 (defn update
-  [{:keys [client index default-opts] :as proxy} ^ValueObject vo id {:as options :keys [fields]}]
+  "Updates or creates a document using provided data.
+   Options are  :doc-as-upsert? – default is true
+           and  :upsert – the document to insert if doc with id doesn't exists"
+  [{:keys [client index default-opts] :as proxy} ^ValueObject vo id {:keys [fields] :as options}]
   {:pre [(instance? ValueObject vo) (not (nil? id)) index client]}
-  (let [type (Integer/toHexString (.. vo voManifest ID))
-        id (prime.types/to-String id)
-        fields (map field-hexname fields)]
-    (->> (merge default-opts {:index index :doc (vo/without-id vo) :doc-as-upsert? true} options)
-         (patched-update-options type id)
-         (ces/update-doc client)
-         (finish-change proxy options))))
+  (->> (->update-request (name index)
+                         (vo-hexname vo)
+                         (prime.types/to-String id)
+                         (vo/without-id vo)
+                         (merge default-opts
+                                (if fields (assoc options :fields (map field-hexname fields))
+                                 #_else options)))
+       (es/update client)
+       (.actionGet)
+       (cnv/update-response->map)))
+
 
 
 (defn delete
   [{:keys [client index default-opts] :as proxy} ^ValueObject vo options]
   {:pre [(instance? ValueObject vo) index client (vo/has-id? vo)]}
-  (->> (ces/delete-doc client (merge default-opts
-                                     {:index index
-                                      :id (vo-id->str vo)
-                                      :type (Integer/toHexString (.. vo voManifest ID))}
-                                     options))
-       (finish-change proxy options)))
+  (apply doc/delete client index (vo-hexname vo) (vo-id->str vo)
+         (->> (let [options (merge default-opts options)]
+                (if (:refresh-at-change options) (assoc options :refresh true)
+                 #_else options))
+             (mapcat identity))))
 
 
 ;;; Search.
@@ -457,7 +537,9 @@
     (ElasticSearch-root-ValueSource. (Integer/parseInt (.type hit) 16) (.. empty-vo voManifest) (source-fn hit) (.id hit))))
 
 (defn scroll-seq [es, ^SearchResponse scroll-req keep-alive, from]
-  (let [ ^SearchResponse response (ces/scroll es {:scroll-id (.getScrollId scroll-req) :scroll keep-alive, :format :java})
+  (let [ft (es/search-scroll es (cnv/->search-scroll-request (.getScrollId scroll-req)
+                                                             {:scroll keep-alive}))
+         ^SearchResponse response (.actionGet ft)
           hits     (.. response getHits hits)
           num-hits (.. response getHits totalHits)
           last-hit (+  from (count hits)) ]
@@ -466,20 +548,49 @@
     #_else    hits)))
 
 
-(def search-cljes-opts
-  [:listener :ignore-indices :routing :listener-threaded? :search-type :operation-threading
-   :query-hint :scroll :source])
-
-(def search-extra-source-opts
-  [:query :filter :from :size :types :sort :highlighting :script-fields :preference :facets
-   :named-filters :boost :explain :version :min-score])
+(def search-source-opts
+  ;; Based on all fields generated by `SearchSourceBuilder.toXContent()`
+  ;; https://github.com/elasticsearch/elasticsearch/blob/master/src/main/java/org/elasticsearch/search/builder/SearchSourceBuilder.java
+  [:from :size :timeout :query :post_filter :filter :min_score :version :explain :_source
+   :fields :fielddata_fields :script_fields :sort :track_scores :indices_boost :facets
+   :aggregations :highlight :suggest :rescore :stats])
 
 (def need-hex-map-opts
-  [:query :sort :highlighting :script-fields :facets :named-filters])
+  [:query :sort :highlighting :script_fields :facets :named_filters])
 
+(defn ^SearchRequest ->search-request
+  [index-name mapping-type {:keys [search-type search_type routing preference
+                                   template-source template-name template-params
+                                   source extra-source scroll ;indices-options
+                                   ]}]
+  (let [r (SearchRequest.)]
+    ;; non-source
+    (when index-name
+      (.indices r (cnv/->string-array index-name)))
+    (when mapping-type
+      (.types r (cnv/->string-array mapping-type)))
+    (when-let [s (or search-type search_type)]
+      (.searchType r ^String (name s)))
+    (when routing
+      (.routing r ^String routing))
+    (when preference
+      (.preference r ^String preference))
+    (when template-source
+      (.templateSource r ^bytes template-source))
+    (when template-name
+      (.templateName r ^bytes template-name))
+    (when template-params
+      (.templateParams r ^bytes template-params))
+    (when source
+      (.source r ^bytes source))
+    (when extra-source
+      (.extraSource r ^bytes extra-source))
+    (when scroll
+      (.scroll r ^String scroll))
+    r))
 
-;; ---TODO add "type" filter by default.
-;; ---TODO use id->voCompanion when type filter is removed, to allow searching for multiple types.
+;; ---TODO add ability to search multiple VO types (and remove type filter)
+;; ---TODO use id->voCompanion when type filter is removed
 (defn search
   "options: see clj-elasticsearch.client/search
   example: (vo/search {:filter {:term {:name 'Henk'}}})
@@ -493,7 +604,6 @@
    {:keys [filter only exclude size scroll] :as options}]
   {:pre [(instance? ValueObject vo) (string? index) (not (and size scroll)) client]}
   (let [options (merge default-opts options)
-        typefilter {:type {:value (vo-hexname vo)}}
         filter (map-keywords->hex-fields vo filter)
         filter (if-not filter
                  (when-not (empty? vo)
@@ -501,22 +611,18 @@
                  (if-not (empty? vo)
                    {:and (conj [filter] (vo->search-filter vo))}
                    filter))
-        filter (if filter {:and [typefilter filter]} typefilter)
         fields (when (or only exclude)
                  (map field-hexname (vo/field-filtered-seq vo only exclude)))
         extra-source-opts (->> (map (fn [[k v]] (tuple k (map-keywords->hex-fields vo v)))
                                     (select-keys options need-hex-map-opts))
                                (into {:fields fields :filter filter})
-                               (merge (select-keys options search-extra-source-opts))
+                               (merge (select-keys options search-source-opts))
                                (clojure.core/filter val)
                                (into {}))
-        es-options (assoc (into {} (clojure.core/filter val (select-keys options search-cljes-opts)))
-                     :format (clojure.core/get options :format :java)
-                     :indices (clojure.core/get options :indices [index])
-                     :extra-source (generate-hexed-fields-smile extra-source-opts))
+        es-options (assoc options :source (generate-hexed-fields-smile extra-source-opts))
         ;; _ (clojure.pprint/pprint (assoc es-options :extra-source extra-source-opts))
-        ^SearchResponse
-        response (ces/search client es-options)]
+        ft (es/search client (->search-request index (vo-hexname vo) es-options))
+        ^SearchResponse response (.actionGet ft)]
       (with-meta
         (map (partial SearchHit->ValueObject
                       (if fields SearchHit->fields SearchHit->source)
@@ -533,16 +639,18 @@
   [{:keys [client index default-opts] :as proxy} ^ValueObject vo path path-vars options script params]
   {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index client (string? script)]}
   (let [path (hexify-path vo (pathops/fill-path path path-vars))
-        type (Integer/toHexString (.. vo voManifest ID))]
-    (->> (ces/update-doc client {:index index
-                                 :type type
-                                 :id (vo-id->str vo)
-                                 :source (generate-hexed-fields-smile
-                                          {:script script
-                                           :lang "clj"
-                                           :params (assoc params :path path)})})
-         (finish-change proxy options))))
-
+        req (doto (cnv/->update-request index
+                                        (vo-hexname vo)
+                                        (vo-id->str vo)
+                                        script
+                                        nil) ; params are set using smile source below
+              (.refresh (or (:refresh-at-change options (:refresh-at-change default-opts))
+                            (:refresh options (:refresh default-opts))
+                            false))
+              (.source ^bytes (generate-hexed-fields-smile {"lang"   "clj"
+                                                            "params" (assoc params :path path)})))
+        res (es/update client req)]
+      (cnv/update-response->map (.actionGet res))))
 
 (defn append-to
   [proxy vo path path-vars value options]
@@ -578,6 +686,3 @@
 
   ([vo child-query]
     {"has_child" {"type" (vo-hexname vo), "query" child-query}}))
-
-(defn convert [res]
-  (ces/convert (:response (meta res)) :clj))

@@ -364,8 +364,10 @@
            terms)))))
 
 (defn vo->search-filter [vo]
-  (let [term-filter (vo->term-filter (vo/without-id vo))]
-    (if (prime.vo/has-id? vo) (conj (or term-filter {}) {"ids" {"values" [(:id vo)]}})
+  (let [term-filter (vo->term-filter (vo/without-id vo))
+        ids-filter  (when (prime.vo/has-id? vo) {"ids" {"values" [(:id vo)]}})]
+    (if ids-filter
+      (if-not term-filter ids-filter #_else {:and [term-filter ids-filter]})
     #_else term-filter)))
 
 

@@ -7,6 +7,7 @@
   protocols. The namespace also includes helper functions for easy
   creation of implementations of these protocols."
   (:require [fast-zip.core :as zip]
+            [taoensso.timbre :as log]
             [prime.vo :refer (id-field vo-zipper)]
             [prime.vo.definition :refer (companion-object-symbol)]
             [prime.utils :refer (guard-let index-of forcat)]))
@@ -190,7 +191,10 @@
   "Returns a call to VOProxy function `name` using the supplied proxy
   and argumentlist."
   [name arglist proxy]
-  `(~(symbol "prime.vo.proxy" (str name)) ~proxy ~@(rest arglist)))
+  `(if ~proxy
+    (~(symbol "prime.vo.proxy" (str name)) ~proxy ~@(rest arglist))
+   ;else, proxy is nil
+    (log/warn ~(str proxy) (str "is nil [!]  Ignoring: (" ~(str name) " " ~(str proxy)) ~@(rest arglist) ")")))
 
 
 (defn- vo-proxy-delegator-proxy-forms

@@ -253,7 +253,6 @@ import prime.types.ValueTypes._;
 		var onlyIntegers              = true;
 		var hasDoubles                = false;
 		var hasIntegers               = false;
-		var lastField                 = null;
 		var idType                    = null;
 		var idFromSuperclassOrTrait   = false;
 		var idField : Property        = null;
@@ -294,7 +293,6 @@ import prime.types.ValueTypes._;
 		// Do the Meta inferring
 		for (p in fields)
 		{
-			lastField = p;
 			longestFieldNameLength = IntMath.max(p.name.quote().length, longestFieldNameLength);
 			if (!p.type.isSingleValue()) longestSubFieldNameLength = IntMath.max(p.name.quote().length, longestSubFieldNameLength);
 
@@ -393,7 +391,7 @@ trait "); a(def.name); a(" extends ");
 
 			a("\n) extends ValueObject_");
 			if (fields.length <= 1) a(fields.length + "");
-			else switch (lastField.index + 1) {
+			else switch (def.maxPropertyIndexNonTransient + 1) {
 				case 2,3,4:                   a( "4(voIndexSet, srcDiff)");
 				case 5,6,7,8:                 a( "8(voIndexSet.toByte,  srcDiff.toByte)");
 				case 9,10,11,12,13,14,15,16:  a("16(voIndexSet.toShort, srcDiff.toShort)");

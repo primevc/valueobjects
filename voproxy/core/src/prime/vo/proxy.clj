@@ -166,6 +166,16 @@
       (zip/node (vo-keep-vo vz keep-map)))))
 
 
+(defn path-keep
+  "Returns true if a path operation should be applied
+   according to the given `vo path` and `vo-keep map`.
+
+   This fn assumes the path and keep map use keywords to specify the VO fields."
+  [vo-keep-map path]
+  (not (nil? (reduce (fn [keep-map item] (if (keyword? item) (item keep-map) #_else keep-map))
+                     vo-keep-map path))))
+
+
 (defprotocol VOTransformer
   "In mathematics, a transformation could be any function mapping a set X to another set or itself.
    The term “transformation” refers to a function from X to itself that preserves this structure.
@@ -187,7 +197,7 @@
 
 ;;; Delegator proxies.
 
-(defn- mk-proxy-call
+(defn- mk-proxy-function-call
   "Returns a call to VOProxy function `name` using the supplied proxy
   and argumentlist."
   [name arglist proxy]
@@ -195,6 +205,18 @@
     (~(symbol "prime.vo.proxy" (str name)) ~proxy ~@(rest arglist))
    ;else, proxy is nil
     (log/warn ~(str proxy) (str "is nil [!]  Ignoring: (" ~(str name) " " ~(str proxy)) ~@(rest arglist) ")")))
+
+(defn- mk-proxy-call
+  "Returns a call to VOProxy function `name` wrapped in `path-keep` check if keep-map is provided."
+  [name arglist keep-map proxy]
+
+  (let [proxy-call (mk-proxy-function-call name arglist proxy)]
+    (cond
+      (and keep-map (some #(= 'path %) arglist))
+      `(when (path-keep ~keep-map ~'path) ~proxy-call)
+
+      :else
+      proxy-call)))
 
 
 (defn- vo-proxy-delegator-proxy-forms
@@ -206,8 +228,8 @@
   `proxies` are called, `proxy-result-sym` is bound to the result of
   the call to the `result-proxy`, and `meta-result-sym` is bound to
   the result of the call to the `meta-proxy`."
-  [name arglist proxies result-proxy proxy-result-sym meta-proxy meta-result-sym]
-  (let [proxy-calls (into {} (map (juxt identity (partial mk-proxy-call name arglist)) proxies))]
+  [name arglist proxies result-proxy proxy-result-sym meta-proxy meta-result-sym keep-map]
+  (let [proxy-calls (into {} (map (juxt identity (partial mk-proxy-call name arglist keep-map)) proxies))]
     (if (= 'get-vo name)
       [proxy-result-sym `(or ~@(vals proxy-calls))]
       (forcat [proxy proxies]
@@ -246,7 +268,8 @@
                                                                        result-proxy
                                                                        proxy-result-sym
                                                                        meta-proxy
-                                                                       meta-result-sym)]
+                                                                       meta-result-sym
+                                                                       keep-map)]
                        (assert (not (empty? proxies))
                                (str "need to specify at least one value in :proxies for " type))
                        (assert result-proxy

@@ -8,6 +8,7 @@ package prime.types;
  import java.text.{ParseException, DecimalFormatSymbols, DecimalFormat}
  import java.util.{Locale, Collection}
  import java.lang.Integer
+ import java.net.URLEncoder
  import scala.util.matching.Regex
  import scala.collection.JavaConversions
 
@@ -287,8 +288,12 @@ object Conversion
 
   //  -------
 
+  val illegalURIChars = "[^ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789\\-\\._~:/?#\\[\\]@!$&'()*+,;=%]".r
+
   def URI       (value:URI)          : URI = value;
-  def URI       (value:String)       : URI = new URI(value.replace(" ", "%20"));
+  def URI       (value:String)       : URI = new URI(
+    illegalURIChars.replaceAllIn(value, x => if (x.matched == " ") "%20" else URLEncoder.encode(x.matched, "UTF-8"))
+  );
   def URI       (value:RawType)      : URI = URI(value.asString);
   def URI       (value:java.net.URL) : URI = value.toURI;
   def URI       (value:ObjectId)     : URI = URI(String(value));

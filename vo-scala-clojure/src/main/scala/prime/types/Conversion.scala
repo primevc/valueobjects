@@ -289,10 +289,13 @@ object Conversion
   //  -------
 
   val illegalURIChars = "[^ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789\\-\\._~:/?#\\[\\]@!$&'()*+,;=%]".r
+  val illegalPercents = "(?i)%(?![0-9A-F]{2}|[0-9A-F]{4}|[0-9A-F]{6})".r
 
   def URI       (value:URI)          : URI = value;
   def URI       (value:String)       : URI = new URI(
-    illegalURIChars.replaceAllIn(value, x => if (x.matched == " ") "%20" else URLEncoder.encode(x.matched, "UTF-8"))
+    illegalURIChars.replaceAllIn(
+      illegalPercents.replaceAllIn(value, x => "%25"),
+      x => if (x.matched == " ") "%20" else URLEncoder.encode(x.matched, "UTF-8"))
   );
   def URI       (value:RawType)      : URI = URI(value.asString);
   def URI       (value:java.net.URL) : URI = value.toURI;

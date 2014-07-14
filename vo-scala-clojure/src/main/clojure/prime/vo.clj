@@ -109,6 +109,9 @@
   (or (instance? package$ValueTypes$Tarray field)
       (and (instance? ValueObjectField field) (array-field? (.valueType ^ValueObjectField field)))))
 
+(defn to-field-type [^ValueObjectField field value]
+  (.. field valueType (convert value)))
+
 (defn ^ValueObject type-default-vo [^package$ValueType field-type]
   (condp instance? field-type
     ValueObjectField          (type-default-vo (.valueType ^ValueObjectField field-type))
@@ -147,7 +150,8 @@
                           (map?  next-step)
                             (let [[k v] (first next-step)]
                               (assert (= 1 (count next-step)) (print-str "Search in array path " field " only supported for 1 key. Instead: " next-step))
-                              { (field-transform (field-or-subtype-field inner-vo k)) v })
+                              (let [field (field-or-subtype-field inner-vo k)]
+                                { (field-transform field) (condp = v, * *, nil nil, (to-field-type field v)) }))
                           :else
                             next-step)
                         (if path (fields-path-seq inner-vo path field-transform) #_else nil))

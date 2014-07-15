@@ -11,6 +11,7 @@
             [containium.systems.config :as config]
             [containium.systems.cassandra :as cassandra]
             [containium.systems.cassandra.embedded12 :as embedded]
+            [containium.systems.logging :as logging]
             [taoensso.timbre :as log]
             [prime.types.repository-util :as repo-util]
             [prime.types.cassandra-repository-util])
@@ -31,6 +32,7 @@
     (log/set-level! :info)
     (try
       (with-systems systems [:config (config/map-config {:cassandra {:config-file "cassandra.yaml"}})
+                             :logging logging/logger
                              :cassandra embedded/embedded12]
         (deliver cassandra (:cassandra systems))
         (try (cassandra/write-schema @cassandra "DROP KEYSPACE fs;") (catch Exception ex))

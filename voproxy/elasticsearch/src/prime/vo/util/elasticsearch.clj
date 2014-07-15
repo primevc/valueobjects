@@ -531,12 +531,9 @@
 
 ;;; Search.
 
-(defn SearchHit->fields [^SearchHit sh] (.fields sh)     )
-(defn SearchHit->source [^SearchHit sh] (.sourceAsMap sh))
-
-(defn SearchHit->ValueObject [source-fn, ^ValueObject empty-vo, ^SearchHit hit]
+(defn SearchHit->ValueObject [^ValueObject empty-vo, ^SearchHit hit]
   (.apply (. empty-vo voCompanion)
-    (ElasticSearch-root-ValueSource. (Integer/parseInt (.type hit) 16) (.. empty-vo voManifest) (source-fn hit) (.id hit))))
+    (ElasticSearch-root-ValueSource. (Integer/parseInt (.type hit) 16) (.. empty-vo voManifest) (.sourceAsMap hit) (.id hit))))
 
 (defn scroll-seq [es, ^SearchResponse scroll-req keep-alive, from]
   (let [ft (es/search-scroll es (cnv/->search-scroll-request (.getScrollId scroll-req)
@@ -614,10 +611,10 @@
                    {:and (conj [filter] (vo->search-filter vo))}
                    filter))
         fields (when (or only exclude)
-                 (map field-hexname (vo/field-filtered-seq vo only exclude)))
+                 (map #(str (field-hexname %) "*") (vo/field-filtered-seq vo only exclude)))
         extra-source-opts (->> (map (fn [[k v]] (tuple k (map-keywords->hex-fields vo v)))
                                     (select-keys options need-hex-map-opts))
-                               (into {:fields fields :filter filter})
+                               (into {"_source" fields "filter" filter})
                                (merge (select-keys options search-source-opts))
                                (clojure.core/filter val)
                                (into {}))
@@ -626,9 +623,7 @@
         ft (es/search client (->search-request index (vo-hexname vo) es-options))
         ^SearchResponse response (.actionGet ft)]
       (with-meta
-        (map (partial SearchHit->ValueObject
-                      (if fields SearchHit->fields SearchHit->source)
-                      vo)
+        (map #(SearchHit->ValueObject vo %)
              (if-not scroll
                (.. response getHits hits)
                (scroll-seq client response scroll 0)))

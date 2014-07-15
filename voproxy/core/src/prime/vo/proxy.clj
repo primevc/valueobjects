@@ -172,7 +172,7 @@
 
    This fn assumes the path and keep map use keywords to specify the VO fields."
   [vo-keep-map path]
-  (not (nil? (reduce (fn [keep-map item] (if (keyword? item) (item keep-map) #_else keep-map))
+  (not (nil? (reduce (fn [keep-map item] (if (and (map? keep-map) (keyword? item)) (item keep-map) #_else keep-map))
                      vo-keep-map path))))
 
 

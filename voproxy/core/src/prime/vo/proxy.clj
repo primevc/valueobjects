@@ -282,8 +282,10 @@
                                (str ":with-meta cannot be the same as :return-result-of for " type))
                        `[(instance? ~type ~'vo)
                          (let [~'vo
-                               ~(if-not (and keep-map (not= name 'get-vo)) 'vo
-                                 #_else (vo-keep-form keep-map type 'vo))]
+                               ~(if (and keep-map (or (= name 'update) (= name 'put-vo)))
+                                  (vo-keep-form keep-map type 'vo)
+                                 ;else
+                                  'vo)]
                            (let ~(vec (concat [(if pre-form 'vo #_else '_) pre-form]
                                               proxy-forms
                                               (if (= name 'get-vo)

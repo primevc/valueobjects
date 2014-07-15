@@ -215,9 +215,9 @@ trait ClojureMapSupport extends IPersistentMap
   // ---
   // IPersistentMap
   // ---
-  def without     (key: Any): this.type = voManifest.findOrNull(key) match {
+  def without     (key: Any): this.type = findFieldOrNull(key) match {
     case null => this
-    case idx  => without(idx);
+    case f    => assoc(f, null);
   }
 
   // IPersistentMap interfaces

@@ -10,7 +10,7 @@
                  [containium "0.1.0-SNAPSHOT"] ;---TODO: Use containium-cassandra when available.
                  [cc.qbits/alia "1.9.2"] ;---TODO: Remove when containium-cassandra-alia available.
                  [org.xerial.snappy/snappy-java "1.1.0-M4"]
-                 [com.taoensso/timbre "2.6.2"]
+                 [com.taoensso/timbre "3.2.1"]
                  [commons-codec "1.8"]]
   :global-vars {*warn-on-reflection* true}
   :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"

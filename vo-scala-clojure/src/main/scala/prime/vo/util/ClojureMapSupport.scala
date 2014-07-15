@@ -215,7 +215,10 @@ trait ClojureMapSupport extends IPersistentMap
   // ---
   // IPersistentMap
   // ---
-  def without     (key: Any): this.type = without(voManifest.index_!(key));
+  def without     (key: Any): this.type = voManifest.findOrNull(key) match {
+    case null => this
+    case idx  => without(idx);
+  }
 
   // IPersistentMap interfaces
   // ILookup

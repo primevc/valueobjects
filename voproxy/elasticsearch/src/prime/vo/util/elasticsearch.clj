@@ -614,7 +614,7 @@
                  (map #(str (field-hexname %) "*") (vo/field-filtered-seq vo only exclude)))
         extra-source-opts (->> (map (fn [[k v]] (tuple k (map-keywords->hex-fields vo v)))
                                     (select-keys options need-hex-map-opts))
-                               (into {"_source" fields "filter" filter})
+                               (into {:_source fields :filter filter})
                                (merge (select-keys options search-source-opts))
                                (clojure.core/filter val)
                                (into {}))

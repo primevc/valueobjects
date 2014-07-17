@@ -36,10 +36,20 @@
   (and val (or (sequential? val) (.. (class val) isArray) (instance? java.util.List val))))
 
 
+(defn- find-index [vec obj]
+  {:pre [(vector? vec)]}
+  (-> (if (map? obj)
+        (let [[k v] (first obj)] (fn [i item] (when (to= (get item k) v) i)))
+       ;else
+        (fn [i item] (when (to= item obj) i)))
+      (keep-indexed vec)
+      (first)))
+
+
 (defn concrete-path-step [obj path-step]
   (if (and (array-like? obj) (not (number? path-step)))
     (let [[k v] (first path-step)
-          result (first (keep-indexed (fn [i item] (when (to= (get item k) v) i)) obj))]
+          result (find-index obj path-step)]
       (if-not result
         (throw (IllegalArgumentException. (str "Could not find a match for '" path-step "'.")))
         result))
@@ -198,11 +208,6 @@
 
 
 ;;; Concrete opertion, remove from.
-
-(defn- find-index [vec obj]
-  {:pre [(vector? vec)]}
-  (first (keep-indexed (fn [i item] (when (to= item obj) i)) vec)))
-
 
 (defn- remove-at [map-or-vec key]
   (if (vector? map-or-vec)

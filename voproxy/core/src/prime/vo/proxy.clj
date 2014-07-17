@@ -239,14 +239,13 @@
            '_)
          (proxy-calls proxy)]))))
 
-(defn- vo-keep-form [keep-map, type, target]
-(let [keep-map ; Make sure the ID field is kept.
-      (assoc (eval (clojure.walk/postwalk-replace {* true '* true} keep-map))
-             (-> (companion-object-symbol (eval type))
-                 ^prime.vo.ValueObjectCompanion (eval)
-                 (.manifest) (id-field) (.keyword))
-             true)]
-  `(if-let [vo# ~target] (vo-keep vo# ~keep-map))))
+(defn- prepare-vo-keep-map [keep-map, type]
+  ; Make sure the ID field is kept. (assoc it)
+  (assoc (eval (clojure.walk/postwalk-replace {* true '* true} keep-map))
+         (-> (companion-object-symbol (eval type))
+             ^prime.vo.ValueObjectCompanion (eval)
+             (.manifest) (id-field) (.keyword))
+         true))
 
 (defn- vo-proxy-delegator-fn
   "Given a VOProxy function `name`, its arguments list, and a sequence
@@ -281,15 +280,18 @@
                        (assert (not= meta-proxy result-proxy)
                                (str ":with-meta cannot be the same as :return-result-of for " type))
                        `[(instance? ~type ~'vo)
-                         (let [~'vo
-                               ~(if (and keep-map (or (= name 'update) (= name 'put-vo)))
-                                  (vo-keep-form keep-map type 'vo)
-                                 ;else
-                                  'vo)]
+                         (let ~(cond
+                                (and keep-map (or (= name 'update) (= name 'put-vo)))
+                                ['vo `(if ~'vo (vo-keep ~'vo ~keep-map))]
+
+                                (and keep-map (some #(= 'value %) arglist))
+                                ['value `(if ~'value (vo-keep ~'value (get-in ~keep-map (filter keyword? ~'path))))]
+                                  
+                                :else [])
                            (let ~(vec (concat [(if pre-form 'vo #_else '_) pre-form]
                                               proxy-forms
                                               (if (= name 'get-vo)
-                                                ['vo  (if keep-map (vo-keep-form keep-map type post-form)
+                                                ['vo  (if keep-map `(vo-keep ~post-form ~keep-map)
                                                        #_else post-form)]
                                                #_else ['_ post-form])))
                              ~(if (and meta-proxy (not= name 'get-vo))
@@ -347,14 +349,17 @@
   that result is used and the other proxies are not executed. The
   :with-meta option has no effect on `get-vo` calls either."
   [delegations]
-  (let [vo-opts-pairs (partition 2 delegations)]
+  (let [vo-opts-pairs (map (fn [[type {:keys [keep] :as opts} :as pair]]
+                            (if keep [type (assoc opts :keep (prepare-vo-keep-map keep type))]
+                             #_else  pair))
+                           (partition 2 delegations))]
     `(reify
       VOTransformer
       (transform [this ~'vo]
         (cond
           ~@(forcat [[type opts] vo-opts-pairs :when (:keep opts)]
               `[(instance? ~type ~'vo)
-                ~(vo-keep-form (:keep opts) type 'vo)])
+                (vo-keep 'vo ~(:keep opts))])
           :else ~'vo))
       VOProxy
        ~@(for [{:keys [name arglists]} (vals (:sigs VOProxy))

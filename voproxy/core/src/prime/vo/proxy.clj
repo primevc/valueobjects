@@ -366,7 +366,7 @@
         (cond
           ~@(forcat [[type opts] vo-opts-pairs :when (:keep opts)]
               `[(instance? ~type ~'vo)
-                (vo-keep 'vo ~(:keep opts))])
+                (vo-keep ~'vo ~(:keep opts))])
           :else ~'vo))
       VOProxy
        ~@(for [{:keys [name arglists]} (vals (:sigs VOProxy))

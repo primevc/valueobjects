@@ -165,6 +165,14 @@
       ;; went correct.
       (zip/node (vo-keep-vo vz keep-map)))))
 
+(defn inner-keep-map
+  "Returns the inner keep map or last truthy value (like *) for the given `vo path`
+  into a `vo-keep map`.
+
+   This fn assumes the path and keep map use keywords to specify the VO fields."
+  [vo-keep-map path]
+  (reduce (fn [keep-map item] (if (and (map? keep-map) (keyword? item)) (item keep-map) #_else keep-map))
+          vo-keep-map path))
 
 (defn path-keep
   "Returns true if a path operation should be applied
@@ -172,8 +180,7 @@
 
    This fn assumes the path and keep map use keywords to specify the VO fields."
   [vo-keep-map path]
-  (not (nil? (reduce (fn [keep-map item] (if (and (map? keep-map) (keyword? item)) (item keep-map) #_else keep-map))
-                     vo-keep-map path))))
+  (not (nil? (inner-keep-map vo-keep-map path))))
 
 
 (defprotocol VOTransformer
@@ -285,7 +292,7 @@
                                 ['vo `(if ~'vo (vo-keep ~'vo ~keep-map))]
 
                                 (and keep-map (some #(= 'value %) arglist))
-                                ['value `(if ~'value (vo-keep ~'value (get-in ~keep-map (filter keyword? ~'path))))]
+                                ['value `(if ~'value (vo-keep ~'value (inner-keep-map ~keep-map (filter keyword? ~'path))))]
                                   
                                 :else [])
                            (let ~(vec (concat [(if pre-form 'vo #_else '_) pre-form]

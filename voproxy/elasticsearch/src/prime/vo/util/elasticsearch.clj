@@ -151,10 +151,6 @@
   - :only    exclusive #{set} of fields to include in mapping
   - :exclude #{set} of fields not to include in mapping
   - any ElasticSearch option.
-
-  Known issues / TODO:
-   - ValueObjects fields need to have their subtypes mappings merged in,
-      or ElasticSearch will complain about strict mapping when storing a vo that has subtype specific fields.
   "
   ([^ValueObject vo] (vo-mapping vo {}))
 
@@ -163,7 +159,7 @@
          field-set (vo/field-filtered-seq vo (:only option-map) (:exclude option-map))]
     (let [unknown-options
           (set/difference
-            (set (keys option-map))
+            (->> option-map keys (filter keyword?) set)
             (set (map vo/keyword field-set))
             #{ :exclude :only } )]
       (assert (empty? unknown-options) (print-str "\n\tMapping non-existant field(s):" unknown-options "\n\t " vo)))

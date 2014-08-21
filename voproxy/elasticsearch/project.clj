@@ -9,7 +9,7 @@
                  [prime/voproxy-core "0.1.0-SNAPSHOT"]
                  [prime/voserializer-cheshire "0.1.0-SNAPSHOT"]
                  [org.elasticsearch/elasticsearch "1.2.1"]
-                 [clojurewerkz/elastisch "2.0.0"]
+                 [clojurewerkz/elastisch "2.1.0-beta4"]
                  [clj-tuple "0.1.5"]]
   :profiles {:test {:dependencies [[containium "0.1.0-SNAPSHOT"]
                                    [org.clojars.touch/elasticsearch-lang-clojure "0.2.0-SNAPSHOT"]]}

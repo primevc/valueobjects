@@ -551,7 +551,7 @@
    :aggregations :highlight :suggest :rescore :stats])
 
 (def need-hex-map-opts
-  [:query :sort :highlighting :script_fields :facets :named_filters])
+  [:query :sort :highlight :script_fields :facets :named_filters :aggregations])
 
 (defn ^SearchRequest ->search-request
   [index-name mapping-type {:keys [search-type search_type routing preference
@@ -624,7 +624,6 @@
                (.. response getHits hits)
                (scroll-seq client response scroll 0)))
         {:request es-options, :response response})))
-
 
 ;;; Delta change functions.
 

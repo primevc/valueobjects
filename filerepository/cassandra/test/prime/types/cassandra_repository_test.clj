@@ -10,7 +10,7 @@
   (:require [containium.systems :refer (with-systems)]
             [containium.systems.config :as config]
             [containium.systems.cassandra :as cassandra]
-            [containium.systems.cassandra.embedded12 :as embedded]
+            [containium.systems.cassandra.embedded :as embedded]
             [containium.systems.logging :as logging]
             [taoensso.timbre :as log]
             [prime.types.repository-util :as repo-util]
@@ -31,9 +31,10 @@
   (let [log-level-before (:current-level @log/config)]
     (log/set-level! :info)
     (try
-      (with-systems systems [:config (config/map-config {:cassandra {:config-file "cassandra.yaml"}})
-                             :logging logging/logger
-                             :cassandra embedded/embedded12]
+      (with-systems systems
+        [:config (config/map-config {:cassandra {:config-file "cassandra-test.yaml"}})
+         :logging logging/logger
+         :cassandra embedded/embedded]
         (deliver cassandra (:cassandra systems))
         (try (cassandra/write-schema @cassandra "DROP KEYSPACE fs;") (catch Exception ex))
         (f))

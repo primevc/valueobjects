@@ -10,7 +10,7 @@
             [prime.types.repository-util :refer (mk-repository)]
             [containium.systems :as system]
             [containium.systems.config :as config]
-            [containium.systems.cassandra.alia1 :as alia]
+            [containium.systems.cassandra.alia :as alia]
             [containium.systems.logging :as logging]))
 
 
@@ -21,5 +21,5 @@
         config (config/map-config {:alia {:contact-points [host]
                                           :port (Integer/parseInt port)}})
         logging (system/start logging/logger {:config config})
-        alia (system/start (alia/alia1 :alia) {:config config :logging logging})]
+        alia (system/start (alia/alia :alia) {:config config :logging logging})]
     (repo/cassandra-repository alia :one repository-name)))

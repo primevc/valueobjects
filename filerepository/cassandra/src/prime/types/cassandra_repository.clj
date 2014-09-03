@@ -208,7 +208,7 @@
         statement-fn (. ^Statements (. state statements) stream)
         hash (ref-hash ref)
         result (statement-fn hash)]
-    (:data (first result))))
+    (when-let [data (:data (first result))] (.slice data))))
 
 
 (defn repo-stream
@@ -245,7 +245,7 @@
       (do (log/info "File not available in temporary directory; creating it now.")
           (let [statement-fn (. ^Statements (. state statements) stream)
                 result (statement-fn hash)
-                 ^ByteBuffer data (:data (first result))
+                ^ByteBuffer data (when-let [data (:data (first result))] (.slice data))
                 channel (FileChannel/open (.toPath tmp) (into-array [StandardOpenOption/CREATE_NEW
                                                                      StandardOpenOption/WRITE]))]
             (.write channel data)

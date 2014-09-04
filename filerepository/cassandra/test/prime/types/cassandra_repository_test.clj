@@ -58,7 +58,7 @@
 (deftest absorb-test
   (testing "absorbing a file"
 
-    (let [repo (cassandra-repository @cassandra :one "not-used-atm")
+    (let [repo (cassandra-repository @cassandra :one "not-used-atm" :ttl-fn (constantly nil))
           file (File/createTempFile "cassandra" ".test")]
       (FileUtils/writeStringToFile file "cassandra test")
 
@@ -75,6 +75,25 @@
 
         (.delete repo ref)
         (is (not (exists? repo ref)) "it can delete the file")))))
+
+(deftest timeout-test
+  (testing "absorbing a file"
+
+    (let [repo (cassandra-repository @cassandra :one "not-used-atm" :ttl-fn (constantly 5))
+          file (File/createTempFile "cassandra" ".test")]
+      (FileUtils/writeStringToFile file "cassandra test")
+
+      (let [ref (absorb repo file)]
+        (is ref "absorbing succeeds")
+
+        (is (= (.prefixedString ref) "cassandra://2-Ll2ZG1O9D2DuVM4-8y_Oo8UMjn66zGw8OdMwUEngY")
+            "it returns the correct reference")
+
+        (is (exists? repo ref) "it contains the file")
+
+        (Thread/sleep 5000)
+
+        (is (not (exists? repo ref)) "it garbage collected the file")))))
 
 
 (deftest store-test

@@ -64,7 +64,7 @@
                 (fn [hash buffer]
                   (let [ttl-secs (calculate-ttl)
                         prepared (if-not ttl-secs prepared      #_else prepared-ttl)
-                        values   (if-not ttl-secs [hash buffer] #_else [hash buffer ttl-secs])]
+                        values   (if-not ttl-secs [hash buffer] #_else [hash buffer (int ttl-secs)])]
                     (cassandra/do-prepared system prepared options values))))))]
     (Statements.
       (mk-cassandra-fn "INSERT INTO files (hash, data) VALUES (?, ?)" ttl-fn)

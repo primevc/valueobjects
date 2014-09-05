@@ -70,7 +70,7 @@ trait ClojureMapSupport extends IPersistentMap
 
   private[this] var _hash : Int = -1;
   override def hashCode = if(_hash != -1) _hash else {
-    _hash = this.getClass.hashCode ^ clojure.lang.APersistentMap.mapHash(this);
+    _hash = voManifest.ID ^ clojure.lang.APersistentMap.mapHash(this);
     _hash
   }
 

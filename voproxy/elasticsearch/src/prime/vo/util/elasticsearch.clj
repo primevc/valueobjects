@@ -447,7 +447,7 @@
                        options)
         req (es/index client (->index-request index
                                               (vo-hexname vo)
-                                              (vo/without-id vo)
+                                              vo
                                               (merge default-opts options)))
         resp (cnv/index-response->map (.actionGet req))]))
 

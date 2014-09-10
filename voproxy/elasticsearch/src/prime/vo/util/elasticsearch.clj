@@ -197,6 +197,11 @@
 
 (defn map-keywords->hex-fields [^prime.vo.ValueObject vo, expr]
   (cond
+    (instance? clojure.lang.MapEntry expr)
+      (let [[k v] expr
+             k    (if-not (keyword? k) k #_else (keyword->hex-field vo k))]
+        (or (term-kv-pair v k nil) ; Returns nil (3rd arg) if there's no special handling for v
+            (tuple k (map-keywords->hex-fields vo v))))
     (instance? ValueObject expr)
       expr
     (keyword? expr)

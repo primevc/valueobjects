@@ -488,11 +488,11 @@ trait "); a(def.name); a(" extends ");
 				{
 					a("name match {\n");
 					for (p in fields) if (predicate(p)) {
-						a('    case "'); a(p.name); a('" => this.'); a(p.name.quote()); a(";\n");
+						a('    case "'); a(p.name); a('" => if ((this.initIndexSet & '); a(propFlag(p)); a(") != 0) this."); a(p.name.quote()); a(" else notFound;\n");
 					}
 					a("    case _ => try voManifest.index(idx) match {\n");
 					for (p in fields) if (predicate(p)) {
-						a("      case " + p.bitIndex()); a(" => this."); a(p.name.quote()); a(";\n");
+						a("      case " + p.bitIndex()); a(" => if ((this.initIndexSet & "); a(propFlag(p)); a(") != 0) this."); a(p.name.quote()); a(" else notFound;\n");
 					}
 					a("    } catch { case _ => if (this.contains(name,idx)) "); a(converter); a("(anyAt(name,idx)) else notFound; }\n  }\n");
 				}

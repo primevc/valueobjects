@@ -1356,7 +1356,7 @@ class Haxe implements CodeGenerator
 			var hasDefaultCase = false;
 			a("\tstatic public function from"); a(conv.name.substr(2)); a("(str:String) : "); a(def.fullName); a("\n\t{\n\t\t");
 			a("return switch (str) {");
-			for (e in conv.enums) if (e != def.catchAll)
+			for (e in conv.enumsByValue) if (e != def.catchAll)
 			{
 				a('\n\t\t  case "'); a(e.conversions.get(conv.name)); a('": '); a(def.fullName); a("."); a(e.name); a(";");
 			} else {

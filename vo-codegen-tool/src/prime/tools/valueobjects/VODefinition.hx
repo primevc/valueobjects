@@ -1189,6 +1189,7 @@ typedef EnumConversionTuple = {
 class EnumConversionProperty extends Property
 {
 	public var enums		(default,null)	: List<Enumeration>;
+	public var enumsByValue (default,null)	: Map<String,Enumeration>;
 	public var definition	(default,null)	: EnumDef;
 	
 	public function new(name:String, parent)
@@ -1196,6 +1197,7 @@ class EnumConversionProperty extends Property
 		this.definition = parent;
 		super(name, parent);
 		this.enums = new List();
+		this.enumsByValue = new Map();
 		this.type = TenumConverter(this);
 	}
 }
@@ -1290,8 +1292,14 @@ class EnumDef implements TypeDefinitionWithProperties
 				c.index = ++conversionNum;
 			}
 			
-			if (!Lambda.has(c.enums, e))
+			if (!Lambda.has(c.enums, e)){
 				c.enums.add(e);
+			}
+
+			var enumValue = e.conversions.get(k);
+			var enumConversion = c.enumsByValue.get(enumValue);
+			if (enumConversion == null || e.intValue < enumConversion.intValue)
+				c.enumsByValue.set(enumValue, e);
 		}
 	}
 	

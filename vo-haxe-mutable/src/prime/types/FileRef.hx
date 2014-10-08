@@ -37,18 +37,31 @@ package prime.types;
  */
 class FileRef extends prime.types.URI
 {
+	static var cassandra = URIScheme.Scheme("cassandra");
+
 	/**
 	 * prefix that will be added before every URI.toString
-	 * By not adding the prefix to the URI itself we can make sure the data
-	 * isn't saved with a prefix
+	 * Will always end with a slash '/' character.
 	 */
-	public static var prefix (default, set_prefix) : String;
+	public static var prefix (default, set_prefix) : String = "/";
 
 	public function toURIString(cdnPostfix : String)
 	{
-		return (hasScheme(URIScheme.Scheme("cassandra"))
-				? (prefix != null? prefix : "") + (host != null? host : "") + cdnPostfix
-				: (scheme == null && prefix != null ? prefix + super.toString() : super.toString()) + (path.indexOf(".") == -1? cdnPostfix : ""));
+		if (hasScheme(cassandra))
+			return prefix + host + cdnPostfix;
+		else
+		{
+			var uri = super.toString();
+			var firstSlash  = uri != ""      && uri.charCodeAt(0) == '/'.code;
+			var secondSlash = uri.length > 1 && uri.charCodeAt(1) == '/'.code;
+
+			if (firstSlash)
+				uri = (!secondSlash)? prefix + uri.substr(1) : uri;
+			else
+				uri = scheme == null? prefix + uri : uri;
+
+			return uri + (path.indexOf(".") == -1? cdnPostfix : "");
+		}
 	}
 
 	public function toURI(?cdnPostfix : String) return new URI(toURIString(if (cdnPostfix == null) "" else cdnPostfix.toLowerCase()));
@@ -57,6 +70,7 @@ class FileRef extends prime.types.URI
 	
 	private static inline function set_prefix (v:String)
 	{
-		return prefix = (v != null && v != "" && v.charAt(v.length - 1) != "/") ? v + "/" : v;
+		Assert.that(v != null);
+		return prefix = v == "" || v.charCodeAt(v.length - 1) != '/'.code ? v + "/" : v;
 	}
 }

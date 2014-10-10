@@ -240,7 +240,7 @@
   (log/info "File requested for FileRef" ref)
   (let [^State state (.state ^prime.types.CassandraRepository this)
         hash (ref-hash ref)
-        tmp (File. ^String (.tmp-dir state) (str "cfr-" hash))]
+        tmp (File. ^String (.tmp-dir state) (str "cfr-" (Base64/encodeBase64URLSafeString hash)))]
     (if-not (.exists tmp)
       (do (log/info "File not available in temporary directory; creating it now.")
           (let [statement-fn (. ^Statements (. state statements) stream)

@@ -227,7 +227,7 @@ trait ClojureMapSupport extends IPersistentMap
     case f    => ClojureSupport.valAt(f, self);
   }
   final def valAt (key: Any, notFound: AnyRef): AnyRef = findFieldOrNull(key) match {
-    case null => null;
+    case null => notFound;
     case f    => ClojureSupport.valAt(f, self, notFound);
   }
 

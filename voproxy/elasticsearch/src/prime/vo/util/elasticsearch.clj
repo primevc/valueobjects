@@ -638,7 +638,8 @@
   "Get the total number of search hits from the metadata of a 'search result."
   [query]
   (let [^SearchResponse response (-> query meta :response)]
-    (.. response getHits getTotalHits)))
+    (when response
+      (.. response getHits getTotalHits))))
 
 
 ;;; Delta change functions.

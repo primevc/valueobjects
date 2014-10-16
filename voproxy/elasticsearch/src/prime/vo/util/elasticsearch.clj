@@ -150,6 +150,7 @@
   options are
   - :only    exclusive #{set} of fields to include in mapping
   - :exclude #{set} of fields not to include in mapping
+  - 'symbol  Any symbol is treated as literal field name. This is useful for \"copy_to\" mappings.
   - any ElasticSearch option.
   "
   ([^ValueObject vo] (vo-mapping vo {}))
@@ -167,12 +168,14 @@
       :dynamic    "strict"
       :properties
       (into {}
-        (cons
-          {"t" {:type "integer", :store "no"}},
+        (concat
+          [{"t" {:type "integer", :store "no"}}],
           (map
             (fn [^ValueObjectField field] (field-mapping (option-map (.keyword field)) field (if id-field (identical? id-field field))))
             field-set)
-          ))
+          (->> option-map
+               (filter #(symbol? (first %)))
+               (map (fn [[k v]] [(name k) v])))))
     }))
 )
 

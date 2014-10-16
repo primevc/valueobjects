@@ -630,6 +630,14 @@
                (scroll-seq client response scroll 0)))
         {:request es-options, :response response})))
 
+
+(defn search-hit-count
+  "Get the total number of search hits from the metadata of a 'search result."
+  [query]
+  (let [^SearchResponse response (-> query meta :response)]
+    (.. response getHits getTotalHits)))
+
+
 ;;; Delta change functions.
 
 (defn- update-by-script

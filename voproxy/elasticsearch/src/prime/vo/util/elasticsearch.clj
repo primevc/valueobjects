@@ -256,7 +256,8 @@
 (defn vo-index-mapping-pair [[^ValueObject vo, options]]
   (assert options)
   [ (vo-hexname vo),
-    (dissoc (vo-mapping vo options) :type :exclude :only) ])
+    (conj (dissoc (vo-mapping vo options) :type :exclude :only)
+          (filter (comp string? first) options)) ])
 
 (defn put-mapping [es index-name, vo-options-pair]
   (if (map? vo-options-pair)

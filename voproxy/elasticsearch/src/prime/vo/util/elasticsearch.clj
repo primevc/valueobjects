@@ -646,19 +646,27 @@
 ;;; Delta change functions.
 
 (defn- update-by-script
-  [{:keys [client index default-opts] :as proxy} ^ValueObject vo path path-vars options script params]
+  [{:keys [client index default-opts] :as proxy} ^ValueObject vo path path-vars {:keys [upsert parent] :as options} script params]
   {:pre [(instance? ValueObject vo) (not (nil? (:id vo))) index client (string? script)]}
   (let [path (hexify-path vo (pathops/fill-path path path-vars))
         req (doto (cnv/->update-request index
                                         (vo-hexname vo)
                                         (vo-id->str vo)
                                         script
-                                        nil) ; params are set using smile source below
+                                        nil ; params are set using smile source below
+                                        options)
+              (.script script) ; For some retarded reason this is required when using "options" above
+              (.upsert ^bytes (generate-hexed-fields-smile upsert))
               (.refresh (or (:refresh-at-change options (:refresh-at-change default-opts))
                             (:refresh options (:refresh default-opts))
                             false))
               (.source ^bytes (generate-hexed-fields-smile {"lang"   "clj"
                                                             "params" (assoc params :path path)})))
+
+        ;; "You should set the _parent field in the index request that you can pass via UpdateRequest#doc(IndexRequest)""
+        ;; - https://github.com/elasticsearch/elasticsearch/issues/4538
+        _ (when upsert (.. req upsertRequest (parent parent)))
+        ;_ (prn script (core/decode-smile (generate-hexed-fields-smile upsert)))
         res (es/update client req)]
       (cnv/update-response->map (.actionGet res))))
 

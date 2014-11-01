@@ -347,7 +347,7 @@
   ([vo]
     (let [terms (vo->term-filter vo "")
           terms (mapv #(hash-map "term" %) terms)]
-      (if (second terms) {:and terms}
+      (if (second terms) {"bool" {"must" terms}}
        #_else (first terms))))
 
   ([vo prefix]
@@ -372,7 +372,7 @@
   (let [term-filter (vo->term-filter (vo/without-id vo))
         ids-filter  (when (prime.vo/has-id? vo) {"ids" {"values" [(:id vo)]}})]
     (if ids-filter
-      (if-not term-filter ids-filter #_else {:and [term-filter ids-filter]})
+      (if-not term-filter ids-filter #_else {"bool" [ids-filter term-filter]})
     #_else term-filter)))
 
 
@@ -613,7 +613,8 @@
                  (when-not (empty? vo)
                    (vo->search-filter vo))
                  (if-not (empty? vo)
-                   {:and (conj [filter] (vo->search-filter vo))}
+                   {"bool" {"must" (cons (vo->search-filter vo) [filter])}}
+                   ; http://www.elasticsearch.org/blog/all-about-elasticsearch-filter-bitsets/
                    filter))
         fields (when (or only exclude)
                  (map #(str (field-hexname %) "*") (vo/field-filtered-seq vo only exclude)))

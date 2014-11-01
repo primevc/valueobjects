@@ -346,7 +346,7 @@
 (defn vo->term-filter
   ([vo]
     (let [terms (vo->term-filter vo "")
-          terms (mapv #(hash-map :term %) terms)]
+          terms (mapv #(hash-map "term" %) terms)]
       (if (second terms) {:and terms}
        #_else (first terms))))
 
@@ -698,9 +698,9 @@
 ;;; Query helpers
 
 (defn has-child-vo
-  "Construct a 'has_child' query for the given VO type and optional query.
-   If no query is given: query is built using vo as term filter, or match_all if vo is empty."
+  "Construct a 'has_child' filter for the given VO type and optional filter.
+   If no filter is given: filter is built using vo as term filter, or match_all if vo is empty."
   ([vo] (has-child-vo vo (if (empty? vo) {"match_all" {}} #_else (vo->search-filter vo))))
 
-  ([vo child-query]
-    {"has_child" {"type" (vo-hexname vo), "query" child-query}}))
+  ([vo child-filter]
+    {"has_child" {"type" (vo-hexname vo), "filter" child-filter}}))

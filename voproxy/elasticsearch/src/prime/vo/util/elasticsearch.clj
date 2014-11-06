@@ -540,16 +540,23 @@
   (.apply (. empty-vo voCompanion)
     (ElasticSearch-root-ValueSource. (Integer/parseInt (.type hit) 16) (.. empty-vo voManifest) (.sourceAsMap hit) (.id hit))))
 
-(defn scroll-seq [es, ^SearchResponse scroll-req keep-alive, from]
-  (let [ft (es/search-scroll es (cnv/->search-scroll-request (.getScrollId scroll-req)
-                                                             {:scroll keep-alive}))
-         ^SearchResponse response (.actionGet ft)
-          hits     (.. response getHits hits)
-          num-hits (.. response getHits totalHits)
-          last-hit (+  from (count hits)) ]
-    (if (and (.getScrollId response) (< last-hit num-hits))
-      (concat hits (lazy-seq (scroll-seq es response keep-alive last-hit)))
-    #_else    hits)))
+(defn scroll-seq [es ^SearchResponse response, keep-alive search-type, from]
+  (let [hits     (.. response getHits hits)
+        num-hits (.. response getHits totalHits)
+        hitcount (count hits)
+        last-hit (+  from hitcount)]
+    ;(println "Doing a scroll-seq" search-type keep-alive search-type "from:" from "count:" (count hits) "hits:" hits " last: " last-hit " num: " num-hits)
+    (if (and (.getScrollId response) (> hitcount 0) (< last-hit num-hits))
+      (concat
+        hits
+        (lazy-seq
+          (let [next-scroll
+                (es/search-scroll es
+                  (cnv/->search-scroll-request (.getScrollId response)
+                                               {:scroll keep-alive, :search-type search-type}))]
+            (scroll-seq es (.actionGet next-scroll) keep-alive search-type last-hit))))
+    ;else
+      hits)))
 
 
 (def search-source-opts
@@ -605,8 +612,8 @@
   "
   [{:keys [client index default-opts] :as proxy}
    ^ValueObject vo
-   {:keys [query filter only exclude size scroll _source] :as options}]
-  {:pre [(instance? ValueObject vo) (string? index) (not (and size scroll)) client]}
+   {:keys [query filter only exclude size scroll search-type _source] :as options}]
+  {:pre [(instance? ValueObject vo) (string? index) client]}
   (let [options (merge default-opts options)
         filter (map-keywords->hex-fields vo filter)
         filter (if-not filter
@@ -631,13 +638,15 @@
         es-options (assoc options :source (generate-hexed-fields-smile extra-source-opts))
         ;; _ (clojure.pprint/pprint (assoc es-options :extra-source extra-source-opts))
         ft (es/search client (->search-request index (vo-hexname vo) es-options))
-        ^SearchResponse response (.actionGet ft)]
-      (with-meta
-        (map #(SearchHit->ValueObject vo %)
-             (if-not scroll
-               (.. response getHits hits)
-               (scroll-seq client response scroll 0)))
-        {:request es-options, :response response})))
+        ]
+      ;(delay
+        (let [^SearchResponse response (.actionGet ft)]
+          (with-meta
+          (map #(SearchHit->ValueObject vo %)
+               (if-not scroll
+                 (.. response getHits hits)
+                 (scroll-seq client response scroll search-type 0)))
+          {:request es-options, :response response}))));)
 
 
 (defn search-hit-count

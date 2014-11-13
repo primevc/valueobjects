@@ -57,7 +57,13 @@ class MutableVOInstanceUnpacker(voCompanionMap : IntMap[VOCompanion[_]]) extends
     val field = fieldOffset + i
     //assert(vo != null, "Cannot write field:" + field + " = '" + value + "'' to null VO type:" + currentType)
     //println("putValue: %50s @ %2s in %s; i = %s, fieldOffset = %2s, fields = %6$s ".format(value,field,vo,i,fieldOffset,fields))
-    vo.voCompanion.putValue(vo, field, value);
+    try {
+      vo.voCompanion.putValue(vo, field, value);
+      } catch {
+        case e : java.net.URISyntaxException =>
+          println("Ignoring invalid URI: " + e);
+          e.printStackTrace();
+      }
 
     fields ^= 1 << i;
     if (fields == 0) fieldOffset += 8;// - i; // index fixup for last bit

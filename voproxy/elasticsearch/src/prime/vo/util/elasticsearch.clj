@@ -372,7 +372,7 @@
   (let [term-filter (vo->term-filter (vo/without-id vo))
         ids-filter  (when (prime.vo/has-id? vo) {"ids" {"values" [(:id vo)]}})]
     (if ids-filter
-      (if-not term-filter ids-filter #_else {"bool" [ids-filter term-filter]})
+      (if-not term-filter ids-filter #_else {"bool" {"must" [ids-filter term-filter]}})
     #_else term-filter)))
 
 

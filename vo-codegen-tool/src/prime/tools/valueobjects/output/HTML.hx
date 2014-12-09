@@ -382,11 +382,11 @@ class HTML implements CodeGenerator
 	');
 	
 	static var t_mod = new haxe.Template('
-		<h1><a name="::fullName::">::fullName::</a></h1>
+		<h1><a name="::fullName::" href="#::fullName::">::fullName::</a></h1>
 	');
 	
 	static var t_type = new haxe.Template('
-		<h2><b>::type::</b> <a name="::fullName::">::name::</a></h2>
+		<h2><b>::type::</b> <a name="::fullName::" href="::fullName::">::name::</a></h2>
 		<div class="supers">::supers::</div>
 		<div class="implemented">::implemented::</div>
 		<p>::description::</p>

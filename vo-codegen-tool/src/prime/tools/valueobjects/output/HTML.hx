@@ -112,6 +112,7 @@ class HTML implements CodeGenerator
 		var props = [];
 		for (p in properties) {
 			props.push({
+				id  : StringTools.hex(p.propertyID(), 4).toLowerCase(),
 				type: typeHTML(p.name, p.type),
 				name: p.name,
 				desc: p.description != null? p.description.trim().split("\n").join("<br>") : "",
@@ -317,12 +318,13 @@ class HTML implements CodeGenerator
 		border-top: 1px solid #808080;
 		border-left: 2px solid #000;
 		padding: 0;
+		min-width: 80%;
 	}
 	td {
 		padding: 0.2em 0.3em;
 		border-right: 2px solid #000;
 		border-bottom: 1px solid #606060;
-		min-width: 15em;
+		min-width: 3em;
 		font-size: 9pt;
 		background: #1A1D1D;
 		text-align: right;
@@ -386,7 +388,7 @@ class HTML implements CodeGenerator
 	');
 	
 	static var t_type = new haxe.Template('
-		<h2><b>::type::</b> <a name="::fullName::" href="::fullName::">::name::</a></h2>
+		<h2><b>::type::</b> <a name="::fullName::" href="#::fullName::">::name::</a></h2>
 		<div class="supers">::supers::</div>
 		<div class="implemented">::implemented::</div>
 		<p>::description::</p>
@@ -397,7 +399,13 @@ class HTML implements CodeGenerator
 	static var t_properties = new haxe.Template('
 		<table cellspacing="0" cellpadding="0">
 		::foreach property::
-			<tr><td>::type::</td><td>::name::</td><td>::desc::</td><td>::opts::</td></tr>
+			<tr>
+				<td>::id::</td>
+				<td>::name::</td>
+				<td>::type::</td>
+				<td>::desc::</td>
+				<td>::opts::</td>
+			</tr>
 		::end::
 		</table>
 	');

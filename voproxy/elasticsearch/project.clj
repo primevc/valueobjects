@@ -5,8 +5,7 @@
 (defproject prime/voproxy-elastic "0.1.0-SNAPSHOT"
   :description "ElasticSearch VOProxy implementation."
   :url "https://github.com/primevc/valueobjects"
-  :dependencies [[org.clojure/clojure "1.5.1"]
-                 [prime/voproxy-core "0.1.0-SNAPSHOT"]
+  :dependencies [[prime/voproxy-core "0.1.0-SNAPSHOT"]
                  [prime/voserializer-cheshire "0.1.0-SNAPSHOT"]
                  [org.elasticsearch/elasticsearch "1.2.1"]
                  [clojurewerkz/elastisch "2.1.0-beta4"]

@@ -540,21 +540,21 @@
   (.apply (. empty-vo voCompanion)
     (ElasticSearch-root-ValueSource. (Integer/parseInt (.type hit) 16) (.. empty-vo voManifest) (.sourceAsMap hit) (.id hit))))
 
-(defn scroll-seq [es ^SearchResponse response, keep-alive search-type, from]
+(defn scroll-seq [es ^SearchResponse response, keep-alive from]
   (let [hits     (.. response getHits hits)
         num-hits (.. response getHits totalHits)
         hitcount (count hits)
         last-hit (+  from hitcount)]
     ;(println "Doing a scroll-seq" search-type keep-alive search-type "from:" from "count:" (count hits) "hits:" hits " last: " last-hit " num: " num-hits)
-    (if (and (.getScrollId response) (> hitcount 0) (< last-hit num-hits))
+    (if (and (.getScrollId response) (> num-hits 0) (< last-hit num-hits))
       (concat
         hits
         (lazy-seq
           (let [next-scroll
                 (es/search-scroll es
                   (cnv/->search-scroll-request (.getScrollId response)
-                                               {:scroll keep-alive, :search-type search-type}))]
-            (scroll-seq es (.actionGet next-scroll) keep-alive search-type last-hit))))
+                                               {:scroll keep-alive}))]
+            (scroll-seq es (.actionGet next-scroll) keep-alive last-hit))))
     ;else
       hits)))
 
@@ -645,7 +645,7 @@
           (map #(SearchHit->ValueObject vo %)
                (if-not scroll
                  (.. response getHits hits)
-                 (scroll-seq client response scroll search-type 0)))
+                 (scroll-seq client response scroll 0)))
           {:request es-options, :response response}))));)
 
 

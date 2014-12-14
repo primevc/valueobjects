@@ -194,9 +194,14 @@
   [^ValueObject vo path]
   (vo/fields-path-seq vo path field-hexname))
 
+(def ^:private keyword->hex-field*
+  (memoize
+    (fn [vo key]
+      (if-let [path (vo/fields-path-seq vo (clojure.string/split (name key) #"[.]") field-hexname)]
+        (.intern (clojure.string/join "." (filter string? path)))))))
+
 (defn keyword->hex-field   [^prime.vo.ValueObject vo, ^clojure.lang.Named key]
-  (if-let [path (vo/fields-path-seq vo (clojure.string/split (name key) #"[.]") field-hexname)]
-    (clojure.string/join "." (filter string? path))))
+  (keyword->hex-field* (empty vo) key))
 
 (defn map-keywords->hex-fields [^prime.vo.ValueObject vo, expr]
   (cond
@@ -600,6 +605,12 @@
       (.scroll r ^String scroll))
     r))
 
+(def ^:private field-filtered-seq*
+  (memoize
+    (fn [vo only exclude]
+      (->> (vo/field-filtered-seq vo only exclude)
+           (mapv #(str (field-hexname %) "*"))))))
+
 ;; ---TODO add ability to search multiple VO types (and remove type filter)
 ;; ---TODO use id->voCompanion when type filter is removed
 (defn search
@@ -624,11 +635,11 @@
                    ; http://www.elasticsearch.org/blog/all-about-elasticsearch-filter-bitsets/
                    filter))
         fields (when (or only exclude)
-                 (map #(str (field-hexname %) "*") (vo/field-filtered-seq vo only exclude)))
+                 (field-filtered-seq* (empty vo) only exclude))
         extra-source-opts (->> (map (fn [[k v]] (tuple k (map-keywords->hex-fields vo v)))
                                     (select-keys options need-hex-map-opts))
                                (into {:_source (if-not (nil? _source) _source fields)
-                                      "query" 
+                                      "query"
                                       (when (or query filter)
                                         {"filtered" (if query {"query" query, "filter" filter}
                                                     #_else  (when filter {"filter" filter}))})})

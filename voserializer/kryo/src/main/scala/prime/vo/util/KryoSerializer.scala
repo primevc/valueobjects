@@ -120,11 +120,11 @@ object EnumSerializer extends Serializer[EnumValue](true,true) {
   def write (kryo:Kryo, out:io.Output, e:EnumValue) { kryo match {
     case kryo:VOKryo =>
       if (!classOf[scala.Product].isInstance(e)) {
-        out.writeInt(e.owner.ID << 1    , true);
+        out.writeInt(e.owner.EnumID << 1    , true);
         out.writeInt(e.value,             true);
       }
       else {
-        out.writeInt(e.owner.ID << 1 | 1, true);
+        out.writeInt(e.owner.EnumID << 1 | 1, true);
         out.writeString(e.toString);
       }
   }}

@@ -36,8 +36,8 @@ abstract class EnumValue extends java.io.Serializable with ILookup
 abstract class Enum extends ClojureFn
 {
   type Value <: EnumValue;
+  val  EnumID   : Int;
   def  Null     :     Value = null.asInstanceOf[Value];
-  val  ID       : Int;
   val  valueSet : Set[Value];
 
   protected def stringCatchAll(value : String): Value = throw new java.lang.NoSuchFieldException(value);

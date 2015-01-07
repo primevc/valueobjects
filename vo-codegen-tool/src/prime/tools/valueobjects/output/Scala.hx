@@ -867,7 +867,7 @@ sealed abstract class ${def.name}(val value:Int, override val toString:String'))
 
 		a(#if !haxe3 Std.format #end(') extends EnumValue { final def owner = ${def.name} };\n
 object ${def.name} extends Enum {
-  type Value = ${def.name};\n  val  ID    = ${def.index};\n\n'));
+  type Value = ${def.name};\n  val  EnumID = ${def.index};\n\n'));
 
 		var overrideValueOf = null;
 

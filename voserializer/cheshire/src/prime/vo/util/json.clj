@@ -103,7 +103,7 @@
 
 (defn- encode-rgba
   [^prime.types.RGBA in ^JsonGenerator out]
-  (.writeString out (.toRGBAString in)))
+  (.writeNumber out (.toInt in)))
 
 
 ;;; Register encoders and advice cheshire.generate/generate.

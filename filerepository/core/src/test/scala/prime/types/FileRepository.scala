@@ -65,3 +65,36 @@ class BasicLocalFileRepositorySpec extends Specification {
     }
   }
 }
+
+class SelectingFileRepositorySpec extends Specification {
+
+  /* Initialisation */
+
+  val http = new BasicLocalFileRepository(systemTmpDir)
+  val cassandra = new BasicLocalFileRepository(systemTmpDir)
+  val local = new BasicLocalFileRepository(systemTmpDir)
+  val selections = List(("http(s)?://.*".r.pattern, http),
+                        ("cassandra://".r.pattern, cassandra),
+                        (".*".r.pattern, local))
+  val selecting = new SelectingFileRepository(selections)
+
+  /* The actual tests. */
+
+  "The selecting repository" should {
+
+    "choose the HTTP repository" in {
+      val chosen = selecting.findRepository(FileRef("https://google.nl/images"))
+      chosen mustEqual http
+    }
+
+    "choose the cassandra repository" in {
+      val chosen = selecting.findRepository(FileRef("cassandra://423enhsy8j123iearr"))
+      chosen mustEqual cassandra
+    }
+
+    "choose the default local repository" in {
+      val chosen = selecting.findRepository(FileRef("324onarst2oarste2"))
+      chosen mustEqual local
+    }
+  }
+}

@@ -1,14 +1,20 @@
 package prime.types
 
 import java.io._
+import java.util.regex.Pattern
 
-class SelectingFileRepository(repositories: Map[String, FileRepository],
-                              default: Option[FileRepository])
+/** A forwarding file repository, based on the prefix of the ref passed in. The prefix
+  * is matched agains the regex patterns of the passed in repositories. The first
+  * match is used, or an error is thrown.
+  *
+  * Of course, only those operations that receive a FileRef are implemented.
+  */
+class SelectingFileRepository(repositories: List[Tuple2[Pattern, FileRepository]])
 extends FileRepository
 {
 
-  private def findRepository(ref: FileRef): FileRepository = {
-    repositories.get(ref.prefix).orElse(default).get
+  protected[types] def findRepository(ref: FileRef): FileRepository = {
+    repositories.find( {case (p, fr) => p.matcher(ref.prefix).matches} ).get._2
   }
 
   def existsImpl(ref: FileRef) = findRepository(ref).exists(ref)

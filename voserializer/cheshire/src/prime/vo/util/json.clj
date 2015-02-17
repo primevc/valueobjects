@@ -99,7 +99,7 @@
 
 (defn- encode-fileref
   [^prime.types.FileRef in ^JsonGenerator out]
-  (.writeString out (to-String in)))
+  (.writeString out (.prefixedString in)))
 
 (defn- encode-rgba
   [^prime.types.RGBA in ^JsonGenerator out]

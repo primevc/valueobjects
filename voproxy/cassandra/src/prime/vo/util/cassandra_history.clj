@@ -75,6 +75,28 @@
 
 ;;; Change data serialization.
 
+(defn- keyword?->name
+  "When given value is a keyword, then its name is returned. Otherwise
+  the value is returned unmodified."
+  [k]
+  (if (keyword? k) (name k) k))
+
+
+(defn- replace-keywords
+  "Replaces the keywords in the vo-change path by strings. This was
+  implemented for the case where `prime.vo/fields-path-seq` returns a
+  seq where the last path item has not been transformed. This happens
+  when the path points to an item by value in a primitive (including
+  VORef) array. For example: `(remove-from organization-vo [:members
+  {:id 1}])`."
+  [path]
+  (map (fn [item]
+         (if (map? item)
+           {(keyword?->name (key (first item))) (val (first item))}
+           item))
+       path))
+
+
 (defn- replace-star
   "Replaces the * parts in the vo-change path."
   [path]
@@ -87,7 +109,9 @@
 (defn- prepare-path
   "Prepares a vo-change path such that it can be serialized."
   [vo path]
-  (replace-star (prime.vo/fields-path-seq vo path #(.id ^ValueObjectField %))))
+  (-> (prime.vo/fields-path-seq vo path #(.id ^ValueObjectField %))
+      replace-star
+      replace-keywords))
 
 
 (defn- change-data->bytes

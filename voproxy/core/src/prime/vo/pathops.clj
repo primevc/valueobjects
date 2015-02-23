@@ -42,7 +42,9 @@
         (let [[k v] (first obj)]
           (if (map? (first vec))
             (fn [i item] (when (to= (get item k) v) i)) ; for {:vo-key value} lookups
-            (fn [i item] (when (to= item v) i)))) ; for {:id value} literal lookups
+            (if (#{:= "="} k)
+              (fn [i item] (when (to= item v) i)) ; {:= value} literal lookups
+              (throw (IllegalArgumentException. "Must {:= ...} map for primitive array lookups")))))
         (fn [i item] (when (to= item obj) i)))
       (keep-indexed vec)
       (first)))

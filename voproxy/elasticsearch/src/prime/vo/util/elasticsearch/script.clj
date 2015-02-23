@@ -37,7 +37,10 @@
           result (first (keep-indexed
                          (if (instance? Map (first obj))
                            (fn [i item] (when (to= (get item k) v) i)) ; for {"vo-key" value} lookups
-                           (fn [i item] (when (to= item v) i))) ; for {"id" value"} literal lookups
+                           (if (#{:= "="} k)
+                             (fn [i item] (when (to= item v) i))  ; for {"=" value"} literal lookups
+                             (throw (IllegalArgumentException.
+                                     "Must {:= ...} map for primitive array lookups"))))
                          obj))]
       (if-not result
         (throw (IllegalArgumentException. (str "Could not find a match for '" path-step "'.")))

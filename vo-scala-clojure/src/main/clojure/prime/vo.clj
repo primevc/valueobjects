@@ -141,7 +141,7 @@
         (if next-step
           (if (array-field? field)
             (do (assert (or (integer? next-step) (map? next-step) (= * next-step) (= "*" next-step))
-                        (print-str "\n  A path-node poiting inside a vector should be: * (for any), an integer index  or an {:id map} -- Instead " next-step " was given."))
+                        (print-str "\n  A path-node poiting inside a vector should be: * (for any), an integer index  or an {:id map} or {:= map} -- Instead " next-step " was given."))
                 (if-let [inner-vo (type-default-vo field)]
                   ; This is an array of VOs.
                   (cons (cond
@@ -150,8 +150,9 @@
                           (map?  next-step)
                             (let [[k v] (first next-step)]
                               (assert (= 1 (count next-step)) (print-str "Search in array path " field " only supported for 1 key. Instead: " next-step))
-                              (let [field (field-or-subtype-field inner-vo k)]
-                                { (field-transform field) (condp = v, * *, nil nil, (to-field-type field v)) }))
+                              (let [field (field-or-subtype-field inner-vo (if (#{:= "="} k) :id k))]
+                                { (if (#{:= "="} k) k (field-transform field))
+                                  (condp = v, * *, nil nil, (to-field-type field v)) }))
                           :else
                             next-step)
                         (if path (fields-path-seq inner-vo path field-transform) #_else nil))

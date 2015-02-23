@@ -191,4 +191,8 @@
 (implement-to= InternetAddress     to-EmailAddr)
 (implement-to= java.net.URI        to-URI)
 (implement-to= prime.types.FileRef to-FileRef)
-(implement-to= VORef               to-VORef)
+
+(extend-protocol prime.types/ConvertableToEquality
+  prime.types.VORef
+  (to= [a b]
+    (to= (._id a) b)))

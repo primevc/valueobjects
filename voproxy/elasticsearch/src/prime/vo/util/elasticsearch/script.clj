@@ -34,7 +34,11 @@
   [obj path-step]
   (if (and (array-like? obj) (not (number? path-step)))
     (let [[k v] (first path-step)
-          result (first (keep-indexed (fn [i item] (when (to= (get item k) v) i)) obj))]
+          result (first (keep-indexed
+                         (if (instance? Map (first obj))
+                           (fn [i item] (when (to= (get item k) v) i)) ; for {"vo-key" value} lookups
+                           (fn [i item] (when (to= item v) i))) ; for {"id" value"} literal lookups
+                         obj))]
       (if-not result
         (throw (IllegalArgumentException. (str "Could not find a match for '" path-step "'.")))
         result))

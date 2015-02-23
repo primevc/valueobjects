@@ -39,8 +39,10 @@
 (defn- find-index [vec obj]
   {:pre [(vector? vec)]}
   (-> (if (map? obj)
-        (let [[k v] (first obj)] (fn [i item] (when (to= (get item k) v) i)))
-       ;else
+        (let [[k v] (first obj)]
+          (if (map? (first vec))
+            (fn [i item] (when (to= (get item k) v) i)) ; for {:vo-key value} lookups
+            (fn [i item] (when (to= item v) i)))) ; for {:id value} literal lookups
         (fn [i item] (when (to= item obj) i)))
       (keep-indexed vec)
       (first)))

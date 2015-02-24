@@ -4,7 +4,10 @@
 
 (ns prime.types.repository-util
   (:require [clojure.java.io :refer (as-file)]
-            [prime.types]))
+            [prime.types])
+  (:import [scala Tuple2]
+           [scala.collection JavaConversions]
+           [prime.types SelectingFileRepository]))
 
 
 ;;; Repository creation functions.
@@ -46,3 +49,17 @@
   "Call `exists` on the FileRepository Scala trait."
   [this ^prime.types.FileRef ref]
   (prime.types.FileRepository$class/exists this ref))
+
+
+(defn selecting-FileRepository
+  "Creates a SelectingFileRepository. Example:
+
+  (selecting-FileRepository #\"http.*\" http-repo
+                            #\".*\"    local-repo)"
+  [& pairs]
+  (->> pairs
+       (partition 2)
+       (map (fn [[k v]] (Tuple2. k v)))
+       JavaConversions/asScalaBuffer
+       .toList
+       SelectingFileRepository.))

@@ -7,6 +7,7 @@
   protocols, with ElasticSearch as the backend."
   (:import [org.elasticsearch.node Node])
   (:require [prime.vo.proxy :refer (VOProxy VOSearchProxy)]
+            [clojurewerkz.elastisch.native.index :refer (delete-mapping)]
             [prime.vo.util.elasticsearch :as es]))
 
 
@@ -87,7 +88,6 @@
   (search [this vo options]
     (es/search this vo options)))
 
-
 (defn ->ElasticSearchVOProxy
   ([index node-or-client]
      (ElasticSearchVOProxy. index node-or-client {}))
@@ -97,3 +97,15 @@
                               (.client ^Node node-or-client)
                              #_else node-or-client)
                             default-opts)))
+
+
+(defn reindex
+  "Usage:
+    (reindex foo-proxy \"foo-index\" setup/foo-mapping
+             (->> (history/get-ids foo-history) (map #(get-vo foo-history %))))"
+  [target-voproxy idx-name mapping seq-of-new-vos]
+  (when-let [first-vo (->> seq-of-new-vos (remove nil?) (first))]
+    (delete-mapping  (:client target-voproxy) idx-name (es/vo-hexname first-vo))
+    (es/create-index (:client target-voproxy) idx-name mapping)
+    (doseq [vo seq-of-new-vos :when vo]
+      (prime.vo.proxy/put-vo target-voproxy vo))))

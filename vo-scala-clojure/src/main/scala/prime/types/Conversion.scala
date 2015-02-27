@@ -371,6 +371,7 @@ object Conversion
   def ObjectId  (value:MessagePackObjectId) : ObjectId = value.oid;
   def ObjectId  (value:URI)                 : ObjectId = if (value == null) throw NoInputException else ObjectId(value.toString);
   def ObjectId  (value:String)              : ObjectId = try new ObjectId(Base64.decodeBase64(value)) catch { case e:IllegalArgumentException => new ObjectId(value); };
+  def ObjectId  (value:RawType)             : ObjectId = ObjectId(String(value));
   def ObjectId  (value:Array[Byte])         : ObjectId = new ObjectId(value);
   def ObjectId  (value:ByteBuffer)          : ObjectId = ObjectId(ByteArray(value));
 
@@ -381,6 +382,7 @@ object Conversion
     case v:String              => ObjectId(v)
     case v:Array[Byte]         => ObjectId(v)
     case v:ByteBuffer          => ObjectId(v)
+    case v:RawType             => ObjectId(v)
     case None                  => throw NoInputException;
     case value                 => val v = object_id.invoke(value); if (v != null) v.asInstanceOf[ObjectId] else throw FailureException;
   }

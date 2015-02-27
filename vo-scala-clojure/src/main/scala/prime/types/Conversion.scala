@@ -9,6 +9,7 @@ package prime.types;
  import java.util.{Locale, Collection}
  import java.lang.Integer
  import java.net.URLEncoder
+ import java.nio.ByteBuffer
  import scala.util.matching.Regex
  import scala.collection.JavaConversions
 
@@ -371,6 +372,7 @@ object Conversion
   def ObjectId  (value:URI)                 : ObjectId = if (value == null) throw NoInputException else ObjectId(value.toString);
   def ObjectId  (value:String)              : ObjectId = try new ObjectId(Base64.decodeBase64(value)) catch { case e:IllegalArgumentException => new ObjectId(value); };
   def ObjectId  (value:Array[Byte])         : ObjectId = new ObjectId(value);
+  def ObjectId  (value:ByteBuffer)          : ObjectId = ObjectId(ByteArray(value));
 
   def ObjectId  (value:Any) : ObjectId = unpack(value) match {
     case v:ObjectId            => ObjectId(v)
@@ -378,8 +380,25 @@ object Conversion
     case v:URI                 => ObjectId(v)
     case v:String              => ObjectId(v)
     case v:Array[Byte]         => ObjectId(v)
+    case v:ByteBuffer          => ObjectId(v)
     case None                  => throw NoInputException;
     case value                 => val v = object_id.invoke(value); if (v != null) v.asInstanceOf[ObjectId] else throw FailureException;
+  }
+
+  //  -------
+
+  def ByteArray (buffer:ByteBuffer) : Array[Byte] = {
+    val length = buffer.remaining();
+    if (buffer.hasArray()) {
+      val boff = buffer.arrayOffset() + buffer.position();
+      java.util.Arrays.copyOfRange(buffer.array(), boff, boff + length);
+    }
+    else {
+      // else, DirectByteBuffer.get() is the fastest route
+      val bytes = new Array[Byte](length);
+      buffer.duplicate().get(bytes);
+      bytes;
+    }
   }
 }
 

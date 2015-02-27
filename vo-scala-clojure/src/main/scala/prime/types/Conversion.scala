@@ -85,6 +85,7 @@ object Conversion
 
   def Integer   (value:Int)         : Int = value;
   def Integer   (value:String)      : Int = { val v = value.trim; if (!v.isEmpty && v != "NaN") v.toInt; else throw FailureException }
+  def Integer   (value:RawType)     : Int = Integer(value.asString);
   def Integer   (value:Number)      : Int = if (value != null) value.intValue else throw FailureException;
   def Integer   (value:IntegerType) : Int = value.asInt;
   def Integer   (value:Long)        : Int = value.toInt;
@@ -95,6 +96,7 @@ object Conversion
     case v:Number      => Integer(v)
     case v:String      => Integer(v)
     case v:IntegerType => Integer(v)
+    case v:RawType     => Integer(v)
     case None          => throw NoInputException;
     case value         => val v = integer.invoke(value); if (v != null) v.asInstanceOf[Int] else throw FailureException;
   }
@@ -103,6 +105,7 @@ object Conversion
 
   def Long      (value:Long)        : Long = value;
   def Long      (value:String)      : Long = { val v = value.trim; if (!v.isEmpty && v != "NaN") v.toLong; else throw FailureException }
+  def Long      (value:RawType)     : Long = Long(value.asString);
   def Long      (value:Number)      : Long = if (value != null) value.longValue else throw FailureException;
   def Long      (value:IntegerType) : Long = value.asLong;
   def Long      (value:Int)         : Long = value.toLong;
@@ -113,6 +116,7 @@ object Conversion
     case v:Number      => Long(v)
     case v:String      => Long(v)
     case v:IntegerType => Long(v)
+    case v:RawType     => Long(v)
     case None          => throw NoInputException;
     case value         => val v = long.invoke(value); if (v != null) v.asInstanceOf[Long] else throw FailureException;
   }
@@ -121,6 +125,7 @@ object Conversion
 
   def Decimal   (value:Double)                : Double = value;
   def Decimal   (value:String)                : Double = { val v = value.trim; if (!v.isEmpty) v.toDouble else throw FailureException; }
+  def Decimal   (value:RawType)               : Double = Decimal(value.asString);
   def Decimal   (value:Number)                : Double = if (value != null) value.doubleValue else throw FailureException;
   def Decimal   (value:FloatType)             : Double = value.asDouble;
   def Decimal   (value:Any, format:String)    : Double = unpack(value) match {
@@ -128,6 +133,7 @@ object Conversion
     case v:Number      => Decimal(v)
     case v:String      => Decimal(v, format)
     case v:FloatType   => Decimal(v)
+    case v:RawType     => Decimal(v)
     case None          => throw NoInputException;
     case value         => val v = if (format != null) decimal.invoke(value, format) else decimal.invoke(value); if (v != null) v.asInstanceOf[Double] else throw FailureException;
   }
@@ -186,6 +192,7 @@ object Conversion
   }
   def RGBA      (value:Number)                   : RGBA = RGBA(Integer(value));
   def RGBA      (value:IntegerType)              : RGBA = RGBA(value.asLong);
+  def RGBA      (value:RawType)                  : RGBA = RGBA(value.asString);
   def RGBA      (value:Long)                     : RGBA = RGBA((value & 0xFFFFFFFF).toInt);
   def RGBA      (rgb:Int, a:Int)                 : RGBA = RGBA((rgb << 8) | a);
   def RGBA      (rgb:Int, alphaPercentage:Float) : RGBA = RGBA(rgb, (255 * alphaPercentage).toInt);
@@ -197,6 +204,7 @@ object Conversion
     case v:Number      => RGBA(v)
     case v:String      => RGBA(v)
     case v:IntegerType => RGBA(v)
+    case v:RawType     => RGBA(v)
     case None          => throw NoInputException;
     case value         => val v = rgba.invoke(value); if (v != null) v.asInstanceOf[RGBA] else throw FailureException;
   }
@@ -316,12 +324,13 @@ object Conversion
 
   def URL (value:URI)    : URL = if (value != null) { if(value.isAbsolute) value else URI("http://" + value); } else throw NoInputException;
   def URL (value:String) : URL = URL(URI(value));
+  def URL (value:RawType): URL = URL(value.asString);
 
   def URL (value:Any) : URL = unpack(value) match {
     case v:java.net.URL => v.toURI
     case v:URI          => URL(v)
     case v:String       => URL(v)
-    case v:RawType      => URL(v.asString);
+    case v:RawType      => URL(v);
     case None           => throw NoInputException;
     case value          => val v = uri.invoke(value); if (v != null) URL(v.asInstanceOf[URI]) else throw FailureException;
   }
@@ -371,7 +380,7 @@ object Conversion
   def ObjectId  (value:MessagePackObjectId) : ObjectId = value.oid;
   def ObjectId  (value:URI)                 : ObjectId = if (value == null) throw NoInputException else ObjectId(value.toString);
   def ObjectId  (value:String)              : ObjectId = try new ObjectId(Base64.decodeBase64(value)) catch { case e:IllegalArgumentException => new ObjectId(value); };
-  def ObjectId  (value:RawType)             : ObjectId = ObjectId(String(value));
+  def ObjectId  (value:RawType)             : ObjectId = ObjectId(value.asString);
   def ObjectId  (value:Array[Byte])         : ObjectId = new ObjectId(value);
   def ObjectId  (value:ByteBuffer)          : ObjectId = ObjectId(ByteArray(value));
 

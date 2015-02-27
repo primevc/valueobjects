@@ -178,7 +178,7 @@ object Conversion
   def RGBA      (value:RGBA)                     : RGBA = value;
 
   private val all_0 = new Regex("(?i)([0x#]*)")
-  private val all_F = new Regex("(?i)([Fx#]*)")
+  private val all_F = new Regex("(?i)(?:0x|#)?(FFFFFF|FFFFFFFF)")
 
   def RGBA      (value:String)                   : RGBA = value match {
     case all_0(_)   => Colors.black

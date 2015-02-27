@@ -245,6 +245,14 @@
                                       args)]
       (build-vo result target-vo)))
 
+(defn get-ids
+  "This returns all IDs of VOs ever stored in history. This includes deleted VOs."
+  [{:keys [system consistency]} target-vo]
+  (let [query (str "SELECT DISTINCT id FROM " (get-table-name target-vo))
+        prepared (cassandra/prepare system query)
+        result (cassandra/do-prepared system prepared {:consistency consistency :keywordize? true})]
+      (map :id result)))
+
 
 ;;--- FIXME: Implement this based on dates and slice query.
 ;;    (and implicit search to latest put for begin date)

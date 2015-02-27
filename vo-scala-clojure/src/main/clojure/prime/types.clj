@@ -10,6 +10,7 @@
            javax.mail.internet.InternetAddress
            scala.collection.immutable.IndexedSeq
           [java.io File InputStream]
+          [java.nio ByteBuffer]
           [prime.types Conversion VORef]
           [org.joda.time DateMidnight DateTime Interval ReadableInstant]
           [org.joda.time.format DateTimeFormatter])
@@ -67,7 +68,7 @@
 (def-default-converter Interval   =>  Interval)
 (def-default-converter EmailAddr  =>  InternetAddress  String  URI  URL)
 (def-default-converter URI        =>  URI              String       URL  ObjectId)
-(def-default-converter ObjectId   =>  ObjectId         String  URI       ByteArray)
+(def-default-converter ObjectId   =>  ObjectId         String  URI       ByteBuffer  ByteArray)
 
 (extend-type nil
   To-String

@@ -455,6 +455,7 @@
   [{:keys [client index default-opts] :as proxy} ^ValueObject vo options]
   {:pre [client index]}
   (assert (vo/has-id? vo) (print-str "VO requires an id: " vo))
+  (assert (or (nil? (:id options)) (= (:id options) (:id vo))) (print-str "VO :id differs from options :id, vo = " vo ". options = " options))
   (let [options (merge default-opts
                        {:id (vo-id->str vo)
                         :op-type "index"}

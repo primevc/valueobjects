@@ -370,9 +370,19 @@
           :else ~'vo))
       VOProxy
        ~@(for [{:keys [name arglists]} (vals (:sigs VOProxy))
-               arglist arglists
-               :when (< 1 (count arglist))]
-           (vo-proxy-delegator-fn name arglist vo-opts-pairs)))))
+               ;; Ignore the first arglist, like (get-vo [vo])
+               ;; Forward all to the last (full options arglist)
+               my-args (->> (next arglists) (drop-last 1))]
+           (let [full-args
+                 (concat my-args
+                         (take (- (count (last arglists)) (count my-args))
+                               (repeat nil)))]
+             ;; Return implementation which forwards the call using nil for the remaining arguments
+             `(~name ~my-args
+                ~(mk-proxy-function-call name full-args (first my-args)))))
+       ;; Implement the full options (last arglist):
+       ~@(for [{:keys [name arglists]} (vals (:sigs VOProxy))]
+           (vo-proxy-delegator-fn name (last arglists) vo-opts-pairs)))))
 
 
 (defmacro def-vo-proxy-delegator

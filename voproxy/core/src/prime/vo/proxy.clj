@@ -208,8 +208,14 @@
   "Returns a call to VOProxy function `name` using the supplied proxy
   and argumentlist."
   [name arglist proxy]
+  `(~(symbol "prime.vo.proxy" (str name)) ~proxy ~@(rest arglist)))
+
+(defn- mk-checked-proxy-function-call
+  "Returns a nil-checked call to VOProxy function `name` using the supplied proxy
+  and argumentlist."
+  [name arglist proxy]
   `(if ~proxy
-    (~(symbol "prime.vo.proxy" (str name)) ~proxy ~@(rest arglist))
+    ~(mk-proxy-function-call name arglist proxy)
    ;else, proxy is nil
     (log/warn ~(str proxy) (str "is nil [!]  Ignoring: (" ~(str name) " " ~(str proxy)) ~@(rest arglist) ")")))
 
@@ -217,7 +223,7 @@
   "Returns a call to VOProxy function `name` wrapped in `path-keep` check if keep-map is provided."
   [name arglist keep-map proxy]
 
-  (let [proxy-call (mk-proxy-function-call name arglist proxy)]
+  (let [proxy-call (mk-checked-proxy-function-call name arglist proxy)]
     (cond
       (and keep-map (some #(= 'path %) arglist))
       `(when (path-keep ~keep-map ~'path) ~proxy-call)

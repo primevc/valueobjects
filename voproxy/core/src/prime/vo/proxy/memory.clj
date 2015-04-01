@@ -57,14 +57,15 @@
     (update this vo (:id vo) {}))
 
   (update [this vo id]
-    (update this vo id {}))
+    (update this vo (or id (:id vo)) {}))
 
   (update [this vo id options]
-    (assert id (print-str "id required, but no id supplied for vo:" vo))
-    (debug "Updating VO" vo "having ID" id "with options" options)
-    (swap! data update-in [(votype->hex vo) id]
-           (partial utils/deep-merge-with (fn [x y] y))
-           (assoc vo :id id)))
+    (let [id (or id (:id vo))]
+      (assert id (print-str "id required, but no id supplied for vo:" vo))
+      (debug "Updating VO" vo "having ID" id "with options" options)
+      (swap! data update-in [(votype->hex vo) id]
+             (partial utils/deep-merge-with (fn [x y] y))
+             (assoc vo :id id))))
 
   (delete [this vo]
     (delete this vo {}))

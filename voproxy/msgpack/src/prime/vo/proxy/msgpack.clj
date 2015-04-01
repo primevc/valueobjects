@@ -20,11 +20,14 @@
   (put-vo [this vo options]
     (mp/put directory vo options))
 
+  (update [this vo]
+    (mp/update directory vo (:id vo) {}))
+
   (update [this vo id]
-    (mp/update directory vo id {}))
+    (mp/update directory vo (or id (:id vo)) {}))
 
   (update [this vo id options]
-    (mp/update directory vo id options))
+    (mp/update directory vo (or id (:id vo)) (or options {})))
 
   (delete [this vo]
     (mp/delete directory vo {}))

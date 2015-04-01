@@ -30,10 +30,10 @@
     (es/update this vo (:id vo) {}))
 
   (update [this vo id]
-    (es/update this vo id {}))
+    (es/update this vo (or id (:id vo)) {}))
 
   (update [this vo id options]
-    (es/update this vo id options))
+    (es/update this vo (or id (:id vo)) (or options {})))
 
   (delete [this vo]
     (es/delete this vo {}))

@@ -248,3 +248,34 @@
     (let [pre (map (fn [form] (if-not (list? form) `(prn ~form) form)) pre)]
       `(do ~@pre ~@body))
     `(do ~@body)))
+
+
+;; Locking by value functions.
+
+(defn mk-lock-pool
+  "Create a new lock pool for use with `with-lock-by-value`. Using a
+  pool ensures that locks are acquired within the same context, and
+  don't interfere with other contexts."
+  [] (atom {}))
+
+(defn with-lock-by-value
+  "Execute a function `f` by synchronizing on a value `val` (does not
+  necessarily need to be the same object), applying `args` to the
+  function. The original lock object is released when it is not used
+  anymore.
+
+  Supply a lock `pool`, acquired by `mk-lock-pool` as the context in
+  which to acquire and reuse the lock values."
+  [pool val f & args]
+  (let [locks (swap! pool update-in [val]
+                     (fn [[lock-val counter]]
+                       [(or lock-val val)
+                        (or (and counter (inc counter)) 1)]))]
+    (try
+      (locking (get-in locks [val 0])
+        (apply f args))
+      (finally
+        (swap! pool (fn [locks]
+                      (if (= (get-in locks [val 1]) 1)
+                        (dissoc locks val)
+                        (update-in locks [val 1] dec))))))))

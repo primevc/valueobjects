@@ -23,9 +23,14 @@ object ClojureSupport {
     - or empty value-object instance if field is not set and is a ValueObject field
     - or null if field is not set, and it is a simple value field.
   */
-  final def valOrDefaultAt[T <: ValueObject](f : ValueObjectField[T], obj : T) : T = {
-    if (f in obj) clojurify(f, f(obj))         .asInstanceOf[T];
-    else          clojurify(f, f.defaultValue) .asInstanceOf[T];
+  final def valAt[T <: ValueObject](f : ValueObjectField[T], obj : T) : AnyRef = f match {
+    case f : VOValueObjectField[_,_] => f(obj);
+    case f : ValueObjectField[_]     => {
+      if      (f in obj)           clojurify(f, f(obj))
+      else if (f.valueType.isLazy) clojurify(f, f.defaultValue)
+      else                         null;
+    }
+    case null => null;
   }
 
   RT.load("prime/vo");
@@ -219,7 +224,7 @@ trait ClojureMapSupport extends IPersistentMap
   // ILookup
   final def valAt (key: Any) : AnyRef = findFieldOrNull(key) match {
     case null => null;
-    case f    => ClojureSupport.valAt(f, self, null);
+    case f    => ClojureSupport.valAt(f, self);
   }
   final def valAt (key: Any, notFound: AnyRef): AnyRef = findFieldOrNull(key) match {
     case null => notFound;
@@ -248,7 +253,7 @@ trait ClojureMapSupport extends IPersistentMap
   // ---
   override final def invoke  (key: AnyRef)                   : AnyRef = findFieldOrNull(key) match {
     case null => throw new ValueObjectManifest.NoSuchFieldException(this, key.toString);
-    case f    => ClojureSupport.valAt(f, self, null)
+    case f    => ClojureSupport.valAt(f, self)
   }
   override final def invoke  (key: AnyRef, notFound: AnyRef) : AnyRef = findFieldOrNull(key) match {
     case null => throw new ValueObjectManifest.NoSuchFieldException(this, key.toString);
@@ -264,6 +269,6 @@ trait ClojureMapSupport extends IPersistentMap
   // ---
   // Indexed
   // ---
-  final def nth(index : Int)                  = ClojureSupport.valAt(voManifest(index), self, null);
+  final def nth(index : Int)                  = ClojureSupport.valAt(voManifest(index), self);
   final def nth(index : Int, notFound:AnyRef) = ClojureSupport.valAt(voManifest(index), self, notFound);
 }

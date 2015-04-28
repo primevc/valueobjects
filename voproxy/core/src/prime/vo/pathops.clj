@@ -40,10 +40,10 @@
   {:pre [(vector? vec)]}
   (-> (if (map? obj)
         (let [[k v] (first obj)]
-          (if (map? (first vec))
+          (if (or (map? (first vec)) (empty? vec))
             (fn [i item] (when (to= (get item k) v) i)) ; for {:vo-key value} lookups
             (if (#{:= "="} k)
-              (fn [i item] (when (to= item v) i)) ; {:= value} literal lookups
+              (fn [i item] (when (to= item v) i))
               (throw (IllegalArgumentException. "Must {:= ...} map for primitive array lookups")))))
         (fn [i item] (when (to= item obj) i)))
       (keep-indexed vec)

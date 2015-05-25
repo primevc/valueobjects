@@ -6,8 +6,9 @@
   "An implementation of the VOProxy protocol, keeping all data in
   memory. This implementation is mostly suitable for unit testing or
   interactive development."
-  (:require [prime.vo :refer (manifest)]
+  (:require [clojure.string :refer (split)]
             [prime.utils :as utils]
+            [prime.vo :refer (manifest)]
             [prime.vo.proxy :refer :all]
             [prime.vo.pathops :as pathops]
             [taoensso.timbre :refer (trace debug info warn error fatal spy)]))
@@ -33,6 +34,33 @@
               actual
               search))]
     (= actual (utils/deep-merge-with vector-merge actual search))))
+
+;;; Simuation of elasticsearch filters
+
+(defn- es-filter
+  "Supports:
+
+    range filter -  with `lt`, `lte`, `gt` and `gte`."
+  [options vos]
+  (if-let [paths (get-in options [:filter "range"])]
+    (filter (fn [vo]
+              (loop [paths paths]
+                (if-let [[path tests] (first paths)]
+                  (let [fields (-> (name path) (split #"\.") (->> (map keyword)))
+                        value (reduce get vo fields)
+                        matches? (every? (fn [[test-type test-value]]
+                                           (case test-type
+                                             "lt" (< (compare value test-value) 0)
+                                             "lte" (<= (compare value test-value) 0)
+                                             "gt" (> (compare value test-value) 0)
+                                             "gte" (>= (compare value test-value) 0)))
+                                         tests)]
+                    (if matches?
+                      (recur (next paths))
+                      false))
+                  true)))
+            vos)
+    vos))
 
 ;;; Define the in-memory proxy, both implementing VOProxy as well as
 ;;; VOSearchProxy. The MemoryVOProxy takes an atom encapsulating a map as its
@@ -151,7 +179,7 @@
   (search [this vo options]
     (debug "Searching for VOs based on" vo "having options" options "in" @data)
     (let [vos (vals (get @data (votype->hex vo)))]
-      (doall (filter (partial matches? vo) vos)))))
+      (doall (es-filter options (filter (partial matches? vo) vos))))))
 
 
 ;;; A constructor function.

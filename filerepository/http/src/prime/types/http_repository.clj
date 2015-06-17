@@ -18,7 +18,8 @@
   (:require [taoensso.timbre :as log]
             [clojure.java.io :as io]
             [clj-http.client :as client]
-            [prime.types :refer (to-URI)])
+            [prime.types :refer (to-URI)]
+            [prime.types.repository-util :as util])
   (:import [prime.types FileRef]
            [java.io File FileFilter]))
 
@@ -99,6 +100,9 @@
             tmp (File/createTempFile "http-" ".download" (File. (.tmp-dir state)))]
         (io/copy (:body response) tmp)
         tmp))))
+
+
+(def repo-exists util/exists?) ; trait method
 
 
 ;;; Generate HttpRepository class, for use in Java and Scala.

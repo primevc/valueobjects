@@ -22,4 +22,6 @@
 
         (is (exists? repo ref) "it contains the file")
 
+        (is (.exists repo ref) "it contains the file (direct call)")
+
         (is (= (.length ^File (get-file repo ref)) 2409) "it can return the contents as a File")))))

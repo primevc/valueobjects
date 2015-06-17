@@ -70,6 +70,8 @@
 
         (is (exists? repo ref) "it contains the file")
 
+        (is (.exists repo ref) "it contains the file (direct call)")
+
         (is (= (IOUtils/toString (stream repo ref)) "cassandra test")
             "it can stream the contents")
 

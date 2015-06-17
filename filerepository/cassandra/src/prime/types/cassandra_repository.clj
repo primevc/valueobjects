@@ -266,6 +266,9 @@
     (statement-fn hash)))
 
 
+(def repo-exists repository/exists?) ; trait method
+
+
 ;;; Generate CassandraRepository class, for use in Java and Scala.
 
 (defn repo-init

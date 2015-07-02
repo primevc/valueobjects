@@ -6,11 +6,9 @@
   :description "The Cassandra implementation of FileRepository."
   :url "https://github.com/primevc/valueobjects"
   :dependencies [[org.clojure/clojure "1.6.0"]
-                 [prime/filerepository-core "0.1.0-SNAPSHOT"]
+                 [prime/filerepository-core "0.1.0-SNAPSHOT" :exclusions [commons-codec org.slf4j/slf4j-api]]
                  [containium "0.1.0-SNAPSHOT"] ;---TODO: Use containium-cassandra when available.
-                 [org.xerial.snappy/snappy-java "1.1.0-M4"]
-                 [com.taoensso/timbre "3.2.1"]
-                 [commons-codec "1.8"]]
+                 [com.taoensso/timbre "3.2.1"]]
   :global-vars {*warn-on-reflection* true}
   :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"
                  {:extensions "true"

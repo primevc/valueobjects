@@ -6,10 +6,11 @@
   :description "ElasticSearch VOProxy implementation."
   :url "https://github.com/primevc/valueobjects"
   :dependencies [[prime/voproxy-core "0.1.0-SNAPSHOT"]
-                 [prime/voserializer-cheshire "0.1.0-SNAPSHOT"]
+                 [prime/voserializer-cheshire "0.1.0-SNAPSHOT" :exclusions [cheshire]]
                  [org.elasticsearch/elasticsearch "1.4.1"]
-                 [clojurewerkz/elastisch "2.1.0" :exclusions [clj-http]]
-                 [clj-tuple "0.1.5"]]
+                 [clojurewerkz/elastisch "2.1.0" :exclusions [cheshire org.msgpack/msgpack]]
+                 [clj-http "1.1.2" :exclusions [org.msgpack/msgpack]]
+                 [clj-tuple "0.2.2"]]
   :profiles {:test {:dependencies [[containium "0.1.0-SNAPSHOT"]
                                    [org.clojars.touch/elasticsearch-lang-clojure "0.2.0-SNAPSHOT"]]}
              :mvel {:dependencies [[org.mvel/mvel2 "2.1.3.Final"]]}}

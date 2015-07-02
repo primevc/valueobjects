@@ -5,9 +5,8 @@
 (defproject prime/filerepository-http "0.1.0-SNAPSHOT"
   :description "The HTTP (retrieve only) implementation of FileRepository."
   :url "https://github.com/primevc/valueobjects"
-  :dependencies [[org.clojure/clojure "1.5.1"]
+  :dependencies [[org.clojure/clojure "1.6.0"]
                  [prime/filerepository-core "0.1.0-SNAPSHOT"]
-                 [com.taoensso/timbre "3.3.1"]
                  [clj-http "1.0.1"]]
   :global-vars {*warn-on-reflection* true}
   :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"

@@ -5,7 +5,7 @@
 (defproject prime/filerepository-core "0.1.0-SNAPSHOT"
   :description "The core FileRepository functionality."
   :url "https://github.com/primevc/valueobjects"
-  :dependencies [[org.clojure/clojure "1.5.1"]
+  :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.scala-lang/scala-library "2.9.2"]
                  [prime/vo "0.1.0-SNAPSHOT"]]
   :profiles {:test {:dependencies [[org.specs2/specs2_2.9.2 "1.11"]]}}

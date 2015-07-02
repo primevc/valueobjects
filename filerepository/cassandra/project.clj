@@ -5,7 +5,7 @@
 (defproject prime/filerepository-cassandra "0.1.0-SNAPSHOT"
   :description "The Cassandra implementation of FileRepository."
   :url "https://github.com/primevc/valueobjects"
-  :dependencies [[org.clojure/clojure "1.5.1"]
+  :dependencies [[org.clojure/clojure "1.6.0"]
                  [prime/filerepository-core "0.1.0-SNAPSHOT"]
                  [containium "0.1.0-SNAPSHOT"] ;---TODO: Use containium-cassandra when available.
                  [org.xerial.snappy/snappy-java "1.1.0-M4"]

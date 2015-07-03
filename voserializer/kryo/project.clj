@@ -7,7 +7,7 @@
   :url "https://github.com/primevc/valueobjects"
   :dependencies [[org.scala-lang/scala-library "2.9.2"]
                  [prime/vo "0.1.0-SNAPSHOT"]
-                 [com.esotericsoftware.kryo/kryo "2.20"]]
+                 [com.esotericsoftware.kryo/kryo "2.21"]]
   :profiles {:test {:dependencies [[org.specs2/specs2_2.9.2 "1.11"]]}}
   :pom-plugins [[net.alchim31.maven/scala-maven-plugin "3.1.6"
                  {:executions [:execution [:goals [:goal "compile"] [:goal "testCompile"]]]

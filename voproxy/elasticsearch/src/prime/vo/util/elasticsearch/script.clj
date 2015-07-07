@@ -113,9 +113,11 @@
 (defn- merge-at*
   [^Map obj ^Map value]
   (debug "MERGE AT" obj value)
-  (doseq [[k v] value]
-    (.put obj k v))
-  obj)
+  (if obj
+    (do (doseq [[k v] value] (.put obj k v))
+        obj)
+  ;else
+    value))
 
 
 (defn merge-at

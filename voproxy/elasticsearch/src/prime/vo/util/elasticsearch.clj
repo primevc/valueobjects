@@ -23,6 +23,7 @@
            [com.fasterxml.jackson.core JsonGenerator]
            [org.elasticsearch.action.get GetResponse]
            [org.elasticsearch.action.search SearchRequest SearchResponse]
+           [org.elasticsearch.search.aggregations.bucket SingleBucketAggregation MultiBucketsAggregation MultiBucketsAggregation$Bucket]
             org.elasticsearch.common.xcontent.XContentType
            [org.elasticsearch.action.index IndexRequest IndexResponse]
            [org.elasticsearch.action.update UpdateRequest UpdateResponse]
@@ -667,6 +668,55 @@
   (let [^SearchResponse response (-> query meta :response)]
     (when response
       (.. response getHits getTotalHits))))
+
+
+;;; Aggregations
+
+(defn- terms-bucket->maps [^MultiBucketsAggregation agg]
+  (for [^MultiBucketsAggregation$Bucket b (.getBuckets agg)]
+    {:doc_count (.getDocCount b) :key (.getKey b)}))
+
+(defn- with-response-meta
+  ([data]
+    (with-response-meta data data))
+  ([data res]
+    (with-meta data {:res res :total (-> res search-hit-count)})))
+
+(defn search->aggregations [res]
+  ;(prn "search->aggregations" res (meta res))
+  (let [aggs (.. ^SearchResponse (:response (meta res)) getAggregations iterator next getAggregations)
+        ;_ (prn "getAggregations" aggs)
+        mapped-aggs
+        (map (fn [^SingleBucketAggregation agg]
+               [(keyword (.getName agg)) (terms-bucket->maps agg)])
+             aggs)]
+    ;(prn mapped-aggs)
+    (with-response-meta
+      (if-not (next mapped-aggs) (-> mapped-aggs first second) #_else (into {} mapped-aggs))
+      res)))
+
+(defn- vo->agg-filter [vo-filter]
+  (if-not (empty? vo-filter)
+    (vo->term-filter vo-filter)
+  ;else
+    {"type" {"value" (vo-hexname vo-filter)}}))
+
+(defn ->term-agg [fields vo-filter size & [agg-filter]]
+  {"agg"
+    {"filter" (if-not agg-filter (vo->agg-filter vo-filter)
+               #_else {"and" [(vo->agg-filter vo-filter) agg-filter]})
+     "aggs" (into {}
+                  (for [field (if (keyword? fields) [fields] fields)]
+                    [(name field)
+                     {"terms" {"field" field, "size" size}}]))}})
+
+(defn get-aggregation [proxy fields vo-filter size & [agg-filter]]
+  (let [query-opts {:size 0
+                    :_source false
+                    :aggregations (->term-agg fields vo-filter size agg-filter)}
+        res  (search proxy vo-filter query-opts)
+        aggregation (search->aggregations res)]
+    aggregation))
 
 
 ;;; Delta change functions.

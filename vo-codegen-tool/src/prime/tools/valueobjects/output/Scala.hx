@@ -372,7 +372,7 @@ trait "); a(def.name); a(" extends ");
 
 		// -----
 		// Class definition
-		function voSourceAt(p:Property, localEmpty = false) return 'At("'+ p.name +'", '+ propHex(p) +', '+ (localEmpty? 'this' : def.fullName +'.empty') + ((p.type.isTclass() && p.type.getPTypedef().unpackPTypedef() == def)? '' : '.' + p.name.quote()) +')';
+		function voSourceAt(p:Property, localEmpty = false) return 'At("'+ p.name +'", '+ propHex(p) +', '+ (localEmpty? 'this' : def.fullName +'.empty') + '.' + p.name.quote() +')';
 		function anyAt     (p:Property, localEmpty = false) return 'voSource.any'    + voSourceAt(p, localEmpty);
 		function intAt     (p:Property, localEmpty = false) return '          voSource.int' + voSourceAt(p, localEmpty);
 		function doubleAt  (p:Property, localEmpty = false) return '       voSource.double' + voSourceAt(p, localEmpty);

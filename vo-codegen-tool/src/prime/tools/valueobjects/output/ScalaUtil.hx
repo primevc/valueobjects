@@ -119,7 +119,7 @@ class ScalaUtil
 		var arrayType = null;
 		var converterFn = switch(t)
 		{
-			case Tarray(innerT,_,_):	arrayType = innerT; "Vector";
+			case Tarray(innerT,_,_):	arrayType = innerT; "   Vector";
 			case Turi:					"      URI";
 			case Turl:					"      URL";
 			case TuniqueID:				" ObjectId";

@@ -44,7 +44,7 @@
             (fn [i item] (when (to= (get item k) v) i)) ; for {:vo-key value} lookups
             (if (#{:= "="} k)
               (fn [i item] (when (to= item v) i))
-              (throw (IllegalArgumentException. "Must {:= ...} map for primitive array lookups")))))
+              (throw (IllegalArgumentException. "Must use {:= ...} map for primitive array lookups")))))
         (fn [i item] (when (to= item obj) i)))
       (keep-indexed vec)
       (first)))
@@ -55,7 +55,7 @@
     (let [[k v] (first path-step)
           result (find-index obj path-step)]
       (if-not result
-        (throw (IllegalArgumentException. (str "Could not find a match for '" path-step "'.")))
+        (throw (IllegalArgumentException. (str "Could not find a match for " (pr-str path-step))))
         result))
     #_else
     path-step))

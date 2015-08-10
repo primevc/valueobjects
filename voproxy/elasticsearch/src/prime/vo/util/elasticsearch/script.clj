@@ -40,10 +40,10 @@
                            (if (#{:= "="} k)
                              (fn [i item] (when (to= item v) i))  ; for {"=" value"} literal lookups
                              (throw (IllegalArgumentException.
-                                     "Must {:= ...} map for primitive array lookups"))))
+                                     "Must use {:= ...} map for primitive array lookups"))))
                          obj))]
       (if-not result
-        (throw (IllegalArgumentException. (str "Could not find a match for '" path-step "'.")))
+        (throw (IllegalArgumentException. (str "Could not find a match for " (pr-str path-step))))
         result))
     #_else
     path-step))

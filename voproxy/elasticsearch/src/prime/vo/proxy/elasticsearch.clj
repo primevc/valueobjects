@@ -5,6 +5,7 @@
 (ns prime.vo.proxy.elasticsearch
   "A concrete implementation of the VOProxy and VOSearchProxy
   protocols, with ElasticSearch as the backend."
+  (:refer-clojure :exclude [update])
   (:import [org.elasticsearch.node Node])
   (:require [prime.vo.proxy :refer (VOProxy VOSearchProxy)]
             [clojurewerkz.elastisch.native.index :refer (delete-mapping)]

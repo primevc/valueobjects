@@ -6,6 +6,7 @@
   "An implementation of the VOProxy protocol, keeping all data in
   memory. This implementation is mostly suitable for unit testing or
   interactive development."
+  (:refer-clojure :exclude [update])
   (:require [clojure.string :refer (split)]
             [prime.utils :as utils]
             [prime.vo :refer (manifest)]

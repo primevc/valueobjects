@@ -5,6 +5,7 @@
 (ns prime.vo.proxy.cassandra-history
   "A concrete implementation of the VOProxy and VOHistoryProxy
   protocols, having Cassandra as its backend."
+  (:refer-clojure :exclude [update])
   (:require [prime.vo.proxy :refer (VOProxy VOHistoryProxy)]
             [prime.vo.util.cassandra-history :as ch]
             [containium.systems.cassandra :as cassandra :refer (Cassandra)]

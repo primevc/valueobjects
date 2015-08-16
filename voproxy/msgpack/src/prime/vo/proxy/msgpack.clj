@@ -5,6 +5,7 @@
 (ns prime.vo.proxy.msgpack
   "A concrete implementation of the VOProxy protocol, with MessagePack
   as its backend."
+  (:refer-clojure :exclude [update])
   (:require [prime.vo.proxy :refer (VOProxy)]
             [prime.vo.util.msgpack :as mp]))
 

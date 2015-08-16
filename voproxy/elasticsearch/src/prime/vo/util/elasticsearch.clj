@@ -4,7 +4,7 @@
 
 (ns prime.vo.util.elasticsearch
   "The implementation of the ElasticSearch VOProxy and VOSearchProxy."
-  (:refer-clojure :exclude (get))
+  (:refer-clojure :exclude (get update))
   (:require [prime.vo :as vo]
             [clj-tuple :refer (tuple)]
             [clojure.set     :as set]

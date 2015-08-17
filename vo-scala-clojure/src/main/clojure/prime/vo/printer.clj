@@ -100,11 +100,11 @@
 (prefer-method print-dup ValueObject clojure.lang.IPersistentCollection)
 (prefer-method print-dup ValueObject java.util.Map)
 
-(defmethod print-dup org.joda.time.DateMidnight [d ^java.io.Writer w]
+(defmethod print-dup org.joda.time.DateMidnight [^org.joda.time.DateMidnight d ^java.io.Writer w]
   (.write w "\"") (.write w (.toString d "YYYY-MM-DD")) (.write w "\""))
 
-(defmethod print-dup org.joda.time.DateTime [d ^java.io.Writer w]
-  (.write w "\"") (.write w (str d)) (.write w "\""))
+(defmethod print-dup org.joda.time.DateTime [^org.joda.time.DateTime d ^java.io.Writer w]
+  (.write w "\"") (.write w (.toString d)) (.write w "\""))
 
 (defmethod print-dup EnumValue [^EnumValue v, ^Writer w] (.write w "#=") (print-method v w))
 

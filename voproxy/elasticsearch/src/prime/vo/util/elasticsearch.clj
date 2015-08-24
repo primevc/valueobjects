@@ -574,7 +574,7 @@
    :aggregations :highlight :suggest :rescore :stats])
 
 (def need-hex-map-opts
-  [:query :sort :highlight :script_fields :facets :named_filters :aggregations])
+  [:query :sort :highlight :script_fields :facets :named_filters :aggregations :post_filter])
 
 (defn ^SearchRequest ->search-request
   [index-name mapping-type {:keys [search-type search_type routing preference
@@ -682,9 +682,10 @@
   ([data res]
     (with-meta data {:res res :total (-> res search-hit-count)})))
 
-(defn search->aggregations [res]
-  ;(prn "search->aggregations" res (meta res))
-  (let [aggs (.. ^SearchResponse (:response (meta res)) getAggregations iterator next getAggregations)
+(defn search->term-aggregations [res]
+  ;(prn "search->term-aggregations" res (meta res))
+  (let [aggs (some-> ^SearchResponse (:response (meta res)) .getAggregations .iterator
+                     ^SingleBucketAggregation (.next) .getAggregations)
         ;_ (prn "getAggregations" aggs)
         mapped-aggs
         (map (fn [^SingleBucketAggregation agg]
@@ -695,7 +696,7 @@
       (if-not (next mapped-aggs) (-> mapped-aggs first second) #_else (into {} mapped-aggs))
       res)))
 
-(defn- vo->agg-filter [vo-filter]
+(defn vo->agg-filter [vo-filter]
   (if-not (empty? vo-filter)
     (vo->term-filter vo-filter)
   ;else
@@ -711,11 +712,11 @@
                      {"terms" {"field" field, "size" size}}]))}})
 
 (defn get-aggregation [proxy fields vo-filter size & [agg-filter]]
-  (let [query-opts {:size 0
+  (let [query-opts {:search-type :count
                     :_source false
                     :aggregations (->term-agg fields vo-filter size agg-filter)}
         res  (search proxy vo-filter query-opts)
-        aggregation (search->aggregations res)]
+        aggregation (search->term-aggregations res)]
     aggregation))
 
 

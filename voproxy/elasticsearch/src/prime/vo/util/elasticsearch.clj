@@ -29,6 +29,23 @@
            [org.elasticsearch.action.update UpdateRequest UpdateResponse]
            [org.elasticsearch.search SearchHit SearchHitField]))
 
+;;; Monkey patches
+
+(binding [*ns* (find-ns 'clojurewerkz.elastisch.native.conversion)]
+  ;; Add :key to bucket
+  (defn range-bucket->map
+    [^org.elasticsearch.search.aggregations.bucket.range.Range$Bucket b]
+    {:doc_count (.getDocCount b)
+     :from_as_string (String/valueOf ^long (.. b getFrom longValue))
+     :from (.. b getFrom longValue)
+     :to_as_string (String/valueOf ^long (.. b getTo longValue))
+     :to (.. b getTo longValue)
+     :key (.getKey b)})
+  ;; Overwrite protocol implementation
+  (extend-protocol clojurewerkz.elastisch.native.conversion/AggregatorPresenter
+    org.elasticsearch.search.aggregations.bucket.range.Range
+    (aggregation-value [^Range agg]
+      {:buckets (vec (map range-bucket->map (.getBuckets agg)))})))
 
 ;;; Demonize TransportClient, if Immutant is available.
 

@@ -65,6 +65,8 @@
   (mapping-field-type-defaults [valueType] "Returns a map with default options for ElasticSearch mapping."))
 
 (extend-protocol TermFilter
+  nil
+  (term-kv-pair [v k kv-pair] kv-pair)
 
   Object
   (term-kv-pair [v k kv-pair] kv-pair)

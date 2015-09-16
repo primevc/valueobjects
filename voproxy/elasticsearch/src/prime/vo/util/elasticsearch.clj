@@ -225,6 +225,8 @@
 
 (defn map-keywords->hex-fields [^prime.vo.ValueObject vo, expr]
   (cond
+    (nil? expr)
+      nil
     (instance? clojure.lang.MapEntry expr)
       (let [[k v] expr
              k    (if-not (keyword? k) (map-keywords->hex-fields vo k) #_else (keyword->hex-field vo k))]
@@ -654,18 +656,20 @@
                    {"bool" {"must" (tuple (vo->search-filter vo) filter)}}
                    ; http://www.elasticsearch.org/blog/all-about-elasticsearch-filter-bitsets/
                    filter))
-        query (when (or query filter)
-                {"filtered"
-                 (if query {"filter" filter, "query" (map-keywords->hex-fields vo query)}
-                  #_else   {"filter" filter})})
+        query {"filtered"
+               (if query {"filter" filter, "query" (map-keywords->hex-fields vo query)}
+                #_else   {"filter" filter})}
         fields (when (or only exclude)
                  (field-filtered-seq* (empty vo) only exclude))
         options (if default-opts (conj default-opts options) #_else options)
-        extra-source-opts (->>
-                            (for [[option-key option-value] options
-                                  :let [v (case option-key
+        extra-source-opts (loop [[[option-key option-value :as opt] & more-options] (seq options)
+                                 result (transient {:query query})]
+                            (if-not opt
+                              (persistent! result)
+                            ;else process options:
+                              (let [value (case option-key
                                             :query
-                                              nil ;; Already added below using cons
+                                              nil ;; Already added to transient above
                                             :_source
                                               (if-not (nil? _source) _source #_else fields)
                                             #=(need-hex-map-opts)
@@ -674,10 +678,10 @@
                                               option-value
                                             ;otherwise
                                               nil)]
-                                  :when v]  (tuple option-key v))
-                            (cons (tuple :query query))
-                            (into {}))
-        es-options (assoc options :source (generate-hexed-fields-smile extra-source-opts))
+                                (recur more-options
+                                       (if-not value result (assoc! result option-key value))))))
+        es-options (if (empty? extra-source-opts) options
+                    #_else (assoc options :source (generate-hexed-fields-smile extra-source-opts)))
         ;; _ (clojure.pprint/pprint (assoc es-options :extra-source extra-source-opts))
         ft (es/search client (->search-request index (vo-hexname vo) es-options))
         ]

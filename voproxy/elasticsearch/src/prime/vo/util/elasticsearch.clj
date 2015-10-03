@@ -665,13 +665,16 @@
         extra-source-opts (loop [[[option-key option-value :as opt] & more-options] (seq options)
                                  result (transient {:query query})]
                             (if-not opt
-                              (persistent! result)
+                              (let [result
+                                    (if-let [s (or _source fields)] (assoc! result :_source s)
+                                     #_else result)]
+                                (persistent! result))
                             ;else process options:
                               (let [value (case option-key
                                             :query
                                               nil ;; Already added to transient above
                                             :_source
-                                              (if-not (nil? _source) _source #_else fields)
+                                              nil ;; Already added to transient above
                                             #=(need-hex-map-opts)
                                               (map-keywords->hex-fields vo option-value)
                                             #=(search-source-opts)

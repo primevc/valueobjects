@@ -70,7 +70,7 @@
   "Test whether the specified FileRef exists in the repository."
   [this ^FileRef ref]
   (log/debug "Checking whether FileRef" ref "exists.")
-  (let [exists (= (:status (client/head (ref-url ref))) 200)]
+  (let [exists (= (:status (client/head (ref-url ref) {:insecure? true})) 200)]
     (log/debug "FileRef" ref (if exists "exists." "does not exist (or is inaccessible)."))
     exists))
 
@@ -85,7 +85,7 @@
   "Open an InputStream to the file as referenced by the FileRef. Or
   returns nil/null when the ref cannot be found."
   [this ^FileRef ref]
-  (let [response (client/get (ref-url ref) {:as :stream})]
+  (let [response (client/get (ref-url ref) {:as :stream, :insecure? true})]
     (when (= (:status response) 200)
       (:body response))))
 
@@ -94,7 +94,7 @@
   "Returns a File containing the data as referenced by the FileRef."
   [^prime.types.HttpRepository this ^FileRef ref]
   (log/info "File requested for FileRef" ref)
-  (let [response (client/get (ref-url ref) {:as :stream})]
+  (let [response (client/get (ref-url ref) {:as :stream, :insecure? true})]
     (when (= (:status response) 200)
       (let [^State state (.state this)
             tmp (File/createTempFile "http-" ".download" (File. (.tmp-dir state)))]

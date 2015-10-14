@@ -89,6 +89,11 @@
     (fact "a value within an array can be replaced"
 
       (replace-at {:booklet {:spreads [{:id 1 :tags ["ahoi" 0 1 2 3 4 5]}]}}
+                  [:booklet :spreads {:id 1} :tags {:= "5"}]
+                  "last!")
+      => {:booklet {:spreads [{:id 1 :tags ["ahoi" 0 1 2 3 4 "last!"]}]}}
+
+      (replace-at {:booklet {:spreads [{:id 1 :tags ["ahoi" 0 1 2 3 4 5]}]}}
                   [:booklet :spreads {:id 1} :tags 0]
                   "VET!")
       => {:booklet {:spreads [{:id 1 :tags ["VET!" 0 1 2 3 4 5]}]}})
@@ -141,6 +146,15 @@
 
       (insert-at {:tags [1 2 3 4]} [:tags -1] "whoop")
       => {:tags [1 2 3 "whoop" 4]})
+
+
+    (fact "value indexes work for move to"
+
+      (move-vo-to {:tags [1 2 3 4]} [:tags {:= 1}] 0)
+      => {:tags [1 2 3 4]}
+
+      (move-vo-to {:tags [1 2 3 4]} [:tags {:= 4}] 0)
+      => {:tags [4 1 2 3]})
 
 
     (fact "negative indexes work for move to"

@@ -8,6 +8,8 @@
   (:use prime.utils))
 
 
+(def ^:dynamic *throw-when-missing* false)
+
 ;;; Path helper functions.
 
 (defn- fill-path-step [step var]
@@ -54,8 +56,8 @@
   (if (and (array-like? obj) (not (number? path-step)))
     (let [[k v] (first path-step)
           result (find-index obj path-step)]
-      (if-not result
-        (throw (IllegalArgumentException. (str "Could not find a match for " (pr-str path-step))))
+      (if (and (not result) *throw-when-missing*)
+        (throw (IndexOutOfBoundsException. (str "Could not find a match for " (pr-str path-step))))
         result))
     #_else
     path-step))
@@ -68,7 +70,7 @@
   value of this function over the core `get-in` function is that this
   function understands our own type of paths."
   [m [k & ks]]
-  (let [k (concrete-path-step m k)]
+  (when-let [k (concrete-path-step m k)]
     (when (and (number? k) (not (contains? m k)))
       (throw (IllegalArgumentException. (str "Object " m " does not contain '" k "'."))))
     (if ks
@@ -159,9 +161,11 @@
 (defn- vector-move-item [vec from to]
   {:pre [(array-like? vec) (not (empty? vec))]}
   (let [vec (clojure.core/vec vec) ; Hack: subvec behaves different on Scala vectors vs Clojure's.
-        from (relative-vector-index (count vec) (concrete-path-step vec from))
-        to (relative-vector-index (count vec) to)]
-    (if (= from to) vec
+        from (concrete-path-step vec from)
+        to   (concrete-path-step vec to)
+        from (when from (relative-vector-index (count vec) from))
+        to   (when to   (relative-vector-index (count vec) to))]
+    (if (or (nil? from) (nil? to) (= from to)) vec
         (vector-insert-at (vector-remove vec from) to
                           (nth vec from) :allow-index-after-last))))
 
@@ -182,8 +186,8 @@
   [container at value]
   (assert container "replace is only possible in existing container")
   (if (vector? container)
-    (let [at (concrete-path-step container at)
-          index (relative-vector-index (count container) at)]
+    (when-let [index (some->> at (concrete-path-step container)
+                              (relative-vector-index (count container)))]
       (if (array-like? value)
         (let [[pre post] (split-at index container)]
           (into [] (concat pre value (next post))))

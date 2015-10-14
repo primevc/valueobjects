@@ -182,7 +182,8 @@
   [container at value]
   (assert container "replace is only possible in existing container")
   (if (vector? container)
-    (let [index (relative-vector-index (count container) (concrete-path-step container at))]
+    (let [at (concrete-path-step container at)
+          index (relative-vector-index (count container) at)]
       (if (array-like? value)
         (let [[pre post] (split-at index container)]
           (into [] (concat pre value (next post))))

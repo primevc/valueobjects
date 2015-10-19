@@ -4,7 +4,7 @@
 
 (ns prime.vo.pathops
   "Operations (add, update, ...) for ValueObject using value-paths."
-  (:require-macros [prime.utils :refer (or-not)])
+  #?(:cljs (:require-macros [prime.utils :refer (or-not)]))
   (:require
     #?(:clj [prime.types :refer (to=)]))
   (:use #?(:clj prime.utils)))
@@ -56,7 +56,7 @@
             (fn [i item] (when (to= (get item k) v) i)) ; for {:vo-key value} lookups
             (if (#{:= "="} k)
               (fn [i item] (when (to= item v) i))
-              (throw #?(:clj IllegalArgumentException. :cljs js/Object "Must use {:= ...} map for primitive array lookups")))))
+              (throw (new #?(:clj IllegalArgumentException :cljs js/Error) "Must use {:= ...} map for primitive array lookups")))))
         (fn [i item] (when (to= item obj) i)))
       (keep-indexed vec)
       (first)))
@@ -67,7 +67,7 @@
     (let [[k v] (first path-step)
           result (find-index obj path-step)]
       (if (and (not result) *throw-when-missing*)
-        (throw #?(:clj IndexOutOfBoundsException. :cljs js/Object (str "Could not find a match for " (pr-str path-step))))
+        (throw (new #?(:clj IndexOutOfBoundsException :cljs js/Error) (str "Could not find a match for " (pr-str path-step))))
         result))
     #_else
     path-step))
@@ -82,7 +82,7 @@
   [m [k & ks]]
   (when-let [k (concrete-path-step m k)]
     (when (and (number? k) (not (contains? m k)))
-      (throw #?(:clj IllegalArgumentException. :cljs js/Object (str "Object " m " does not contain '" k "'."))))
+      (throw (new #?(:clj IllegalArgumentException :cljs js/Error) (str "Object " m " does not contain '" k "'."))))
     (if ks
       (recur (get m k) ks)
       (get m k))))

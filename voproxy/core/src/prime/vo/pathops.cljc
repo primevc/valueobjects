@@ -4,9 +4,12 @@
 
 (ns prime.vo.pathops
   "Operations (add, update, ...) for ValueObject using value-paths."
-  (require [prime.types :refer (to=)])
-  (:use prime.utils))
+  (:require-macros [prime.utils :refer (or-not)])
+  (:require
+    #?(:clj [prime.types :refer (to=)]))
+  (:use #?(:clj prime.utils)))
 
+#?(:cljs (defn to= [ a b ] (= a b)))
 
 (def ^:dynamic *throw-when-missing* false)
 
@@ -32,10 +35,17 @@
           (when-not (empty? path-rest)
             (fill-path path-rest variables)))))
 
+#?(:clj
+  (defn array-like?
+    [val]
+    ; TODO: Check array type in cljs
+    (and val (or (sequential? val) #?(:clj (.. (class val) isArray)) #?(:clj (instance? java.util.List val))))))
 
-(defn array-like?
-  [val]
-  (and val (or (sequential? val) (.. (class val) isArray) (instance? java.util.List val))))
+#?(:cljs
+  (defn array-like?
+    [val]
+    ; TODO: Check array type in cljs
+    (and val (or (sequential? val)))))
 
 
 (defn- find-index [vec obj]
@@ -46,7 +56,7 @@
             (fn [i item] (when (to= (get item k) v) i)) ; for {:vo-key value} lookups
             (if (#{:= "="} k)
               (fn [i item] (when (to= item v) i))
-              (throw (IllegalArgumentException. "Must use {:= ...} map for primitive array lookups")))))
+              (throw #?(:clj IllegalArgumentException. :cljs js/Object "Must use {:= ...} map for primitive array lookups")))))
         (fn [i item] (when (to= item obj) i)))
       (keep-indexed vec)
       (first)))
@@ -57,7 +67,7 @@
     (let [[k v] (first path-step)
           result (find-index obj path-step)]
       (if (and (not result) *throw-when-missing*)
-        (throw (IndexOutOfBoundsException. (str "Could not find a match for " (pr-str path-step))))
+        (throw #?(:clj IndexOutOfBoundsException. :cljs js/Object (str "Could not find a match for " (pr-str path-step))))
         result))
     #_else
     path-step))
@@ -72,7 +82,7 @@
   [m [k & ks]]
   (when-let [k (concrete-path-step m k)]
     (when (and (number? k) (not (contains? m k)))
-      (throw (IllegalArgumentException. (str "Object " m " does not contain '" k "'."))))
+      (throw #?(:clj IllegalArgumentException. :cljs js/Object (str "Object " m " does not contain '" k "'."))))
     (if ks
       (recur (get m k) ks)
       (get m k))))

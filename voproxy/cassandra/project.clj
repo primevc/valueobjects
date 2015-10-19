@@ -5,9 +5,7 @@
 (defproject prime/voproxy.cassandra-history "0.1.0-SNAPSHOT"
   :description "Cassandra implementation of VOProxy."
   :url "https://github.com/primevc/valueobjects"
-  :dependencies [[prime/vo "0.1.0-SNAPSHOT"
-                  :exclusions [org.slf4j/slf4j-api org.slf4j/slf4j-log4j12]]
-                 [prime/voproxy-core "0.1.0-SNAPSHOT"]
+  :dependencies [[prime/voproxy-core "0.1.0-SNAPSHOT"]
                  [prime/voserializer-cheshire "0.1.0-SNAPSHOT"]
                  [cc.qbits/hayt "1.4.0"]
                  [containium "0.1.0-SNAPSHOT"]] ;---TODO: Use containium-cassandra when available.

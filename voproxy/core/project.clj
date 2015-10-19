@@ -5,7 +5,7 @@
 (defproject prime/voproxy-core "0.1.0-SNAPSHOT"
   :description "VOProxy core library."
   :url "https://github.com/primevc/valueobjects"
-  :dependencies [[prime/vo "0.1.0-SNAPSHOT"]
+  :dependencies [[prime/vo "0.1.0-SNAPSHOT" :exclusions [org.clojure/clojure]]
                  [prime/utils "0.1.0-SNAPSHOT"]
                  [org.clojure/clojure "1.7.0"]
                  [fast-zip "0.3.0"]

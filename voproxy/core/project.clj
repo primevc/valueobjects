@@ -12,7 +12,7 @@
                  [com.taoensso/timbre "3.2.1"]]
   :profiles {:test {:dependencies [[midje "1.5.1"]]}}
   :scm {:dir "../.."}
-  :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"
+  :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.7.1"
                  {:extensions "true"
                   :executions ([:execution
                                 [:id "clojure-compile"]

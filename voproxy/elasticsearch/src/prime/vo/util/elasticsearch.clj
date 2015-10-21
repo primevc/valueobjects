@@ -158,7 +158,7 @@
               #_else
                 (vo-mapping empty (or option-map {})))
 
-              (dissoc option-map :type)
+              (apply dissoc option-map :type (filter symbol? (keys option-map)))
           ))
         #_else
           (conj {} (mapping-field-type-defaults value-type) option-map) ;overwrites defaults

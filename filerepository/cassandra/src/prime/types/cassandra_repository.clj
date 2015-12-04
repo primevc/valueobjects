@@ -234,13 +234,8 @@
       ref)))
 
 
-(defn repo-getFile
-  "Returns a File containing the data as referenced by the FileRef."
-  [this ^FileRef ref]
-  (log/info "File requested for FileRef" ref)
-  (let [^State state (.state ^prime.types.CassandraRepository this)
-        hash (ref-hash ref)
-        tmp (File. ^String (.tmp-dir state) (str "cfr-" (Base64/encodeBase64URLSafeString hash)))]
+(defn- mk-tmpFile! [^State state, ^File tmp, hash]
+  (locking state
     (if-not (.exists tmp)
       (do (log/info "File not available in temporary directory; creating it now.")
           (let [statement-fn (. ^Statements (. state statements) stream)
@@ -251,7 +246,16 @@
             (.write channel data)
             (.close channel)))
       (do (log/info "File" tmp "already available in temporary directory; touching it now.")
-          (.setLastModified tmp (System/currentTimeMillis)))) ;; touch
+          (.setLastModified tmp (System/currentTimeMillis)))))) ;; touch
+
+(defn repo-getFile
+  "Returns a File containing the data as referenced by the FileRef."
+  [this ^FileRef ref]
+  (log/info "File requested for FileRef" ref)
+  (let [^State state (.state ^prime.types.CassandraRepository this)
+        hash (ref-hash ref)
+        tmp (File. ^String (.tmp-dir state) (str "cfr-" (Base64/encodeBase64URLSafeString hash)))]
+    (mk-tmpFile! state tmp hash)
     tmp))
 
 

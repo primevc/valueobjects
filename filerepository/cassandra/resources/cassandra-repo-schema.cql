@@ -6,4 +6,6 @@ CREATE KEYSPACE fs WITH replication = {
 CREATE TABLE fs.files (
     hash blob PRIMARY KEY,
     data blob
-);
+) WITH
+    compaction={'class': 'DateTieredCompactionStrategy'} AND
+    compression={};

@@ -147,13 +147,16 @@
     :merge-at (int 9)))
 
 
+(def ^:private cassandra-prepare
+  (memoize cassandra/prepare))
+
 (defn- get-latest-put
   "Returns the latest PUT action row for the given VO from the
   database."
   [system consistency vo]
   (let [table-name (get-table-name vo)
         query (str "SELECT version, action FROM " table-name " WHERE id = ? ORDER BY version DESC;")
-        prepared (cassandra/prepare system query)
+        prepared (cassandra-prepare system query)
         result (cassandra/do-prepared system prepared
                                       {:consistency consistency :keywordize? true}
                                       [(idconv vo)])]
@@ -239,7 +242,7 @@
   (let [last-put (:version (get-latest-put system consistency target-vo))
         query (str "SELECT * FROM " (get-table-name target-vo) " WHERE id = ? "
                    (when last-put "and version >= ?;"))
-        prepared (cassandra/prepare system query)
+        prepared (cassandra-prepare system query)
         args (if last-put [(idconv target-vo) last-put] [(idconv target-vo)])
         result (cassandra/do-prepared system prepared {:consistency consistency :keywordize? true}
                                       args)]
@@ -249,7 +252,7 @@
   "This returns all IDs of VOs ever stored in history. This includes deleted VOs."
   [{:keys [system consistency]} target-vo]
   (let [query (str "SELECT DISTINCT id FROM " (get-table-name target-vo))
-        prepared (cassandra/prepare system query)
+        prepared (cassandra-prepare system query)
         result (cassandra/do-prepared system prepared {:consistency consistency :keywordize? true})]
       (map :id result)))
 
@@ -259,7 +262,7 @@
 (defn get-slice [{:keys [system consistency]} vo {:keys [slices] :or [slices 1]}]
   ;; This should just send all records.
   #_(let [query (str "SELECT * FROM " (get-table-name vo) " WHERE id = ?")
-        prepared (cassandra/prepare system query)
+        prepared (cassandra-prepare system query)
         result (cassandra/do-prepared system prepared {:consistency consistency :keywordize? true}
                                       [(idconv vo)])]
     ;;---TODO: Create a custom ValueSource for history data, keeping the UUID and action around.
@@ -272,7 +275,7 @@
   [{:keys [system consistency]} vo id action data]
   (let [query (str "INSERT INTO " (get-table-name vo) " (version, id, action, data) "
                    "VALUES ( ? , ? , ? , ? )")
-        prepared (cassandra/prepare system query)]
+        prepared (cassandra-prepare system query)]
     (cassandra/do-prepared system prepared {:consistency consistency}
                            [(UUIDGen/getTimeUUID) id (action->int action)
                             (when data (ByteBuffer/wrap data))])))

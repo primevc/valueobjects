@@ -23,10 +23,11 @@
 
 ;;; Helper functions.
 
-(defn get-table-name
-  "Returns the table name for the given VO."
-  [vo]
-  (str "t" (Integer/toHexString (.ID (prime.vo/manifest vo)))))
+
+(let [hexfn (memoize #(str "t" (Integer/toHexString %)))]
+  (defn get-table-name
+    "Returns the table name for the given VO."
+    [vo] (hexfn (.ID (prime.vo/manifest vo)))))
 
 
 (defn- as-vo
@@ -148,15 +149,16 @@
 
 
 (def ^:private cassandra-prepare
-  (memoize cassandra/prepare))
+  (memoize (fn [system & query] (cassandra/prepare system (apply str query)))))
 
 (defn- get-latest-put
   "Returns the latest PUT action row for the given VO from the
   database."
   [system consistency vo]
   (let [table-name (get-table-name vo)
-        query (str "SELECT version, action FROM " table-name " WHERE id = ? ORDER BY version DESC;")
-        prepared (cassandra-prepare system query)
+        prepared (cassandra-prepare system
+                   "SELECT version, action FROM " table-name
+                   " WHERE id = ? ORDER BY version DESC;")
         result (cassandra/do-prepared system prepared
                                       {:consistency consistency :keywordize? true}
                                       [(idconv vo)])]
@@ -240,9 +242,9 @@
   "This returns a VO having all records since the last put re-applied to it."
   [{:keys [system consistency]} target-vo]
   (let [last-put (:version (get-latest-put system consistency target-vo))
-        query (str "SELECT * FROM " (get-table-name target-vo) " WHERE id = ? "
-                   (when last-put "and version >= ?;"))
-        prepared (cassandra-prepare system query)
+        prepared (cassandra-prepare system
+                   "SELECT * FROM " (get-table-name target-vo)
+                   " WHERE id = ? " (when last-put "AND version >= ?;"))
         args (if last-put [(idconv target-vo) last-put] [(idconv target-vo)])
         result (cassandra/do-prepared system prepared {:consistency consistency :keywordize? true}
                                       args)]
@@ -251,8 +253,8 @@
 (defn get-ids
   "This returns all IDs of VOs ever stored in history. This includes deleted VOs."
   [{:keys [system consistency]} target-vo]
-  (let [query (str "SELECT DISTINCT id FROM " (get-table-name target-vo))
-        prepared (cassandra-prepare system query)
+  (let [prepared (cassandra-prepare system
+                   "SELECT DISTINCT id FROM " (get-table-name target-vo))
         result (cassandra/do-prepared system prepared {:consistency consistency :keywordize? true})]
       (map :id result)))
 
@@ -261,8 +263,8 @@
 ;;    (and implicit search to latest put for begin date)
 (defn get-slice [{:keys [system consistency]} vo {:keys [slices] :or [slices 1]}]
   ;; This should just send all records.
-  #_(let [query (str "SELECT * FROM " (get-table-name vo) " WHERE id = ?")
-        prepared (cassandra-prepare system query)
+  #_(let [prepared (cassandra-prepare system
+                     "SELECT * FROM " (get-table-name vo) " WHERE id = ?")
         result (cassandra/do-prepared system prepared {:consistency consistency :keywordize? true}
                                       [(idconv vo)])]
     ;;---TODO: Create a custom ValueSource for history data, keeping the UUID and action around.
@@ -273,9 +275,9 @@
 (defn- insert
   "Inserts the change data into the database."
   [{:keys [system consistency]} vo id action data]
-  (let [query (str "INSERT INTO " (get-table-name vo) " (version, id, action, data) "
-                   "VALUES ( ? , ? , ? , ? )")
-        prepared (cassandra-prepare system query)]
+  (let [prepared (cassandra-prepare system
+                   "INSERT INTO " (get-table-name vo) " (version, id, action, data) "
+                   "VALUES ( ? , ? , ? , ? )")]
     (cassandra/do-prepared system prepared {:consistency consistency}
                            [(UUIDGen/getTimeUUID) id (action->int action)
                             (when data (ByteBuffer/wrap data))])))

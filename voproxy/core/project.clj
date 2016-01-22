@@ -7,7 +7,7 @@
   :url "https://github.com/primevc/valueobjects"
   :dependencies [[prime/vo "0.1.0-SNAPSHOT" :exclusions [org.clojure/clojure]]
                  [prime/utils "0.1.0-SNAPSHOT"]
-                 [org.clojure/clojure "1.7.0"]
+                 [org.clojure/clojure "1.8.0"]
                  [fast-zip "0.3.0"]
                  [com.taoensso/timbre "3.2.1"]]
   :profiles {:test {:dependencies [[midje "1.5.1"]]}}

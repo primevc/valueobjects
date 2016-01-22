@@ -5,7 +5,7 @@
 (defproject prime/voserializer-cheshire "0.1.0-SNAPSHOT"
   :description "A serializer for VOs using the Cheshire JSON library."
   :url "https://github.com/primevc/valueobjects"
-  :dependencies [[org.clojure/clojure "1.6.0"]
+  :dependencies [[org.clojure/clojure "1.8.0"]
                  [prime/vo "0.1.0-SNAPSHOT"]
                  [cheshire "5.2.0"]]
   :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"

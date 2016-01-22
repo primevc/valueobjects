@@ -5,8 +5,7 @@
 (defproject prime/filerepository-cassandra "0.1.0-SNAPSHOT"
   :description "The Cassandra implementation of FileRepository."
   :url "https://github.com/primevc/valueobjects"
-  :dependencies [[org.clojure/clojure "1.6.0"]
-                 [prime/filerepository-core "0.1.0-SNAPSHOT" :exclusions [commons-codec org.slf4j/slf4j-api]]
+  :dependencies [[prime/filerepository-core "0.1.0-SNAPSHOT" :exclusions [commons-codec org.slf4j/slf4j-api]]
                  [containium "0.1.0-SNAPSHOT"] ;---TODO: Use containium-cassandra when available.
                  [com.taoensso/timbre "3.2.1"]]
   :global-vars {*warn-on-reflection* true}

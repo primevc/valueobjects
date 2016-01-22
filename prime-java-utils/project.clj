@@ -1,6 +1,6 @@
 (defproject prime/utils "0.1.0-SNAPSHOT"
   :description "Clojure Utility functions for the JVM"
-  :dependencies [[org.clojure/clojure "1.7.0"]
+  :dependencies [[org.clojure/clojure "1.8.0"]
                  [com.taoensso/timbre "3.4.0"]
                  [commons-codec "1.10"]
                  [commons-io "2.4"]

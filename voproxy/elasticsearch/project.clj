@@ -15,7 +15,7 @@
                                    [org.clojars.touch/elasticsearch-lang-clojure "0.2.0-SNAPSHOT"]]}
              :mvel {:dependencies [[org.mvel/mvel2 "2.1.3.Final"]]}}
   :global-vars {*warn-on-reflection* true}
-  :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.20"
+  :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.7.1"
                  {:extensions "true"
                   :executions ([:execution
                                 [:id "clojure-compile"]

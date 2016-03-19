@@ -28,18 +28,14 @@
   "This wraps the tests in this namespace, and sets up an embedded Cassandra
   instance to test on."
   [f]
-  (let [log-level-before (:current-level @log/config)]
-    (log/set-level! :info)
-    (try
-      (with-systems systems
-        [:config (config/map-config {:cassandra {:config-file "cassandra-test.yaml"}})
-         :logging logging/logger
-         :cassandra embedded/embedded]
-        (deliver cassandra (:cassandra systems))
-        (try (cassandra/write-schema @cassandra "DROP KEYSPACE fs;") (catch Exception ex))
-        (f))
-      (finally
-        (log/set-level! log-level-before)))))
+  (log/with-level :info
+    (with-systems systems
+      [:config (config/map-config {:cassandra {:config-file "cassandra-test.yaml"}})
+       :logging logging/logger
+       :cassandra embedded/embedded]
+      (deliver cassandra (:cassandra systems))
+      (try (cassandra/write-schema @cassandra "DROP KEYSPACE fs;") (catch Exception ex))
+      (f))))
 
 
 (defn mock-exists

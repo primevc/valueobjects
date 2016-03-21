@@ -9,7 +9,7 @@
                  [containium "0.1.0-SNAPSHOT"] ;---TODO: Use containium-cassandra when available.
                 ]
   :global-vars {*warn-on-reflection* true}
-  :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"
+  :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.7.1"
                  {:extensions "true"
                   :configuration ([:sourceDirectories [:sourceDirectory "src"]]
                                   [:testSourceDirectories [:testSourceDirectory "test"]])
@@ -17,6 +17,7 @@
                                 [:id "aot-compile"]
                                 [:phase "compile"]
                                 [:configuration
+                                 [:vmargs "-Dclojure.compiler.transitive=false"]
                                  [:temporaryOutputDirectory "false"]
                                  [:copyDeclaredNamespaceOnly "true"]
                                  [:compileDeclaredNamespaceOnly "true"]
@@ -39,6 +40,15 @@
                                   ;; [:namespace "!some.namespace.to.ignore"]
                                   ]]
                                 [:goals [:goal "compile"]]]
-                               [:execution [:phase "test"] [:goals [:goal "test"]]])}]]
+                               [:execution [:phase "test"] [:goals [:goal "test"]]]
+                              )}]
+                [org.apache.maven.plugins/maven-assembly-plugin "2.6"
+                 {:executions ([:execution
+                                [:id "gen-class-jar"]
+                                [:phase "package"]
+                                [:goals [:goal "single"]]
+                                [:configuration
+                                 [:appendAssemblyId false]
+                                 [:descriptors [:descriptor "assembly.xml"]]]])}]]
   :pom-addition [:properties [:project.build.sourceEncoding "UTF-8"]]
   :aot [prime.types.cassandra-repository])

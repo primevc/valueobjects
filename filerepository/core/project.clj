@@ -11,6 +11,9 @@
   :profiles {:test {:dependencies [[org.specs2/specs2_2.9.2 "1.11"]]}}
   :source-paths ["src/main/clojure"]
   :test-paths ["src/test/clojure"]
+  :plugins [[lein-scalac "0.1.0"]]
+  :scala-source-path "src/main/scala"
+  :prep-tasks ["scalac"]
   :pom-plugins [[net.alchim31.maven/scala-maven-plugin "3.1.6"
                  {:executions [:execution [:goals [:goal "compile"] [:goal "testCompile"]]]
                   :configuration ([:scalaVersion "2.9.2"]

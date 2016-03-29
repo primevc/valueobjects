@@ -9,6 +9,8 @@
                  [prime/voserializer-cheshire "0.1.0-SNAPSHOT"]
                  [cc.qbits/hayt "1.4.0"]
                  [containium "0.1.0-SNAPSHOT"]] ;---TODO: Use containium-cassandra when available.
+  :profiles {:test {:dependencies [[prime/test-vo "0.1.0-SNAPSHOT"]
+                                   [prime/voproxy-core "0.1.0-SNAPSHOT" :classifier "test-sources"]]}}
   :global-vars {*warn-on-reflection* true}
   :pom-plugins [[com.theoryinpractise/clojure-maven-plugin "1.3.15"
                  {:extensions "true"

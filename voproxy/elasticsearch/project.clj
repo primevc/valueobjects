@@ -12,6 +12,8 @@
                  [clj-http "1.1.2" :exclusions [org.msgpack/msgpack]]
                  [clj-tuple "0.2.2"]]
   :profiles {:test {:dependencies [[containium "0.1.0-SNAPSHOT"]
+                                   [prime/test-vo "0.1.0-SNAPSHOT"]
+                                   [prime/voproxy-core "0.1.0-SNAPSHOT" :classifier "test-sources"]
                                    [org.clojars.touch/elasticsearch-lang-clojure "0.2.0-SNAPSHOT"]]}
              :mvel {:dependencies [[org.mvel/mvel2 "2.1.3.Final"]]}}
   :global-vars {*warn-on-reflection* true}

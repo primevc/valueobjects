@@ -35,9 +35,12 @@
     (.write w (.substring ^String (get str 1) 1))
     (when (.isInstance scala.Product v)
       ; It's a case class with a String parameter
-      (.write w " \"")
-      (.write w (clojure.string/replace (.toString v) "\"" "\\\""))
-      (.write w "\""))
+      (if-let [v (.toString v)]
+        (do (.write w " \"")
+            (.write w (clojure.string/replace v "\"" "\\\""))
+            (.write w "\"")))
+      ;else
+        (.write w " nil"))
     (.write w ")")))
 
 (defmethod print-method FileRef   [^FileRef   v, ^Writer w]

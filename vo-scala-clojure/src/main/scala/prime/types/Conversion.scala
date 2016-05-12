@@ -217,7 +217,7 @@ object Conversion
   def Date      (value:java.util.Date)                      : Date = new Date(value, ISOChronology.getInstanceUTC);
   def Date      (value:Long)                                : Date = new Date(value, ISOChronology.getInstanceUTC);
   def Date      (value:Number)                              : Date = Date(value.longValue);
-  def Date      (value:String, formatter:DateTimeFormatter) : Date = formatter.parseDateTime(String(value)).toDateMidnight;
+  def Date      (value:String, formatter:DateTimeFormatter) : Date = formatter.parseDateTime(String(value)).withChronology(ISOChronology.getInstanceUTC).toDateMidnight;
   def Date      (value:String)                              : Date = Date(value, ISODateTimeFormat.dateParser);
   def Date      (value:IntegerType)                         : Date = Date(value.asLong);
   def Date      (value:FloatType)                           : Date = Date(value.asLong);
@@ -245,7 +245,7 @@ object Conversion
   def DateTime  (value:java.util.Date)                      : DateTime = new DateTime(value, ISOChronology.getInstanceUTC);
   def DateTime  (value:Long)                                : DateTime = new DateTime(value, ISOChronology.getInstanceUTC);
   def DateTime  (value:Number)                              : DateTime = DateTime(value.longValue);
-  def DateTime  (value:String, formatter:DateTimeFormatter) : DateTime = formatter.parseDateTime(String(value));
+  def DateTime  (value:String, formatter:DateTimeFormatter) : DateTime = formatter.parseDateTime(String(value)).withChronology(ISOChronology.getInstanceUTC);
   def DateTime  (value:String)                              : DateTime = DateTime(value, ISODateTimeFormat.dateTime);
   def DateTime  (value:IntegerType)                         : DateTime = DateTime(value.asLong);
   def DateTime  (value:FloatType)                           : DateTime = DateTime(value.asLong);

@@ -2,6 +2,7 @@ package prime.types;
  import prime.vo._;
  import org.joda.time.{ReadableInstant}
  import org.joda.time.format.{DateTimeFormatter, ISODateTimeFormat}
+ import org.joda.time.chrono.ISOChronology;
  import org.apache.commons.codec.binary.Base64;
  import org.msgpack.`object`._
  import prime.utils.msgpack.MessagePackObjectId;
@@ -213,7 +214,7 @@ object Conversion
 
   def Date      (value:Date)                                : Date = value;
   def Date      (value:ReadableInstant)                     : Date = new Date(value);
-  def Date      (value:java.util.Date)                      : Date = new Date(value);
+  def Date      (value:java.util.Date)                      : Date = new Date(value, ISOChronology.getInstanceUTC);
   def Date      (value:Long)                                : Date = new Date(value);
   def Date      (value:Number)                              : Date = new Date(value.longValue);
   def Date      (value:String, formatter:DateTimeFormatter) : Date = formatter.parseDateTime(String(value)).toDateMidnight;
@@ -241,7 +242,7 @@ object Conversion
 
   def DateTime  (value:DateTime)                            : DateTime = value;
   def DateTime  (value:ReadableInstant)                     : DateTime = new DateTime(value);
-  def DateTime  (value:java.util.Date)                      : DateTime = new DateTime(value);
+  def DateTime  (value:java.util.Date)                      : DateTime = new DateTime(value, ISOChronology.getInstanceUTC);
   def DateTime  (value:Long)                                : DateTime = new DateTime(value);
   def DateTime  (value:Number)                              : DateTime = new DateTime(value.longValue);
   def DateTime  (value:String, formatter:DateTimeFormatter) : DateTime = formatter.parseDateTime(String(value));

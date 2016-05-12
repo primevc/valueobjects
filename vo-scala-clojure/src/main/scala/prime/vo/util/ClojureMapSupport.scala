@@ -238,13 +238,7 @@ trait ClojureMapSupport extends IPersistentMap
   }
 
   // Iterable
-  /**
-    Always returns null. Why? I'll tell you why:
-
-    user=> (.iterator {:wut :wat})
-    ClassCastException clojure.lang.PersistentArrayMap cannot be cast to clojure.lang.PersistentHashMap  user/eval1540 (NO_SOURCE_FILE:1)
-   */
-  override def iterator = null;// : java.util.Iterator[AnyRef] = null;
+  def iterator = new clojure.lang.SeqIterator(this.seq).asInstanceOf[java.util.Iterator[AnyRef]]
   final protected def   keySet(field : ValueObjectField[_]) = field.keyword;
   final protected def entrySet(field : ValueObjectField[_]) = new MapEntry(field.keyword, field.get(ClojureMapSupport.this)).asInstanceOf[java.util.Map.Entry[Keyword,Any]];
 

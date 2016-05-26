@@ -88,7 +88,7 @@
   implemented for the case where `prime.vo/fields-path-seq` returns a
   seq where the last path item has not been transformed. This happens
   when the path points to an item by value in a primitive (including
-  VORef) array. For example: `(remove-from organization-vo [:members
+  VORef) array. For example: `(remove-at organization-vo [:members
   {:id 1}])`."
   [path]
   (map (fn [item]
@@ -142,7 +142,7 @@
     :delete (int 3)
     :append-to (int 5)
     :move-to (int 4)
-    :remove-from (int 6)
+    :remove-at (int 6)
     :insert-at (int 7)
     :replace-at (int 8)
     :merge-at (int 9)))
@@ -212,10 +212,10 @@
                      filled-path (pathops/fill-path path path-vars)]
                  (pathops/move-vo-to accumulator filled-path to))
 
-               #=(action->int :remove-from)
+               #=(action->int :remove-at)
                (let [[path path-vars _] (bytes->change-data (:data row))
                      filled-path (pathops/fill-path path path-vars)]
-                 (pathops/remove-from accumulator filled-path))
+                 (pathops/remove-at accumulator filled-path))
 
                #=(action->int :insert-at)
                (let [[path path-vars value _] (bytes->change-data (:data row))
@@ -341,8 +341,8 @@
                                ))))
 
 
-(defn remove-from
+(defn remove-at
   [proxy vo path path-vars options]
-  {:pre [(or (pathops/remove-from vo (pathops/fill-path path path-vars)) true)]}
-  (insert proxy vo (idconv vo) :remove-from
+  {:pre [(or (pathops/remove-at vo (pathops/fill-path path path-vars)) true)]}
+  (insert proxy vo (idconv vo) :remove-at
           (change-data->bytes (prepare-path vo path) path-vars)))

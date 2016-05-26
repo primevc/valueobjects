@@ -155,7 +155,7 @@
 
 ;; Removing
 
-(defn- remove-from*
+(defn- remove-at*
   [obj at]
   (debug "REMOVE FROM" obj at)
   (let [at (concrete-path-step obj at)
@@ -168,10 +168,10 @@
   obj)
 
 
-(defn remove-from
+(defn remove-at
   [{:strs [path ctx]}]
   (let [doc (get ctx "_source")]
-    (update-in-vo doc (butlast path) remove-from* (last path))))
+    (update-in-vo doc (butlast path) remove-at* (last path))))
 
 
 ;; Inserting
@@ -293,10 +293,10 @@
        (def-source prime.vo.util.elasticsearch.script/replace-at*)
        (def-source prime.vo.util.elasticsearch.script/replace-at)))
 
-(def remove-from-script
+(def remove-at-script
   (str base-script
-       (def-source prime.vo.util.elasticsearch.script/remove-from*)
-       (def-source prime.vo.util.elasticsearch.script/remove-from)))
+       (def-source prime.vo.util.elasticsearch.script/remove-at*)
+       (def-source prime.vo.util.elasticsearch.script/remove-at)))
 
 (def insert-at-script
   (str base-script

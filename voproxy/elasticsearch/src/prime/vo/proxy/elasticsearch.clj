@@ -72,11 +72,11 @@
   (merge-at [this vo path path-vars value options]
     (es/merge-at this vo path (or path-vars ()) value options))
 
-  (remove-from [this vo path path-vars]
-    (es/remove-from this vo path (or path-vars ()) {}))
+  (remove-at [this vo path path-vars]
+    (es/remove-at this vo path (or path-vars ()) {}))
 
-  (remove-from [this vo path path-vars options]
-    (es/remove-from this vo path (or path-vars ()) options))
+  (remove-at [this vo path path-vars options]
+    (es/remove-at this vo path (or path-vars ()) options))
 
   VOSearchProxy
   ;; [es ^ValueObject vo indices & {:as options :keys [ query filter from size types sort

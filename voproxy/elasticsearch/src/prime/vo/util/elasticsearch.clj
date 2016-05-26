@@ -803,9 +803,9 @@
   [proxy vo path path-vars value options]
   (update-by-script proxy vo path path-vars options escript/merge-at-script {"value" value}))
 
-(defn remove-from
+(defn remove-at
   [proxy vo path path-vars options]
-  (update-by-script proxy vo path path-vars options escript/remove-from-script nil))
+  (update-by-script proxy vo path path-vars options escript/remove-at-script nil))
 
 
 ;;; Query helpers

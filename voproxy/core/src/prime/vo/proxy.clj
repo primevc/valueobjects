@@ -6,9 +6,10 @@
   "This namespace defines the VOProxy, VOSearchProxy and VOHistoryProxy
   protocols. The namespace also includes helper functions for easy
   creation of implementations of these protocols."
-  (:refer-clojure :exclude [update])
+  (:refer-clojure :exclude [get update])
   (:require [fast-zip.core :as zip]
             [taoensso.timbre :as log]
+            [clojure.core :as clj]
             [prime.vo :refer (id-field vo-zipper)]
             [prime.vo.definition :refer (companion-object-symbol)]
             [prime.utils :refer (guard-let index-of forcat)]))
@@ -74,7 +75,7 @@
     :allow-nil-or-empty-path? This defaults to false, which means a
     path cannot be nil or empty.")
 
-  (remove-from [vo path path-vars] [proxy vo path path-vars] [proxy vo path path-vars options]
+  (remove-at [vo path path-vars] [proxy vo path path-vars] [proxy vo path path-vars options]
     "Given a VO and a path in a VO, removes that what the path points to."))
 
 
@@ -88,6 +89,13 @@
   "Get the history of a particular VO."
   (get-slice [proxy vo] [proxy vo options]
     "Get latest slice of history of a VO. Can be limited to a certain amount of :slices."))
+
+
+;; Backwards compatibility aliases
+
+(def ^{:doc "Alias of VOProxy/get-vo"}    get         get-vo)
+(def ^{:doc "Alias of VOProxy/put-vo"}    put         put-vo)
+(def ^{:doc "Alias of VOProxy/remove-at"} remove-from remove-at)
 
 
 ;;; A filter for value objects.
@@ -119,7 +127,7 @@
            next in-fields]
       (if next
         (let [field-key (first (zip/node next))
-              keep-item (get keep-map field-key)
+              keep-item (clj/get keep-map field-key)
               new (if-not keep-item
                     (zip/edit next (constantly nil))
                     (if-not (map? keep-item)
@@ -129,8 +137,8 @@
                       ;; vector or a value object. If so, recurse!
                       (guard-let [value-vz (-> next zip/down zip/right) :when zip/branch?]
                         (zip/up (if (vector? (zip/node value-vz))
-                                  (vo-keep-array value-vz (get keep-map field-key))
-                                  (vo-keep-vo value-vz (get keep-map field-key))))
+                                  (vo-keep-array value-vz (clj/get keep-map field-key))
+                                  (vo-keep-vo value-vz (clj/get keep-map field-key))))
                         next)))]
           (recur new (zip/right new)))
         (zip/up former)))
@@ -236,7 +244,7 @@
 (defn- vo-proxy-delegator-proxy-forms
   "Returns a sequence alternating binding symbols and proxy function
   calls. The function calls are to the `name` function of the VOProxy,
-  using the given `arglist`. If `name` is \"get-vo\", then the
+  using the given `arglist`. When `name` is \"get\" or \"get-vo\", the
   supplied `proxies` are tried in order, and the result of the first
   to succeed is bound to the `proxy-result-sym`. Otherwise, all
   `proxies` are called, `proxy-result-sym` is bound to the result of
@@ -244,7 +252,7 @@
   the result of the call to the `meta-proxy`."
   [name arglist proxies result-proxy proxy-result-sym meta-proxy meta-result-sym keep-map]
   (let [proxy-calls (into {} (map (juxt identity (partial mk-proxy-call name arglist keep-map)) proxies))]
-    (if (= 'get-vo name)
+    (if (#{'get 'get-vo} name)
       [proxy-result-sym `(or ~@(vals proxy-calls))]
       (forcat [proxy proxies]
         [(condp = proxy
@@ -261,16 +269,22 @@
              (.manifest) (id-field) (.keyword))
          true))
 
+(defn- ->name [name]
+  (or ({'get 'get-vo, 'put 'put-vo, 'remove-from 'remove-at} name)
+      name))
+
 (defn- vo-proxy-delegator-fn
   "Given a VOProxy function `name`, its arguments list, and a sequence
   of pairs of value object types and their delegation options, returns
   a spec for reifying the `name` function in the VOProxy."
   [name arglist vo-opts-pairs]
-  (let [conditions (forcat [[type opts] vo-opts-pairs :when ((:methods opts (constantly true)) name)]
-                     (let [pre-form (get opts (keyword (str "pre-" name)))
-                           post-form (get opts (keyword (str "post-" name)) 'vo)
+  (let [conditions (forcat [[type opts] vo-opts-pairs
+                            :let [name (->name name)]
+                            :when ((:methods opts (constantly true)) name)]
+                     (let [pre-form (clj/get opts (keyword (str "pre-" name)))
+                           post-form (clj/get opts (keyword (str "post-" name)) 'vo)
                            proxies (:proxies opts)
-                           result-proxy (get proxies (if (:return-result-of opts)
+                           result-proxy (clj/get proxies (if (:return-result-of opts)
                                                        (index-of (:return-result-of opts) proxies)
                                                        0))
                            meta-proxy (:with-meta opts)
@@ -428,9 +442,9 @@
   `merge-at
     [ [['vo 'path 'path-vars 'value] ['vo 'path 'path-vars 'value 'options]]
       'merge-at]
-  `remove-from
+  `remove-at
     [ [['vo 'path 'path-vars] ['vo 'path 'path-vars 'options]]
-      'remove-from]
+      'remove-at]
   })
 
 

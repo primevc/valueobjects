@@ -10,7 +10,8 @@
   (deftest ...)"
   (:refer-clojure :exclude [update])
   (:require [clojure.test :refer :all]
-            [prime.vo.proxy :refer :all]
+            [prime.vo.proxy :refer (VOProxy get-vo put-vo update delete append-to insert-at move-to
+                                    replace-at merge-at remove-from VOSearchProxy search)]
             [prime.test.vo])
   (:refer prime.test.vo)
   (:import [org.bson.types ObjectId]))

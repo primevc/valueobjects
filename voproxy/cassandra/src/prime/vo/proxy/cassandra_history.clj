@@ -70,11 +70,11 @@
   (merge-at [this vo path path-vars value options]
     (ch/merge-at this vo path (or path-vars ()) value options))
 
-  (remove-from [this vo path path-vars]
-    (ch/remove-from this vo path (or path-vars ()) {}))
+  (remove-at [this vo path path-vars]
+    (ch/remove-at this vo path (or path-vars ()) {}))
 
-  (remove-from [this vo path path-vars options]
-    (ch/remove-from this vo path (or path-vars ()) options))
+  (remove-at [this vo path path-vars options]
+    (ch/remove-at this vo path (or path-vars ()) options))
 
   VOHistoryProxy
   (get-slice [this vo]

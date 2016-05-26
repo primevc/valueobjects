@@ -228,7 +228,7 @@
 
 ;;; Concrete opertion, remove from.
 
-(defn- remove-at [map-or-vec key]
+(defn- remove-at* [map-or-vec key]
   (if (vector? map-or-vec)
     (if-let [key (if (number? key) key #_else (find-index map-or-vec key))]
       (vector-remove map-or-vec (relative-vector-index (count map-or-vec) key))
@@ -238,10 +238,12 @@
     (dissoc map-or-vec key)))
 
 
-(defn remove-from
+(defn remove-at
   "Given a path in a VO, removes that what it points to."
   [vo path]
   (let [path (vec path)
         at (last path)
         path (pop path)]
-    (update-in-vo vo path remove-at at)))
+    (update-in-vo vo path remove-at* at)))
+
+(def remove-from remove-at) ; Backwards compatibility alias

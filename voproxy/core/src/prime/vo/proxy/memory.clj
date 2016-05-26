@@ -8,6 +8,7 @@
   interactive development."
   (:refer-clojure :exclude [update])
   (:require [clojure.string :refer (split)]
+            [clojure.core :as clj]
             [prime.utils :as utils]
             [prime.vo :refer (manifest)]
             [prime.vo.proxy :refer :all]
@@ -48,7 +49,7 @@
               (loop [paths paths]
                 (if-let [[path tests] (first paths)]
                   (let [fields (-> (name path) (split #"\.") (->> (map keyword)))
-                        value (reduce get vo fields)
+                        value (reduce clj/get vo fields)
                         matches? (every? (fn [[test-type test-value]]
                                            (case test-type
                                              "lt" (< (compare value test-value) 0)
@@ -162,15 +163,15 @@
           updated-vo (pathops/merge-at (get-vo this vo) filled-path value)]
       (put-vo this updated-vo (:id updated-vo))))
 
-  (remove-from [this vo path path-vars]
-    (remove-from this vo path path-vars {}))
+  (remove-at [this vo path path-vars]
+    (remove-at this vo path path-vars {}))
 
-  (remove-from [this vo path path-vars options]
+  (remove-at [this vo path path-vars options]
     (assert-not-nil-id vo)
     (debug "Removing value from vo identified by" vo "on path" path "with vars" path-vars
            "having options" options)
     (let [filled-path (pathops/fill-path path path-vars)
-          updated-vo (pathops/remove-from (get-vo this vo) filled-path)]
+          updated-vo (pathops/remove-at (get-vo this vo) filled-path)]
       (put-vo this updated-vo (:id updated-vo))))
 
   VOSearchProxy
@@ -179,7 +180,7 @@
 
   (search [this vo options]
     (debug "Searching for VOs based on" vo "having options" options "in" @data)
-    (let [vos (vals (get @data (votype->hex vo)))]
+    (let [vos (vals (clj/get @data (votype->hex vo)))]
       (doall (es-filter options (filter (partial matches? vo) vos))))))
 
 

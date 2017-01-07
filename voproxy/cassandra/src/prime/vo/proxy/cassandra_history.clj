@@ -128,7 +128,7 @@
   [system keyspace consistency & vos]
   (when-not (cassandra/has-keyspace? system keyspace)
     (cassandra/write-schema system (str "CREATE KEYSPACE " keyspace " WITH REPLICATION = "
-                              "{ 'class' : 'SimpleStrategy', 'replication_factor' : 3 };")))
+                              "{ 'class' : 'SimpleStrategy', 'replication_factor' : 1 };")))
   (let [session (cassandra/keyspaced system keyspace)
         proxy (CassandraHistoryVOProxy. session consistency keyspace)]
     (apply add-vo-support proxy vos)

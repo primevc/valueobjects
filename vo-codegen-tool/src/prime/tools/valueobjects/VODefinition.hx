@@ -455,7 +455,7 @@ class Util
 			case Tarray(type, min, max):	getPTypedef(type);
 			
 			default: null;
-			//Turi,TuniqueID,Tstring,Tinteger,Temail,Tdecimal,Tcolor,Tbool
+			//Turi,TuniqueID,Tstring,Tinteger,Tlong,Temail,Tdecimal,Tcolor,Tbool
 		}
 	}
 	
@@ -476,6 +476,7 @@ class Util
 			case TfileRef:				false;
 			case Tstring:				false;
 			case Tinteger(_,_,_):		false;
+			case Tlong(_,_,_):			false;
 			case TenumConverter(_):		false;
 			case Temail:				false;
 			case Tdecimal(_,_,_):		false;
@@ -501,6 +502,7 @@ class Util
 			case TfileRef:				true;
 			case Tstring:				true;
 			case Tinteger(_,_,_):		true;
+			case Tlong(_,_,_):			true;
 			case TenumConverter(_):		true;
 			case Temail:				true;
 			case Tdecimal(_,_,_):		true;
@@ -537,7 +539,7 @@ class Util
 			
 			case Tarray(t,_,_):			isSingleValue(t);
 			case Turi, Turl, TuniqueID, Tstring, TfileRef, Temail, Tcolor, Tdate, Tdatetime, Tinterval,
-			     Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_), TenumConverter(_), TclassRef(_): true;
+			     Tinteger(_,_,_), Tlong(_,_,_), Tdecimal(_,_,_), Tbool(_), TenumConverter(_), TclassRef(_): true;
 		}
 	}
 	
@@ -738,6 +740,7 @@ class PropertyTypeResolver
 	{
 		return switch(type) {
 			case integer:		Tinteger();
+			case long:			Tlong();
 			case decimal:		Tdecimal();
 			case color:			Tcolor;
 			case date:			Tdate;
@@ -782,7 +785,7 @@ class PropertyTypeResolver
 	{
 		type = switch(value)
 		{
-			case integer, decimal, color, date, datetime, interval, string, URI, URL, EMail, UniqueID, FileRef, ClassRef(_):
+			case integer, long, decimal, color, date, datetime, interval, string, URI, URL, EMail, UniqueID, FileRef, ClassRef(_):
 				builtinAbstractPType(value);
 			
 			case is(typeName):
@@ -823,7 +826,7 @@ class PropertyTypeResolver
 							case MUndefined(n,m):	throw Err_UndefinedType(path);
 						}
 					
-					case integer, decimal, color, date, datetime, interval, string, URI, URL, EMail, UniqueID, FileRef, ClassRef(_):
+					case integer, long, decimal, color, date, datetime, interval, string, URI, URL, EMail, UniqueID, FileRef, ClassRef(_):
 						builtinAbstractPType(atype);
 					
 					case namedSetOf	(_,_,_,_):	throw "namedSetOf(namedSetOf(...)) unsupported";
@@ -873,6 +876,7 @@ class AttributeHandler
 		
 		switch (p.type) {
 			case Tinteger(min, max, stride):	p.type = Tinteger(value, max, stride);
+			case Tlong(min, max, stride):		p.type = Tlong(value, max, stride);
 			case Tdecimal(min, max, stride):	p.type = Tdecimal(value, max, stride);
 			case Tarray(type, min, max):		p.type = Tarray(type, value, max);
 			
@@ -892,6 +896,7 @@ class AttributeHandler
 		
 		switch (p.type) {
 			case Tinteger(min, max, stride):	p.type = Tinteger(min, value, stride);
+			case Tlong(min, max, stride):		p.type = Tlong(min, value, stride);
 			case Tdecimal(min, max, stride):	p.type = Tdecimal(min, value, stride);
 			case Tarray(type, min, max):		p.type = Tarray(type, min, value);
 			
@@ -1009,7 +1014,7 @@ class Property
 				if (max != null)	assert(defaultval <= max);
 				if (stride != null)	assert(defaultval == (defaultval / stride) * stride);
 			
-			case Tinteger(min,max,stride):
+			case Tinteger(min,max,stride), Tlong(min,max,stride):
 				assert(hasType(Int));
 				if (min != null)	assert(defaultval >= min);
 				if (max != null)	assert(defaultval <= max);
@@ -1127,6 +1132,7 @@ class Enumeration
 			switch (cast(opt,AbstractPType)) {
 				case string:	this.type = PType.Tstring;
 				case integer:	this.type = PType.Tinteger();
+				case long:		this.type = PType.Tlong();
 				case decimal:	this.type = PType.Tdecimal();
 				case color:		this.type = PType.Tcolor;
 				case UniqueID:	this.type = PType.TuniqueID;
@@ -2353,6 +2359,7 @@ class BaseTypeDefinition implements TypeDefinitionWithProperties
 			case Tcolor:			throw Err_PropertyHasNoMembers;
 			case Tdecimal(a,b,c):	throw Err_PropertyHasNoMembers;
 			case Tinteger(a,b,c):	throw Err_PropertyHasNoMembers;
+			case Tlong(a,b,c):		throw Err_PropertyHasNoMembers;
 			case TuniqueID:			throw Err_PropertyHasNoMembers;
 			case TfileRef:			throw Err_PropertyHasNoMembers;
 			case TclassRef(a):		throw Err_PropertyHasNoMembers;
@@ -2599,6 +2606,7 @@ enum PType
 	
 	Tbool			(val:Bool);
 	Tinteger		(?min:Float,	?max:Float,	?stride:Int);
+	Tlong			(?min:Float,	?max:Float,	?stride:Int);
 	Tdecimal		(?min:Float,	?max:Float,	?stride:Float);
 	Tdate;
 	Tdatetime;
@@ -2633,6 +2641,7 @@ enum AbstractPType
 	// numeric
 	decimal;
 	integer;
+	long;
 	color;
 	
 	// string

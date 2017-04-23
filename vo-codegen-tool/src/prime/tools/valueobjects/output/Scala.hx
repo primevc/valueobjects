@@ -81,6 +81,9 @@ private class ScalaBase
 		case Tbool(dval):
 			a(Std.string(val == null? dval : val));
 
+		case Tlong(_,_,_):
+			a(val == null? "scala.Long.MinValue" : Std.string(val));
+
 		case Tinteger(_,_,_):
 			a(val == null? "Int.MinValue" : Std.string(val));
 
@@ -251,6 +254,8 @@ import prime.types.ValueTypes._;
 		var leafNode                  = true;
 		var onlyDoubles               = true;
 		var onlyIntegers              = true;
+		var onlyLongs                 = true;
+		var hasLongs                  = false;
 		var hasDoubles                = false;
 		var hasIntegers               = false;
 		var idType                    = null;
@@ -310,22 +315,23 @@ import prime.types.ValueTypes._;
 			switch(p.type)
 			{
 				case Tdef(pt):
-					onlyDoubles = onlyIntegers = false;
+					onlyDoubles = onlyLongs = onlyIntegers = false;
 					switch(pt) {
 						case Tenum (_):
 						case Tclass(_): if (!p.isReference()) leafNode = false;
 					}
 
 				case Tarray(t,_,_):
-					onlyDoubles = onlyIntegers = false;
+					onlyDoubles = onlyLongs = onlyIntegers = false;
 					if (leafNode) leafNode = t.isSingleValue() || p.isReference();
 
-				case Tinteger(_,_,_): onlyDoubles  = false; hasIntegers = true;
-				case Tdecimal(_,_,_): onlyIntegers = false; hasDoubles  = true;
+				case Tinteger(_,_,_): onlyDoubles  = onlyLongs = false; hasIntegers = true;
+				case Tlong(_,_,_):    onlyDoubles  = onlyIntegers = false; hasLongs = true;
+				case Tdecimal(_,_,_): onlyIntegers = onlyLongs = false; hasDoubles  = true;
 
 				case Tbool(_), Turi, Turl, TuniqueID, Tstring, TfileRef, Temail, Tcolor, Tdate, Tdatetime, Tinterval,
 				     TenumConverter(_), TclassRef(_):
-				    onlyDoubles = onlyIntegers = false;
+				    onlyDoubles = onlyLongs = onlyIntegers = false;
 			}
 		}
 
@@ -375,6 +381,7 @@ trait "); a(def.name); a(" extends ");
 		function voSourceAt(p:Property, localEmpty = false) return 'At("'+ p.name +'", '+ propHex(p) +', '+ (localEmpty? 'this' : def.fullName +'.empty') + '.' + p.name.quote() +')';
 		function anyAt     (p:Property, localEmpty = false) return 'voSource.any'    + voSourceAt(p, localEmpty);
 		function intAt     (p:Property, localEmpty = false) return '          voSource.int' + voSourceAt(p, localEmpty);
+		function longAt    (p:Property, localEmpty = false) return '         voSource.long' + voSourceAt(p, localEmpty);
 		function doubleAt  (p:Property, localEmpty = false) return '       voSource.double' + voSourceAt(p, localEmpty);
 
 		if (!def.isMixin)
@@ -404,8 +411,9 @@ trait "); a(def.name); a(" extends ");
 
 			if (fields.length > 0) {
 				if      (onlyDoubles)  a(" with Doubles");
+				else if (onlyLongs)    a(" with Longs");
 				else if (onlyIntegers) a(" with Integers");
-				else if (!(hasDoubles || hasIntegers)) a(" with NoPrimitives");
+				else if (!(hasDoubles || hasIntegers || hasLongs)) a(" with NoPrimitives");
 			}
 			a(" {\n");
 			// VOType, voCompanion, voManifest
@@ -498,12 +506,14 @@ trait "); a(def.name); a(" extends ");
 				}
 			}
 
-			if (hasDoubles || hasIntegers)
+			if (hasDoubles || hasIntegers || hasLongs)
 			{
-				if (!onlyIntegers)
+				if (!onlyIntegers && !onlyLongs)
 					unboxedAt("double", "Double", "Decimal", hasDoubles,  function (p) return switch (p.type) { default: false; case Tdecimal(_,_,_): true; });
-				if (!onlyDoubles)
+				if (!onlyDoubles  && !onlyLongs)
 					unboxedAt("int",    "Int",    "Integer", hasIntegers, function (p) return switch (p.type) { default: false; case Tinteger(_,_,_): true; });
+				if (!onlyDoubles  && !onlyIntegers)
+					unboxedAt("long",   "Long",   "Long",    hasLongs,    function (p) return switch (p.type) { default: false; case Tlong(_,_,_):    true; });
 			}
 
 			// def copy(...)
@@ -602,6 +612,7 @@ trait "); a(def.name); a(" extends ");
 	      			a("      "); a(p.name.quote()); spaces(longestFieldNameLength - p.name.quote().length); a(" = "); if (!p.lazyInit()) a("try ");
 	      			switch (p.type) {
 	      				case Tinteger(_,_,_): a(   intAt(p, true));
+	      				case    Tlong(_,_,_): a(  longAt(p, true));
 						case Tdecimal(_,_,_): a(doubleAt(p, true));
 						default:
 							if (!p.isArray() && p.isReference()) try {
@@ -630,7 +641,7 @@ trait "); a(def.name); a(" extends ");
 							var name = p.name.quote();
 							a("(if ("); a(name); a(" != null) "); a(name); a(" else this."); a(p.name.quote(p.lazyInit()? "0" : null)); ac(")".code);
 
-						case Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_):
+						case Tbool(_), Tinteger(_,_,_), Tlong(_,_,_), Tdecimal(_,_,_):
 							a(p.name.quote());
 					}
 				}
@@ -807,6 +818,13 @@ trait "); a(def.name); a(" extends ");
 
 			case Tinteger(l,u,s):
 				a("Tinteger(");
+				if (l != null){											a("min = "); a(Std.string(l)); }
+				if (u != null){ if (l != null)				a(", ");	a("max = "); a(Std.string(u)); }
+				if (s != null){ if (u != null || l != null)	a(", ");	a("stride = "); a(Std.string(s)); }
+				ac(")".code);
+
+			case Tlong(l,u,s):
+				a("Tlong(");
 				if (l != null){											a("min = "); a(Std.string(l)); }
 				if (u != null){ if (l != null)				a(", ");	a("max = "); a(Std.string(u)); }
 				if (s != null){ if (u != null || l != null)	a(", ");	a("stride = "); a(Std.string(s)); }
@@ -1029,14 +1047,14 @@ import prime.vo.mutable._
 				case Tarray(_,_,_):
 					emptyChecks.add({expr: "(__"+ p.name +" == null || __"+ p.name +".length == 0)", id: i});
 				
-				case Tstring, TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, Turl, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
+				case Tstring, TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, Turl, TuniqueID, Tinteger(_,_,_), Tlong(_,_,_), Tdecimal(_,_,_), Tbool(_):
 					++nonEmptyChecks;
 				
 				case TenumConverter(_):		throw p;
 				case TclassRef(_):			continue; //throw p;
 			}
 			else switch (p.type) {
-				case TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, Turl, TuniqueID, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
+				case TfileRef, Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, Turl, TuniqueID, Tinteger(_,_,_), Tlong(_,_,_), Tdecimal(_,_,_), Tbool(_):
 					superClassHasBitflags = true;
 				default:
 			}
@@ -1385,7 +1403,7 @@ import prime.vo.mutable._
 	
 	function writeLiteral(type:PType, val:Dynamic) switch (type)
 	{
-		case Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_):
+		case Tbool(_), Tinteger(_,_,_), Tlong(_,_,_), Tdecimal(_,_,_):
 			a(Std.string(val));
 		
 		case TfileRef:
@@ -1423,6 +1441,7 @@ import prime.vo.mutable._
 			'"" + ' + path; //+".toString";
 		case Tstring:				path;
 		case Tinteger(_,_,_):		path;
+		case Tlong(_,_,_):			path;
 		case Tdecimal(_,_,_):		path;
 		case Tbool(_):				path;
 		case Tcolor:				path;
@@ -1620,7 +1639,7 @@ import prime.vo.mutable._
 			case Tstring:
 				add_ifVarNotNull(p.name, '""');
 			
-			case Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, Turl, TuniqueID, TfileRef, Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
+			case Tdate, Tdatetime, Tinterval, Tcolor, Temail, Turi, Turl, TuniqueID, TfileRef, Tinteger(_,_,_), Tlong(_,_,_), Tdecimal(_,_,_), Tbool(_):
 				a('__'); a(p.name);
 			
 			case TclassRef(className):	throw p;
@@ -1736,6 +1755,13 @@ import prime.vo.mutable._
 				if (s != null){ if (u != null || l != null)	a(", ");	a("stride = "); a(Std.string(s)); }
 				ac(")".code);
 			
+			case Tlong(l,u,s):
+				a("Tlong(");
+				if (l != null){											a("min = "); a(Std.string(l)); }
+				if (u != null){ if (l != null)				a(", ");	a("max = "); a(Std.string(u)); }
+				if (s != null){ if (u != null || l != null)	a(", ");	a("stride = "); a(Std.string(s)); }
+				ac(")".code);
+			
 			case Tdecimal(l,u,s):
 				a("Tdecimal(");
 				if (l != null){											a("min = "); a(Std.string(l)); }
@@ -1772,6 +1798,7 @@ import prime.vo.mutable._
 		case TfileRef:				"FileRef";
 		case Tstring:				"ConvertTo.string";
 		case Tinteger(_,_,_):		"ConvertTo.integer";
+		case Tlong(_,_,_):		    "ConvertTo.long";
 		case Tdecimal(_,_,_):		"ConvertTo.decimal";
 		case Tdate:					"ConvertTo.date";
 		case Tdatetime:				"ConvertTo.datetime";
@@ -1810,6 +1837,7 @@ import prime.vo.mutable._
 			"null";
 		
 		case Tinteger(_,_,_):		"0";
+		case Tlong(_,_,_):		    "0L";
 		case Tdecimal(_,_,_):		"Double.NaN";
 		case Tbool(v):				Std.string(v);
 		
@@ -2447,7 +2475,7 @@ class XMLProxyGenerator
 			addPathEscaped(path);
 			a(")");
 			
-		case Tbool(_), Tinteger(_,_,_):
+		case Tbool(_), Tinteger(_,_,_), Tlong(_,_,_):
 			a("new scala.xml.Unparsed(("); addPathEscaped(path); a(").toString)");
 			
 		default:
@@ -2460,6 +2488,7 @@ class XMLProxyGenerator
 	{
 		case Tbool(val):				a("if ("); addPathEscaped(path); a(") 1 else 0");
 		case Tinteger(min,max,stride):	addPathEscaped(path);
+		case Tlong(min,max,stride):		addPathEscaped(path);
 		case Tdecimal(min,max,stride):	addPathEscaped(path); a(".toInt");
 		case Tstring:					addPathEscaped(path); throw "Int String? "+path+" : "+type;
 		case Tcolor:					addPathEscaped(path); a(".toInt");
@@ -2534,6 +2563,8 @@ class ScalaMessagePacking extends MessagePacking
 			case Tarray(_,_,_), Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_), Tstring, Tdate, Tdatetime, Tinterval, Turi, Turl, TuniqueID, Temail, Tcolor, TfileRef:
 				a('o.pack('); a(path); ac(")".code);
 			
+			case Tlong(_,_,_):
+				a('o.packLong('); a(path); ac(")".code);
 			
 			case TenumConverter(_), TclassRef(_):
 				throw "Not implemented";

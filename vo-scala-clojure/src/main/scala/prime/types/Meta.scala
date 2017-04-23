@@ -11,6 +11,7 @@ object Type
 
   case class Tbool      (default:Boolean=false)  extends T
   case class Tinteger   (min:Int=Int.MinValue,  max:Int=Int.MaxValue, stride:Int=0)  extends T
+  case class Tlong      (min:Long=Long.MinValue, max:Long=Long.MaxValue, stride:Long=0)  extends T
   case class Tdecimal   (min:Double=Double.MinValue, max:Double=Double.MaxValue, stride:Double=0)  extends T
 
   case object Tdate      extends T

@@ -59,6 +59,7 @@ class ScalaUtil
 			case TfileRef:				"prime.types.FileRef";
 			case Tstring:				"String";
 			case Tinteger(_,_,_):		"Int";
+			case Tlong(_,_,_):			"Long";
 			case Tdecimal(_,_,_):		"Double";
 			case Tbool(v):				res.defaultValue = v; "Boolean";
 			case TenumConverter(_):		throw t; //"";
@@ -94,6 +95,7 @@ class ScalaUtil
 			case TfileRef:				"prime.types.FileRef";
 			case Tstring:				"String";
 			case Tinteger(_,_,_):		"Int";
+			case Tlong(_,_,_):			"Long";
 			case Tdecimal(_,_,_):		"Double";
 			case Tbool(v):				res.defaultValue = v; "Boolean";
 			case TenumConverter(_):		throw t; //"";
@@ -126,6 +128,7 @@ class ScalaUtil
 			case TfileRef:				"  FileRef";
 			case Tstring:				"   String";
 			case Tinteger(_,_,_):		"  Integer";
+			case Tlong(_,_,_):			"     Long";
 			case Tdecimal(_,_,_):		"  Decimal";
 			case Tbool(v):				"  Boolean";
 			case Temail:				"EmailAddr";

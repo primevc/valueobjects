@@ -72,6 +72,7 @@ class HaxeMessagePacking extends MessagePacking
 		{
 			case Tbool(val):				a('b += o.packBool(');			a(path); ac(")".code);
 			case Tinteger(min,max,stride):	a('b += o.packInt(');			a(path); ac(")".code);
+			case Tlong(min,max,stride):		a('b += o.packInt(');			a(path); ac(")".code);
 			case Tdecimal(min,max,stride):	a('b += o.packDouble(');		a(path); ac(")".code);
 			case Tstring:					a('b += o.packString(');		a(path); ac(")".code);
 			case Tdate:						a('b += o.packDate(');			a(path); ac(")".code);
@@ -510,7 +511,7 @@ class Haxe implements CodeGenerator
 		switch (ptype) {
 			case Tarray(_,_,_), Turi, Turl:
 			
-			case Tinteger(_,_,_), Tdecimal(_,_,_), Tbool(_):
+			case Tinteger(_,_,_), Tlong(_,_,_), Tdecimal(_,_,_), Tbool(_):
 				if (!bindable) nullCheck = null; // Simple types can't be null...
 			
 			default:
@@ -547,7 +548,7 @@ class Haxe implements CodeGenerator
 		case Turi, Turl, TfileRef:
 			path + ".isSet";
 		
-		case Tinteger(_,_,_), Tdecimal(_,_,_):
+		case Tinteger(_,_,_), Tlong(_,_,_), Tdecimal(_,_,_):
 			path + ".isSet()";
 		
 		case Tdef(_):
@@ -1562,6 +1563,7 @@ private class HaxeUtil
 			if (constOnly) null else getClassConstructorCall(Util.unpackPTypedef(type));
 		
 		case Tinteger(_,_,_):		'prime.types.Number.INT_NOT_SET';
+		case Tlong(_,_,_):			'prime.types.Number.INT_NOT_SET';
 //		case Tdecimal(_,_,_):		'prime.types.Number.FLOAT_NOT_SET';
 		case Temail:				"''";
 		
@@ -1581,7 +1583,7 @@ private class HaxeUtil
 	{
 		case Tbool(_), Tcolor:
 			isConstructorArg || bindable;
-		case Tinteger(_,_,_), Tdecimal(_,_,_):
+		case Tinteger(_,_,_), Tlong(_,_,_), Tdecimal(_,_,_):
 			bindable;
 		case Tstring,Tdate,Tdatetime,Tinterval,Turi,Turl,TuniqueID,Temail,TfileRef, Tdef(_), TenumConverter(_), Tarray(_,_,_), TclassRef(_):
 			true;
@@ -1623,6 +1625,7 @@ private class HaxeUtil
 		{
 			case Tbool(val):				constructorArg ? 'Null<Bool>' : 'Bool';
 			case Tinteger(min,max,stride):	'Int';
+			case Tlong   (min,max,stride):	'Int';
 			case Tdecimal(min,max,stride):	'Float';
 			case Tstring:					'String';
 			case Tdate:						'Date';
@@ -1673,6 +1676,7 @@ private class HaxeUtil
 	{
 		case Tbool(val):				'TBool';
 		case Tinteger(min,max,stride):	'TInt';
+		case Tlong(min,max,stride):		'TInt';
 		case Tdecimal(min,max,stride):	'TFloat';
 		case Tstring:					'TClass(String)';
 		case Tdate:						'TClass(Date)';
@@ -1700,7 +1704,7 @@ private class HaxeUtil
 	{
 		return switch (type)
 		{
-			case Tbool(_), Tinteger(_,_,_), Tdecimal(_,_,_):
+			case Tbool(_), Tinteger(_,_,_), Tlong(_,_,_), Tdecimal(_,_,_):
 				path +" == "+ Std.string(val);
 			
 			case Tstring:
@@ -2271,6 +2275,7 @@ private class HaxeXMLMap extends CodeBufferer
 		{
 			case Tbool(val):				"("+path+")? 1:0";
 			case Tinteger(min,max,stride):	path;
+			case Tlong(min,max,stride):		path;
 			case Tdecimal(min,max,stride):	"Std.int("+path+")";
 			case Tstring:					"Std.int("+path+")";
 			case Tcolor:					"Std.int("+path+")";
@@ -2297,6 +2302,7 @@ private class HaxeXMLMap extends CodeBufferer
 		{
 			case Tbool(val):				xmlstring+"toBool("+path+", "+val+")";
 			case Tinteger(min,max,stride):	path;
+			case Tlong(min,max,stride):		path;
 			case Tdecimal(min,max,stride):	path;
 			case Tstring:					path;
 			case Tcolor:					path;
@@ -2332,6 +2338,7 @@ private class HaxeXMLMap extends CodeBufferer
 		{
 			case Tbool(val):				path += ", " + val; xmlstring+prefix+'Bool';
 			case Tinteger(min,max,stride):	xmlstring+prefix+'Int';
+			case Tlong(min,max,stride):		xmlstring+prefix+'Int';
 			case Tdecimal(min,max,stride):	xmlstring+prefix+'Float';
 			case Tstring, TfileRef:			if (prefix == "to") xmlstring+prefix+'String'; else null;
 			case Turi:						if (prefix == "to") { setProp = false; "this." + property + ".parse"; } else xmlstring+prefix+'URI';

@@ -11,6 +11,7 @@
 
   (^boolean contains [this, ^String name, ^int idx])
   (^int     intAt    [this, ^String name, ^int idx] [this, ^String name, ^int idx, ^int    notFound])
+  (^long    longAt   [this, ^String name, ^int idx] [this, ^String name, ^int idx, ^long   notFound])
   (^double  doubleAt [this, ^String name, ^int idx] [this, ^String name, ^int idx, ^double notFound])
   (^Object  anyAt    [this, ^String name, ^int idx] [this, ^String name, ^int idx, ^Object notFound]))
 
@@ -29,10 +30,12 @@
           (^int    typeID   [this, ^int ID] ID)
 
           (^int    intAt    [this, ^String name ^int idx ^int    notFound] (prime.types/to-Integer (.anyAt this name idx notFound)))
+          (^long   longAt   [this, ^String name ^int idx ^long   notFound] (prime.types/to-Long    (.anyAt this name idx notFound)))
           (^double doubleAt [this, ^String name ^int idx ^double notFound] (prime.types/to-Decimal (.anyAt this name idx notFound)))
 
           (^Object anyAt    [this, ^String name ^int idx]  (.anyAt    this name idx nil))
           (^int    intAt    [this, ^String name ^int idx]  (.intAt    this name idx Integer/MIN_VALUE))
+          (^long   longAt   [this, ^String name ^int idx]  (.longAt   this name idx Long/MIN_VALUE))
           (^double doubleAt [this, ^String name ^int idx]  (.doubleAt this name idx Double/NaN))
         ]))
       definitions)))

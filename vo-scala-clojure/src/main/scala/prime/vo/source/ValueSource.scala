@@ -32,10 +32,12 @@ trait ValueSource extends ValueSourceable {
   def anyAt   (name: String, idx: Int, notFound: Any     ): Any;
   def doubleAt(name: String, idx: Int, notFound: Double  ): Double;
   def intAt   (name: String, idx: Int, notFound: Int     ): Int;
+  def longAt  (name: String, idx: Int, notFound: Long    ): Long;
 
   def anyAt   (name: String, idx: Int): Any     =    anyAt(name, idx, null);
   def doubleAt(name: String, idx: Int): Double  = doubleAt(name, idx, Double.NaN);
   def intAt   (name: String, idx: Int): Int     =    intAt(name, idx, Int.MinValue);
+  def longAt  (name: String, idx: Int): Long    =   longAt(name, idx, scala.Long.MinValue);
 
   final def as_source           = this;
   final def as_source(kind:Any) = this;
@@ -45,13 +47,23 @@ trait Integers {
   this : ValueSource =>
 
   final override def anyAt   (name: String, idx: Int, notFound: Any    ): Any     = if (contains(name,idx)) intAt(name, idx) else notFound;
+  final override def longAt  (name: String, idx: Int, notFound: Long   ): Long    = intAt(name, idx, notFound.toInt) toLong
   final override def doubleAt(name: String, idx: Int, notFound: Double ): Double  = intAt(name, idx, notFound.toInt) toDouble
+}
+
+trait Longs {
+  this : ValueSource =>
+
+  final override def anyAt   (name: String, idx: Int, notFound: Any    ): Any     = if (contains(name,idx)) longAt(name, idx) else notFound;
+  final override def intAt   (name: String, idx: Int, notFound: Int    ): Int     = longAt(name, idx, notFound.toLong) toInt
+  final override def doubleAt(name: String, idx: Int, notFound: Double ): Double  = longAt(name, idx, notFound.toLong) toDouble
 }
 
 trait Doubles {
   this : ValueSource =>
 
   final override def anyAt   (name: String, idx: Int, notFound: Any    ): Any     = if (contains(name,idx)) doubleAt(name, idx) else notFound;
+  final override def longAt  (name: String, idx: Int, notFound: Long   ): Long    = doubleAt(name, idx, notFound.toDouble) toLong
   final override def intAt   (name: String, idx: Int, notFound: Int    ): Int     = doubleAt(name, idx, notFound.toDouble) toInt
 }
 
@@ -59,6 +71,7 @@ trait NoPrimitives {
   this : ValueSource =>
 
   final override def intAt   (name: String, idx: Int, notFound: Int    ): Int     = if (contains(name,idx)) Integer(anyAt(name,idx)) else notFound;
+  final override def longAt  (name: String, idx: Int, notFound: Long   ): Long    = if (contains(name,idx))    Long(anyAt(name,idx)) else notFound;
   final override def doubleAt(name: String, idx: Int, notFound: Double ): Double  = if (contains(name,idx)) Decimal(anyAt(name,idx)) else notFound;
 }
 
@@ -66,6 +79,7 @@ trait EmptyValueSource extends ValueSource {
   @inline final def contains (name: String, i: Int)                               = false;
   @inline final def anyAt    (name: String, i: Int, notFound: Any)     : Any      = notFound;
   @inline final def intAt    (name: String, i: Int, notFound: Int)     : Int      = notFound;
+  @inline final def longAt   (name: String, i: Int, notFound: Long)    : Long     = notFound;
   @inline final def doubleAt (name: String, i: Int, notFound: Double)  : Double   = notFound;
 }
 
@@ -140,6 +154,7 @@ class AnonymousValueSource(val values : Any*) extends ValueSource {
   def contains (ignored: String, i: Int): Boolean                     = contains(i);
   def anyAt    (ignored: String, i: Int, notFound: Any)     : Any     = { val idx = (i & 0xFF); if (idx < values.length)         values(idx)  else notFound; }
   def intAt    (ignored: String, i: Int, notFound: Int)     : Int     = { val idx = (i & 0xFF); if (idx < values.length) Integer(values(idx)) else notFound; }
+  def longAt   (ignored: String, i: Int, notFound: Long)    : Long    = { val idx = (i & 0xFF); if (idx < values.length)    Long(values(idx)) else notFound; }
   def doubleAt (ignored: String, i: Int, notFound: Double)  : Double  = { val idx = (i & 0xFF); if (idx < values.length) Decimal(values(idx)) else notFound; }
 
   override def toString(): String = getClass.getName +"("+ values.mkString(",") +")";
@@ -152,5 +167,6 @@ case class SingleValueSource[@specialized(Int,Double) T](key : String, value : T
   def contains (name: String, i: Int)                    : Boolean = contains(name);
   def anyAt    (name: String, i: Int, notFound: Any)     : Any     = if (name == key) value          else notFound;
   def intAt    (name: String, i: Int, notFound: Int)     : Int     = if (name == key) Integer(value) else notFound;
+  def longAt   (name: String, i: Int, notFound: Long)    : Long    = if (name == key)    Long(value) else notFound;
   def doubleAt (name: String, i: Int, notFound: Double)  : Double  = if (name == key) Decimal(value) else notFound;
 }

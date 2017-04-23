@@ -64,6 +64,7 @@ m._class(253, "ValueObjectTest", {_implements: UniqueID}, {
   name:    [16, string],
   owner:   [17, is(".VOTestRef")],
   meta:    [18, is(".ValueObjectTestMeta")],
+  long:    [19, long],
 });
 
 m._class(254, "ValueObjectExtendsTest", {_extends: ".ValueObjectTest", _implements: [Sized, Point]}, {

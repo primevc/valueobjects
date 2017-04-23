@@ -70,6 +70,7 @@ package object types
 
     case class Tbool      (default:Boolean=false)                                                   extends ValueType { val keyword = k("prime.types", "boolean"); def convert(any:Any) = Boolean(any); def klass = java.lang.Boolean.TYPE; }
     case class Tinteger   (min:Int=Int.MinValue,  max:Int=Int.MaxValue, stride:Int=0)               extends ValueType { val keyword = k("prime.types", "integer"); def convert(any:Any) = Integer(any); def klass = java.lang.Integer.TYPE; }
+    case class Tlong      (min:Long=scala.Long.MinValue, max:Long=scala.Long.MaxValue, stride:Long=0L) extends ValueType { val keyword = k("prime.types", "long"); def convert(any:Any) = prime.types.Conversion.Long(any); def klass = java.lang.Long.TYPE; }
     case class Tdecimal   (min:Double=Double.MinValue, max:Double=Double.MaxValue, stride:Double=0) extends ValueType { val keyword = k("prime.types", "decimal"); def convert(any:Any) = Decimal(any); def klass = java.lang .Double.TYPE; }
 
     case object Tdate      extends ValueType { val keyword = k("prime.types", "Date");      def convert(any:Any) = Date(any);      def klass = classOf[Date];      }

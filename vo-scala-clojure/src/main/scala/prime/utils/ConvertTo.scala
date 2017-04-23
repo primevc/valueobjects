@@ -193,11 +193,11 @@ object ConvertTo
   }
   def integer       (value:java.lang.Number) : Int = if (value == null) 0 else value.intValue
   def integer       (value:IntegerType) : Int = value.asInt
-
-  def long          (value:String) : Long = {
-    val v = value.trim
-    if (v.isEmpty) 0 else v.toLong
-  }
+  
+  def long          (value:java.lang.Number) : Long = if (value == null) 0L else value.longValue
+  def long          (value:IntegerType) : Long = value.asLong
+  def long          (value:String) : Long = prime.types.Conversion.Long(value)
+  def long          (value:Any) : Long = prime.types.Conversion.Long(value)
 
   def decimal       (value:Any, format:String = null) : Double = unpack(value) match {
     case v:Double => v

@@ -69,6 +69,7 @@ class HTML implements CodeGenerator
 			case Tdatetime:					'<b>datetime</b>';
 			case Tinterval:					'<b>interval</b>';
 			case Tinteger(min,max,stride):	'<b>integer</b>'+ minmax(min,max);
+			case Tlong(min,max,stride):		'<b>long</b>'+ minmax(min,max);
 			case Tdecimal(min,max,stride):	'<b>decimal</b>'+ minmax(min,max);
 			case Tbool(bool):				'<b>boolean</b><span title="default value">'+bool+'</span>';
 			case TenumConverter(prop):		'<b>conversion </b>' + Lambda.map(prop.enums, function(e:Enumeration){ return "<span>"+ e.name +" &harr; '"+ e.conversions.get(prop.name) +"'</span><br/>"; }).join(" ");

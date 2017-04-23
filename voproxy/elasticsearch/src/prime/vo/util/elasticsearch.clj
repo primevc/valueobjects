@@ -89,6 +89,7 @@
     (case (. valueType keyword)
       :prime.types/boolean    nil
       :prime.types/integer    nil
+      :prime.types/long       nil
       :prime.types/decimal    nil
       :prime.types/Date       nil
       :prime.types/Date+time  nil
@@ -115,6 +116,7 @@
   (case (. valueType keyword)
     :prime.types/boolean    "boolean"
     :prime.types/integer    "integer"
+    :prime.types/long       "long"
     :prime.types/decimal    "double"
     :prime.types/Date       "date"
     :prime.types/Date+time  "date"

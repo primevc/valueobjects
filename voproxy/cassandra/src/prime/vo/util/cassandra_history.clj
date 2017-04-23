@@ -51,6 +51,7 @@
   (case type
     :prime.types/ObjectId   [ :blob       ObjectId->ByteBuffer    ]
     :prime.types/integer    [ :int        prime.types/to-Integer  ]
+    :prime.types/long       [ :bigint     prime.types/to-Long     ]
     :prime.types/Color      [ :int        prime.types/to-Integer  ]
     :prime.types/String     [ :varchar    prime.types/to-String   ]
     :prime.types/URI        [ :varchar    prime.types/to-String   ]
